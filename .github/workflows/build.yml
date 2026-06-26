@@ -23,4 +23,26 @@ jobs:
       - name: Make run.sh executable
         run: chmod +x ./run.sh
       - name: Build with run.sh
-        run: ./run.sh build 
+        run: ./run.sh build
+      # Run the regression suite. Reuses the build's `build/` derivedData and
+      # `SourcePackages/` clone (NOT a fresh resolve) so the FluidAudio
+      # swiftLanguageVersions patch applied by run.sh stays in effect — a fresh
+      # derivedData re-resolves an unpatched FluidAudio, tripping Swift-6
+      # data-race errors and breaking the test target's link. Flags mirror
+      # run.sh's xcodebuild invocation; `-test-without-building` is avoided
+      # because run.sh only builds the app scheme, not the OpenSuperWhisperTests
+      # bundle, so `test` builds the (small) test target against the cached deps.
+      - name: Test OpenSuperWhisperTests (reuse build's derivedData + SourcePackages)
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme OpenSuperWhisper \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath build \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            -skipUnavailableActions \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | xcpretty --simple --color
