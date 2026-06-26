@@ -17,6 +17,9 @@ class IndicatorWindowManager: IndicatorViewDelegate {
     private var anchorFromTop = false
     private var anchorTopY: CGFloat = 0
     private var resizeObserver: NSObjectProtocol?
+    // Recursion-guard backstop (Option C): bounds reposition to one in-flight pass even if
+    // layout scheduling shifts (macOS 26/Tahoe). Nested reposition calls become no-ops.
+    private var isRepositioning = false
 
     private init() {}
     
@@ -87,14 +90,19 @@ class IndicatorWindowManager: IndicatorViewDelegate {
 
             reposition(window: window, screen: screen)
 
-            // Keep the bottom edge anchored as the content (and window) grows upward.
-            if resizeObserver == nil {
-                resizeObserver = NotificationCenter.default.addObserver(
-                    forName: NSWindow.didResizeNotification, object: window, queue: .main
-                ) { [weak self, weak window] _ in
-                    guard let self, let window, let screen = window.screen ?? NSScreen.main else { return }
-                    self.reposition(window: window, screen: screen)
-                }
+            // Re-anchor the bottom/top edge as the content (and window) resizes.
+            // Added fresh on every show() and removed in hide() (see teardown) so the
+            // observer's lifecycle is symmetric with the window's visibility — it never
+            // lingers across show/hide cycles. A lingering observer firing reposition()
+            // during the stop-time settle storm is part of the #11 crash chain.
+            resizeObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResizeNotification, object: window, queue: .main
+            ) { [weak self, weak window] _ in
+                guard let self, let window, let screen = window.screen ?? NSScreen.main else { return }
+                // Re-anchor asynchronously so setFrameOrigin never runs inside the in-flight
+                // layout pass that posted this didResizeNotification — synchronous frame
+                // mutation mid-layout is the #11 re-entrancy that overflowed the stack.
+                self.scheduleReposition(window: window, screen: screen)
             }
         }
 
@@ -114,6 +122,23 @@ class IndicatorWindowManager: IndicatorViewDelegate {
 
         window?.orderFront(nil)
         return newViewModel
+    }
+
+    /// Coalesces re-anchoring to the next runloop turn so `setFrameOrigin` never executes
+    /// inside the layout pass that posted `didResizeNotification`. A burst of resizes (e.g. the
+    /// stop-time settle storm) collapses to a single deferred `reposition` once layout settles,
+    /// and `isRepositioning` bounds reposition to one in-flight pass — no synchronous re-entry.
+    private func scheduleReposition(window: NSWindow, screen: NSScreen) {
+        guard !isRepositioning else { return } // already a deferred reposition pending
+        isRepositioning = true
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self else { return }
+            defer { self.isRepositioning = false }
+            // Re-derive the screen inside the deferred turn — the window may have moved screens
+            // since the notification fired. Falls back to the firing-time screen, then main.
+            guard let window, let resolvedScreen = window.screen ?? screen ?? NSScreen.main else { return }
+            self.reposition(window: window, screen: resolvedScreen)
+        }
     }
 
     private func reposition(window: NSWindow, screen: NSScreen) {
@@ -152,17 +177,27 @@ class IndicatorWindowManager: IndicatorViewDelegate {
 
     func hide() {
         KeyboardShortcuts.disable(.escape)
-        
+
+        // Tear down the resize observer BEFORE the hide animation so the stop-time
+        // settle storm (isVisible spring + scaleEffect/opacity + bubbleWidth collapse)
+        // can't drive any further reposition() calls. The window is already anchored;
+        // the hide-out animation fades/scales in place and does not re-anchor.
+        // (#11: a never-removed observer was the cross-cycle half of the crash chain.)
+        if let resizeObserver {
+            NotificationCenter.default.removeObserver(resizeObserver)
+            self.resizeObserver = nil
+        }
+
         Task {
             guard let viewModel = self.viewModel else { return }
-            
+
             await viewModel.hideWithAnimation()
             viewModel.cleanup()
-            
+
             self.window?.contentView = nil
             self.window?.orderOut(nil)
             self.viewModel = nil
-            
+
             NotificationCenter.default.post(name: .indicatorWindowDidHide, object: nil)
         }
     }
