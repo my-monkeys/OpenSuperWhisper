@@ -7,6 +7,6 @@ diff --git a/Package.swift b/Package.swift
      ],
 +    // Build FluidAudio in Swift 5 mode: swift-tools 6.0 defaults to Swift 6
 +    // strict concurrency, which trips data-race errors (StreamingAsrManager).
-+    swiftLanguageModes: [.v5],
++    swiftLanguageVersions: [.v5],
      cxxLanguageStandard: .cxx17
  )

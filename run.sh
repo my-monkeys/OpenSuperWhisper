@@ -57,14 +57,14 @@ apply_fluidaudio_swift5_mode() {
         exit 1
     fi
 
-    if grep -q "swiftLanguageModes: \[.v5\]" "$target"; then
+    if grep -q "swiftLanguageVersions: \[.v5\]" "$target"; then
         echo "FluidAudio Swift 5 mode patch already applied."
         return
     fi
 
     echo "Applying FluidAudio Swift 5 mode patch..."
     patch --silent --forward -d "$checkout" -p1 < "$patch_file"
-    if [[ $? -ne 0 ]] && ! grep -q "swiftLanguageModes: \[.v5\]" "$target"; then
+    if [[ $? -ne 0 ]] && ! grep -q "swiftLanguageVersions: \[.v5\]" "$target"; then
         echo "Failed to apply FluidAudio Swift 5 mode patch."
         exit 1
     fi
