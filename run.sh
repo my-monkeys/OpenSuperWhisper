@@ -36,6 +36,40 @@ apply_fluidaudio_patches() {
     fi
 }
 
+# Patch FluidAudio's Package.swift to build in Swift 5 mode. FluidAudio
+# declares swift-tools-version: 6.0, which defaults to Swift 6 strict
+# concurrency and trips data-race errors in StreamingAsrManager — while the
+# OpenSuperWhisper host target is SWIFT_VERSION=5.0. Building the dependency
+# in the host's (lenient) Swift 5 mode avoids that. Idempotent; fails loudly
+# if the target moved (so a FluidAudio bump can't silently skip it).
+apply_fluidaudio_swift5_mode() {
+    local checkout="SourcePackages/checkouts/FluidAudio"
+    local patch_file="patches/fluidaudio-swift5-mode.patch"
+    local target="$checkout/Package.swift"
+
+    if [[ ! -f "$patch_file" ]]; then
+        echo "Missing FluidAudio patch: $patch_file"
+        exit 1
+    fi
+
+    if [[ ! -f "$target" ]]; then
+        echo "Missing FluidAudio Package.swift: $target"
+        exit 1
+    fi
+
+    if grep -q "swiftLanguageModes: \[.v5\]" "$target"; then
+        echo "FluidAudio Swift 5 mode patch already applied."
+        return
+    fi
+
+    echo "Applying FluidAudio Swift 5 mode patch..."
+    patch --silent --forward -d "$checkout" -p1 < "$patch_file"
+    if [[ $? -ne 0 ]] && ! grep -q "swiftLanguageModes: \[.v5\]" "$target"; then
+        echo "Failed to apply FluidAudio Swift 5 mode patch."
+        exit 1
+    fi
+}
+
 # Configure libwhisper
 echo "Configuring libwhisper..."
 cmake -G Xcode -B libwhisper/build -S libwhisper
@@ -77,6 +111,8 @@ if [[ $? -ne 0 ]]; then
 fi
 
 apply_fluidaudio_patches
+
+apply_fluidaudio_swift5_mode
 
 # Build the app
 echo "Building OpenSuperWhisper..."
