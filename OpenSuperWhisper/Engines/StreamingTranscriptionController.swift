@@ -26,6 +26,16 @@ final class StreamingTranscriptionController: ObservableObject {
 
     private init() {}
 
+    /// TEST-ONLY injection point for the live-caption text. Drives the same `@Published`
+    /// properties the real streaming callback writes (see the `onUpdate` path), so the hosted
+    /// `IndicatorWindow` re-evaluates `bubbleWidth` and the hosting controller re-probes
+    /// `preferredContentSize` exactly as a live session would — without a microphone. Reachable
+    /// only via `@testable import` (it is `internal`, not `public`); no production caller uses it.
+    func _testInjectCaption(confirmed: String, volatile: String = "") {
+        confirmedText = confirmed
+        volatileText = volatile
+    }
+
     /// Starts streaming. Throws if models/mic can't be set up — callers should fall back to the
     /// file-based flow. `boostTerms` (the custom dictionary's terms) bias recognition when present.
     func start(boostTerms: [String]) async throws {
