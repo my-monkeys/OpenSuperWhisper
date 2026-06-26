@@ -17,9 +17,16 @@ class IndicatorWindowManager: IndicatorViewDelegate {
     private var anchorFromTop = false
     private var anchorTopY: CGFloat = 0
     private var resizeObserver: NSObjectProtocol?
+    // True while a deferred reposition is pending (set before the async dispatch, cleared in its
+    // defer). NOT "currently repositioning" — it marks that one reposition is already scheduled
+    // for the next runloop, so a nested didResizeNotification during the same burst is a no-op.
     // Recursion-guard backstop (Option C): bounds reposition to one in-flight pass even if
-    // layout scheduling shifts (macOS 26/Tahoe). Nested reposition calls become no-ops.
-    private var isRepositioning = false
+    // layout scheduling shifts (macOS 26/Tahoe).
+    private var isRepositionPending = false
+    // One-shot: if the guard above ever drops a nested call, log it ONCE. A trip means a
+    // residual layout loop is being coalesced on this macOS build — the only in-the-field
+    // signal that Option C is doing work (the async dispatch alone wasn't enough).
+    private var hasLoggedRepositionPendingTrip = false
 
     private init() {}
     
@@ -127,13 +134,23 @@ class IndicatorWindowManager: IndicatorViewDelegate {
     /// Coalesces re-anchoring to the next runloop turn so `setFrameOrigin` never executes
     /// inside the layout pass that posted `didResizeNotification`. A burst of resizes (e.g. the
     /// stop-time settle storm) collapses to a single deferred `reposition` once layout settles,
-    /// and `isRepositioning` bounds reposition to one in-flight pass — no synchronous re-entry.
+    /// and `isRepositionPending` bounds reposition to one in-flight pass — no synchronous re-entry.
     private func scheduleReposition(window: NSWindow, screen: NSScreen) {
-        guard !isRepositioning else { return } // already a deferred reposition pending
-        isRepositioning = true
+        guard !isRepositionPending else {
+            // A nested reposition arrived while one was already pending — the guard dropped it.
+            // Log once so a residual layout loop (a sign the async dispatch alone isn't fully
+            // breaking re-entry on this macOS build) is observable in unified logging:
+            //   log show --predicate 'subsystem == "fr.my-monkey.opensuperwhisper"' --last 30m
+            if !hasLoggedRepositionPendingTrip {
+                hasLoggedRepositionPendingTrip = true
+                Diag.log.fault("Indicator reposition recursion-guard tripped — nested layout re-entry coalesced (#11)")
+            }
+            return
+        }
+        isRepositionPending = true
         DispatchQueue.main.async { [weak self, weak window] in
             guard let self else { return }
-            defer { self.isRepositioning = false }
+            defer { self.isRepositionPending = false }
             // Re-derive the screen inside the deferred turn — the window may have moved screens
             // since the notification fired. Falls back to the firing-time screen, then main.
             guard let window, let resolvedScreen = window.screen ?? screen ?? NSScreen.main else { return }

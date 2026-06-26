@@ -14,7 +14,7 @@ import XCTest
 ///   (1) observer add/remove symmetry — added fresh on `show()`, removed in `hide()`;
 ///   (2) `scheduleReposition` dispatches `reposition` to the next runloop turn so
 ///       `setFrameOrigin` never runs inside the layout pass that posted the notification;
-///   (3) `isRepositioning` recursion-guard coalesces a nested burst.
+///   (3) `isRepositionPending` recursion-guard coalesces a nested burst.
 ///
 /// These tests assert the OBSERVABLE contracts of that fix, not the private flags:
 ///   - observer removed on hide() → no reposition after teardown
@@ -114,7 +114,7 @@ final class IndicatorLayoutRecursionTests: XCTestCase {
         drainMainRunloop(seconds: 0.1) // let the initial show() reposition settle
         let baseline = FrameOriginCounter.shared.count
 
-        // Burst of resizes while visible — scheduleReposition's isRepositioning guard
+        // Burst of resizes while visible — scheduleReposition's isRepositionPending guard
         // coalesces these to a SINGLE deferred reposition.
         for _ in 0..<6 {
             NotificationCenter.default.post(
