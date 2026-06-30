@@ -48,9 +48,16 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             self.window = panel
         }
         
-        // Host with a controller that resizes the window to fit the SwiftUI content.
-        let hostingController = NSHostingController(rootView: IndicatorWindow(viewModel: newViewModel))
-        hostingController.sizingOptions = [.preferredContentSize]
+        // Host the SwiftUI content and size the window to it *ourselves* (see `resizeToContent`).
+        // We deliberately do NOT use `sizingOptions = [.preferredContentSize]`: that auto-resize
+        // runs animated on macOS 26 (NSHostingView.updateAnimatedWindowSize) and recurses into
+        // layout until the main-thread stack overflows — the #11/#15/#19 crash.
+        let hostingController = NSHostingController(
+            rootView: IndicatorWindow(viewModel: newViewModel) { [weak self] size in
+                self?.resizeToContent(size)
+            }
+        )
+        hostingController.sizingOptions = []
         window?.contentViewController = hostingController
 
         // Position window - use the screen containing the point, or main screen as fallback
@@ -114,6 +121,22 @@ class IndicatorWindowManager: IndicatorViewDelegate {
 
         window?.orderFront(nil)
         return newViewModel
+    }
+
+    /// Sizes the indicator window to its SwiftUI content, *non-animated*. This replaces
+    /// NSHostingView's `.preferredContentSize` auto-resize, whose animated variant recurses into
+    /// layout and overflows the main-thread stack on macOS 26 (#11/#15/#19). `setContentSize`
+    /// snaps in a single pass, so no SwiftUI animation can ever drive a window resize.
+    private func resizeToContent(_ size: CGSize) {
+        guard let window, size.width > 1, size.height > 1 else { return }
+        let newSize = NSSize(width: ceil(size.width), height: ceil(size.height))
+        let current = window.contentRect(forFrameRect: window.frame).size
+        if abs(current.width - newSize.width) > 0.5 || abs(current.height - newSize.height) > 0.5 {
+            window.setContentSize(newSize)
+        }
+        if let screen = window.screen ?? NSScreen.main {
+            reposition(window: window, screen: screen)
+        }
     }
 
     private func reposition(window: NSWindow, screen: NSScreen) {
