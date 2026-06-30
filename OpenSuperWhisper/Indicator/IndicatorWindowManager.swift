@@ -5,7 +5,13 @@ import SwiftUI
 @MainActor
 class IndicatorWindowManager: IndicatorViewDelegate {
     static let shared = IndicatorWindowManager()
-    
+
+    /// The indicator window is sized manually (see `resizeToContent`) — NEVER via NSHostingView's
+    /// `.preferredContentSize` auto-resize. That auto-resize animates the window frame on macOS 26
+    /// (`NSHostingView.updateAnimatedWindowSize`) and recurses into layout until the main-thread
+    /// stack overflows (#11/#15/#19). Must stay empty; `IndicatorLayoutRecursionTests` guards it.
+    nonisolated static let hostingSizingOptions: NSHostingSizingOptions = []
+
     var window: NSWindow?
     var viewModel: IndicatorViewModel?
 
@@ -57,7 +63,7 @@ class IndicatorWindowManager: IndicatorViewDelegate {
                 self?.resizeToContent(size)
             }
         )
-        hostingController.sizingOptions = []
+        hostingController.sizingOptions = Self.hostingSizingOptions
         window?.contentViewController = hostingController
 
         // Position window - use the screen containing the point, or main screen as fallback
