@@ -432,7 +432,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
            AppContextModelRules.rule(for: bundleID, host: context.host) != option {
             promptForModelScope(option, bundleID: bundleID, host: context.host, scopeLabel: scopeLabel)
         } else {
-            ModelCatalog.activate(option)
+            MainActor.assumeIsolated { ModelSelectionStore.shared.select(option) }
         }
         populateModelSubmenu()
     }
@@ -459,11 +459,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         case .alertFirstButtonReturn:
             // System default — change the active model everywhere (scopes with
             // their own rule still win); drop any pending one-time override.
-            ModelCatalog.activate(option)
+            MainActor.assumeIsolated { ModelSelectionStore.shared.select(option) }
             RecordingContext.shared.clearOneTimeModel(for: bundleID)
         case .alertSecondButtonReturn:
             // Default for this scope (site or app) — apply now and persist.
-            ModelCatalog.activate(option)
+            MainActor.assumeIsolated { ModelSelectionStore.shared.select(option) }
             AppContextModelRules.set(option, for: bundleID, host: host)
             RecordingContext.shared.clearOneTimeModel(for: bundleID)
         case .alertThirdButtonReturn:

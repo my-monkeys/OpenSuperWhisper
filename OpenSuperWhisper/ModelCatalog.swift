@@ -125,5 +125,8 @@ enum ModelCatalog {
         Task { @MainActor in
             TranscriptionService.shared.reloadEngine()
         }
+        // AppPreferences is the source of truth for the active model; tell any open
+        // Settings window to reflect this change (it caches its own @Published copies).
+        NotificationCenter.default.post(name: .modelSelectionDidChange, object: nil)
     }
 }

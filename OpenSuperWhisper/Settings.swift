@@ -7,8 +7,15 @@ import SwiftUI
 import FluidAudio
 
 class SettingsViewModel: ObservableObject {
+    /// True while re-syncing the @Published copies from AppPreferences (e.g. after the
+    /// menu-bar Model picker changed the active model). Suppresses the model didSets'
+    /// side effects so the sync doesn't write back, double-reload, or clobber the engine.
+    private var isSyncing = false
+    private var modelSyncObserver: NSObjectProtocol?
+
     @Published var selectedEngine: String {
         didSet {
+            guard !isSyncing else { return }
             AppPreferences.shared.selectedEngine = selectedEngine
             if selectedEngine == "whisper" {
                 loadAvailableModels()
@@ -24,6 +31,7 @@ class SettingsViewModel: ObservableObject {
     
     @Published var fluidAudioModelVersion: String {
         didSet {
+            guard !isSyncing else { return }
             AppPreferences.shared.fluidAudioModelVersion = fluidAudioModelVersion
             // Clicking a Parakeet model activates the Parakeet engine (browse ≠ select).
             if selectedEngine != "fluidaudio" {
@@ -40,6 +48,7 @@ class SettingsViewModel: ObservableObject {
     
     @Published var selectedModelURL: URL? {
         didSet {
+            guard !isSyncing else { return }
             if let url = selectedModelURL {
                 AppPreferences.shared.selectedWhisperModelPath = url.path
             }
@@ -57,6 +66,7 @@ class SettingsViewModel: ObservableObject {
 
     @Published var remoteServerModel: String {
         didSet {
+            guard !isSyncing else { return }
             AppPreferences.shared.remoteServerModel = remoteServerModel
             reloadRemoteEngineIfSelected()
         }
@@ -542,8 +552,45 @@ class SettingsViewModel: ObservableObject {
         loadAvailableModels()
         initializeDownloadableModels()
         initializeFluidAudioModels()
+
+        // Reflect external model changes (the menu-bar Model picker) while Settings is open.
+        modelSyncObserver = NotificationCenter.default.addObserver(
+            forName: .modelSelectionDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.syncModelSelectionFromPreferences()
+        }
     }
-    
+
+    deinit {
+        if let modelSyncObserver {
+            NotificationCenter.default.removeObserver(modelSyncObserver)
+        }
+    }
+
+    /// Re-read the active engine/model from AppPreferences (the source of truth) into the
+    /// @Published copies, without triggering their write-back/reload side effects. Keeps an
+    /// open Settings window in sync when the menu-bar Model picker changes the selection.
+    func syncModelSelectionFromPreferences() {
+        let prefs = AppPreferences.shared
+        let newURL = (prefs.selectedWhisperModelPath ?? prefs.selectedModelPath).map { URL(fileURLWithPath: $0) }
+        guard selectedEngine != prefs.selectedEngine
+            || fluidAudioModelVersion != prefs.fluidAudioModelVersion
+            || remoteServerModel != prefs.remoteServerModel
+            || selectedModelURL != newURL else { return }
+
+        isSyncing = true
+        selectedEngine = prefs.selectedEngine
+        fluidAudioModelVersion = prefs.fluidAudioModelVersion
+        remoteServerModel = prefs.remoteServerModel
+        selectedModelURL = newURL
+        isSyncing = false
+
+        // Refresh the model list shown for the now-active engine.
+        if selectedEngine == "whisper" { loadAvailableModels() }
+        else if selectedEngine == "fluidaudio" { initializeFluidAudioModels() }
+        clampLanguageToSupported()
+    }
+
     func initializeFluidAudioModels() {
         downloadableFluidAudioModels = SettingsFluidAudioModels.availableModels.map { model in
             var updatedModel = model
