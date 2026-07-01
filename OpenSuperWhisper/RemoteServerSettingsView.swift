@@ -149,50 +149,81 @@ struct RemoteServerSettingsView: View {
 
     /// Inner content of the "Local fallback" disclosure: use a downloaded on-device model
     /// when the remote server is unreachable (e.g. off-network). Off by default.
+    /// Any on-device model downloaded at all — gates whether the fallback feature is
+    /// even offered (no local model → nothing to fall back to).
+    private var hasAnyLocalModel: Bool {
+        !(ModelCatalog.whisperModels() + ModelCatalog.parakeetModels() + ModelCatalog.senseVoiceModels()).isEmpty
+    }
+
     @ViewBuilder private var fallbackBody: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle("Use a local model when the server is unreachable",
-                   isOn: $viewModel.remoteFallbackEnabled)
-                .toggleStyle(.switch)
-
-            if viewModel.remoteFallbackEnabled {
-                let models = localFallbackModels
-                if models.isEmpty {
-                    Text(viewModel.translateToEnglish
-                         ? "Translate to English is on, but no Whisper model is downloaded — only Whisper supports translation. Download one under Engine & Model."
-                         : "No on-device models downloaded. Download a Whisper or Parakeet model under Engine & Model to enable fallback.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    HStack {
-                        Text("Fallback model").foregroundColor(.secondary)
-                        Spacer()
-                        Picker("", selection: $viewModel.remoteFallbackModel) {
-                            Text("Select…").tag(DictationModelOption?.none)
-                            ForEach(models, id: \.self) { model in
-                                Text(model.displayName).tag(DictationModelOption?.some(model))
-                            }
-                        }
+            if !hasAnyLocalModel {
+                // No on-device model to fall back to — don't show the toggle; explain why.
+                Text("To enable local fallback, download an on-device model first (Engine & Model → download a Whisper or Parakeet model).")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack {
+                    Text("Use a local model when the server is unreachable")
+                    Spacer(minLength: 8)
+                    Toggle("", isOn: $viewModel.remoteFallbackEnabled)
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
                         .labelsHidden()
-                        .fixedSize()
-                    }
+                }
 
-                    if viewModel.translateToEnglish {
-                        Text("Translate to English is on, so only Whisper models are offered — Parakeet and SenseVoice can't translate.")
+                if viewModel.remoteFallbackEnabled {
+                    let models = localFallbackModels
+                    if models.isEmpty {
+                        // Has a local model, but translate-on filtered them all out (no Whisper).
+                        Text("Translate to English is on, but no Whisper model is downloaded — only Whisper supports translation. Download one under Engine & Model.")
                             .font(.caption)
-                            .foregroundColor(.orange)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        HStack {
+                            Text("Fallback model").foregroundColor(.secondary)
+                            Spacer(minLength: 8)
+                            Picker("", selection: $viewModel.remoteFallbackModel) {
+                                ForEach(models, id: \.self) { model in
+                                    Text(model.displayName).tag(DictationModelOption?.some(model))
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+
+                        if viewModel.translateToEnglish {
+                            Text("Translate to English is on, so only Whisper models are offered — Parakeet and SenseVoice can't translate.")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Text("Only downloaded on-device models are listed. To add one, use Engine & Model → download.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-
-                    Text("Only downloaded on-device models are listed. To add one, use Engine & Model → download.")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 6)
+        .onAppear { ensureFallbackSelection() }
+        .onChange(of: viewModel.remoteFallbackEnabled) { _, _ in ensureFallbackSelection() }
+        .onChange(of: viewModel.translateToEnglish) { _, _ in ensureFallbackSelection() }
+    }
+
+    /// When fallback is enabled, guarantee a valid model is selected (the only one, or
+    /// the first) — an empty selection is functionally disabled, so we never leave it
+    /// blank. Re-runs when Translate flips, since that changes the eligible set.
+    private func ensureFallbackSelection() {
+        guard viewModel.remoteFallbackEnabled else { return }
+        let models = localFallbackModels
+        guard !models.isEmpty else { return }
+        if let current = viewModel.remoteFallbackModel, models.contains(current) { return }
+        viewModel.remoteFallbackModel = models.first
     }
 
     private var timeoutBody: some View {
