@@ -10,6 +10,15 @@ class FluidAudioEngine: TranscriptionEngine {
     private var isCancelled = false
     private var transcriptionTask: Task<String, Error>?
     private var progressTask: Task<Void, Never>?
+
+    /// When set ("v2"/"v3"), overrides the pref-selected model version — lets the
+    /// remote local-fallback build an engine for a specific model without mutating
+    /// global prefs.
+    private let versionOverride: String?
+
+    init(versionOverride: String? = nil) {
+        self.versionOverride = versionOverride
+    }
     
     var onProgressUpdate: ((Float) -> Void)?
     
@@ -18,9 +27,9 @@ class FluidAudioEngine: TranscriptionEngine {
     }
     
     func initialize() async throws {
-        let versionString = AppPreferences.shared.fluidAudioModelVersion
+        let versionString = versionOverride ?? AppPreferences.shared.fluidAudioModelVersion
         let version: AsrModelVersion = versionString == "v2" ? .v2 : .v3
-        
+
         let models = try await AsrModels.downloadAndLoad(version: version)
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)

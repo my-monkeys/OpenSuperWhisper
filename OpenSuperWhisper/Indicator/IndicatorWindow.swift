@@ -1,3 +1,4 @@
+import AVFoundation
 import Cocoa
 import Combine
 import SwiftUI
@@ -115,6 +116,13 @@ class IndicatorViewModel: ObservableObject {
             return
         }
 
+        // Capture where the dictation is happening (frontmost app, browser site/URL,
+        // window title) and apply any context-aware model rule before recording. This
+        // runs AppleScript/Accessibility synchronously on the main thread; it's quick,
+        // but see the note in RecordingContext.captureFrontmost. (F2/F3)
+        RecordingContext.shared.captureFrontmost()
+        ContextModelSwitcher.applyForCurrentContext()
+
         // Show recording immediately and optimistically. Whether the mic needs a
         // connection is decided off the main thread inside `recorder.startRecording()`
         // (it touches AVFoundation/CoreAudio, which can stall); the recorder then
@@ -148,6 +156,13 @@ class IndicatorViewModel: ObservableObject {
 
     static var shouldUseLiveStreaming: Bool {
         AppPreferences.shared.liveTranscriptionEnabled && AppPreferences.shared.selectedEngine == "fluidaudio"
+    }
+
+    /// Real duration of a saved audio file, in seconds (0 if it can't be read).
+    nonisolated static func audioDuration(of url: URL) async -> TimeInterval {
+        guard let seconds = try? await AVURLAsset(url: url).load(.duration) else { return 0 }
+        let value = CMTimeGetSeconds(seconds)
+        return value.isFinite ? value : 0
     }
 
     func startDecoding() {
@@ -215,19 +230,10 @@ class IndicatorViewModel: ObservableObject {
                         try recorder.moveTemporaryRecording(from: tempURL, to: finalURL)
                         hookAudioPath = finalURL.path
 
-                        // Save the recording to store
-                        await MainActor.run {
-                            self.recordingStore.addRecording(Recording(
-                                id: recordingId,
-                                timestamp: timestamp,
-                                fileName: fileName,
-                                transcription: text,
-                                duration: 0,
-                                status: .completed,
-                                progress: 1.0,
-                                sourceFileURL: nil
-                            ))
-                        }
+                        await self.storeRecording(
+                            id: recordingId, timestamp: timestamp, fileName: fileName,
+                            finalURL: finalURL, transcription: text,
+                            status: .completed, progress: 1.0)
                     } else {
                         // Delete the temporary recording immediately
                         try? FileManager.default.removeItem(at: tempURL)
@@ -257,6 +263,19 @@ class IndicatorViewModel: ObservableObject {
                     return
                 } catch {
                     print("Error transcribing audio: \(error)")
+                    // Don't lose the audio on failure (e.g. an intermittent remote 405 /
+                    // network blip after a long dictation). When history is on, keep the
+                    // recording with a .failed status + retry message so it shows in the log
+                    // and can be re-run with the regenerate (↻) button. Otherwise discard.
+                    if AppPreferences.shared.saveTranscriptionHistory,
+                       let saved = self.persistFailedRecording(tempURL: tempURL) {
+                        await self.storeRecording(
+                            id: saved.id, timestamp: saved.timestamp, fileName: saved.fileName,
+                            finalURL: saved.url, transcription: "Transcription failed — click ↻ to try again.",
+                            status: .failed, progress: 0)
+                    } else {
+                        try? FileManager.default.removeItem(at: tempURL)
+                    }
                     await MainActor.run {
                         self.showError("Transcription failed: \(error.localizedDescription)")
                     }
@@ -264,9 +283,9 @@ class IndicatorViewModel: ObservableObject {
                 }
             }
         } else {
-            
+
             print("!!! Not found record url !!!")
-            
+
             Task {
                 await MainActor.run {
                     self.delegate?.didFinishDecoding()
@@ -274,7 +293,63 @@ class IndicatorViewModel: ObservableObject {
             }
         }
     }
-    
+
+    /// Insert a recording (already at its final URL) into the store with the measured
+    /// audio duration and the captured source context (app / window / URL / model used).
+    /// Shared by the success and failure paths so their metadata wiring can't drift.
+    private func storeRecording(id: UUID, timestamp: Date, fileName: String, finalURL: URL,
+                                transcription: String, status: RecordingStatus, progress: Float) async {
+        let realDuration = await Self.audioDuration(of: finalURL)
+        let ctx = RecordingContext.shared
+        // The model that actually produced the text (which is the local fallback, not
+        // the configured remote model, when the server was unreachable).
+        let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
+        let wasFallback = transcriptionService.lastUsedFallback
+        await MainActor.run {
+            self.recordingStore.addRecording(Recording(
+                id: id,
+                timestamp: timestamp,
+                fileName: fileName,
+                transcription: transcription,
+                duration: realDuration,
+                status: status,
+                progress: progress,
+                sourceFileURL: nil,
+                sourceAppName: ctx.appName,
+                sourceWindowTitle: ctx.windowTitle,
+                sourceURL: ctx.fullURL,
+                modelUsed: modelUsed,
+                wasFallback: wasFallback
+            ))
+        }
+    }
+
+    /// Move a temp recording to its permanent location after a FAILED transcription
+    /// so the audio survives and can be re-run from the history list. Returns the
+    /// saved identity, or nil if the file move failed (then the temp is discarded).
+    private func persistFailedRecording(tempURL: URL) -> (id: UUID, timestamp: Date, fileName: String, url: URL)? {
+        let timestamp = Date()
+        let fileName = "\(Int(timestamp.timeIntervalSince1970)).wav"
+        let id = UUID()
+        let finalURL = Recording(
+            id: id,
+            timestamp: timestamp,
+            fileName: fileName,
+            transcription: "",
+            duration: 0,
+            status: .failed,
+            progress: 0,
+            sourceFileURL: nil
+        ).url
+        do {
+            try recorder.moveTemporaryRecording(from: tempURL, to: finalURL)
+            return (id, timestamp, fileName, finalURL)
+        } catch {
+            print("Failed to persist failed recording: \(error)")
+            return nil
+        }
+    }
+
     /// Returns `true` when auto-paste ran but no editable field was focused,
     /// so the caller can surface a "copied — press ⌘V" notice. When no target
     /// is found, typing is skipped and the text is left on the clipboard.
@@ -398,6 +473,25 @@ struct RecordingIndicator: View {
     }
 }
 
+/// Pointing-hand cursor while hovering (macOS 14 predates SwiftUI's .pointerStyle).
+/// Pops on disappear too, so the cursor never sticks when the bubble goes away
+/// mid-hover (e.g. after clicking Stop).
+private struct PointerCursorModifier: ViewModifier {
+    @State private var hovering = false
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onDisappear { if hovering { NSCursor.pop(); hovering = false } }
+    }
+}
+
+extension View {
+    func pointerCursorOnHover() -> some View { modifier(PointerCursorModifier()) }
+}
+
 /// Reports the indicator bubble's laid-out size (before the entrance render transforms) so the
 /// window manager can size the panel itself — see the note on `.onPreferenceChange` below.
 private struct IndicatorContentSizeKey: PreferenceKey {
@@ -430,10 +524,58 @@ struct IndicatorWindow: View {
             return hasCaption ? max(notch.width, 440) : notch.width
         }
         let live = viewModel.state == .recording && IndicatorViewModel.shouldUseLiveStreaming
-        return live ? 380 : 200
+        if live { return 380 }
+        // Widen the recording pill to fit any enabled on-bubble buttons so the
+        // "Recording…" label never wraps; compact (200) otherwise.
+        var width: CGFloat = 200
+        if viewModel.state == .recording {
+            if AppPreferences.shared.showStopButtonOnIndicator { width += 20 }
+            if AppPreferences.shared.showCancelButtonOnIndicator { width += 20 }
+        }
+        return width
     }
     
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
+
+    /// Opt-in on-bubble controls (default off). Shown on the trailing side while
+    /// recording. Stop = stop & transcribe (same as the hotkey toggle); Cancel =
+    /// discard (same as the Esc cancel shortcut). Fixed-size, so they don't couple
+    /// the bubble's size to the window (see the recursion-crash note above).
+    private var anyIndicatorButton: Bool {
+        AppPreferences.shared.showStopButtonOnIndicator
+            || AppPreferences.shared.showCancelButtonOnIndicator
+    }
+
+    @ViewBuilder private var indicatorControls: some View {
+        HStack(spacing: 8) {
+            if AppPreferences.shared.showStopButtonOnIndicator {
+                Button { IndicatorWindowManager.shared.stopRecording() } label: {
+                    // A red ring with a red stop square inside (transparent interior).
+                    Image(systemName: "stop.circle")
+                        .font(.system(size: 19, weight: .regular))
+                        .foregroundColor(.red)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointerCursorOnHover()
+                .help("Finish recording")
+            }
+            if AppPreferences.shared.showCancelButtonOnIndicator {
+                Button { IndicatorWindowManager.shared.stopForce() } label: {
+                    // A plain red trash can — discard without transcribing.
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundColor(.red)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointerCursorOnHover()
+                .help("Cancel recording")
+            }
+        }
+    }
 
     var body: some View {
 
@@ -452,9 +594,7 @@ struct IndicatorWindow: View {
                     
                     Text("Connecting...")
                         .font(.system(size: 13, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
+                }                
             case .recording:
                 if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
@@ -464,6 +604,10 @@ struct IndicatorWindow: View {
                         Text("Recording…")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.secondary)
+                        if anyIndicatorButton {
+                            Spacer(minLength: 8)
+                            indicatorControls
+                        }
                     }
                 } else {
                     // Once text starts, drop the label: just the dot + the text, which grows
@@ -478,20 +622,24 @@ struct IndicatorWindow: View {
                             .font(.system(size: 14))
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(width: 300, alignment: .leading)
+                        if anyIndicatorButton {
+                            Spacer(minLength: 8)
+                            indicatorControls
+                        }
                     }
                 }
 
             case .decoding:
+                // Keep the same height as the recording state (the spinner's intrinsic
+                // height is capped) so the bubble doesn't jump taller when transcribing.
                 HStack(spacing: 8) {
                     ProgressView()
-                        .scaleEffect(0.7)
-                        .frame(width: 24)
-                    
+                        .controlSize(.small)
+                        .frame(width: 24, height: 16)
+
                     Text("Transcribing...")
                         .font(.system(size: 13, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
+                }                
             case .busy:
                 HStack(spacing: 8) {
                     Image(systemName: "hourglass")
@@ -501,9 +649,7 @@ struct IndicatorWindow: View {
                     Text("Processing...")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.orange)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
+                }                
             case .error(let message):
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -514,8 +660,6 @@ struct IndicatorWindow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.red)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             case .info(let message):
                 HStack(spacing: 8) {
                     Image(systemName: "doc.on.clipboard")
@@ -526,8 +670,6 @@ struct IndicatorWindow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.primary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             case .idle:
                 EmptyView()
             }

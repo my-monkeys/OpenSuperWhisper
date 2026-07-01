@@ -105,10 +105,11 @@ class AppState: ObservableObject {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableObject {
     private var statusItem: NSStatusItem?
     private var mainWindow: NSWindow?
     private var languageSubmenu: NSMenu?
+    private var modelSubmenu: NSMenu?
     private var microphoneService = MicrophoneService.shared
     private var microphoneObserver: AnyCancellable?
     
@@ -208,7 +209,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func updateStatusBarMenu() {
         let menu = NSMenu()
         
-        menu.addItem(NSMenuItem(title: "OpenSuperWhisper", action: #selector(openApp), keyEquivalent: "o"))
+        let openItem = NSMenuItem(title: "Open Window", action: #selector(openApp), keyEquivalent: "o")
+        openItem.target = self   // without a target macOS disables the item (it did nothing)
+        menu.addItem(openItem)
 
         let transcriptionLanguageItem = NSMenuItem(title: NSLocalizedString("Language", comment: ""), action: nil, keyEquivalent: "")
         languageSubmenu = NSMenu()
@@ -229,12 +232,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         transcriptionLanguageItem.submenu = languageSubmenu
         menu.addItem(transcriptionLanguageItem)
 
-        // Translation needs a Whisper-class model; Parakeet/SenseVoice only transcribe in the source
-        // language (#124), and Groq translates only on whisper-large-v3 (not turbo). Off those, gray
-        // the item out and say why instead of silently ignoring it.
+        // Translation needs a Whisper-class model or a remote server; Parakeet/SenseVoice only
+        // transcribe in the source language (#124). Off those, gray the item out and say why
+        // instead of silently ignoring it.
         let engine = AppPreferences.shared.selectedEngine
-        let translateSupported = EngineCapabilities.supportsTranslation(
-            engine: engine, groqModel: AppPreferences.shared.groqModel)
+        let translateSupported = EngineCapabilities.supportsTranslation(engine: engine)
         let translateItem = NSMenuItem(
             title: translateSupported
                 ? NSLocalizedString("Translate to English", comment: "")
@@ -244,6 +246,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         translateItem.target = self
         translateItem.state = (translateSupported && AppPreferences.shared.translateToEnglish) ? .on : .off
         menu.addItem(translateItem)
+
+        // Model picker — quick cross-engine switch. Its items are (re)built each time
+        // the submenu opens (menuNeedsUpdate) so newly-downloaded or newly-fetched
+        // remote models show up without relaunching. (F2)
+        let modelMenuItem = NSMenuItem(title: NSLocalizedString("Model", comment: ""), action: nil, keyEquivalent: "")
+        let modelMenu = NSMenu()
+        modelMenu.delegate = self
+        modelSubmenu = modelMenu
+        populateModelSubmenu()
+        modelMenuItem.submenu = modelMenu
+        menu.addItem(modelMenuItem)
 
         // Listen for language preference changes
         NotificationCenter.default.addObserver(
@@ -336,7 +349,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     @objc private func toggleTranslateToEnglish() {
-        AppPreferences.shared.translateToEnglish.toggle()
+        MainActor.assumeIsolated { TranslateStore.shared.toggle() }
         updateStatusBarMenu()
     }
     
@@ -344,6 +357,125 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         guard let device = sender.representedObject as? MicrophoneService.AudioDevice else { return }
         microphoneService.selectMicrophone(device)
         updateStatusBarMenu()
+    }
+
+    // MARK: - Model picker (F2)
+
+    // The Model submenu opening is the moment to snapshot the app the user is in,
+    // so binding a model targets the right app without requiring a recording first.
+    // Opening a status-bar menu doesn't steal focus, so the frontmost app is still
+    // the one the cursor is in.
+    func menuWillOpen(_ menu: NSMenu) {
+        RecordingContext.shared.captureFrontmost()
+    }
+
+    // Rebuild the Model submenu just before it opens, so it reflects the latest
+    // downloaded/fetched models and the current selection.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === modelSubmenu {
+            populateModelSubmenu()
+        }
+    }
+
+    private func populateModelSubmenu() {
+        guard let submenu = modelSubmenu else { return }
+        submenu.removeAllItems()
+
+        let active = ModelCatalog.activeOption()
+        let groups: [(label: String, options: [DictationModelOption])] = [
+            ("Whisper", ModelCatalog.whisperModels()),
+            ("Parakeet", ModelCatalog.parakeetModels()),
+            ("SenseVoice", ModelCatalog.senseVoiceModels()),
+            ("Remote", ModelCatalog.remoteModels()),
+        ]
+
+        var addedAnything = false
+        for group in groups where !group.options.isEmpty {
+            if addedAnything { submenu.addItem(NSMenuItem.separator()) }
+            let header = NSMenuItem(title: group.label, action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            submenu.addItem(header)
+
+            for option in group.options {
+                let item = NSMenuItem(
+                    title: option.displayName,
+                    action: #selector(selectModel(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = option
+                item.indentationLevel = 1
+                if let active, active.engine == option.engine, active.identifier == option.identifier {
+                    item.state = .on
+                }
+                submenu.addItem(item)
+            }
+            addedAnything = true
+        }
+
+        if !addedAnything {
+            let none = NSMenuItem(title: NSLocalizedString("No models available", comment: ""), action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            submenu.addItem(none)
+        }
+    }
+
+    @objc private func selectModel(_ sender: NSMenuItem) {
+        guard let option = sender.representedObject as? DictationModelOption else { return }
+        let context = RecordingContext.shared
+        // Ask the scope only when it's meaningful: context-awareness is on, there's
+        // more than one model to choose between, and we're in a recognized app
+        // whose current rule differs. Otherwise just set the system default.
+        if AppPreferences.shared.contextAwareModelMode.prompts,
+           ModelCatalog.allAvailable().count > 1,
+           let bundleID = context.bundleID, let scopeLabel = context.scopeLabel,
+           AppContextModelRules.rule(for: bundleID, host: context.host) != option {
+            promptForModelScope(option, bundleID: bundleID, host: context.host, scopeLabel: scopeLabel)
+        } else {
+            MainActor.assumeIsolated { ModelSelectionStore.shared.select(option) }
+        }
+        populateModelSubmenu()
+    }
+
+    /// Picking a model can mean: the system default (everywhere, except apps with
+    /// their own rule), the default for the current app, just the next recording in
+    /// that app, or — when the app already has a rule — forgetting it. Never
+    /// overwrites a rule silently.
+    private func promptForModelScope(_ option: DictationModelOption, bundleID: String, host: String?, scopeLabel: String) {
+        // "scope" is the most specific bindable context: the site (host) inside a
+        // browser, otherwise the app.
+        let hasRule = AppContextModelRules.exactRule(for: bundleID, host: host) != nil
+        let alert = NSAlert()
+        alert.messageText = "Apply “\(option.displayName)”?"
+        alert.informativeText = "Set it as your system default, the default for \(scopeLabel), or just for your next recording."
+        alert.addButton(withTitle: "System Default")
+        alert.addButton(withTitle: "Default for \(scopeLabel)")
+        alert.addButton(withTitle: "Just This Time")
+        if hasRule {
+            alert.addButton(withTitle: "Forget \(scopeLabel)’s Default")
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            // System default — change the active model everywhere (scopes with
+            // their own rule still win); drop any pending one-time override.
+            MainActor.assumeIsolated { ModelSelectionStore.shared.select(option) }
+            RecordingContext.shared.clearOneTimeModel(for: bundleID)
+        case .alertSecondButtonReturn:
+            // Default for this scope (site or app) — apply now and persist.
+            MainActor.assumeIsolated { ModelSelectionStore.shared.select(option) }
+            AppContextModelRules.set(option, for: bundleID, host: host)
+            RecordingContext.shared.clearOneTimeModel(for: bundleID)
+        case .alertThirdButtonReturn:
+            // Just this time — next recording uses it; the system default is left
+            // untouched (the override fires at record-start).
+            RecordingContext.shared.setOneTimeModel(option, for: bundleID)
+        default:
+            // Fourth button (only present when this scope has a rule): forget it so
+            // it falls back to the app rule, then the system default.
+            AppContextModelRules.remove(bundleID: bundleID, host: host)
+            RecordingContext.shared.clearOneTimeModel(for: bundleID)
+        }
     }
     
     @objc private func statusBarButtonClicked(_ sender: Any) {
@@ -365,10 +497,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     
     @objc private func selectLanguage(_ sender: NSMenuItem) {
         guard let languageCode = sender.representedObject as? String else { return }
-        
-        // Update preferences
-        AppPreferences.shared.whisperLanguage = languageCode
-        
+
+        // Single mutation point — persists and notifies an open Settings window.
+        MainActor.assumeIsolated { LanguageStore.shared.select(languageCode) }
+
         // Update menu item states
         if let submenu = sender.menu {
             for item in submenu.items {
@@ -419,6 +551,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 }
 
 extension AppDelegate: NSWindowDelegate {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // Keep the main window alive — just hide it — instead of letting SwiftUI destroy
+        // it on close. A destroyed WindowGroup window can't be reliably re-created from
+        // within the app on macOS 26, which left the menu-bar "Open Window"/"Settings"
+        // items doing nothing. Hidden, it stays in the windows list so showMainWindow()
+        // can always bring it back. (Settings is a separate scene — let it close.)
+        guard sender.title != "Settings" else { return true }
+        sender.orderOut(nil)
+        NSApplication.shared.setActivationPolicy(.accessory)
+        return false
+    }
+
     func windowWillClose(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
     }

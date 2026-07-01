@@ -7,56 +7,146 @@ import SwiftUI
 import FluidAudio
 
 class SettingsViewModel: ObservableObject {
+    /// True while re-syncing the @Published copies from AppPreferences (e.g. after the
+    /// menu-bar Model picker changed the active model). Suppresses the model didSets'
+    /// side effects so the sync doesn't write back, double-reload, or clobber the engine.
+    private var isSyncing = false
+    private var modelSyncObserver: NSObjectProtocol?
+    private var languageSyncObserver: NSObjectProtocol?
+    private var translateSyncObserver: NSObjectProtocol?
+
     @Published var selectedEngine: String {
         didSet {
-            AppPreferences.shared.selectedEngine = selectedEngine
+            guard !isSyncing else { return }
+            // The active selection is owned by ModelSelectionStore (see the select* methods,
+            // which persist + reload the engine). This observer only refreshes the model list
+            // shown for whatever engine is now displayed.
             if selectedEngine == "whisper" {
                 loadAvailableModels()
             } else {
                 initializeFluidAudioModels()
             }
             clampLanguageToSupported()
-            Task { @MainActor in
-                TranscriptionService.shared.reloadEngine()
-            }
         }
     }
     
     @Published var fluidAudioModelVersion: String {
         didSet {
-            AppPreferences.shared.fluidAudioModelVersion = fluidAudioModelVersion
-            // Clicking a Parakeet model activates the Parakeet engine (browse ≠ select).
-            if selectedEngine != "fluidaudio" {
-                selectedEngine = "fluidaudio"
-            } else {
-                clampLanguageToSupported()
-                Task { @MainActor in
-                    TranscriptionService.shared.reloadEngine()
-                }
-            }
+            guard !isSyncing else { return }
+            // Selection (engine switch + persistence + reload) is applied via selectParakeet(_:);
+            // this observer only refreshes the row download states.
             initializeFluidAudioModels()
         }
     }
     
     @Published var selectedModelURL: URL? {
         didSet {
+            guard !isSyncing else { return }
             if let url = selectedModelURL {
                 AppPreferences.shared.selectedWhisperModelPath = url.path
             }
         }
     }
 
-    /// User-initiated model selection. Persists the model and, when the model declares a
-    /// preferred language (e.g. the ivrit.ai Hebrew model), switches to it. Use this for
-    /// explicit user actions only — not from init/restore — so we never override the language
-    /// on a routine reload.
+    // MARK: - Remote (OpenAI-compatible) engine settings
+
+    @Published var remoteServerURL: String {
+        didSet {
+            AppPreferences.shared.remoteServerURL = remoteServerURL
+            reloadRemoteEngineIfSelected()
+        }
+    }
+
+    @Published var remoteServerModel: String {
+        didSet {
+            guard !isSyncing else { return }
+            AppPreferences.shared.remoteServerModel = remoteServerModel
+            reloadRemoteEngineIfSelected()
+            // Editing the model string while Remote is the active engine changes the active
+            // selection — keep the store's mirror current (selectRemote covers the click path).
+            if selectedEngine == "remote" {
+                MainActor.assumeIsolated { ModelSelectionStore.shared.refresh() }
+            }
+        }
+    }
+
+    /// Non-optional in the UI (empty == "no key"); persisted to the Keychain-backed
+    /// optional `AppPreferences.remoteServerAPIKey` (empty clears it).
+    @Published var remoteServerAPIKey: String {
+        didSet {
+            AppPreferences.shared.remoteServerAPIKey = remoteServerAPIKey
+            reloadRemoteEngineIfSelected()
+        }
+    }
+
+    @Published var remoteServerTimeoutEnabled: Bool {
+        didSet {
+            AppPreferences.shared.remoteServerTimeoutEnabled = remoteServerTimeoutEnabled
+            reloadRemoteEngineIfSelected()
+        }
+    }
+
+    @Published var remoteServerTimeoutSeconds: Double {
+        didSet {
+            AppPreferences.shared.remoteServerTimeoutSeconds = remoteServerTimeoutSeconds
+            reloadRemoteEngineIfSelected()
+        }
+    }
+
+    /// Context-aware model selection mode (per-app / per-site rules). See F2.
+    @Published var contextAwareModelMode: ContextAwareModelMode {
+        didSet {
+            AppPreferences.shared.contextAwareModelMode = contextAwareModelMode
+        }
+    }
+
+    /// Re-initialize the engine on a remote-config change, but only when the remote
+    /// engine is the active one (editing the config while on Whisper shouldn't reload).
+    private func reloadRemoteEngineIfSelected() {
+        guard selectedEngine == "remote" else { return }
+        Task { @MainActor in
+            TranscriptionService.shared.reloadEngine()
+        }
+    }
+
+    /// User-initiated model selections. Each routes through the single mutation point —
+    /// `ModelSelectionStore.select` — so the menu bar, Settings, and the context rules all change
+    /// the active model the same way and can't drift. The store persists to AppPreferences,
+    /// reloads the engine, and posts `.modelSelectionDidChange`, which syncs our @Published copies
+    /// back (`syncModelSelectionFromPreferences`). Call these for explicit user actions only —
+    /// never from init/restore — so a routine reload can't override the language.
     func selectModel(_ url: URL) {
-        selectedModelURL = url
-        // Clicking a Whisper model is what activates the Whisper engine (browse ≠ select).
-        if selectedEngine != "whisper" { selectedEngine = "whisper" }
+        MainActor.assumeIsolated {
+            ModelSelectionStore.shared.select(DictationModelOption(
+                engine: "whisper",
+                identifier: url.path,
+                displayName: url.deletingPathExtension().lastPathComponent))
+        }
+        // A model may declare a preferred language (e.g. the ivrit.ai Hebrew model) — switch to it.
         if let lang = SettingsDownloadableModels.preferredLanguage(forFilename: url.lastPathComponent),
            selectedLanguage != lang {
             selectedLanguage = lang
+        }
+    }
+
+    func selectParakeet(_ version: String) {
+        MainActor.assumeIsolated {
+            ModelSelectionStore.shared.select(DictationModelOption(
+                engine: "fluidaudio", identifier: version, displayName: version))
+        }
+    }
+
+    func selectRemote(_ id: String) {
+        MainActor.assumeIsolated {
+            ModelSelectionStore.shared.select(DictationModelOption(
+                engine: "remote", identifier: id, displayName: id))
+        }
+    }
+
+    func selectSenseVoice() {
+        MainActor.assumeIsolated {
+            ModelSelectionStore.shared.select(DictationModelOption(
+                engine: "sensevoice", identifier: "default", displayName: "SenseVoice"))
         }
     }
 
@@ -71,22 +161,23 @@ class SettingsViewModel: ObservableObject {
     
     @Published var selectedLanguage: String {
         didSet {
-            AppPreferences.shared.whisperLanguage = selectedLanguage
-            NotificationCenter.default.post(name: .appPreferencesLanguageChanged, object: nil)
+            // Single mutation point (LanguageStore) — persists + notifies the menu. Idempotent,
+            // so the menu→Settings sync setting this back to the same value is a harmless no-op.
+            MainActor.assumeIsolated { LanguageStore.shared.select(selectedLanguage) }
         }
     }
 
     @Published var translateToEnglish: Bool {
         didSet {
-            AppPreferences.shared.translateToEnglish = translateToEnglish
+            MainActor.assumeIsolated { TranslateStore.shared.set(translateToEnglish) }
         }
     }
 
-    /// Whether the selected engine + model can translate to English (#124). When false the
-    /// "Translate to English" toggle is disabled — Parakeet/SenseVoice (and Groq's turbo model)
-    /// ignore the flag, so showing an active toggle is misleading.
+    /// Whether the selected engine can translate to English (#124). When false the
+    /// "Translate to English" toggle is disabled — Parakeet/SenseVoice ignore the flag, so
+    /// showing an active toggle is misleading.
     var canTranslate: Bool {
-        EngineCapabilities.supportsTranslation(engine: selectedEngine, groqModel: AppPreferences.shared.groqModel)
+        EngineCapabilities.supportsTranslation(engine: selectedEngine)
     }
 
     /// Languages the selected engine+model can transcribe — filters the language picker (#155).
@@ -187,6 +278,22 @@ class SettingsViewModel: ObservableObject {
         didSet {
             AppPreferences.shared.indicatorPosition = indicatorPosition
         }
+    }
+
+    @Published var showStopButtonOnIndicator: Bool {
+        didSet { AppPreferences.shared.showStopButtonOnIndicator = showStopButtonOnIndicator }
+    }
+
+    @Published var showCancelButtonOnIndicator: Bool {
+        didSet { AppPreferences.shared.showCancelButtonOnIndicator = showCancelButtonOnIndicator }
+    }
+
+    @Published var remoteFallbackEnabled: Bool {
+        didSet { AppPreferences.shared.remoteFallbackEnabled = remoteFallbackEnabled }
+    }
+
+    @Published var remoteFallbackModel: DictationModelOption? {
+        didSet { AppPreferences.shared.remoteFallbackModel = remoteFallbackModel }
     }
 
     @Published var liveTranscriptionEnabled: Bool {
@@ -411,6 +518,12 @@ class SettingsViewModel: ObservableObject {
         let prefs = AppPreferences.shared
         self.selectedEngine = prefs.selectedEngine
         self.fluidAudioModelVersion = prefs.fluidAudioModelVersion
+        self.remoteServerURL = prefs.remoteServerURL
+        self.remoteServerModel = prefs.remoteServerModel
+        self.remoteServerAPIKey = prefs.remoteServerAPIKey ?? ""
+        self.remoteServerTimeoutEnabled = prefs.remoteServerTimeoutEnabled
+        self.remoteServerTimeoutSeconds = prefs.remoteServerTimeoutSeconds
+        self.contextAwareModelMode = prefs.contextAwareModelMode
         self.selectedLanguage = prefs.whisperLanguage
         self.translateToEnglish = prefs.translateToEnglish
         self.suppressBlankAudio = prefs.suppressBlankAudio
@@ -427,6 +540,10 @@ class SettingsViewModel: ObservableObject {
         self.playSoundOnRecordStart = prefs.playSoundOnRecordStart
         self.startHidden = prefs.startHidden
         self.indicatorPosition = prefs.indicatorPosition
+        self.showStopButtonOnIndicator = prefs.showStopButtonOnIndicator
+        self.showCancelButtonOnIndicator = prefs.showCancelButtonOnIndicator
+        self.remoteFallbackEnabled = prefs.remoteFallbackEnabled
+        self.remoteFallbackModel = prefs.remoteFallbackModel
         self.liveTranscriptionEnabled = prefs.liveTranscriptionEnabled
         self.useAsianAutocorrect = prefs.useAsianAutocorrect
         self.modifierOnlyHotkey = ModifierKey(rawValue: prefs.modifierOnlyHotkey) ?? .none
@@ -461,8 +578,57 @@ class SettingsViewModel: ObservableObject {
         loadAvailableModels()
         initializeDownloadableModels()
         initializeFluidAudioModels()
+
+        // Reflect external model changes (the menu-bar Model picker) while Settings is open.
+        modelSyncObserver = NotificationCenter.default.addObserver(
+            forName: .modelSelectionDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.syncModelSelectionFromPreferences()
+        }
+        // Same for the menu-bar Language picker and Translate toggle. The @Published didSets route
+        // back through the stores idempotently, so setting the same value here doesn't loop.
+        languageSyncObserver = NotificationCenter.default.addObserver(
+            forName: .appPreferencesLanguageChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.selectedLanguage = AppPreferences.shared.whisperLanguage }
+        }
+        translateSyncObserver = NotificationCenter.default.addObserver(
+            forName: .translateSettingDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.translateToEnglish = AppPreferences.shared.translateToEnglish }
+        }
     }
-    
+
+    deinit {
+        for observer in [modelSyncObserver, languageSyncObserver, translateSyncObserver] {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+        }
+    }
+
+    /// Re-read the active engine/model from AppPreferences (the source of truth) into the
+    /// @Published copies, without triggering their write-back/reload side effects. Keeps an
+    /// open Settings window in sync when the menu-bar Model picker changes the selection.
+    func syncModelSelectionFromPreferences() {
+        let prefs = AppPreferences.shared
+        let newURL = (prefs.selectedWhisperModelPath ?? prefs.selectedModelPath).map { URL(fileURLWithPath: $0) }
+        guard selectedEngine != prefs.selectedEngine
+            || fluidAudioModelVersion != prefs.fluidAudioModelVersion
+            || remoteServerModel != prefs.remoteServerModel
+            || selectedModelURL != newURL else { return }
+
+        isSyncing = true
+        selectedEngine = prefs.selectedEngine
+        fluidAudioModelVersion = prefs.fluidAudioModelVersion
+        remoteServerModel = prefs.remoteServerModel
+        selectedModelURL = newURL
+        isSyncing = false
+
+        // Refresh the model list shown for the now-active engine.
+        if selectedEngine == "whisper" { loadAvailableModels() }
+        else if selectedEngine == "fluidaudio" { initializeFluidAudioModels() }
+        clampLanguageToSupported()
+    }
+
     func initializeFluidAudioModels() {
         downloadableFluidAudioModels = SettingsFluidAudioModels.availableModels.map { model in
             var updatedModel = model
@@ -652,14 +818,12 @@ class SettingsViewModel: ObservableObject {
                         downloadableFluidAudioModels[index].isDownloaded = true
                         downloadableFluidAudioModels[index].downloadProgress = 1.0
                     }
-                    fluidAudioModelVersion = model.version
+                    // Just-downloaded model becomes the active selection (persists + reloads
+                    // the engine through the single mutation point).
+                    selectParakeet(model.version)
                     isDownloading = false
                     downloadingModelName = nil
                     downloadProgress = 1.0
-                    
-                    Task { @MainActor in
-                        TranscriptionService.shared.reloadEngine()
-                    }
                 }
             } catch is CancellationError {
                 wasCancelled = true
@@ -904,10 +1068,11 @@ struct SettingRow<Trailing: View>: View {
 
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, model, transcription, history, advanced, updates, feedback
+    case general, model, transcription, history, appContext, advanced, updates, feedback
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .appContext: return "App Context"
         case .general: return "General"
         case .model: return "Engine & Model"
         case .transcription: return "Transcription"
@@ -919,6 +1084,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     }
     var icon: String {
         switch self {
+        case .appContext: return "macwindow"
         case .general: return "slider.horizontal.3"
         case .model: return "cpu"
         case .transcription: return "text.bubble"
@@ -977,7 +1143,7 @@ struct SettingsView: View {
         case "fluidaudio": return "Parakeet"
         case "whisper": return "Whisper"
         case "sensevoice": return "SenseVoice"
-        case "groq": return "Groq"
+        case "remote": return "Remote"
         default: return engine
         }
     }
@@ -988,7 +1154,7 @@ struct SettingsView: View {
         case "fluidaudio": return "Parakeet"
         case "whisper": return "Whisper"
         case "sensevoice": return "SenseVoice"
-        case "groq": return "Groq"
+        case "remote": return "Remote"
         default: return engine
         }
     }
@@ -999,8 +1165,8 @@ struct SettingsView: View {
             return "Most accurate, ~99 languages, and can translate to English. Runs fully on-device."
         case "sensevoice":
             return "Fast — Chinese, Cantonese, English, Japanese, Korean. Runs fully on-device."
-        case "groq":
-            return "Cloud — extremely fast whisper-large-v3. ⚠️ Audio is sent to Groq's servers (NOT on-device). Needs a free API key."
+        case "remote":
+            return "Cloud / self-hosted — any OpenAI-compatible server (Groq, speaches, LiteLLM, …)."
         default:
             return "Fast, multilingual (25 languages), with a live preview as you speak. Runs fully on-device."
         }
@@ -1009,6 +1175,7 @@ struct SettingsView: View {
     /// Content for the currently-selected sidebar tab.
     @ViewBuilder private var detailContent: some View {
         switch selectedTab {
+        case .appContext:    AppContextSettingsView(viewModel: viewModel)
         case .general:       shortcutSettings
         case .model:         modelSettings
         case .transcription: transcriptionSettings
@@ -1188,7 +1355,7 @@ struct SettingsView: View {
     }
     
     private var modelSettings: some View {
-        Form {
+        ScrollView {
             Section {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Speech Recognition Engine")
@@ -1201,51 +1368,23 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.green)
 
-                    // Centered Parakeet / Whisper / Autre. "Autre" reveals an engine dropdown below.
+                    // All engines are peers: three on-device (Parakeet / Whisper /
+                    // SenseVoice) plus Remote. Picking one shows its settings below.
                     HStack {
                         Spacer()
-                        Picker("", selection: Binding(
-                            get: { ["fluidaudio", "whisper"].contains(browseEngine) ? browseEngine : "other" },
-                            set: { newValue in
-                                if newValue == "other" {
-                                    if !["sensevoice", "groq"].contains(browseEngine) {
-#if arch(arm64)
-                                        browseEngine = "sensevoice"
-#else
-                                        browseEngine = "groq"
-#endif
-                                    }
-                                } else {
-                                    browseEngine = newValue
-                                }
-                            }
-                        )) {
+                        Picker("", selection: $browseEngine) {
                             Text("Parakeet").tag("fluidaudio")
                             Text("Whisper").tag("whisper")
-                            Text("Autre").tag("other")
+#if arch(arm64)
+                            Text("SenseVoice").tag("sensevoice")
+#endif
+                            Text("Remote").tag("remote")
                         }
                         .pickerStyle(.segmented)
                         .fixedSize()
                         Spacer()
                     }
                     .padding(.top, 4)
-
-                    if !["fluidaudio", "whisper"].contains(browseEngine) {
-                        HStack {
-                            Text("Engine:").foregroundColor(.secondary)
-                            Picker("", selection: $browseEngine) {
-#if arch(arm64)
-                                Text("SenseVoice").tag("sensevoice")
-#endif
-                                Text("Groq").tag("groq")
-                            }
-                            .pickerStyle(.menu)
-                            .fixedSize()
-                            Spacer()
-                        }
-                        .padding(.top, 4)
-                    }
-
 
                     Text(engineBlurb(for: browseEngine))
                         .font(.caption)
@@ -1258,8 +1397,8 @@ struct SettingsView: View {
                         SenseVoiceModelSection(viewModel: viewModel)
                     }
 #endif
-                    if browseEngine == "groq" {
-                        GroqSettingsSection(viewModel: viewModel)
+                    if browseEngine == "remote" {
+                        RemoteSettingsSection(viewModel: viewModel)
                     }
 
                     if browseEngine == "whisper" {
@@ -1450,7 +1589,14 @@ struct SettingsView: View {
                                     .disabled(!viewModel.canTranslate)
                             }
                             if !viewModel.canTranslate {
-                                Text("Only Whisper and Groq (large-v3) translate; the current engine ignores this.")
+                                Text("Only Whisper and remote servers translate; the current engine ignores this.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else if viewModel.translateToEnglish && viewModel.selectedEngine == "remote" {
+                                // We forward to the server's /audio/translations endpoint, but there's
+                                // no capability signal per remote model — so we can't verify the server
+                                // actually translates. Say so instead of failing silently server-side.
+                                Text("Sent to the server's translations endpoint — we can't confirm this remote model supports translation.")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -1857,7 +2003,7 @@ struct SettingsView: View {
     }
 
     private var storageSettings: some View {
-        Form {
+        ScrollView {
             VStack(spacing: 20) {
                 // Maximum number of recordings
                 VStack(alignment: .leading, spacing: 16) {
@@ -2016,7 +2162,7 @@ struct SettingsView: View {
     }
 
     private var advancedSettings: some View {
-        Form {
+        ScrollView {
             VStack(spacing: 20) {
                 // Decoding Strategy
                 VStack(alignment: .leading, spacing: 16) {
@@ -2315,6 +2461,24 @@ struct SettingsView: View {
                             .onAppear { cancelKey = SettingsView.currentCancelKeyID() }
                         }
 
+                        SettingRow(
+                            title: "Show Stop Button on Recording Bar",
+                            caption: "A stop-and-transcribe button on the recording indicator."
+                        ) {
+                            Toggle("", isOn: $viewModel.showStopButtonOnIndicator)
+                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
+                                .labelsHidden()
+                        }
+
+                        SettingRow(
+                            title: "Show Cancel Button on Recording Bar",
+                            caption: "A discard (trash) button on the recording indicator."
+                        ) {
+                            Toggle("", isOn: $viewModel.showCancelButtonOnIndicator)
+                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
+                                .labelsHidden()
+                        }
+
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Hold to Record")
@@ -2355,7 +2519,7 @@ struct SettingsView: View {
                         SettingRow(
                             title: "Pause media during recording",
                             caption: "Pause other apps' playback while recording, then resume.",
-                            info: "macOS doesn't let the app detect what was playing, so if media was already paused it may start playing when you stop — if that bothers you, use the volume option below instead."
+                            info: "Pauses the system's active player while recording, then resumes what was playing. If the app can't detect what was playing (unsigned builds), it leaves playback paused — press play to resume. Acts on the system's active player, so it can't independently restore several sources at once."
                         ) {
                             Toggle("", isOn: $viewModel.pauseMediaOnRecord)
                                 .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
@@ -2635,14 +2799,12 @@ struct FluidAudioModelDownloadItemView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .imageScale(.large)
-                } else if isSelected {
-                    // Chosen for this engine, but the engine isn't the active one.
-                    Image(systemName: "checkmark.circle")
-                        .foregroundColor(.secondary)
-                        .imageScale(.large)
                 } else {
+                    // Not the active model → offer Select. One global selection, so a
+                    // non-active model shows no "remembered" checkmark (selecting here
+                    // activates Parakeet and deselects other engines).
                     Button(action: {
-                        viewModel.fluidAudioModelVersion = model.version
+                        viewModel.selectParakeet(model.version)
                     }) {
                         Text("Select")
                     }
@@ -2670,14 +2832,14 @@ struct FluidAudioModelDownloadItemView: View {
             }
         }
         .padding(12)
-        .background(isSelected ? Color(.controlBackgroundColor).opacity(0.7) : Color(.controlBackgroundColor).opacity(0.5))
+        .background(isActive ? Color(.controlBackgroundColor).opacity(0.7) : Color(.controlBackgroundColor).opacity(0.5))
         .cornerRadius(8)
         .contentShape(Rectangle())
         .onTapGesture {
             // Activate on tap whenever this isn't already the *active* model — even if it's the
             // selected version but Parakeet isn't the active engine (browse ≠ select).
             if model.isDownloaded && !isActive {
-                viewModel.fluidAudioModelVersion = model.version
+                viewModel.selectParakeet(model.version)
             }
         }
         .alert("Download Error", isPresented: $showError) {
@@ -2752,12 +2914,10 @@ struct ModelDownloadItemView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .imageScale(.large)
-                } else if isSelected {
-                    // Chosen for Whisper, but Whisper isn't the active engine.
-                    Image(systemName: "checkmark.circle")
-                        .foregroundColor(.secondary)
-                        .imageScale(.large)
                 } else {
+                    // Not the active model → offer Select. The app has one global
+                    // selection, so a non-active model shows no "remembered" checkmark
+                    // (selecting here activates Whisper and deselects other engines).
                     Button(action: {
                         let modelPath = WhisperModelManager.shared.modelsDirectory.appendingPathComponent(model.filename).path
                         viewModel.selectModel(URL(fileURLWithPath: modelPath))
@@ -2788,7 +2948,7 @@ struct ModelDownloadItemView: View {
             }
         }
         .padding(12)
-        .background(isSelected ? Color(.controlBackgroundColor).opacity(0.7) : Color(.controlBackgroundColor).opacity(0.5))
+        .background(isActive ? Color(.controlBackgroundColor).opacity(0.7) : Color(.controlBackgroundColor).opacity(0.5))
         .cornerRadius(8)
         .contentShape(Rectangle())
         .onTapGesture {

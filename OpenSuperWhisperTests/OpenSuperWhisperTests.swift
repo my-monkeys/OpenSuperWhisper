@@ -298,17 +298,19 @@ final class MicrophoneServiceRequiresConnectionTests: XCTestCase {
 
 final class EngineCapabilitiesTests: XCTestCase {
     func testTranslation_whisperAlwaysSupported() {
-        XCTAssertTrue(EngineCapabilities.supportsTranslation(engine: "whisper", groqModel: "anything"))
+        XCTAssertTrue(EngineCapabilities.supportsTranslation(engine: "whisper"))
     }
 
-    func testTranslation_groqOnlyOnLargeV3() {
-        XCTAssertTrue(EngineCapabilities.supportsTranslation(engine: "groq", groqModel: "whisper-large-v3"))
-        XCTAssertFalse(EngineCapabilities.supportsTranslation(engine: "groq", groqModel: "whisper-large-v3-turbo"))
+    func testTranslation_remoteSupported() {
+        // Groq folded into the generic remote engine: translation is forwarded to the
+        // server's OpenAI-standard /audio/translations endpoint, so the capability is on
+        // (the server decides per-model support).
+        XCTAssertTrue(EngineCapabilities.supportsTranslation(engine: "remote"))
     }
 
     func testTranslation_parakeetAndSenseVoiceNever() {
-        XCTAssertFalse(EngineCapabilities.supportsTranslation(engine: "fluidaudio", groqModel: ""))
-        XCTAssertFalse(EngineCapabilities.supportsTranslation(engine: "sensevoice", groqModel: ""))
+        XCTAssertFalse(EngineCapabilities.supportsTranslation(engine: "fluidaudio"))
+        XCTAssertFalse(EngineCapabilities.supportsTranslation(engine: "sensevoice"))
     }
 
     func testLanguages_parakeetV2IsEnglishOnly() {
