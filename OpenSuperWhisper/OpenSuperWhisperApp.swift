@@ -349,7 +349,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     }
 
     @objc private func toggleTranslateToEnglish() {
-        AppPreferences.shared.translateToEnglish.toggle()
+        MainActor.assumeIsolated { TranslateStore.shared.toggle() }
         updateStatusBarMenu()
     }
     
@@ -497,10 +497,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     
     @objc private func selectLanguage(_ sender: NSMenuItem) {
         guard let languageCode = sender.representedObject as? String else { return }
-        
-        // Update preferences
-        AppPreferences.shared.whisperLanguage = languageCode
-        
+
+        // Single mutation point — persists and notifies an open Settings window.
+        MainActor.assumeIsolated { LanguageStore.shared.select(languageCode) }
+
         // Update menu item states
         if let submenu = sender.menu {
             for item in submenu.items {

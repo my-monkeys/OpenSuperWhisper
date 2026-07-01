@@ -12,6 +12,8 @@ class SettingsViewModel: ObservableObject {
     /// side effects so the sync doesn't write back, double-reload, or clobber the engine.
     private var isSyncing = false
     private var modelSyncObserver: NSObjectProtocol?
+    private var languageSyncObserver: NSObjectProtocol?
+    private var translateSyncObserver: NSObjectProtocol?
 
     @Published var selectedEngine: String {
         didSet {
@@ -159,14 +161,15 @@ class SettingsViewModel: ObservableObject {
     
     @Published var selectedLanguage: String {
         didSet {
-            AppPreferences.shared.whisperLanguage = selectedLanguage
-            NotificationCenter.default.post(name: .appPreferencesLanguageChanged, object: nil)
+            // Single mutation point (LanguageStore) — persists + notifies the menu. Idempotent,
+            // so the menu→Settings sync setting this back to the same value is a harmless no-op.
+            MainActor.assumeIsolated { LanguageStore.shared.select(selectedLanguage) }
         }
     }
 
     @Published var translateToEnglish: Bool {
         didSet {
-            AppPreferences.shared.translateToEnglish = translateToEnglish
+            MainActor.assumeIsolated { TranslateStore.shared.set(translateToEnglish) }
         }
     }
 
@@ -582,11 +585,23 @@ class SettingsViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.syncModelSelectionFromPreferences()
         }
+        // Same for the menu-bar Language picker and Translate toggle. The @Published didSets route
+        // back through the stores idempotently, so setting the same value here doesn't loop.
+        languageSyncObserver = NotificationCenter.default.addObserver(
+            forName: .appPreferencesLanguageChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.selectedLanguage = AppPreferences.shared.whisperLanguage }
+        }
+        translateSyncObserver = NotificationCenter.default.addObserver(
+            forName: .translateSettingDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.translateToEnglish = AppPreferences.shared.translateToEnglish }
+        }
     }
 
     deinit {
-        if let modelSyncObserver {
-            NotificationCenter.default.removeObserver(modelSyncObserver)
+        for observer in [modelSyncObserver, languageSyncObserver, translateSyncObserver] {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
         }
     }
 
