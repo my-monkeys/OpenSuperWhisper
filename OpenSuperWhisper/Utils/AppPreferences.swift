@@ -109,6 +109,23 @@ final class AppPreferences {
     @UserDefault(key: "cachedRemoteModels", defaultValue: [String]())
     var cachedRemoteModels: [String]
 
+    // MARK: - Context-aware model selection (per-app / per-site rules)
+
+    // Per-app default model rules (bundle id -> model, or "bundleID|host" -> model),
+    // JSON-encoded. Managed by AppContextModelRules; empty until the user binds a model.
+    @UserDefault(key: "appModelRules", defaultValue: Data())
+    var appModelRulesData: Data
+
+    // Context-aware model selection mode: "ask" (auto-switch + prompt), "auto"
+    // (auto-switch, no prompt), or "off". Stored raw; use contextAwareModelMode.
+    @UserDefault(key: "contextAwareModelMode", defaultValue: "ask")
+    var contextAwareModelModeRaw: String
+
+    var contextAwareModelMode: ContextAwareModelMode {
+        get { ContextAwareModelMode(rawValue: contextAwareModelModeRaw) ?? .ask }
+        set { contextAwareModelModeRaw = newValue.rawValue }
+    }
+
     // Local fallback for the remote engine: when the server is unreachable, transcribe
     // with a downloaded on-device model instead. Off by default; the chosen model is a
     // DictationModelOption stored as JSON (empty until the user picks one).

@@ -117,10 +117,11 @@ class IndicatorViewModel: ObservableObject {
         }
 
         // Capture where the dictation is happening (frontmost app, browser site/URL,
-        // window title) for the transcript's source metadata. This runs
-        // AppleScript/Accessibility synchronously on the main thread; it's quick,
-        // but see the note in RecordingContext.captureFrontmost.
+        // window title) and apply any context-aware model rule before recording. This
+        // runs AppleScript/Accessibility synchronously on the main thread; it's quick,
+        // but see the note in RecordingContext.captureFrontmost. (F2/F3)
         RecordingContext.shared.captureFrontmost()
+        ContextModelSwitcher.applyForCurrentContext()
 
         // Show recording immediately and optimistically. Whether the mic needs a
         // connection is decided off the main thread inside `recorder.startRecording()`
