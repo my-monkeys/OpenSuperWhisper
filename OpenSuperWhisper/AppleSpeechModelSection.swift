@@ -15,10 +15,34 @@ struct AppleSpeechModelSection: View {
     @State private var progress: Double = 0
     @State private var localeName = ""
     @State private var errorMessage: String?
+    /// Regional variants of the current language (fr → fr_FR/fr_CH/fr_CA/fr_BE) and the
+    /// one in effect. The picker only shows when there's an actual choice.
+    @State private var variants: [Locale] = []
+    @State private var selectedVariantID = ""
 
     var body: some View {
         SSection(title: "System speech model") {
             row
+            if variants.count > 1 {
+                SRow(title: "Regional variant",
+                     hint: "Which regional model transcribes this language — spelling and numbers follow it.") {
+                    Picker("", selection: $selectedVariantID) {
+                        ForEach(variants, id: \.identifier) { locale in
+                            Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
+                                .tag(locale.identifier)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .onChange(of: selectedVariantID) { _, newID in
+                        guard !newID.isEmpty else { return }
+                        let code = AppleSpeechSupport.effectiveLanguageCode(for: viewModel.selectedLanguage)
+                        guard AppleSpeechSupport.localeOverrides[code] != newID else { return }
+                        AppleSpeechSupport.localeOverrides[code] = newID
+                        Task { await refresh() }
+                    }
+                }
+            }
             if let errorMessage {
                 Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
             }
@@ -90,6 +114,8 @@ struct AppleSpeechModelSection: View {
         checked = false
         let locale = await AppleSpeechSupport.resolveLocale(language: viewModel.selectedLanguage)
         localeName = Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
+        variants = await AppleSpeechSupport.supportedVariants(for: viewModel.selectedLanguage)
+        selectedVariantID = locale.identifier
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
         let status = await AssetInventory.status(forModules: [transcriber])
         isInstalled = (status == .installed)
