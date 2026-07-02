@@ -105,20 +105,22 @@ struct AppleSpeechModelSection: View {
             do {
                 let locale = await AppleSpeechSupport.resolveLocale(language: viewModel.selectedLanguage)
                 let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-                if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                    // AssetInstallationRequest reports through Foundation.Progress; poll it
-                    // into SwiftUI state for the linear bar.
-                    let poller = Task {
-                        while !Task.isCancelled {
-                            let fraction = request.progress.fractionCompleted
-                            await MainActor.run { progress = fraction }
-                            try? await Task.sleep(nanoseconds: 200_000_000)
+                // The install reports through Foundation.Progress; poll it into
+                // SwiftUI state for the linear bar.
+                var poller: Task<Void, Never>?
+                defer { poller?.cancel() }
+                try await AppleSpeechSupport.installAssetsIfNeeded(
+                    supporting: transcriber, locale: locale,
+                    onProgress: { systemProgress in
+                        poller?.cancel()
+                        poller = Task {
+                            while !Task.isCancelled {
+                                let fraction = systemProgress.fractionCompleted
+                                await MainActor.run { progress = fraction }
+                                try? await Task.sleep(nanoseconds: 200_000_000)
+                            }
                         }
-                    }
-                    defer { poller.cancel() }
-                    try await request.downloadAndInstall()
-                }
-                await AppleSpeechSupport.refreshCaches()
+                    })
                 await MainActor.run {
                     isInstalled = true
                     isInstalling = false
