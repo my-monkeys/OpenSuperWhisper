@@ -18,6 +18,7 @@ struct RemoteServerSettingsView: View {
     @State private var fallbackExpanded: Bool = false
     @State private var showKeyEditor = false
     @State private var autoTestTask: Task<Void, Never>?
+    @State private var showAllModels = false
 
     private var hasKey: Bool { !viewModel.remoteServerAPIKey.isEmpty }
 
@@ -251,6 +252,18 @@ struct RemoteServerSettingsView: View {
         }
     }
 
+    // /v1/models has no capability field, so servers list EVERYTHING they serve —
+    // chat models, embeddings, TTS — alongside the transcription ones. Default to
+    // the models that look like speech-to-text (name heuristic); fail open when
+    // nothing matches, and always offer "show all" since heuristics have misses.
+    private var visibleModels: [RemoteModelInfo] {
+        guard !showAllModels else { return availableModels }
+        let stt = availableModels.filter { RemoteModelFilter.isLikelySpeechToText($0.id) }
+        return stt.isEmpty ? availableModels : stt
+    }
+
+    private var hiddenModelCount: Int { availableModels.count - visibleModels.count }
+
     // Model list styled like the local downloaded-model list: each model from
     // GET /v1/models is a selectable row, plus a "Custom" row that reveals a
     // free-text field (for servers that don't list models, or a wildcard "*").
@@ -262,7 +275,7 @@ struct RemoteServerSettingsView: View {
             // for more, so a server with many models doesn't blow up the panel.
             ScrollView {
                 VStack(spacing: 6) {
-                    ForEach(availableModels) { info in
+                    ForEach(visibleModels) { info in
                         modelRow(
                             name: info.id,
                             description: info.ownedBy.map { "Provided by \($0)" } ?? "Reported by the server",
@@ -291,6 +304,18 @@ struct RemoteServerSettingsView: View {
             // Key the list to the fetched model set so a delta (e.g. Test
             // Connection surfaces a newly-granted model) forces SwiftUI to rebuild.
             .id(availableModels.map(\.id).joined(separator: "|"))
+
+            if hiddenModelCount > 0 || showAllModels {
+                Button {
+                    showAllModels.toggle()
+                } label: {
+                    Text(showAllModels
+                        ? "Show only speech-to-text models"
+                        : "Show all \(availableModels.count) models (\(hiddenModelCount) don't look like speech-to-text)")
+                        .font(.caption)
+                }
+                .buttonStyle(.link)
+            }
 
             if availableModels.isEmpty {
                 // Make the auth-gated listing discoverable: Groq & co return 401 on
@@ -456,5 +481,27 @@ struct RemoteServerSettingsView: View {
         while base.hasSuffix("/") { base.removeLast() }
         if base.hasSuffix("/v1") { base.removeLast(3) }
         return URL(string: base + "/v1/models")
+    }
+}
+
+
+/// Name-based guess at whether a remote model id is a speech-to-text model.
+/// `/v1/models` carries no capability metadata, so this is a curated keyword
+/// list covering the STT families served by OpenAI-compatible providers (Groq,
+/// OpenAI, Mistral, NVIDIA, speaches/faster-whisper, ElevenLabs, …). Misses are
+/// fine — the UI fails open and always offers "show all" + a Custom field.
+enum RemoteModelFilter {
+    private static let sttMarkers: [String] = [
+        "whisper", "transcribe", "transcription", "parakeet", "canary",
+        "voxtral", "sensevoice", "paraformer", "moonshine", "conformer",
+        "citrinet", "scribe", "wav2vec", "seamless", "granite-speech",
+        "speech-to-text", "speech2text", "asr", "stt",
+    ]
+    private static let notSTTMarkers: [String] = ["tts", "text-to-speech"]
+
+    static func isLikelySpeechToText(_ modelID: String) -> Bool {
+        let id = modelID.lowercased()
+        if notSTTMarkers.contains(where: { id.contains($0) }) { return false }
+        return sttMarkers.contains(where: { id.contains($0) })
     }
 }
