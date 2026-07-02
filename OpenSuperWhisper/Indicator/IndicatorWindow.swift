@@ -517,26 +517,30 @@ struct IndicatorWindow: View {
     }
 
     /// Wider while live-recording so the growing caption fits inside the bubble; compact otherwise.
+    /// Extra width for any enabled on-bubble buttons (Spacer 8 + a 24pt control each) so
+    /// they never squeeze the "Recording…" label or the live caption — applies to every
+    /// layout, including the notch pill (its base width has no room to spare).
+    private var buttonExtraWidth: CGFloat {
+        guard viewModel.state == .recording else { return 0 }
+        var extra: CGFloat = 0
+        if AppPreferences.shared.showStopButtonOnIndicator { extra += 32 }
+        if AppPreferences.shared.showCancelButtonOnIndicator { extra += 32 }
+        return extra
+    }
+
     private var bubbleWidth: CGFloat {
         if isNotchMode {
             // Idle width is tunable; it only expands once there is actual caption text to show.
             let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
-            return hasCaption ? max(notch.width, 440) : notch.width
+            return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth
         }
         // Live mode starts compact too — the pill only widens once caption text actually
         // arrives (same rule as notch mode). Starting at 380 made the bubble appear at
         // its "final" size the moment recording began.
         let live = viewModel.state == .recording && IndicatorViewModel.shouldUseLiveStreaming
         let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
-        var width: CGFloat = (live && hasCaption) ? 380 : 200
-        // Widen for any enabled on-bubble buttons (Spacer 8 + a 24pt control each) so
-        // they never squeeze the label or the live caption — in BOTH the compact and
-        // the caption layouts (380 was sized for dot + 300pt text alone).
-        if viewModel.state == .recording {
-            if AppPreferences.shared.showStopButtonOnIndicator { width += 32 }
-            if AppPreferences.shared.showCancelButtonOnIndicator { width += 32 }
-        }
-        return width
+        let base: CGFloat = (live && hasCaption) ? 380 : 200
+        return base + buttonExtraWidth
     }
     
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
