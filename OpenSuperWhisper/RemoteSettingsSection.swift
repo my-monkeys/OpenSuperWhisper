@@ -42,16 +42,39 @@ enum GroqPreset {
 /// preset picker switches between Groq (curated, pre-filled) and a fully custom
 /// OpenAI-compatible server. Both write the same `remoteServer*` preferences and
 /// activate the single `"remote"` engine; the preset is just a convenience prefill.
+/// What the preset menu currently points at: a built-in, or a user-saved preset.
+enum RemotePresetSelection: Equatable {
+    case custom
+    case groq
+    case user(UUID)
+}
+
 struct RemoteSettingsSection: View {
     @ObservedObject var viewModel: SettingsViewModel
-    @State private var preset: RemotePreset
+    @State private var selection: RemotePresetSelection
+    @State private var userPresets: [RemoteUserPreset] = RemoteUserPresets.all()
+    @State private var showSavePrompt = false
+    @State private var newPresetName = ""
 
     init(viewModel: SettingsViewModel) {
         self.viewModel = viewModel
-        // Infer the preset from the configured URL so re-opening Settings shows
-        // the right tab (Groq users land on Groq).
-        _preset = State(initialValue:
-            GroqPreset.isGroqURL(viewModel.remoteServerURL) ? .groq : .custom)
+        // Infer the selection from the configured URL/model so re-opening Settings
+        // shows the right label (a saved preset wins over the Groq heuristic).
+        if let match = RemoteUserPresets.matching(
+            url: viewModel.remoteServerURL, model: viewModel.remoteServerModel) {
+            _selection = State(initialValue: .user(match.id))
+        } else {
+            _selection = State(initialValue:
+                GroqPreset.isGroqURL(viewModel.remoteServerURL) ? .groq : .custom)
+        }
+    }
+
+    private var selectionLabel: String {
+        switch selection {
+        case .custom: return "Custom"
+        case .groq: return "Groq"
+        case .user(let id): return userPresets.first { $0.id == id }?.name ?? "Custom"
+        }
     }
 
     var body: some View {
@@ -73,20 +96,45 @@ struct RemoteSettingsSection: View {
             HStack(spacing: 8) {
                 Text("Preset").foregroundColor(.secondary)
                 Menu {
-                    Button("Custom") { preset = .custom }
-                    Button("Groq") { preset = .groq }
+                    Button("Custom") { select(.custom) }
+                    Button("Groq") { select(.groq) }
+                    if !userPresets.isEmpty {
+                        Divider()
+                        ForEach(userPresets) { p in
+                            Button(p.name) { select(.user(p.id)) }
+                        }
+                    }
                     Divider()
-                    Button("Request a preset…") {
+                    Button("Save current as preset…") {
+                        newPresetName = ""
+                        showSavePrompt = true
+                    }
+                    if case .user(let id) = selection,
+                       let current = userPresets.first(where: { $0.id == id }) {
+                        Button("Delete preset “\(current.name)”", role: .destructive) {
+                            RemoteUserPresets.remove(id)
+                            userPresets = RemoteUserPresets.all()
+                            selection = .custom
+                        }
+                    }
+                    Divider()
+                    Button("Request a built-in preset…") {
                         if let url = URL(string: "https://github.com/my-monkeys/OpenSuperWhisper/issues") {
                             NSWorkspace.shared.open(url)
                         }
                     }
                 } label: {
-                    Text(preset.label)
+                    Text(selectionLabel)
                 }
                 .fixedSize()
-                .onChange(of: preset) { _, newValue in applyPreset(newValue) }
                 Spacer()
+            }
+            .alert("Save preset", isPresented: $showSavePrompt) {
+                TextField("Name (e.g. Home LiteLLM)", text: $newPresetName)
+                Button("Save") { saveCurrentAsPreset() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Saves the current server URL, model, timeout and API key so you can switch back in one click.")
             }
 
             // One uniform config UI; the preset menu just prefills its fields.
@@ -98,10 +146,11 @@ struct RemoteSettingsSection: View {
         .cornerRadius(8)
     }
 
-    /// Prefill (Groq) or clear (Custom) the server config when the preset changes.
+    /// Prefill (Groq), restore (user preset) or clear (Custom) the server config.
     /// Selecting a model/activating the engine happens in the sub-views.
-    private func applyPreset(_ p: RemotePreset) {
-        switch p {
+    private func select(_ newSelection: RemotePresetSelection) {
+        selection = newSelection
+        switch newSelection {
         case .groq:
             if !GroqPreset.isGroqURL(viewModel.remoteServerURL) {
                 viewModel.remoteServerURL = GroqPreset.baseURL
@@ -115,7 +164,31 @@ struct RemoteSettingsSection: View {
                 viewModel.remoteServerURL = ""
                 viewModel.remoteServerModel = ""
             }
+        case .user(let id):
+            guard let preset = userPresets.first(where: { $0.id == id }) else { return }
+            viewModel.remoteServerURL = preset.serverURL
+            viewModel.remoteServerModel = preset.model
+            viewModel.remoteServerTimeoutEnabled = preset.timeoutEnabled
+            viewModel.remoteServerTimeoutSeconds = preset.timeoutSeconds
+            // Restore the preset's key into the active slot (may be empty = no auth).
+            viewModel.remoteServerAPIKey = RemoteUserPresets.apiKey(for: id) ?? ""
         }
+    }
+
+    private func saveCurrentAsPreset() {
+        let name = newPresetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let preset = RemoteUserPreset(
+            id: UUID(),
+            name: name,
+            serverURL: viewModel.remoteServerURL,
+            model: viewModel.remoteServerModel,
+            timeoutEnabled: viewModel.remoteServerTimeoutEnabled,
+            timeoutSeconds: viewModel.remoteServerTimeoutSeconds
+        )
+        RemoteUserPresets.add(preset, apiKey: viewModel.remoteServerAPIKey)
+        userPresets = RemoteUserPresets.all()
+        selection = .user(preset.id)
     }
 }
 

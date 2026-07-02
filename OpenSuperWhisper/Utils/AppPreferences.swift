@@ -126,6 +126,12 @@ final class AppPreferences {
         set { contextAwareModelModeRaw = newValue.rawValue }
     }
 
+    // User-defined remote presets (name + URL + model + timeout), JSON-encoded.
+    // Each preset's API key lives in the Keychain under "remotePreset.<uuid>",
+    // never in UserDefaults. Managed by RemoteUserPresets.
+    @UserDefault(key: "remoteUserPresets", defaultValue: Data())
+    var remoteUserPresetsData: Data
+
     // Local fallback for the remote engine: when the server is unreachable, transcribe
     // with a downloaded on-device model instead. Off by default; the chosen model is a
     // DictationModelOption stored as JSON (empty until the user picks one).
