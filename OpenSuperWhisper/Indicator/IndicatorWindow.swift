@@ -257,6 +257,27 @@ class IndicatorViewModel: ObservableObject {
                     return
                 } catch {
                     print("Error transcribing audio: \(error)")
+                    // Don't lose the audio on failure (e.g. an intermittent remote 405 /
+                    // network blip after a long dictation). When history is on, keep the
+                    // recording with a .failed status + retry message so it shows in the log
+                    // and can be re-run with the regenerate (↻) button. Otherwise discard.
+                    if AppPreferences.shared.saveTranscriptionHistory,
+                       let saved = self.persistFailedRecording(tempURL: tempURL) {
+                        await MainActor.run {
+                            self.recordingStore.addRecording(Recording(
+                                id: saved.id,
+                                timestamp: saved.timestamp,
+                                fileName: saved.fileName,
+                                transcription: "Transcription failed — click ↻ to try again.",
+                                duration: 0,
+                                status: .failed,
+                                progress: 0,
+                                sourceFileURL: nil
+                            ))
+                        }
+                    } else {
+                        try? FileManager.default.removeItem(at: tempURL)
+                    }
                     await MainActor.run {
                         self.showError("Transcription failed: \(error.localizedDescription)")
                     }
@@ -275,6 +296,32 @@ class IndicatorViewModel: ObservableObject {
         }
     }
     
+    /// Move a temp recording to its permanent location after a FAILED transcription
+    /// so the audio survives and can be re-run from the history list. Returns the
+    /// saved identity, or nil if the file move failed (then the temp is discarded).
+    private func persistFailedRecording(tempURL: URL) -> (id: UUID, timestamp: Date, fileName: String, url: URL)? {
+        let timestamp = Date()
+        let fileName = "\(Int(timestamp.timeIntervalSince1970)).wav"
+        let id = UUID()
+        let finalURL = Recording(
+            id: id,
+            timestamp: timestamp,
+            fileName: fileName,
+            transcription: "",
+            duration: 0,
+            status: .failed,
+            progress: 0,
+            sourceFileURL: nil
+        ).url
+        do {
+            try recorder.moveTemporaryRecording(from: tempURL, to: finalURL)
+            return (id, timestamp, fileName, finalURL)
+        } catch {
+            print("Failed to persist failed recording: \(error)")
+            return nil
+        }
+    }
+
     /// Returns `true` when auto-paste ran but no editable field was focused,
     /// so the caller can surface a "copied — press ⌘V" notice. When no target
     /// is found, typing is skipped and the text is left on the clipboard.
@@ -453,8 +500,6 @@ struct IndicatorWindow: View {
                     Text("Connecting...")
                         .font(.system(size: 13, weight: .semibold))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
             case .recording:
                 if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
@@ -482,16 +527,16 @@ struct IndicatorWindow: View {
                 }
 
             case .decoding:
+                // Keep the same height as the recording state (the spinner's intrinsic
+                // height is capped) so the bubble doesn't jump taller when transcribing.
                 HStack(spacing: 8) {
                     ProgressView()
-                        .scaleEffect(0.7)
-                        .frame(width: 24)
-                    
+                        .controlSize(.small)
+                        .frame(width: 24, height: 16)
+
                     Text("Transcribing...")
                         .font(.system(size: 13, weight: .semibold))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
             case .busy:
                 HStack(spacing: 8) {
                     Image(systemName: "hourglass")
@@ -502,8 +547,6 @@ struct IndicatorWindow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.orange)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
             case .error(let message):
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -514,8 +557,6 @@ struct IndicatorWindow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.red)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             case .info(let message):
                 HStack(spacing: 8) {
                     Image(systemName: "doc.on.clipboard")
@@ -526,8 +567,6 @@ struct IndicatorWindow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.primary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             case .idle:
                 EmptyView()
             }
