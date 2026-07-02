@@ -944,6 +944,14 @@ struct SettingsDownloadableModels {
             description: "Fastest processing"
         ),
         SettingsDownloadableModel(
+            name: "Distil large v3 — English",
+            isDownloaded: false,
+            url: URL(string: "https://huggingface.co/distil-whisper/distil-large-v3-ggml/resolve/main/ggml-distil-large-v3.bin?download=true")!,
+            size: 1520,
+            description: "Distilled large-v3: much faster, near-large accuracy, English only. Selecting it sets the language to English.",
+            preferredLanguage: "en"
+        ),
+        SettingsDownloadableModel(
             name: "Hebrew — ivrit.ai Turbo v3",
             isDownloaded: false,
             url: URL(string: "https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/resolve/main/ggml-model.bin?download=true")!,
