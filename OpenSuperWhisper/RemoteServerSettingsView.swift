@@ -292,6 +292,15 @@ struct RemoteServerSettingsView: View {
             // Connection surfaces a newly-granted model) forces SwiftUI to rebuild.
             .id(availableModels.map(\.id).joined(separator: "|"))
 
+            if availableModels.isEmpty {
+                // Make the auth-gated listing discoverable: Groq & co return 401 on
+                // GET /v1/models without credentials, so the list stays empty until
+                // a key is set and Test Connection runs.
+                Text("The server's models are listed here after a successful Test Connection — most providers (e.g. Groq) need the API key set first.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             if isCustomModel {
                 TextField("", text: $viewModel.remoteServerModel, prompt: Text("whisper-1"))
                     .textFieldStyle(.roundedBorder)

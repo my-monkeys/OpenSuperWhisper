@@ -523,14 +523,18 @@ struct IndicatorWindow: View {
             let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
             return hasCaption ? max(notch.width, 440) : notch.width
         }
+        // Live mode starts compact too — the pill only widens once caption text actually
+        // arrives (same rule as notch mode). Starting at 380 made the bubble appear at
+        // its "final" size the moment recording began.
         let live = viewModel.state == .recording && IndicatorViewModel.shouldUseLiveStreaming
-        if live { return 380 }
-        // Widen the recording pill to fit any enabled on-bubble buttons so the
-        // "Recording…" label never wraps; compact (200) otherwise.
-        var width: CGFloat = 200
+        let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
+        var width: CGFloat = (live && hasCaption) ? 380 : 200
+        // Widen for any enabled on-bubble buttons (Spacer 8 + a 24pt control each) so
+        // they never squeeze the label or the live caption — in BOTH the compact and
+        // the caption layouts (380 was sized for dot + 300pt text alone).
         if viewModel.state == .recording {
-            if AppPreferences.shared.showStopButtonOnIndicator { width += 20 }
-            if AppPreferences.shared.showCancelButtonOnIndicator { width += 20 }
+            if AppPreferences.shared.showStopButtonOnIndicator { width += 32 }
+            if AppPreferences.shared.showCancelButtonOnIndicator { width += 32 }
         }
         return width
     }
@@ -612,10 +616,11 @@ struct IndicatorWindow: View {
                 } else {
                     // Once text starts, drop the label: just the dot + the text, which grows
                     // (the window resizes to fit it) so everything stays visible.
-                    HStack(alignment: .top, spacing: 10) {
+                    // Center-aligned: with the (taller) on-bubble buttons enabled, .top
+                    // alignment pinned a single caption line above the vertical middle.
+                    HStack(alignment: .center, spacing: 10) {
                         RecordingIndicator(isBlinking: viewModel.isBlinking)
                             .frame(width: 16)
-                            .padding(.top, 3)
                         (Text(streaming.confirmedText).foregroundColor(.primary)
                             + Text(streaming.confirmedText.isEmpty ? "" : " ")
                             + Text(streaming.volatileText).foregroundColor(.secondary))
