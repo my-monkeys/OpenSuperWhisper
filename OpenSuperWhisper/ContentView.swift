@@ -182,9 +182,10 @@ class ContentViewModel: ObservableObject {
     }
 
     func startRecording() {
-        // Capture where the dictation is happening (frontmost app + browser site)
-        // for the transcript's source metadata.
+        // Capture where the dictation is happening (frontmost app + browser site) and
+        // apply any context-aware model rule before the engine spins up. See F2.
         RecordingContext.shared.captureFrontmost()
+        ContextModelSwitcher.applyForCurrentContext()
 
         if microphoneService.isActiveMicrophoneRequiresConnection() {
             state = .connecting

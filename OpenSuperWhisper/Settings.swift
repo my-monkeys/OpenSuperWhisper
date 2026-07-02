@@ -93,6 +93,13 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// Context-aware model selection mode (per-app / per-site rules). See F2.
+    @Published var contextAwareModelMode: ContextAwareModelMode {
+        didSet {
+            AppPreferences.shared.contextAwareModelMode = contextAwareModelMode
+        }
+    }
+
     /// Re-initialize the engine on a remote-config change, but only when the remote
     /// engine is the active one (editing the config while on Whisper shouldn't reload).
     private func reloadRemoteEngineIfSelected() {
@@ -508,6 +515,7 @@ class SettingsViewModel: ObservableObject {
         self.remoteServerAPIKey = prefs.remoteServerAPIKey ?? ""
         self.remoteServerTimeoutEnabled = prefs.remoteServerTimeoutEnabled
         self.remoteServerTimeoutSeconds = prefs.remoteServerTimeoutSeconds
+        self.contextAwareModelMode = prefs.contextAwareModelMode
         self.selectedLanguage = prefs.whisperLanguage
         self.translateToEnglish = prefs.translateToEnglish
         self.suppressBlankAudio = prefs.suppressBlankAudio
@@ -1050,10 +1058,11 @@ struct SettingRow<Trailing: View>: View {
 
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, model, transcription, history, advanced, updates, feedback
+    case general, model, transcription, history, appContext, advanced, updates, feedback
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .appContext: return "App Context"
         case .general: return "General"
         case .model: return "Engine & Model"
         case .transcription: return "Transcription"
@@ -1065,6 +1074,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     }
     var icon: String {
         switch self {
+        case .appContext: return "macwindow"
         case .general: return "slider.horizontal.3"
         case .model: return "cpu"
         case .transcription: return "text.bubble"
@@ -1155,6 +1165,7 @@ struct SettingsView: View {
     /// Content for the currently-selected sidebar tab.
     @ViewBuilder private var detailContent: some View {
         switch selectedTab {
+        case .appContext:    AppContextSettingsView(viewModel: viewModel)
         case .general:       shortcutSettings
         case .model:         modelSettings
         case .transcription: transcriptionSettings
