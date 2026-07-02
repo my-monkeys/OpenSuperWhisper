@@ -57,6 +57,36 @@ enum AppleSpeechSupport {
         }
     }
 
+    /// Install the locale's assets if they're missing. The system caps reserved
+    /// locales ("Too many allocated locales, 5 maximum") — when the quota is full,
+    /// release one we're not about to use and retry once. `onProgress` exposes the
+    /// system download's Progress for UI.
+    @available(macOS 26.0, *)
+    static func installAssetsIfNeeded(supporting transcriber: SpeechTranscriber, locale: Locale,
+                                      onProgress: ((Foundation.Progress) -> Void)? = nil) async throws {
+        do {
+            try await installOnce(transcriber, onProgress: onProgress)
+        } catch {
+            let reserved = await AssetInventory.reservedLocales
+            guard let victim = reserved.first(where: { $0.identifier != locale.identifier }) else {
+                throw error
+            }
+            _ = await AssetInventory.release(reservedLocale: victim)
+            try await installOnce(transcriber, onProgress: onProgress)
+        }
+        await refreshCaches()
+    }
+
+    @available(macOS 26.0, *)
+    private static func installOnce(_ transcriber: SpeechTranscriber,
+                                    onProgress: ((Foundation.Progress) -> Void)?) async throws {
+        guard let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else {
+            return
+        }
+        onProgress?(request.progress)
+        try await request.downloadAndInstall()
+    }
+
     /// The Locale to transcribe with for the app's language setting.
     /// "auto" means the user's system language (per-transcriber locale is fixed —
     /// the system model has no cross-language auto-detect).
@@ -94,10 +124,7 @@ final class AppleSpeechEngine: TranscriptionEngine {
 
         // Settings installs assets up front, but a language switched from the menu bar
         // may not have them yet — fetch now rather than fail the dictation.
-        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            try await request.downloadAndInstall()
-            await AppleSpeechSupport.refreshCaches()
-        }
+        try await AppleSpeechSupport.installAssetsIfNeeded(supporting: transcriber, locale: locale)
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         currentAnalyzer = analyzer
