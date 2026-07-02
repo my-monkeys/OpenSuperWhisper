@@ -283,9 +283,9 @@ class IndicatorViewModel: ObservableObject {
                 }
             }
         } else {
-            
+
             print("!!! Not found record url !!!")
-            
+
             Task {
                 await MainActor.run {
                     self.delegate?.didFinishDecoding()
@@ -293,7 +293,7 @@ class IndicatorViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// Insert a recording (already at its final URL) into the store with the measured
     /// audio duration and the captured source context (app / window / URL / model used).
     /// Shared by the success and failure paths so their metadata wiring can't drift.
@@ -473,6 +473,25 @@ struct RecordingIndicator: View {
     }
 }
 
+/// Pointing-hand cursor while hovering (macOS 14 predates SwiftUI's .pointerStyle).
+/// Pops on disappear too, so the cursor never sticks when the bubble goes away
+/// mid-hover (e.g. after clicking Stop).
+private struct PointerCursorModifier: ViewModifier {
+    @State private var hovering = false
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onDisappear { if hovering { NSCursor.pop(); hovering = false } }
+    }
+}
+
+extension View {
+    func pointerCursorOnHover() -> some View { modifier(PointerCursorModifier()) }
+}
+
 /// Reports the indicator bubble's laid-out size (before the entrance render transforms) so the
 /// window manager can size the panel itself — see the note on `.onPreferenceChange` below.
 private struct IndicatorContentSizeKey: PreferenceKey {
@@ -505,10 +524,58 @@ struct IndicatorWindow: View {
             return hasCaption ? max(notch.width, 440) : notch.width
         }
         let live = viewModel.state == .recording && IndicatorViewModel.shouldUseLiveStreaming
-        return live ? 380 : 200
+        if live { return 380 }
+        // Widen the recording pill to fit any enabled on-bubble buttons so the
+        // "Recording…" label never wraps; compact (200) otherwise.
+        var width: CGFloat = 200
+        if viewModel.state == .recording {
+            if AppPreferences.shared.showStopButtonOnIndicator { width += 20 }
+            if AppPreferences.shared.showCancelButtonOnIndicator { width += 20 }
+        }
+        return width
     }
     
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
+
+    /// Opt-in on-bubble controls (default off). Shown on the trailing side while
+    /// recording. Stop = stop & transcribe (same as the hotkey toggle); Cancel =
+    /// discard (same as the Esc cancel shortcut). Fixed-size, so they don't couple
+    /// the bubble's size to the window (see the recursion-crash note above).
+    private var anyIndicatorButton: Bool {
+        AppPreferences.shared.showStopButtonOnIndicator
+            || AppPreferences.shared.showCancelButtonOnIndicator
+    }
+
+    @ViewBuilder private var indicatorControls: some View {
+        HStack(spacing: 8) {
+            if AppPreferences.shared.showStopButtonOnIndicator {
+                Button { IndicatorWindowManager.shared.stopRecording() } label: {
+                    // A red ring with a red stop square inside (transparent interior).
+                    Image(systemName: "stop.circle")
+                        .font(.system(size: 19, weight: .regular))
+                        .foregroundColor(.red)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointerCursorOnHover()
+                .help("Finish recording")
+            }
+            if AppPreferences.shared.showCancelButtonOnIndicator {
+                Button { IndicatorWindowManager.shared.stopForce() } label: {
+                    // A plain red trash can — discard without transcribing.
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundColor(.red)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointerCursorOnHover()
+                .help("Cancel recording")
+            }
+        }
+    }
 
     var body: some View {
 
@@ -527,7 +594,7 @@ struct IndicatorWindow: View {
                     
                     Text("Connecting...")
                         .font(.system(size: 13, weight: .semibold))
-                }
+                }                
             case .recording:
                 if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
@@ -537,6 +604,10 @@ struct IndicatorWindow: View {
                         Text("Recording…")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.secondary)
+                        if anyIndicatorButton {
+                            Spacer(minLength: 8)
+                            indicatorControls
+                        }
                     }
                 } else {
                     // Once text starts, drop the label: just the dot + the text, which grows
@@ -551,6 +622,10 @@ struct IndicatorWindow: View {
                             .font(.system(size: 14))
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(width: 300, alignment: .leading)
+                        if anyIndicatorButton {
+                            Spacer(minLength: 8)
+                            indicatorControls
+                        }
                     }
                 }
 
@@ -564,7 +639,7 @@ struct IndicatorWindow: View {
 
                     Text("Transcribing...")
                         .font(.system(size: 13, weight: .semibold))
-                }
+                }                
             case .busy:
                 HStack(spacing: 8) {
                     Image(systemName: "hourglass")
@@ -574,7 +649,7 @@ struct IndicatorWindow: View {
                     Text("Processing...")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.orange)
-                }
+                }                
             case .error(let message):
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
