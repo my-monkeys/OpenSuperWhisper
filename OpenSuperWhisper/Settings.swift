@@ -1068,26 +1068,33 @@ struct SettingRow<Trailing: View>: View {
 
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, model, transcription, history, appContext, advanced, updates, feedback
+    case dictation, models, output, rules, history, advanced, updates, feedback
     var id: String { rawValue }
+
+    /// Main navigation (sidebar top) vs utility items (sidebar footer).
+    static let main: [SettingsTab] = [.dictation, .models, .output, .rules, .history, .advanced]
+    static let footer: [SettingsTab] = [.updates, .feedback]
+
     var title: String {
         switch self {
-        case .appContext: return "App Context"
-        case .general: return "General"
-        case .model: return "Engine & Model"
-        case .transcription: return "Transcription"
-        case .history: return "History"
+        case .dictation: return "Dictation"
+        case .models: return "Models"
+        case .output: return "Output"
+        case .rules: return "Rules"
+        case .history: return "History & Privacy"
         case .advanced: return "Advanced"
         case .updates: return "Updates"
         case .feedback: return "Feedback"
         }
     }
+    // Icons carried over from the previous sidebar (kept on purpose); "Rules" is the
+    // one new tab, so it gets the one new symbol.
     var icon: String {
         switch self {
-        case .appContext: return "macwindow"
-        case .general: return "slider.horizontal.3"
-        case .model: return "cpu"
-        case .transcription: return "text.bubble"
+        case .dictation: return "slider.horizontal.3"
+        case .models: return "cpu"
+        case .output: return "text.bubble"
+        case .rules: return "arrow.triangle.branch"
         case .history: return "clock.arrow.circlepath"
         case .advanced: return "gearshape"
         case .updates: return "sparkles"
@@ -1109,7 +1116,11 @@ struct SettingsView: View {
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var isRecordingNewShortcut = false
-    @State private var selectedTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab = .dictation
+    @State private var sidebarSearch = ""
+    @FocusState private var sidebarSearchFocused: Bool
+    @State private var availableUpdateTag: String?
+    @ObservedObject private var micService = MicrophoneService.shared
     /// The engine whose models are currently being *browsed* (navigation only — the active engine
     /// in `viewModel.selectedEngine` changes only when the user clicks a model).
     @State private var browseEngine: String = AppPreferences.shared.selectedEngine
@@ -1175,29 +1186,26 @@ struct SettingsView: View {
     /// Content for the currently-selected sidebar tab.
     @ViewBuilder private var detailContent: some View {
         switch selectedTab {
-        case .appContext:    AppContextSettingsView(viewModel: viewModel)
-        case .general:       shortcutSettings
-        case .model:         modelSettings
-        case .transcription: transcriptionSettings
-        case .history:       storageSettings
-        case .advanced:      advancedSettings
-        case .updates:       UpdatesView()
-        case .feedback:      feedbackSettings
+        case .dictation: dictationSettings
+        case .models:    modelSettings
+        case .output:    transcriptionSettings
+        case .rules:     AppContextSettingsView(viewModel: viewModel)
+        case .history:   storageSettings
+        case .advanced:  advancedSettings
+        case .updates:   UpdatesView()
+        case .feedback:  feedbackSettings
         }
     }
 
     /// "Feedback" tab — recruit beta testers and route every kind of report (#beta).
     private var feedbackSettings: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Help us improve")
-                        .font(.title2).bold()
-                    Text("OpenSuperWhisper gets better with your feedback. Hit a bug, or have an idea? Tell us — every report helps make it more stable.")
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+        SPane(title: "Feedback", subtitle: "Help us improve") {
+            Text("OpenSuperWhisper gets better with your feedback. Hit a bug, or have an idea? Tell us — every report helps make it more stable.")
+                .font(.system(size: 12))
+                .foregroundColor(STheme.hint)
+                .fixedSize(horizontal: false, vertical: true)
 
+            VStack(spacing: 10) {
                 feedbackLink(
                     title: "Report a bug",
                     subtitle: "On GitHub — steps to reproduce, your macOS version & engine, logs if you have them",
@@ -1213,11 +1221,7 @@ struct SettingsView: View {
                     subtitle: "Early features before they ship, on GitHub Releases",
                     icon: "testtube.2",
                     url: "https://github.com/my-monkeys/OpenSuperWhisper/releases")
-
-                Spacer(minLength: 0)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -1227,106 +1231,174 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(.accentColor)
-                    .frame(width: 30)
+                    .font(.system(size: 15))
+                    .foregroundColor(STheme.accent)
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline)
-                    Text(subtitle).font(.caption).foregroundColor(.secondary)
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(STheme.textBright)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Image(systemName: "arrow.up.right")
-                    .font(.caption).foregroundColor(.secondary)
+                    .font(.system(size: 10))
+                    .foregroundColor(STheme.hint)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.controlBackgroundColor))
-            .cornerRadius(10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(STheme.cardBg))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(STheme.border, lineWidth: 1))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    /// One row in the left sidebar (drawer).
-    private func sidebarRow(_ tab: SettingsTab) -> some View {
+    /// One row in the left sidebar. Selection = soft copper tint (design: "teinte douce").
+    private func sidebarRow(_ tab: SettingsTab, compact: Bool = false) -> some View {
         Button {
             selectedTab = tab
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .frame(width: 20, alignment: .center)
+                    .font(.system(size: compact ? 11 : 12, weight: .medium))
+                    .frame(width: 18, alignment: .center)
+                    .foregroundColor(selectedTab == tab ? STheme.accent : STheme.hint)
                 Text(tab.title)
-                    .font(.system(size: 13))
+                    .font(.system(size: compact ? 12 : 13, weight: .medium))
                 Spacer(minLength: 0)
+                if tab == .updates && availableUpdateTag != nil {
+                    Circle().fill(STheme.accent).frame(width: 6, height: 6)
+                }
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 7)
-            .foregroundStyle(selectedTab == tab ? Color.white : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, compact ? 5 : 7)
+            .foregroundStyle(selectedTab == tab ? STheme.accent : STheme.sidebarItem)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selectedTab == tab ? Color.accentColor : Color.clear)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selectedTab == tab ? STheme.accentSoft : Color.clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
+    /// Sidebar tabs matching the search box (matches everything when it's empty).
+    private func matchesSearch(_ tab: SettingsTab) -> Bool {
+        let q = sidebarSearch.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty || tab.title.localizedCaseInsensitiveContains(q)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            // Vertical sidebar (drawer) listing the tabs — a plain stack so it
-            // can never collapse the way a NavigationSplitView sidebar does.
-            VStack(alignment: .leading, spacing: 3) {
-                ForEach(SettingsTab.allCases) { tab in
+            // Vertical sidebar — search on top, main categories, utility footer
+            // (Updates with a badge when one is available, Feedback, Support us, version).
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 10))
+                        .foregroundColor(STheme.hint)
+                    TextField("Search…", text: $sidebarSearch)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .foregroundColor(STheme.text)
+                        .focused($sidebarSearchFocused)
+                    Text("⌘F")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(STheme.hint)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(STheme.controlBg))
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(STheme.inputBg))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(STheme.controlBorder, lineWidth: 1))
+                .padding(.bottom, 12)
+                .background(
+                    Button("") { sidebarSearchFocused = true }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .opacity(0)
+                )
+
+                ForEach(SettingsTab.main.filter(matchesSearch)) { tab in
                     sidebarRow(tab)
                 }
                 Spacer(minLength: 0)
-            }
-            .padding(10)
-            .frame(width: 212)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .background(.regularMaterial)
 
-            Divider()
-
-            VStack(spacing: 0) {
-                detailContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                Divider()
-
-                // Footer lives inside the detail column so it never runs under the sidebar.
-                HStack {
-                    Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star")
-                                .font(.system(size: 10))
-                            Text("GitHub")
-                                .font(.system(size: 11))
-                        }
-                        .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Button("Done") {
-                        if viewModel.selectedEngine == "whisper" {
-                            if viewModel.selectedModelURL != previousModelURL, let modelPath = viewModel.selectedModelURL?.path {
-                                TranscriptionService.shared.reloadModel(with: modelPath)
-                            }
-                        }
-                        dismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
+                Rectangle().fill(STheme.border).frame(height: 1).padding(.vertical, 8)
+                ForEach(SettingsTab.footer.filter(matchesSearch)) { tab in
+                    sidebarRow(tab, compact: true)
                 }
-                .padding()
-                .background(Color(.windowBackgroundColor))
+                Button {
+                    if let url = URL(string: "https://ko-fi.com/mymonkey") { NSWorkspace.shared.open(url) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "heart")
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(width: 18, alignment: .center)
+                            .foregroundColor(STheme.hint)
+                        Text("Support us").font(.system(size: 12, weight: .medium))
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .foregroundStyle(STheme.sidebarItem)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                HStack(spacing: 6) {
+                    Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
+                        HStack(spacing: 6) {
+                            Image("github-mark")
+                                .resizable()
+                                .renderingMode(.template)
+                                .frame(width: 13, height: 13)
+                            Text("v\(UpdateChecker.currentVersion)")
+                                .font(.system(size: 10.5, design: .monospaced))
+                        }
+                        .foregroundColor(STheme.hint.opacity(0.8))
+                        .contentShape(Rectangle())
+                    }
+                    .help("GitHub")
+                    Spacer()
+                    Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
+                        Image(systemName: "star")
+                            .font(.system(size: 10))
+                            .foregroundColor(STheme.hint.opacity(0.8))
+                    }
+                    .help("Star us on GitHub")
+                }
+                .padding(.horizontal, 10).padding(.top, 6)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.windowBackgroundColor))
+            .padding(12)
+            .frame(width: 224)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(STheme.sidebarBg)
+            .task {
+                if let releases = try? await UpdateChecker.fetchReleases() {
+                    availableUpdateTag = UpdateChecker.availableUpdate(in: releases)?.tagName
+                }
+            }
+
+            Rectangle().fill(STheme.border).frame(width: 1)
+
+            detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(STheme.windowBg)
+                // The old footer's Done button carried this legacy reload; the window now
+                // just closes, so run it when the view goes away instead. (Model selection
+                // reloads through ModelSelectionStore anyway — this is belt-and-suspenders
+                // for a Whisper path that predates the stores.)
+                .onDisappear {
+                    if viewModel.selectedEngine == "whisper",
+                       viewModel.selectedModelURL != previousModelURL,
+                       let modelPath = viewModel.selectedModelURL?.path {
+                        TranscriptionService.shared.reloadModel(with: modelPath)
+                    }
+                }
         }
+        .tint(STheme.accent)
         .frame(minWidth: 720, idealWidth: 780, minHeight: 540, idealHeight: 600)
         .onAppear {
             previousModelURL = viewModel.selectedModelURL
@@ -1354,44 +1426,141 @@ struct SettingsView: View {
         }
     }
     
+    /// Compact engine card (design 1b): name + one-line subtitle, copper when browsed.
+    private func engineCard(tag: String, name: String, sub: LocalizedStringKey) -> some View {
+        Button { browseEngine = tag } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(browseEngine == tag ? STheme.accent : STheme.text)
+                    .lineLimit(1)
+                Text(sub)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(STheme.hint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 9)
+                .fill(browseEngine == tag ? STheme.accentSoft : Color.clear))
+            .overlay(RoundedRectangle(cornerRadius: 9)
+                .stroke(browseEngine == tag ? STheme.accent : STheme.controlBorder, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// "● Active · Engine / model" pill (green — the one live-status element).
+    private var activeModelPill: some View {
+        let model = ModelCatalog.activeOption()?.displayName
+        return Text("● Active · \(engineDisplayName(viewModel.selectedEngine))\(model.map { " / \($0)" } ?? "")")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(STheme.ok)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 9).padding(.vertical, 2)
+            .background(Capsule().fill(STheme.okBg))
+            .frame(maxWidth: 340, alignment: .trailing)
+    }
+
+    /// Shared "downloading…" progress block for the local-engine lists.
+    @ViewBuilder private var downloadProgressBlock: some View {
+        if viewModel.isDownloading {
+            HStack(spacing: 12) {
+                if viewModel.downloadProgress > 0 {
+                    ProgressView(value: viewModel.downloadProgress)
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .tint(STheme.accent)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+                if let downloadingName = viewModel.downloadingModelName {
+                    Text(downloadingName)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(STheme.hint)
+                        .lineLimit(1)
+                }
+                Button("Cancel") { viewModel.cancelDownload() }
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
+        }
+    }
+
+    /// Models-directory row (Storage section of the local engines).
+    private func storageSection(path: String, open: @escaping () -> Void) -> some View {
+        SSection(title: "Storage") {
+            SRow(title: "Models directory", hint: LocalizedStringKey(path)) {
+                Button("Open in Finder", action: open)
+                    .controlSize(.small)
+            }
+        }
+    }
+
     private var modelSettings: some View {
-        ScrollView {
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Speech Recognition Engine")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    // Active engine + model — right under the title, always visible while browsing.
-                    Label("Active: \(engineDisplayName(viewModel.selectedEngine))",
-                          systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Models")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(STheme.textBright)
+                Spacer()
+                activeModelPill
+            }
+            .padding(.horizontal, 24).padding(.top, 16)
 
-                    // All engines are peers: three on-device (Parakeet / Whisper /
-                    // SenseVoice) plus Remote. Picking one shows its settings below.
-                    HStack {
-                        Spacer()
-                        Picker("", selection: $browseEngine) {
-                            Text("Parakeet").tag("fluidaudio")
-                            Text("Whisper").tag("whisper")
+            HStack(spacing: 8) {
+                engineCard(tag: "fluidaudio", name: "Parakeet", sub: "Fast, on-device")
+                engineCard(tag: "whisper", name: "Whisper", sub: "Accurate · 99 langs")
 #if arch(arm64)
-                            Text("SenseVoice").tag("sensevoice")
+                engineCard(tag: "sensevoice", name: "SenseVoice", sub: "zh · yue · ja · ko")
 #endif
-                            Text("Remote").tag("remote")
+                engineCard(tag: "remote", name: "Remote", sub: "Your own server")
+            }
+            .padding(.horizontal, 24).padding(.top, 12)
+
+            if browseEngine == "remote" {
+                HStack(spacing: 8) {
+                    Text("⚠︎")
+                    Text("Audio is uploaded to the remote server — not necessarily on-device.")
+                }
+                .font(.system(size: 11.5))
+                .foregroundColor(STheme.warn)
+                .padding(.horizontal, 11).padding(.vertical, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.warnBg))
+                .padding(.horizontal, 24).padding(.top, 10)
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if browseEngine == "whisper" {
+                        SSection(title: "Whisper models") {
+                            VStack(spacing: 8) {
+                                ForEach($viewModel.downloadableModels) { $model in
+                                    ModelDownloadItemView(model: $model, viewModel: viewModel)
+                                }
+                            }
+                            downloadProgressBlock
                         }
-                        .pickerStyle(.segmented)
-                        .fixedSize()
-                        Spacer()
+                        storageSection(path: WhisperModelManager.shared.modelsDirectory.path) {
+                            NSWorkspace.shared.open(WhisperModelManager.shared.modelsDirectory)
+                        }
+                    } else if browseEngine == "fluidaudio" {
+                        SSection(title: "Parakeet models") {
+                            VStack(spacing: 8) {
+                                ForEach($viewModel.downloadableFluidAudioModels) { $model in
+                                    FluidAudioModelDownloadItemView(model: $model, viewModel: viewModel)
+                                }
+                            }
+                            downloadProgressBlock
+                        }
+                        storageSection(path: AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent().path) {
+                            NSWorkspace.shared.open(AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent())
+                        }
                     }
-                    .padding(.top, 4)
-
-                    Text(engineBlurb(for: browseEngine))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, 8)
-
 #if arch(arm64)
                     if browseEngine == "sensevoice" {
                         SenseVoiceModelSection(viewModel: viewModel)
@@ -1400,927 +1569,594 @@ struct SettingsView: View {
                     if browseEngine == "remote" {
                         RemoteSettingsSection(viewModel: viewModel)
                     }
-
-                    if browseEngine == "whisper" {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Whisper Model")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            ScrollView {
-                                VStack(spacing: 12) {
-                                    ForEach($viewModel.downloadableModels) { $model in
-                                        ModelDownloadItemView(model: $model, viewModel: viewModel)
-                                    }
-                                }
-                            }
-                            .frame(maxHeight: 200)
-                            
-                            if viewModel.isDownloading {
-                                VStack(spacing: 8) {
-                                    HStack {
-                                        if viewModel.downloadProgress > 0 {
-                                            ProgressView(value: viewModel.downloadProgress)
-                                                .progressViewStyle(LinearProgressViewStyle())
-                                        } else {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle())
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Button("Cancel") {
-                                            viewModel.cancelDownload()
-                                        }
-                                        .buttonStyle(.bordered)
-                                    }
-                                    
-                                    if let downloadingName = viewModel.downloadingModelName {
-                                        Text("Downloading: \(downloadingName)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .padding(.top, 8)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Models Directory:")
-                                        .font(.subheadline)
-                                    Button(action: {
-                                        NSWorkspace.shared.open(WhisperModelManager.shared.modelsDirectory)
-                                    }) {
-                                        Label("Open Folder", systemImage: "folder")
-                                            .font(.subheadline)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help("Open models directory")
-                                }
-                                Text(WhisperModelManager.shared.modelsDirectory.path)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .textSelection(.enabled)
-                                    .padding(8)
-                                    .background(Color(.textBackgroundColor).opacity(0.5))
-                                    .cornerRadius(6)
-                            }
-                            .padding(.top, 8)
-                        }
-                    } else if browseEngine == "fluidaudio" {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Parakeet Model")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            ScrollView {
-                                VStack(spacing: 12) {
-                                    ForEach($viewModel.downloadableFluidAudioModels) { $model in
-                                        FluidAudioModelDownloadItemView(model: $model, viewModel: viewModel)
-                                    }
-                                }
-                            }
-                            .frame(maxHeight: 200)
-                            
-                            if viewModel.isDownloading {
-                                VStack(spacing: 8) {
-                                    HStack {
-                                        if viewModel.downloadProgress > 0 {
-                                            ProgressView(value: viewModel.downloadProgress)
-                                                .progressViewStyle(LinearProgressViewStyle())
-                                        } else {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle())
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Button("Cancel") {
-                                            viewModel.cancelDownload()
-                                        }
-                                        .buttonStyle(.bordered)
-                                    }
-                                    
-                                    if let downloadingName = viewModel.downloadingModelName {
-                                        Text("Downloading: \(downloadingName)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .padding(.top, 8)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Models Directory:")
-                                        .font(.subheadline)
-                                    Button(action: {
-                                        let cacheDir = AsrModels.defaultCacheDirectory(for: .v3)
-                                        let parentDir = cacheDir.deletingLastPathComponent()
-                                        NSWorkspace.shared.open(parentDir)
-                                    }) {
-                                        Label("Open Folder", systemImage: "folder")
-                                            .font(.subheadline)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help("Open models directory")
-                                }
-                                Text(AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent().path)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .textSelection(.enabled)
-                                    .padding(8)
-                                    .background(Color(.textBackgroundColor).opacity(0.5))
-                                    .cornerRadius(6)
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
+                .padding(.horizontal, 24).padding(.vertical, 14)
             }
         }
-        .padding()
+        .background(STheme.windowBg)
     }
-    
+
+    /// Small themed text input used across the Output pane.
+    private func sInput(_ text: Binding<String>, prompt: String, width: CGFloat, mono: Bool = false) -> some View {
+        TextField("", text: text, prompt: Text(prompt))
+            .textFieldStyle(.plain)
+            .font(.system(size: 12, design: mono ? .monospaced : .default))
+            .autocorrectionDisabled(true)
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .frame(width: width)
+            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+    }
+
+    /// Themed multiline editor (regex, prompts, instructions).
+    private func sEditor(_ text: Binding<String>, height: CGFloat) -> some View {
+        TextEditor(text: text)
+            .font(.system(size: 11.5, design: .monospaced))
+            .scrollContentBackground(.hidden)
+            .padding(6)
+            .frame(height: height)
+            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+    }
+
+    @ViewBuilder private var ollamaStatusView: some View {
+        switch viewModel.ollamaStatus {
+        case .unknown:
+            EmptyView()
+        case .checking:
+            ProgressView().controlSize(.small)
+        case .ok:
+            Text("✓ Connected — model ready")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(STheme.ok)
+                .padding(.horizontal, 9).padding(.vertical, 2)
+                .background(Capsule().fill(STheme.okBg))
+        case .modelMissing(let model):
+            Text("Reachable, but “\(model)” isn't pulled — run: ollama pull \(model)")
+                .font(.system(size: 11))
+                .foregroundColor(STheme.warn)
+                .fixedSize(horizontal: false, vertical: true)
+        case .unreachable:
+            Text("✕ Can't reach Ollama — is it running? (ollama serve)")
+                .font(.system(size: 11))
+                .foregroundColor(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var transcriptionSettings: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Language Settings
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Language Settings")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Transcription Language")
-                            .font(.subheadline)
-                        
-                        Picker("Language", selection: $viewModel.selectedLanguage) {
-                            ForEach(viewModel.supportedLanguages, id: \.self) { code in
-                                Text(LanguageUtil.languageNames[code] ?? code)
-                                    .tag(code)
-                            }
-                        }
-                        // Recreate the picker when the engine's language set changes, so its
-                        // selection never gets stuck blank on a value that left the list; and
-                        // clamp the stored language to a supported one when this view appears.
-                        .id(viewModel.supportedLanguages)
-                        .onAppear { viewModel.clampLanguageToSupported() }
-                        .pickerStyle(.menu)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.controlBackgroundColor))
-                        .cornerRadius(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text("Translate to English")
-                                    .font(.subheadline)
-                                    .foregroundColor(viewModel.canTranslate ? .primary : .secondary)
-                                Spacer()
-                                Toggle("", isOn: $viewModel.translateToEnglish)
-                                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                    .labelsHidden()
-                                    .disabled(!viewModel.canTranslate)
-                            }
-                            if !viewModel.canTranslate {
-                                Text("Only Whisper and remote servers translate; the current engine ignores this.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            } else if viewModel.translateToEnglish && viewModel.selectedEngine == "remote" {
-                                // We forward to the server's /audio/translations endpoint, but there's
-                                // no capability signal per remote model — so we can't verify the server
-                                // actually translates. Say so instead of failing silently server-side.
-                                Text("Sent to the server's translations endpoint — we can't confirm this remote model supports translation.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.top, 4)
-                        
-                        if Settings.asianLanguages.contains(viewModel.selectedLanguage) {
-                            HStack {
-                                Text("Use Asian Autocorrect")
-                                    .font(.subheadline)
-                                Spacer()
-                                Toggle("", isOn: $viewModel.useAsianAutocorrect)
-                                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                    .labelsHidden()
-                            }
-                            .padding(.top, 4)
+        SPane(title: "Output", subtitle: "What happens to your text, in pipeline order") {
+            SSection(title: "Language") {
+                SRow(title: "Transcription language") {
+                    Picker("", selection: $viewModel.selectedLanguage) {
+                        ForEach(viewModel.supportedLanguages, id: \.self) { code in
+                            Text(LanguageUtil.languageNames[code] ?? code).tag(code)
                         }
                     }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-                
-                // Output Options
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Output Options")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Show Timestamps")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.showTimestamps)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                        
-                        HStack {
-                            Text("Suppress Blank Audio")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.suppressBlankAudio)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Add Space After Sentence")
-                                    .font(.subheadline)
-                                Text("Appends a space when transcription ends with punctuation")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.addSpaceAfterSentence)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Filler Words
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Filler Words")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    SettingRow(
-                        title: "Remove filler words",
-                        caption: "Strip um, uh, er… from transcriptions before inserting.",
-                        info: "Removes matches of the regex below (case-insensitive) from the transcription, then tidies the spacing. Off by default; the inserted text is otherwise unchanged."
-                    ) {
-                        Toggle("", isOn: $viewModel.removeFillerWords)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.removeFillerWords {
-                        TextEditor(text: $viewModel.fillerWordsPattern)
-                            .font(.system(.body, design: .monospaced))
-                            .frame(height: 56)
-                            .padding(6)
-                            .background(Color(.textBackgroundColor))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                        Text("Case-insensitive regex of filler words to remove.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // AI Cleanup
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("AI Cleanup")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    SettingRow(
-                        title: "Clean up with a local LLM (Ollama)",
-                        caption: "Fix punctuation & obvious errors via a local model after transcribing.",
-                        info: "Sends the transcription to your local Ollama server and inserts the cleaned-up result. Requires Ollama running with the model below pulled (e.g. `ollama pull llama3.2`). Adds a little latency. If Ollama isn't reachable, the raw transcription is used unchanged — nothing is lost. Everything stays on your machine."
-                    ) {
-                        Toggle("", isOn: $viewModel.aiPostProcessingEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.aiPostProcessingEnabled {
-                        HStack {
-                            Text("Model")
-                                .font(.subheadline)
-                            Spacer()
-                            TextField("llama3.2", text: $viewModel.aiOllamaModel)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 180)
-                        }
-                        HStack {
-                            Text("Ollama endpoint")
-                                .font(.subheadline)
-                            Spacer()
-                            TextField("http://localhost:11434", text: $viewModel.aiOllamaEndpoint)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 220)
-                            Button {
-                                viewModel.testOllamaConnection()
-                            } label: {
-                                Image(systemName: "bolt.horizontal.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Test the connection to Ollama")
-                        }
-
-                        HStack(spacing: 8) {
-                            Button("Test connection") { viewModel.testOllamaConnection() }
-                                .controlSize(.small)
-
-                            switch viewModel.ollamaStatus {
-                            case .unknown:
-                                EmptyView()
-                            case .checking:
-                                ProgressView().controlSize(.small)
-                                Text("Checking…").font(.caption).foregroundColor(.secondary)
-                            case .ok:
-                                Label("Connected — model ready", systemImage: "checkmark.circle.fill")
-                                    .font(.caption).foregroundColor(.green)
-                            case .modelMissing(let model):
-                                Label("Reachable, but “\(model)” isn't pulled — run: ollama pull \(model)",
-                                      systemImage: "exclamationmark.triangle.fill")
-                                    .font(.caption).foregroundColor(.orange)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            case .unreachable:
-                                Label("Can't reach Ollama — is it running? (ollama serve)",
-                                      systemImage: "xmark.circle.fill")
-                                    .font(.caption).foregroundColor(.red)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            Spacer()
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Instruction")
-                                .font(.subheadline)
-                            TextEditor(text: $viewModel.aiPostProcessingPrompt)
-                                .font(.system(.caption, design: .monospaced))
-                                .frame(height: 80)
-                                .padding(6)
-                                .background(Color(.textBackgroundColor))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                                )
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Clipboard & Paste
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Clipboard & Paste")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Copy to Clipboard")
-                                    .font(.subheadline)
-                                Text("Also place the transcription on the clipboard")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.autoCopyToClipboard)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Auto-paste Transcription")
-                                    .font(.subheadline)
-                                Text("Type the transcription into the focused app")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.autoPasteTranscription)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Paste instead of typing")
-                                    .font(.subheadline)
-                                Text("Insert via ⌘V — works in apps that ignore synthetic typing (Messages, Electron…); uses the clipboard")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.pasteInsteadOfTyping)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Notify When No Paste Target")
-                                    .font(.subheadline)
-                                Text("Show a “copied — press ⌘V” notice if no editable field is focused")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.notifyWhenNoPasteTarget)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Submit on “press enter”")
-                                    .font(.subheadline)
-                                Text("Saying “press enter” at the end removes it from the text and presses Return — submitting in Claude Code, Slack, etc.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.submitOnVoiceCommand)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Initial Prompt
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Initial Prompt")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextEditor(text: $viewModel.initialPrompt)
-                            .frame(height: 60)
-                            .padding(6)
-                            .background(Color(.textBackgroundColor))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                        
-                        Text("Optional text to guide the model's transcription")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Custom Dictionary
-                customDictionarySection
-            }
-            .padding()
-        }
-    }
-    
-    private var customDictionarySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Custom Dictionary")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Spacer()
-                Toggle("", isOn: $viewModel.customDictionaryEnabled)
-                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
+                    // Recreate the picker when the engine's language set changes, so its
+                    // selection never gets stuck blank on a value that left the list; and
+                    // clamp the stored language to a supported one when this view appears.
+                    .id(viewModel.supportedLanguages)
+                    .onAppear { viewModel.clampLanguageToSupported() }
+                    .pickerStyle(.menu)
                     .labelsHidden()
+                    .fixedSize()
+                }
+                SRow(title: "Translate to English",
+                     hint: !viewModel.canTranslate
+                        ? "Only Whisper and remote servers translate; the current engine ignores this."
+                        : (viewModel.translateToEnglish && viewModel.selectedEngine == "remote"
+                            ? "We can't confirm this remote model supports translation"
+                            : nil),
+                     hintColor: viewModel.translateToEnglish && viewModel.selectedEngine == "remote" ? STheme.warn : STheme.hint) {
+                    SToggle(isOn: $viewModel.translateToEnglish, disabled: !viewModel.canTranslate)
+                }
+                if Settings.asianLanguages.contains(viewModel.selectedLanguage) {
+                    SRow(title: "Asian autocorrect", hint: "Fixes CJK spacing") {
+                        SToggle(isOn: $viewModel.useAsianAutocorrect)
+                    }
+                }
             }
 
-            Text("Replace recognized words with a preferred spelling. Matching is case-insensitive and limited to whole words.")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            SSection(title: "Guidance") {
+                SRow(title: "Initial prompt", hint: "Optional text to guide the model's transcription") { EmptyView() }
+                sEditor($viewModel.initialPrompt, height: 48)
+            }
 
-            if viewModel.customDictionaryEnabled {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Boost recognition (advanced)")
-                            .font(.subheadline)
-                        Text("Also bias the model toward these terms while listening, not just fix them afterward. Helps rare, distinctive words (e.g. “Kubernetes”) — but can over-correct short, common ones. Leave off if it replaces too much.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Toggle("", isOn: $viewModel.customDictionaryBoostEnabled)
-                        .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                        .labelsHidden()
+            SSection(title: "Cleanup") {
+                SRow(title: "Remove filler words", hint: "Strip um, uh, er… before inserting") {
+                    SToggle(isOn: $viewModel.removeFillerWords)
                 }
-                .padding(.bottom, 4)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Heard")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("Replace with")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        // Spacer matching the delete button width.
-                        Color.clear.frame(width: 24, height: 1)
+                if viewModel.removeFillerWords {
+                    VStack(alignment: .leading, spacing: 4) {
+                        sEditor($viewModel.fillerWordsPattern, height: 48)
+                        Text("Case-insensitive regex, applied before pasting.")
+                            .font(.system(size: 11)).foregroundColor(STheme.hint)
                     }
-
-                    if viewModel.customDictionaryEntries.isEmpty {
-                        Text("No words yet. Add one below.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 4)
+                    .padding(.leading, 16)
+                }
+                HStack(spacing: 8) {
+                    Text("Clean up with a local LLM")
+                        .font(.system(size: 13)).foregroundColor(STheme.text)
+                    STag("Ollama")
+                    Spacer()
+                    SToggle(isOn: $viewModel.aiPostProcessingEnabled)
+                }
+                .frame(minHeight: 26)
+                if viewModel.aiPostProcessingEnabled {
+                    SRow(title: "Model", indented: true) {
+                        sInput($viewModel.aiOllamaModel, prompt: "llama3.2", width: 170, mono: true)
                     }
-
-                    ForEach($viewModel.customDictionaryEntries) { $entry in
+                    SRow(title: "Endpoint", indented: true) {
                         HStack(spacing: 8) {
-                            TextField("Heard word", text: $entry.original, prompt: Text("git hub"))
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(maxWidth: .infinity)
-                            TextField("Preferred spelling", text: $entry.replacement, prompt: Text("GitHub"))
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(maxWidth: .infinity)
-                            Button(action: {
-                                viewModel.customDictionaryEntries.removeAll { $0.id == entry.id }
-                            }) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.secondary)
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Remove this entry")
-                            .frame(width: 24)
+                            Button("Test") { viewModel.testOllamaConnection() }
+                                .controlSize(.small)
+                            sInput($viewModel.aiOllamaEndpoint, prompt: "http://localhost:11434", width: 210, mono: true)
                         }
                     }
-
-                    Button(action: {
-                        viewModel.customDictionaryEntries.append(CustomDictionaryEntry())
-                    }) {
-                        Label("Add Word", systemImage: "plus.circle")
-                            .font(.subheadline)
+                    HStack { Spacer(); ollamaStatusView }
+                        .padding(.leading, 16)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
+                        sEditor($viewModel.aiPostProcessingPrompt, height: 64)
                     }
-                    .buttonStyle(.borderless)
-                    .padding(.top, 4)
+                    .padding(.leading, 16)
                 }
-                .padding(.top, 4)
+            }
+
+            SSection(title: "Dictionary") {
+                SRow(title: "Custom dictionary", hint: "Whole-word replacement, case-insensitive") {
+                    SToggle(isOn: $viewModel.customDictionaryEnabled)
+                }
+                if viewModel.customDictionaryEnabled {
+                    HStack(spacing: 8) {
+                        Text("Boost recognition")
+                            .font(.system(size: 12)).foregroundColor(STheme.text)
+                        STag("Advanced")
+                        InfoButton(text: "Also bias the model toward these terms while listening, not just fix them afterward. Helps rare, distinctive words (e.g. “Kubernetes”) — but can over-correct short, common ones. Leave off if it replaces too much.")
+                        Spacer()
+                        SToggle(isOn: $viewModel.customDictionaryBoostEnabled)
+                    }
+                    .padding(.leading, 16)
+                    .frame(minHeight: 24)
+
+                    VStack(spacing: 0) {
+                        HStack(spacing: 10) {
+                            Text("Heard").frame(maxWidth: .infinity, alignment: .leading)
+                            Text("Replace with").frame(maxWidth: .infinity, alignment: .leading)
+                            Color.clear.frame(width: 24, height: 1)
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundColor(STheme.sectionTitle)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(STheme.controlBg.opacity(0.6))
+
+                        if viewModel.customDictionaryEntries.isEmpty {
+                            Text("No words yet. Add one below.")
+                                .font(.system(size: 11)).foregroundColor(STheme.hint)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 14)
+                        }
+                        ForEach($viewModel.customDictionaryEntries) { $entry in
+                            HStack(spacing: 10) {
+                                TextField("", text: $entry.original, prompt: Text("git hub"))
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 12))
+                                    .frame(maxWidth: .infinity)
+                                Text("→").font(.system(size: 11)).foregroundColor(STheme.hint)
+                                TextField("", text: $entry.replacement, prompt: Text("GitHub"))
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 12))
+                                    .frame(maxWidth: .infinity)
+                                Button {
+                                    viewModel.customDictionaryEntries.removeAll { $0.id == entry.id }
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(STheme.hint)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Remove this entry")
+                                .frame(width: 24)
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 7)
+                            Rectangle().fill(STheme.border).frame(height: 1)
+                        }
+                    }
+                    .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .padding(.leading, 16)
+
+                    Button {
+                        viewModel.customDictionaryEntries.append(CustomDictionaryEntry())
+                    } label: {
+                        Label("Add word", systemImage: "plus")
+                            .font(.system(size: 11.5, weight: .medium))
+                    }
+                    .controlSize(.small)
+                    .padding(.leading, 16)
+                }
+            }
+
+            SSection(title: "Delivery") {
+                SRow(title: "Copy to clipboard", hint: "Also place the transcription on the clipboard") {
+                    SToggle(isOn: $viewModel.autoCopyToClipboard)
+                }
+                SRow(title: "Auto-paste transcription", hint: "Insert the transcription into the focused app") {
+                    SToggle(isOn: $viewModel.autoPasteTranscription)
+                }
+                SRow(title: "Paste instead of typing",
+                     hint: "⌘V instead of synthetic keystrokes — helps in Electron apps and Messages") {
+                    SToggle(isOn: $viewModel.pasteInsteadOfTyping)
+                }
+                SRow(title: "Notify when no paste target",
+                     hint: "\"Copied — press ⌘V\" if no text field is focused") {
+                    SToggle(isOn: $viewModel.notifyWhenNoPasteTarget)
+                }
+                SRow(title: "Submit on “press enter”",
+                     hint: "Saying “press enter” at the end presses Return — submitting in Claude Code, Slack, etc.") {
+                    SToggle(isOn: $viewModel.submitOnVoiceCommand)
+                }
+                SRow(title: "Show timestamps") {
+                    SToggle(isOn: $viewModel.showTimestamps)
+                }
+                SRow(title: "Suppress blank audio") {
+                    SToggle(isOn: $viewModel.suppressBlankAudio)
+                }
+                SRow(title: "Add space after sentence", hint: "Useful when dictating in bursts") {
+                    SToggle(isOn: $viewModel.addSpaceAfterSentence)
+                }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.3))
-        .cornerRadius(12)
     }
 
     private var storageSettings: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Maximum number of recordings
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Limit Number of Recordings")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Text("Keep only the most recent recordings & transcriptions")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: $viewModel.retentionMaxCountEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
+        SPane(title: "History & Privacy") {
+            SSection(title: "Privacy") {
+                SRow(title: "Save transcription history",
+                     hint: "Off = nothing is ever written to disk — only the current transcription is kept in memory for pasting") {
+                    SToggle(isOn: $viewModel.saveTranscriptionHistory)
+                }
+                SRow(title: "Transcriptions directory",
+                     hint: LocalizedStringKey(Recording.recordingsDirectory.path)) {
+                    Button("Open in Finder") { NSWorkspace.shared.open(Recording.recordingsDirectory) }
+                        .controlSize(.small)
+                }
+            }
 
-                    if viewModel.retentionMaxCountEnabled {
-                        HStack {
-                            Text("Keep at most")
-                                .font(.subheadline)
-                            Spacer()
+            SSection(title: "Retention") {
+                SRow(title: "Limit number of recordings",
+                     hint: "Keep only the most recent recordings & transcriptions") {
+                    SToggle(isOn: $viewModel.retentionMaxCountEnabled)
+                }
+                if viewModel.retentionMaxCountEnabled {
+                    SRow(title: "Keep at most", indented: true) {
+                        HStack(spacing: 6) {
                             TextField("", value: $viewModel.retentionMaxCount, format: .number)
-                                .textFieldStyle(.roundedBorder)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12, design: .monospaced))
                                 .multilineTextAlignment(.trailing)
-                                .frame(width: 80)
+                                .padding(.horizontal, 9).padding(.vertical, 4)
+                                .frame(width: 64)
+                                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                             Stepper("", value: $viewModel.retentionMaxCount, in: 1...100000)
                                 .labelsHidden()
-                            Text("recordings")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            Text("recordings").font(.system(size: 11)).foregroundColor(STheme.hint)
                         }
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Maximum age
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Delete Old Recordings")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Text("Automatically remove recordings older than the chosen age")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: $viewModel.retentionMaxAgeEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.retentionMaxAgeEnabled {
-                        HStack {
-                            Text("Delete after")
-                                .font(.subheadline)
-                            Spacer()
+                SRow(title: "Delete old recordings",
+                     hint: "Automatically remove recordings older than the chosen age") {
+                    SToggle(isOn: $viewModel.retentionMaxAgeEnabled)
+                }
+                if viewModel.retentionMaxAgeEnabled {
+                    SRow(title: "Delete after", indented: true) {
+                        HStack(spacing: 6) {
                             TextField("", value: $viewModel.retentionMaxAgeValue, format: .number)
-                                .textFieldStyle(.roundedBorder)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12, design: .monospaced))
                                 .multilineTextAlignment(.trailing)
-                                .frame(width: 70)
+                                .padding(.horizontal, 9).padding(.vertical, 4)
+                                .frame(width: 56)
+                                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                             Stepper("", value: $viewModel.retentionMaxAgeValue, in: 1...100000)
                                 .labelsHidden()
                             Picker("", selection: $viewModel.retentionMaxAgeUnit) {
-                                ForEach(RetentionUnit.allCases) { unit in
+                                ForEach(RetentionUnit.allCases, id: \.self) { unit in
                                     Text(unit.displayName).tag(unit)
                                 }
                             }
+                            .pickerStyle(.menu)
                             .labelsHidden()
-                            .frame(width: 110)
+                            .fixedSize()
                         }
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                Text("Both limits can be active at the same time. Cleanup runs automatically when you change these settings and after each new transcription, and the age limit is also re-checked periodically in the background. Recordings that are still being processed are never deleted.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Privacy
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Privacy")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Save Transcription History")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.saveTranscriptionHistory)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        Text("When disabled, audio recordings and transcriptions are not saved to disk. Only the current transcription is kept in memory for pasting.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Transcriptions Directory
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Transcriptions Directory")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Directory:")
-                                .font(.subheadline)
-                            Spacer()
-                            Button(action: {
-                                NSWorkspace.shared.open(Recording.recordingsDirectory)
-                            }) {
-                                Label("Open Folder", systemImage: "folder")
-                                    .font(.subheadline)
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Open transcriptions directory")
-                        }
-                        
-                        Text(Recording.recordingsDirectory.path)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .textSelection(.enabled)
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(.textBackgroundColor).opacity(0.5))
-                            .cornerRadius(6)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
+                Text("Both limits combine — whichever is hit first wins. Cleanup runs automatically, never while a transcription is being processed.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding()
         }
     }
 
+    /// "Advanced" — the redesigned engine-internals screen (Settings Explorations 2e):
+    /// App / Decoding / Model parameters / Post-record hook / Debug, in the Atelier style.
     private var advancedSettings: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Decoding Strategy
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Decoding Strategy")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Use Beam Search")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.useBeamSearch)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                                .help("Beam search can provide better results but is slower")
-                        }
-                        
-                        if viewModel.useBeamSearch {
-                            HStack {
-                                Text("Beam Size:")
-                                    .font(.subheadline)
-                                Spacer()
-                                Stepper("\(viewModel.beamSize)", value: $viewModel.beamSize, in: 1...10)
-                                    .help("Number of beams to use in beam search")
-                                    .frame(width: 120)
-                            }
-                        }
+        SPane(title: "Advanced") {
+            SSection(title: "App") {
+                SRow(title: "App language", hint: "Relaunch to apply.") {
+                    Picker("", selection: $appLanguage) {
+                        Text("System").tag("system")
+                        Text("English").tag("en")
+                        Text("Français").tag("fr")
+                        Text("Deutsch").tag("de")
+                        Text("Español").tag("es")
+                        Text("Italiano").tag("it")
+                        Text("Português (BR)").tag("pt-BR")
+                        Text("Tiếng Việt").tag("vi")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 150)
+                    .labelsHidden()
+                    .onChange(of: appLanguage) { _, newValue in
+                        LanguageManager.selected = newValue
+                        langNeedsRelaunch = true
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-                
-                // Model Parameters
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Model Parameters")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Temperature:")
-                                    .font(.subheadline)
-                                Spacer()
-                                Text(String(format: "%.2f", viewModel.temperature))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Slider(value: $viewModel.temperature, in: 0.0...1.0, step: 0.1)
-                                .help("Higher values make the output more random")
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("No Speech Threshold:")
-                                    .font(.subheadline)
-                                Spacer()
-                                Text(String(format: "%.2f", viewModel.noSpeechThreshold))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Slider(value: $viewModel.noSpeechThreshold, in: 0.0...1.0, step: 0.1)
-                                .help("Threshold for detecting speech vs. silence")
-                        }
+                if langNeedsRelaunch {
+                    SRow(title: "Relaunch to apply the new language", indented: true) {
+                        Button("Relaunch Now") { LanguageManager.relaunch() }
+                            .controlSize(.small)
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Post-Record Hook
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Post-Record Hook")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    SettingRow(
-                        title: "Run a command after each transcription",
-                        caption: "Launch your own script when a transcription completes.",
-                        info: "Runs via /bin/sh -c after each successful transcription, in the background. Your command receives the data as environment variables — OSW_TEXT, OSW_AUDIO_PATH (when history is on), OSW_TIMESTAMP, OSW_DURATION — and a JSON object on stdin with the same fields. Example: echo \"$OSW_TEXT\" >> ~/dictations.txt"
-                    ) {
-                        Toggle("", isOn: $viewModel.postRecordHookEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.postRecordHookEnabled {
-                        TextEditor(text: $viewModel.postRecordHookCommand)
-                            .font(.system(.body, design: .monospaced))
-                            .frame(height: 56)
-                            .padding(6)
-                            .background(Color(.textBackgroundColor))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Available in your command (also piped as JSON on stdin):")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            ForEach(Self.postRecordHookVariables, id: \.name) { variable in
-                                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                    Text(variable.name)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundColor(.primary)
-                                    Text("— \(variable.description)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                SRow(title: "Launch at login", hint: "Start OpenSuperWhisper automatically when you log in.") {
+                    SToggle(isOn: Binding(
+                        get: { launchAtLogin.isEnabled },
+                        set: { launchAtLogin.setEnabled($0) }
+                    ))
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Debug Options
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Debug Options")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    HStack {
-                        Text("Debug Mode")
-                            .font(.subheadline)
-                        Spacer()
-                        Toggle("", isOn: $viewModel.debugMode)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                            .help("Enable additional logging and debugging information")
-                    }
+                SRow(title: "Start in the menu bar", hint: "Launch without the main window — open it from the menu bar icon.") {
+                    SToggle(isOn: $viewModel.startHidden)
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
             }
-            .padding()
+
+            SSection(title: "Decoding") {
+                SRow(title: "Use beam search", hint: "Can improve accuracy, at some speed cost.") {
+                    SToggle(isOn: $viewModel.useBeamSearch)
+                }
+                if viewModel.useBeamSearch {
+                    SRow(title: "Beam size", indented: true) {
+                        Stepper("\(viewModel.beamSize)", value: $viewModel.beamSize, in: 1...10)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(STheme.text)
+                            .frame(width: 90)
+                    }
+                }
+            }
+
+            SSection(title: "Model parameters") {
+                VStack(alignment: .leading, spacing: 2) {
+                    SRow(title: "Temperature", hint: "Higher values make decoding more random.") {
+                        Text(String(format: "%.2f", viewModel.temperature))
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundColor(STheme.hint)
+                    }
+                    Slider(value: $viewModel.temperature, in: 0.0...1.0, step: 0.1)
+                        .controlSize(.small)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    SRow(title: "No speech threshold", hint: "How confident the model must be to call a segment silence.") {
+                        Text(String(format: "%.2f", viewModel.noSpeechThreshold))
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundColor(STheme.hint)
+                    }
+                    Slider(value: $viewModel.noSpeechThreshold, in: 0.0...1.0, step: 0.1)
+                        .controlSize(.small)
+                }
+            }
+
+            SSection(title: "Post-record hook") {
+                SRow(title: "Run a command after each transcription", hint: "Launch your own script when a transcription completes.") {
+                    HStack(spacing: 8) {
+                        InfoButton(text: "Runs via /bin/sh -c after each successful transcription, in the background. Your command receives the data as environment variables — OSW_TEXT, OSW_AUDIO_PATH (when history is on), OSW_TIMESTAMP, OSW_DURATION — and a JSON object on stdin with the same fields. Example: echo \"$OSW_TEXT\" >> ~/dictations.txt")
+                        SToggle(isOn: $viewModel.postRecordHookEnabled)
+                    }
+                }
+                if viewModel.postRecordHookEnabled {
+                    sEditor($viewModel.postRecordHookCommand, height: 56)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Available in your command (also piped as JSON on stdin):")
+                            .font(.system(size: 11))
+                            .foregroundColor(STheme.hint)
+                            .fixedSize(horizontal: false, vertical: true)
+                        ForEach(Self.postRecordHookVariables, id: \.name) { variable in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(variable.name)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(STheme.text)
+                                Text("— \(variable.description)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(STheme.hint)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+            }
+
+            SSection(title: "Debug") {
+                SRow(title: "Debug mode", hint: "Extra logging and diagnostic output.") {
+                    SToggle(isOn: $viewModel.debugMode)
+                }
+            }
         }
     }
-    
+
     private var useModifierKey: Bool {
         viewModel.modifierOnlyHotkey != .none
     }
     
+    /// "Dictation" — the redesigned first screen (Settings Explorations 2a):
+    /// Trigger / Recording bar / Input, in the Atelier style.
+    private var dictationSettings: some View {
+        SPane(title: "Dictation") {
+            SSection(title: "Trigger") {
+                SRow(title: "Recording trigger") {
+                    Picker("", selection: Binding(
+                        get: { useModifierKey },
+                        set: { newValue in
+                            if !newValue {
+                                viewModel.modifierOnlyHotkey = .none
+                            } else if viewModel.modifierOnlyHotkey == .none {
+                                viewModel.modifierOnlyHotkey = .leftCommand
+                            }
+                        }
+                    )) {
+                        Text("Key Combination").tag(false)
+                        Text("Single Modifier Key").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                if useModifierKey {
+                    SRow(title: "Modifier key", hint: "One-tap to toggle recording") {
+                        Picker("", selection: $viewModel.modifierOnlyHotkey) {
+                            ForEach(ModifierKey.allCases.filter { $0 != .none }) { key in
+                                Text(key.displayName).tag(key)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    SWarnBox {
+                        Text("**⚠︎ Input Monitoring permission required.** macOS needs it to detect single modifier key presses globally. Only modifier key events (⌘ ⌥ ⇧ ⌃ Fn) are monitored — no regular keystrokes are captured.")
+                        Button("Open Input Monitoring Settings…") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(STheme.warn)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
+                    }
+                } else {
+                    SRow(title: "Shortcut") {
+                        KeyboardShortcuts.Recorder("", name: .toggleRecord)
+                            .frame(width: 150)
+                    }
+                }
+                SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
+                    SToggle(isOn: $viewModel.holdToRecord)
+                }
+                SRow(title: "Cancel shortcut") {
+                    Picker("", selection: $cancelKey) {
+                        ForEach(SettingsView.cancelKeyChoices) { choice in
+                            Text(choice.label).tag(choice.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                    .onChange(of: cancelKey) { _, newValue in
+                        if let choice = SettingsView.cancelKeyChoices.first(where: { $0.id == newValue }) {
+                            KeyboardShortcuts.setShortcut(choice.shortcut, for: .escape)
+                        }
+                    }
+                    .onAppear { cancelKey = SettingsView.currentCancelKeyID() }
+                }
+            }
+
+            SSection(title: "Recording bar") {
+                SRow(title: "Indicator position") {
+                    HStack(spacing: 8) {
+                        Button("Preview") { IndicatorWindowManager.shared.preview() }
+                            .controlSize(.small)
+                        Picker("", selection: $viewModel.indicatorPosition) {
+                            Text("Near cursor").tag("cursor")
+                            Text("Notch").tag("notch")
+                            Text("Top").tag("top")
+                            Text("Center").tag("center")
+                            Text("Bottom").tag("bottom")
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
+                SRow(title: "Show Stop button", hint: "A stop-and-transcribe button on the recording bar") {
+                    SToggle(isOn: $viewModel.showStopButtonOnIndicator)
+                }
+                SRow(title: "Show Cancel button", hint: "A discard (trash) button on the recording bar") {
+                    SToggle(isOn: $viewModel.showCancelButtonOnIndicator)
+                }
+                SRow(title: "Play sound when recording starts") {
+                    SToggle(isOn: $viewModel.playSoundOnRecordStart)
+                }
+                HStack(spacing: 8) {
+                    Text("Live transcription")
+                        .font(.system(size: 13))
+                        .foregroundColor(STheme.text)
+                        .opacity(viewModel.selectedEngine == "fluidaudio" ? 1 : 0.45)
+                    STag("Parakeet only")
+                    Spacer()
+                    SToggle(isOn: $viewModel.liveTranscriptionEnabled,
+                            disabled: viewModel.selectedEngine != "fluidaudio")
+                }
+                .frame(minHeight: 26)
+                SRow(title: "Pause media during recording",
+                     hint: "Resumes what was actually playing when you stop") {
+                    SToggle(isOn: $viewModel.pauseMediaOnRecord)
+                }
+                SRow(title: "Lower system volume while recording") {
+                    SToggle(isOn: $viewModel.reduceVolumeOnRecord)
+                }
+                if viewModel.reduceVolumeOnRecord {
+                    SRow(title: "Volume while recording", indented: true) {
+                        HStack(spacing: 10) {
+                            Slider(value: $viewModel.reduceVolumeLevel, in: 0...0.5)
+                                .controlSize(.small)
+                                .frame(width: 150)
+                                .tint(STheme.accent)
+                            Text("\(Int(viewModel.reduceVolumeLevel * 100))%")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(STheme.hint)
+                                .frame(width: 34, alignment: .trailing)
+                        }
+                    }
+                }
+            }
+
+            SSection(title: "Input") {
+                SRow(title: "Microphone", hint: "Also switchable from the menu bar") {
+                    Picker("", selection: Binding(
+                        get: { micService.selectedMicrophone?.id ?? micService.currentMicrophone?.id ?? "" },
+                        set: { newID in
+                            if let device = micService.availableMicrophones.first(where: { $0.id == newID }) {
+                                micService.selectMicrophone(device)
+                            }
+                        }
+                    )) {
+                        ForEach(micService.availableMicrophones, id: \.id) { device in
+                            Text(device.name).tag(device.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+        }
+    }
+
     private var shortcutSettings: some View {
         ScrollView {
             VStack(spacing: 20) {

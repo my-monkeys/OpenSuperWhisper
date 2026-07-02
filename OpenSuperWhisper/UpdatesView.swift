@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The "Updates" settings tab: shows the current version, a manual update check, and the
-/// release-note history pulled from GitHub Releases.
+/// The "Updates" settings tab (Settings Explorations 2f): shows the current version, a manual
+/// update check, and the release-note history pulled from GitHub Releases.
 struct UpdatesView: View {
     @State private var releases: [GitHubRelease] = []
     @State private var isChecking = false
@@ -10,28 +10,20 @@ struct UpdatesView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                versionCard
-                whatsNewSection
-            }
-            .padding()
+        SPane(title: "Updates") {
+            versionSection
+            whatsNewSection
         }
         .task { await loadReleases() }
     }
 
-    private var versionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Version")
-                .font(.headline)
-                .foregroundColor(.primary)
-
-            HStack(spacing: 10) {
-                Text("OpenSuperWhisper \(UpdateChecker.currentVersion)")
-                    .font(.subheadline)
-
-                Spacer()
-
+    private var versionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let update = availableUpdate {
+                updateBanner(update)
+            }
+            SRow(title: "OpenSuperWhisper \(UpdateChecker.currentVersion)",
+                 hint: "Updates install in place, then the app relaunches.") {
                 Button(action: { Task { await checkForUpdates() } }) {
                     if isChecking {
                         ProgressView().controlSize(.small)
@@ -39,78 +31,81 @@ struct UpdatesView: View {
                         Text("Check for Updates")
                     }
                 }
+                .controlSize(.small)
                 .disabled(isChecking)
             }
-
-            if let update = availableUpdate {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.down.circle.fill").foregroundColor(.green)
-                    Text("Update available: \(update.tagName)")
-                        .font(.subheadline)
-                    Spacer()
-                    // Install in place via Sparkle (download + verify + relaunch), not a web page.
-                    Button("Install Update") { SparkleUpdater.shared.checkForUpdates() }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    // The release page on GitHub, for those who want to read it first.
-                    Button("View on GitHub") { NSWorkspace.shared.open(update.htmlURL) }
-                        .controlSize(.small)
-                }
-            } else if let statusMessage {
+            if let statusMessage {
                 Label(statusMessage, systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(.green)
+                    .font(.system(size: 11))
+                    .foregroundColor(STheme.ok)
             }
-
             if let errorMessage {
-                Text(errorMessage).font(.caption).foregroundColor(.red)
+                Text(errorMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(.red)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.3))
-        .cornerRadius(12)
+    }
+
+    private func updateBanner(_ update: GitHubRelease) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundColor(STheme.accent)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Update available: \(update.tagName)")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(STheme.textBright)
+                // The release page on GitHub, for those who want to read it first.
+                Button("View on GitHub") { NSWorkspace.shared.open(update.htmlURL) }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11))
+            }
+            Spacer()
+            // Install in place via Sparkle (download + verify + relaunch), not a web page.
+            Button("Install Update") { SparkleUpdater.shared.checkForUpdates() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 9).fill(STheme.accentSoft))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.accent.opacity(0.35), lineWidth: 1))
     }
 
     private var whatsNewSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("What's New")
-                .font(.headline)
-                .foregroundColor(.primary)
-
+        SSection(title: "What's new") {
             if releases.isEmpty {
                 Text("Loading release notes…")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundColor(STheme.hint)
             } else {
                 ForEach(releases) { release in
                     releaseRow(release)
                 }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.3))
-        .cornerRadius(12)
     }
 
     private func releaseRow(_ release: GitHubRelease) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline) {
-                Text(release.displayName).font(.subheadline).bold()
+                Text(release.displayName)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(STheme.textBright)
                 Spacer()
                 if let date = release.publishedAt {
-                    Text(date, style: .date).font(.caption).foregroundColor(.secondary)
+                    Text(date, style: .date)
+                        .font(.system(size: 11))
+                        .foregroundColor(STheme.hint)
                 }
             }
             if let body = release.body, !body.isEmpty {
                 Text(renderedNotes(body))
-                    .font(.callout)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundColor(STheme.text.opacity(0.85))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Divider()
+            Rectangle().fill(STheme.border).frame(height: 1).padding(.top, 6)
         }
     }
 

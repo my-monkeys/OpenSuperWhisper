@@ -78,23 +78,8 @@ struct RemoteSettingsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Remote (OpenAI-compatible) Engine")
-                .font(.headline)
-                .foregroundColor(.primary)
-
-            // The one engine family that leaves the device — say so once, here.
-            Label("Audio is uploaded to the remote server — not necessarily on-device.",
-                  systemImage: "cloud")
-                .font(.caption)
-                .foregroundColor(.orange)
-                .fixedSize(horizontal: false, vertical: true)
-
-            // Compact preset dropdown. Default is Custom; Groq prefills the Groq URL
-            // and model list (leaving the key for the user). "Request a preset…" opens
-            // the issue tracker so people can ask for a new built-in provider.
-            HStack(spacing: 8) {
-                Text("Preset").foregroundColor(.secondary)
+        RemoteServerSettingsView(viewModel: viewModel) {
+            SRow(title: "Preset") {
                 Menu {
                     Button("Custom") { select(.custom) }
                     Button("Groq") { select(.groq) }
@@ -127,7 +112,6 @@ struct RemoteSettingsSection: View {
                     Text(selectionLabel)
                 }
                 .fixedSize()
-                Spacer()
             }
             .alert("Save preset", isPresented: $showSavePrompt) {
                 TextField("Name (e.g. Home LiteLLM)", text: $newPresetName)
@@ -136,14 +120,7 @@ struct RemoteSettingsSection: View {
             } message: {
                 Text("Saves the current server URL, model, timeout and API key so you can switch back in one click.")
             }
-
-            // One uniform config UI; the preset menu just prefills its fields.
-            RemoteServerSettingsView(viewModel: viewModel)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(8)
     }
 
     /// Prefill (Groq), restore (user preset) or clear (Custom) the server config.

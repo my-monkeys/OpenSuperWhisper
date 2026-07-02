@@ -17,145 +17,83 @@ struct AppContextSettingsView: View {
     private var hasChoice: Bool { availableModels.count > 1 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        SPane(title: "Rules", subtitle: "Pick a model per app or site") {
             if hasChoice {
-                modeCard
-                rulesCard
+                SSection(title: "Behavior") {
+                    HStack(spacing: 5) {
+                        Text("When the front app changes")
+                            .font(.system(size: 13)).foregroundColor(STheme.text)
+                        InfoButton(text: "Bind a transcription model to an app (or a website, in supported browsers) so it switches automatically when you dictate there. Add a rule below (＋), or from the menu-bar “Model” submenu while that app is focused.\n\n• Ask on change — auto-switch by app, and ask the scope (System Default / this app / just once / forget) whenever you pick a model in the menu.\n• Auto · no prompt — auto-switch by app, but picking a model just sets the system default (no prompt). Set rules up in “Ask”, then switch here.\n• Off — no auto-switch and no prompts.")
+                        Spacer()
+                        Picker("", selection: $viewModel.contextAwareModelMode) {
+                            ForEach(ContextAwareModelMode.allCases, id: \.self) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    .frame(minHeight: 26)
+                }
+
+                SSection(title: "App & site rules") {
+                    VStack(spacing: 0) {
+                        if rules.isEmpty {
+                            (Text("No rules yet.\n").foregroundColor(STheme.hint)
+                                + Text("Click ＋ to add an app, or bind a model from the menu-bar “Model” submenu while an app is focused.")
+                                    .foregroundColor(STheme.hint.opacity(0.75)))
+                                .font(.system(size: 11.5))
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 28).padding(.horizontal, 16)
+                        } else {
+                            ScrollView {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(rules) { rule in
+                                        ruleRow(rule)
+                                        if rule.id != rules.last?.id {
+                                            Rectangle().fill(STheme.border).frame(height: 1)
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(minHeight: 120, maxHeight: 280)
+                        }
+                    }
+                    .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+
+                    HStack(spacing: 8) {
+                        Button(action: addApp) {
+                            Image(systemName: "plus").frame(width: 22, height: 16)
+                        }
+                        .controlSize(.small)
+                        .help("Add an application…")
+                        Button(action: removeSelected) {
+                            Image(systemName: "minus").frame(width: 22, height: 16)
+                        }
+                        .controlSize(.small)
+                        .disabled(selectedID == nil)
+                        .help("Remove the selected rule")
+                        Spacer()
+                    }
+                }
             } else {
-                singleModelNotice
-                Spacer(minLength: 0)
+                SWarnBox {
+                    Text("**Rules need at least two models to switch between.**")
+                    Text("Context-aware selection switches the transcription model based on the app (or website) you're dictating in — download another model in Models to get started.")
+                        .foregroundColor(STheme.text)
+                }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: AppContextModelRules.didChangeNotification)) { _ in
             reload()
         }
-    }
-
-    // MARK: - Single-model notice
-
-    private var singleModelNotice: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "square.stack.3d.up.slash")
-                    .font(.title2)
-                    .foregroundColor(.secondary)
-                Text("App-Specific Models")
-                    .font(.headline)
-            }
-            Text("Context-aware model selection switches the transcription model based on the app (or website) you're dictating in — so it only helps once you have more than one model to choose from.")
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Please download or configure another model to enable app-specific model selection.")
-                .font(.callout).bold()
-                .foregroundColor(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Add a model under Engine & Model (download a Whisper / Parakeet / SenseVoice model, or point the Remote engine at a server).")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.3))
-        .cornerRadius(12)
-    }
-
-    // MARK: - Mode card (moved here from Advanced)
-
-    private var modeCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 5) {
-                Text("Context-Aware Model")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                InfoButton(text: "Bind a transcription model to an app (or a website, in supported browsers) so it switches automatically when you dictate there. Add a rule below (＋), or from the menu-bar “Model” submenu while that app is focused.\n\n• Ask on change — auto-switch by app, and ask the scope (System Default / this app / just once / forget) whenever you pick a model in the menu.\n• Auto · no prompt — auto-switch by app, but picking a model just sets the system default (no prompt). Set rules up in “Ask”, then switch here.\n• Off — no auto-switch and no prompts.")
-            }
-
-            HStack {
-                Text("Mode")
-                    .font(.subheadline)
-                Spacer()
-                Picker("", selection: $viewModel.contextAwareModelMode) {
-                    ForEach(ContextAwareModelMode.allCases, id: \.self) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .fixedSize()
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.3))
-        .cornerRadius(12)
-    }
-
-    // MARK: - Rules list card
-
-    private var rulesCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("App & Site Rules")
-                .font(.headline)
-                .foregroundColor(.primary)
-
-            VStack(spacing: 0) {
-                if rules.isEmpty {
-                    Text("No rules yet. Click ＋ to add an app, or bind a model from the menu-bar “Model” submenu while an app is focused.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.horizontal, 12)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(rules) { rule in
-                                ruleRow(rule)
-                                if rule.id != rules.last?.id { Divider() }
-                            }
-                        }
-                    }
-                    .frame(maxHeight: .infinity)
-                }
-
-                Divider()
-
-                // Add / remove bar, anchored bottom-right of the list container.
-                HStack(spacing: 2) {
-                    Spacer()
-                    Button(action: addApp) {
-                        Image(systemName: "plus").frame(width: 24, height: 20)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Add an application…")
-
-                    Button(action: removeSelected) {
-                        Image(systemName: "minus").frame(width: 24, height: 20)
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(selectedID == nil)
-                    .help("Remove the selected rule")
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-            }
-            .frame(maxHeight: .infinity)
-            .background(Color(.controlBackgroundColor).opacity(0.5))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.separatorColor), lineWidth: 1)
-            )
-            .cornerRadius(8)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(.controlBackgroundColor).opacity(0.3))
-        .cornerRadius(12)
     }
 
     private func ruleRow(_ rule: AppContextRuleRow) -> some View {
