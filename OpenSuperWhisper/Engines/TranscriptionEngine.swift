@@ -35,6 +35,12 @@ enum EngineCapabilities {
             // The remote server decides language support; advertise the full Whisper set
             // (incl. "auto") so the user's choice is forwarded verbatim.
             return LanguageUtil.availableLanguages
+        case "apple":
+            // System speech model (macOS 26). "auto" = the user's system language — the
+            // transcriber has no cross-language auto-detect. The cache is refreshed at
+            // launch; before the first refresh, English is the only safe promise.
+            let cached = AppleSpeechSupport.cachedSupportedLanguages
+            return ["auto"] + (cached.isEmpty ? ["en"] : cached)
         case "sensevoice":
             return ["auto", "zh", "en", "ja", "ko", "yue"]
         case "fluidaudio":

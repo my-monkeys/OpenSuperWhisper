@@ -69,10 +69,18 @@ enum ModelCatalog {
         }
     }
 
+    /// The system speech model (macOS 26+) — one entry, only when the OS supports it
+    /// AND at least one locale's assets are already installed (the cached check keeps
+    /// the never-download-from-the-menu rule).
+    static func appleSpeechModels() -> [DictationModelOption] {
+        guard AppleSpeechSupport.isSupported, AppleSpeechSupport.hasInstalledModel else { return [] }
+        return [DictationModelOption(engine: "apple", identifier: "default", displayName: "Apple Speech")]
+    }
+
     /// Every usable model across engines. Used to decide whether switching is
     /// even meaningful (one model → nothing to choose).
     static func allAvailable() -> [DictationModelOption] {
-        whisperModels() + parakeetModels() + senseVoiceModels() + remoteModels()
+        whisperModels() + parakeetModels() + senseVoiceModels() + appleSpeechModels() + remoteModels()
     }
 
     /// The model currently in effect (active engine + its selected model).
@@ -94,6 +102,8 @@ enum ModelCatalog {
             )
         case "sensevoice":
             return DictationModelOption(engine: "sensevoice", identifier: "default", displayName: "SenseVoice")
+        case "apple":
+            return DictationModelOption(engine: "apple", identifier: "default", displayName: "Apple Speech")
         case "remote":
             let id = prefs.remoteServerModel.trimmingCharacters(in: .whitespacesAndNewlines)
             return id.isEmpty
@@ -116,7 +126,7 @@ enum ModelCatalog {
             prefs.fluidAudioModelVersion = option.identifier
         case "remote":
             prefs.remoteServerModel = option.identifier
-        case "sensevoice":
+        case "sensevoice", "apple":
             break  // single model, nothing else to set
         default:
             break
