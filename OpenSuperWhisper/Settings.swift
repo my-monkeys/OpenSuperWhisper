@@ -1813,161 +1813,73 @@ struct SettingsView: View {
     }
 
     private var storageSettings: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Maximum number of recordings
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Limit Number of Recordings")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Text("Keep only the most recent recordings & transcriptions")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: $viewModel.retentionMaxCountEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
+        SPane(title: "History & Privacy") {
+            SSection(title: "Privacy") {
+                SRow(title: "Save transcription history",
+                     hint: "Off = nothing is ever written to disk — only the current transcription is kept in memory for pasting") {
+                    SToggle(isOn: $viewModel.saveTranscriptionHistory)
+                }
+                SRow(title: "Transcriptions directory",
+                     hint: LocalizedStringKey(Recording.recordingsDirectory.path)) {
+                    Button("Open in Finder") { NSWorkspace.shared.open(Recording.recordingsDirectory) }
+                        .controlSize(.small)
+                }
+            }
 
-                    if viewModel.retentionMaxCountEnabled {
-                        HStack {
-                            Text("Keep at most")
-                                .font(.subheadline)
-                            Spacer()
+            SSection(title: "Retention") {
+                SRow(title: "Limit number of recordings",
+                     hint: "Keep only the most recent recordings & transcriptions") {
+                    SToggle(isOn: $viewModel.retentionMaxCountEnabled)
+                }
+                if viewModel.retentionMaxCountEnabled {
+                    SRow(title: "Keep at most", indented: true) {
+                        HStack(spacing: 6) {
                             TextField("", value: $viewModel.retentionMaxCount, format: .number)
-                                .textFieldStyle(.roundedBorder)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12, design: .monospaced))
                                 .multilineTextAlignment(.trailing)
-                                .frame(width: 80)
+                                .padding(.horizontal, 9).padding(.vertical, 4)
+                                .frame(width: 64)
+                                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                             Stepper("", value: $viewModel.retentionMaxCount, in: 1...100000)
                                 .labelsHidden()
-                            Text("recordings")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            Text("recordings").font(.system(size: 11)).foregroundColor(STheme.hint)
                         }
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Maximum age
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Delete Old Recordings")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Text("Automatically remove recordings older than the chosen age")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: $viewModel.retentionMaxAgeEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.retentionMaxAgeEnabled {
-                        HStack {
-                            Text("Delete after")
-                                .font(.subheadline)
-                            Spacer()
+                SRow(title: "Delete old recordings",
+                     hint: "Automatically remove recordings older than the chosen age") {
+                    SToggle(isOn: $viewModel.retentionMaxAgeEnabled)
+                }
+                if viewModel.retentionMaxAgeEnabled {
+                    SRow(title: "Delete after", indented: true) {
+                        HStack(spacing: 6) {
                             TextField("", value: $viewModel.retentionMaxAgeValue, format: .number)
-                                .textFieldStyle(.roundedBorder)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12, design: .monospaced))
                                 .multilineTextAlignment(.trailing)
-                                .frame(width: 70)
+                                .padding(.horizontal, 9).padding(.vertical, 4)
+                                .frame(width: 56)
+                                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                             Stepper("", value: $viewModel.retentionMaxAgeValue, in: 1...100000)
                                 .labelsHidden()
                             Picker("", selection: $viewModel.retentionMaxAgeUnit) {
-                                ForEach(RetentionUnit.allCases) { unit in
+                                ForEach(RetentionUnit.allCases, id: \.self) { unit in
                                     Text(unit.displayName).tag(unit)
                                 }
                             }
+                            .pickerStyle(.menu)
                             .labelsHidden()
-                            .frame(width: 110)
+                            .fixedSize()
                         }
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                Text("Both limits can be active at the same time. Cleanup runs automatically when you change these settings and after each new transcription, and the age limit is also re-checked periodically in the background. Recordings that are still being processed are never deleted.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Privacy
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Privacy")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Save Transcription History")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.saveTranscriptionHistory)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        Text("When disabled, audio recordings and transcriptions are not saved to disk. Only the current transcription is kept in memory for pasting.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Transcriptions Directory
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Transcriptions Directory")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Directory:")
-                                .font(.subheadline)
-                            Spacer()
-                            Button(action: {
-                                NSWorkspace.shared.open(Recording.recordingsDirectory)
-                            }) {
-                                Label("Open Folder", systemImage: "folder")
-                                    .font(.subheadline)
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Open transcriptions directory")
-                        }
-                        
-                        Text(Recording.recordingsDirectory.path)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .textSelection(.enabled)
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(.textBackgroundColor).opacity(0.5))
-                            .cornerRadius(6)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
+                Text("Both limits combine — whichever is hit first wins. Cleanup runs automatically, never while a transcription is being processed.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding()
         }
     }
 
