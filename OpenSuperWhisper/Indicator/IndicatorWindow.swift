@@ -1,3 +1,4 @@
+import AVFoundation
 import Cocoa
 import Combine
 import SwiftUI
@@ -115,6 +116,12 @@ class IndicatorViewModel: ObservableObject {
             return
         }
 
+        // Capture where the dictation is happening (frontmost app, browser site/URL,
+        // window title) for the transcript's source metadata. This runs
+        // AppleScript/Accessibility synchronously on the main thread; it's quick,
+        // but see the note in RecordingContext.captureFrontmost.
+        RecordingContext.shared.captureFrontmost()
+
         // Show recording immediately and optimistically. Whether the mic needs a
         // connection is decided off the main thread inside `recorder.startRecording()`
         // (it touches AVFoundation/CoreAudio, which can stall); the recorder then
@@ -148,6 +155,13 @@ class IndicatorViewModel: ObservableObject {
 
     static var shouldUseLiveStreaming: Bool {
         AppPreferences.shared.liveTranscriptionEnabled && AppPreferences.shared.selectedEngine == "fluidaudio"
+    }
+
+    /// Real duration of a saved audio file, in seconds (0 if it can't be read).
+    nonisolated static func audioDuration(of url: URL) async -> TimeInterval {
+        guard let seconds = try? await AVURLAsset(url: url).load(.duration) else { return 0 }
+        let value = CMTimeGetSeconds(seconds)
+        return value.isFinite ? value : 0
     }
 
     func startDecoding() {
@@ -215,19 +229,10 @@ class IndicatorViewModel: ObservableObject {
                         try recorder.moveTemporaryRecording(from: tempURL, to: finalURL)
                         hookAudioPath = finalURL.path
 
-                        // Save the recording to store
-                        await MainActor.run {
-                            self.recordingStore.addRecording(Recording(
-                                id: recordingId,
-                                timestamp: timestamp,
-                                fileName: fileName,
-                                transcription: text,
-                                duration: 0,
-                                status: .completed,
-                                progress: 1.0,
-                                sourceFileURL: nil
-                            ))
-                        }
+                        await self.storeRecording(
+                            id: recordingId, timestamp: timestamp, fileName: fileName,
+                            finalURL: finalURL, transcription: text,
+                            status: .completed, progress: 1.0)
                     } else {
                         // Delete the temporary recording immediately
                         try? FileManager.default.removeItem(at: tempURL)
@@ -263,18 +268,10 @@ class IndicatorViewModel: ObservableObject {
                     // and can be re-run with the regenerate (↻) button. Otherwise discard.
                     if AppPreferences.shared.saveTranscriptionHistory,
                        let saved = self.persistFailedRecording(tempURL: tempURL) {
-                        await MainActor.run {
-                            self.recordingStore.addRecording(Recording(
-                                id: saved.id,
-                                timestamp: saved.timestamp,
-                                fileName: saved.fileName,
-                                transcription: "Transcription failed — click ↻ to try again.",
-                                duration: 0,
-                                status: .failed,
-                                progress: 0,
-                                sourceFileURL: nil
-                            ))
-                        }
+                        await self.storeRecording(
+                            id: saved.id, timestamp: saved.timestamp, fileName: saved.fileName,
+                            finalURL: saved.url, transcription: "Transcription failed — click ↻ to try again.",
+                            status: .failed, progress: 0)
                     } else {
                         try? FileManager.default.removeItem(at: tempURL)
                     }
@@ -296,6 +293,36 @@ class IndicatorViewModel: ObservableObject {
         }
     }
     
+    /// Insert a recording (already at its final URL) into the store with the measured
+    /// audio duration and the captured source context (app / window / URL / model used).
+    /// Shared by the success and failure paths so their metadata wiring can't drift.
+    private func storeRecording(id: UUID, timestamp: Date, fileName: String, finalURL: URL,
+                                transcription: String, status: RecordingStatus, progress: Float) async {
+        let realDuration = await Self.audioDuration(of: finalURL)
+        let ctx = RecordingContext.shared
+        // The model that actually produced the text (which is the local fallback, not
+        // the configured remote model, when the server was unreachable).
+        let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
+        let wasFallback = transcriptionService.lastUsedFallback
+        await MainActor.run {
+            self.recordingStore.addRecording(Recording(
+                id: id,
+                timestamp: timestamp,
+                fileName: fileName,
+                transcription: transcription,
+                duration: realDuration,
+                status: status,
+                progress: progress,
+                sourceFileURL: nil,
+                sourceAppName: ctx.appName,
+                sourceWindowTitle: ctx.windowTitle,
+                sourceURL: ctx.fullURL,
+                modelUsed: modelUsed,
+                wasFallback: wasFallback
+            ))
+        }
+    }
+
     /// Move a temp recording to its permanent location after a FAILED transcription
     /// so the audio survives and can be re-run from the history list. Returns the
     /// saved identity, or nil if the file move failed (then the temp is discarded).

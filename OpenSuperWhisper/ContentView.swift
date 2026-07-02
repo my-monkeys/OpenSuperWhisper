@@ -136,7 +136,7 @@ class ContentViewModel: ObservableObject {
         startFreshLoad(query: query)
     }
     
-    func handleProgressUpdate(id: UUID, transcription: String?, progress: Float, status: RecordingStatus, isRegeneration: Bool?) {
+    func handleProgressUpdate(id: UUID, transcription: String?, progress: Float, status: RecordingStatus, isRegeneration: Bool?, modelUsed: String? = nil, wasFallback: Bool? = nil) {
         if let index = recordings.firstIndex(where: { $0.id == id }) {
             if let transcription = transcription {
                 recordings[index].transcription = transcription
@@ -145,6 +145,12 @@ class ContentViewModel: ObservableObject {
             recordings[index].status = status
             if let isRegeneration = isRegeneration {
                 recordings[index].isRegeneration = isRegeneration
+            }
+            if let modelUsed {
+                recordings[index].modelUsed = modelUsed
+            }
+            if let wasFallback {
+                recordings[index].wasFallback = wasFallback
             }
         }
     }
@@ -176,6 +182,10 @@ class ContentViewModel: ObservableObject {
     }
 
     func startRecording() {
+        // Capture where the dictation is happening (frontmost app + browser site)
+        // for the transcript's source metadata.
+        RecordingContext.shared.captureFrontmost()
+
         if microphoneService.isActiveMicrophoneRequiresConnection() {
             state = .connecting
             stopBlinking()
@@ -234,8 +244,16 @@ class ContentViewModel: ObservableObject {
                         // Move the temporary recording to final location
                         try recorder.moveTemporaryRecording(from: tempURL, to: finalURL)
 
+                        // Source context captured at record-start.
+                        let ctx = RecordingContext.shared
+
                         // Save the recording to store
                         await MainActor.run {
+                            // The model that actually produced the text (the local fallback,
+                            // not the configured remote model, when the server was unreachable).
+                            let modelUsed = TranscriptionService.shared.lastUsedModel?.displayName
+                                ?? ModelCatalog.activeOption()?.displayName
+                            let wasFallback = TranscriptionService.shared.lastUsedFallback
                             let newRecording = Recording(
                                 id: recordingId,
                                 timestamp: timestamp,
@@ -244,7 +262,12 @@ class ContentViewModel: ObservableObject {
                                 duration: self.recordingDuration,
                                 status: .completed,
                                 progress: 1.0,
-                                sourceFileURL: nil
+                                sourceFileURL: nil,
+                                sourceAppName: ctx.appName,
+                                sourceWindowTitle: ctx.windowTitle,
+                                sourceURL: ctx.fullURL,
+                                modelUsed: modelUsed,
+                                wasFallback: wasFallback
                             )
                             self.recordingStore.addRecording(newRecording)
 
@@ -479,9 +502,9 @@ struct ContentView: View {
                                         onDelete: {
                                             viewModel.deleteRecording(recording)
                                         },
-                                        onRegenerate: {
+                                        onRegenerate: { model in
                                             Task {
-                                                await TranscriptionQueue.shared.requeueRecording(recording)
+                                                await TranscriptionQueue.shared.requeueRecording(recording, model: model)
                                             }
                                         }
                                     )
@@ -677,13 +700,17 @@ struct ContentView: View {
             
             let transcription = userInfo["transcription"] as? String
             let isRegeneration = userInfo["isRegeneration"] as? Bool
-            
+            let modelUsed = userInfo["modelUsed"] as? String
+            let wasFallback = userInfo["wasFallback"] as? Bool
+
             viewModel.handleProgressUpdate(
                 id: id,
                 transcription: transcription,
                 progress: progress,
                 status: status,
-                isRegeneration: isRegeneration
+                isRegeneration: isRegeneration,
+                modelUsed: modelUsed,
+                wasFallback: wasFallback
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: RecordingStore.recordingsDidUpdateNotification)) { _ in
@@ -795,8 +822,22 @@ struct RecordingRow: View {
     let recording: Recording
     let searchQuery: String
     let onDelete: () -> Void
-    let onRegenerate: () -> Void
+    /// nil → rerun with the current model; otherwise rerun once with that model. (F3)
+    let onRegenerate: (DictationModelOption?) -> Void
     @StateObject private var audioRecorder = AudioRecorder.shared
+
+    /// Models offered in the rerun dropdown — everything usable right now across engines.
+    private var rerunModels: [DictationModelOption] {
+        ModelCatalog.allAvailable()
+    }
+
+    /// Where the dictation happened (target app · site), for the row's second line.
+    /// The model used is rendered separately, right-aligned — see the row body.
+    private var sourceLabel: String? {
+        let site = SourceCapture.host(of: recording.sourceURL) ?? recording.sourceWindowTitle
+        let context = [recording.sourceAppName, site].compactMap { $0 }.joined(separator: " · ")
+        return context.isEmpty ? nil : context
+    }
     @State private var showTranscription = false
     @State private var isHovered = false
     @Environment(\.colorScheme) private var colorScheme
@@ -934,21 +975,55 @@ struct RecordingRow: View {
                 .padding(.vertical, 8)
 
             HStack(alignment: .center, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(recording.timestamp, style: .date)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    HStack(spacing: 4) {
-                        Text(recording.timestamp, style: .time)
-                        Text("·")
-                        Text(TextUtil.formatDuration(recording.duration))
-                        Text("·")
-                        Text("^[\(TextUtil.wordCount(recording.transcription)) word](inflect: true)")
+                VStack(alignment: .leading, spacing: 3) {
+                    // Row 1: date (left) · time / duration / words (right).
+                    HStack(spacing: 8) {
+                        Text(recording.timestamp, style: .date)
+                            .font(.subheadline)
+                        Spacer(minLength: 8)
+                        HStack(spacing: 4) {
+                            Text(recording.timestamp, style: .time)
+                            Text("·")
+                            Text(TextUtil.formatDuration(recording.duration))
+                            Text("·")
+                            Text("^[\(TextUtil.wordCount(recording.transcription)) word](inflect: true)")
+                        }
+                        .font(.caption)
                     }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+
+                    // Row 2: source app / site (left) · model used (right, cpu glyph).
+                    // Omitted when there's no metadata (older recordings, file imports).
+                    if sourceLabel != nil || recording.modelUsed != nil {
+                        HStack(spacing: 8) {
+                            if let sourceLabel {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "macwindow")
+                                    Text(sourceLabel)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                            }
+                            Spacer(minLength: 8)
+                            if let model = recording.modelUsed {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "cpu")
+                                    Text(model)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                                // Orange only when this transcription came from the remote
+                                // engine's local fallback (server was unreachable), so a
+                                // surprising result is easy to spot back in the history.
+                                .foregroundColor(recording.wasFallback ? .orange : .secondary)
+                                .help(recording.wasFallback
+                                      ? "Local fallback — the remote server was unreachable"
+                                      : "")
+                            }
+                        }
+                        .font(.caption2)
+                    }
                 }
+                .foregroundColor(.secondary)
                 
                 if isRegenerating {
                     Spacer()
@@ -1021,15 +1096,37 @@ struct RecordingRow: View {
                     }
 
                     if (recording.status == .completed || recording.status == .failed) && isHovered {
-                        Button(action: {
-                            onRegenerate()
-                        }) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 18))
-                                .foregroundColor(.secondary)
+                        // Two controls: the icon reruns with the current model; the visible
+                        // chevron opens a picker that reruns once with a specific model without
+                        // changing the default. The chevron is the discoverable affordance. (F3)
+                        HStack(spacing: 1) {
+                            Button(action: { onRegenerate(nil) }) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Regenerate (current model)")
+
+                            Menu {
+                                Button("Current model") { onRegenerate(nil) }
+                                if !rerunModels.isEmpty {
+                                    Divider()
+                                    ForEach(rerunModels.indices, id: \.self) { i in
+                                        Button(rerunModels[i].displayName) { onRegenerate(rerunModels[i]) }
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                            }
+                            .menuStyle(.button)
+                            .menuIndicator(.hidden)
+                            .buttonStyle(.plain)
+                            .fixedSize()
+                            .help("Regenerate with a specific model")
                         }
-                        .buttonStyle(.plain)
-                        .help("Regenerate transcription")
                         .transition(.opacity)
                     }
 
