@@ -4,7 +4,7 @@
 
 **Speak. It types. In any app on your Mac — free, open-source, on-device.**
 
-[![Website](https://img.shields.io/badge/Website-opensuperwhisper.com-1f3bff?style=for-the-badge)](https://opensuperwhisper.com)
+[![Website](https://img.shields.io/badge/Website-opensuperwhisper.com-E8734A?style=for-the-badge)](https://opensuperwhisper.com)
 [![Latest release](https://img.shields.io/github/v/release/my-monkeys/OpenSuperWhisper?style=for-the-badge&color=0a8f57)](https://github.com/my-monkeys/OpenSuperWhisper/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-969696?style=for-the-badge)](LICENSE)
 
@@ -69,9 +69,9 @@ Models load lazily: browsing engine tabs never triggers a surprise download.
 
 ## Smart while you dictate
 
-- 🪟 **App Context** — bind a model to an app (or a website in supported browsers) and the model
+- 🪟 **Rules** — bind a model to an app (or a website in supported browsers) and the model
   switches automatically when you dictate there: a fast one for chat, an accurate one for email.
-  Managed from Settings → App Context or the menu-bar **Model** picker.
+  Managed from Settings → Rules or the menu-bar **Model** picker.
 - 📖 **Custom dictionary** — your proper nouns and jargon come out spelled right; boosts
   recognition and applies replacements.
 - 🧹 **Cleaner output** — optional filler-word removal (um, uh…), automatic sentence spacing, and
@@ -84,7 +84,7 @@ Models load lazily: browsing engine tabs never triggers a surprise download.
   menu bar.
 
 <div align="center">
-<img src="docs/screenshots/app-context.png" width="640" alt="App Context — per-app and per-site model rules" />
+<img src="docs/screenshots/app-context.png" width="640" alt="Rules — per-app and per-site model rules" />
 </div>
 
 ## A history that remembers (if you want one)
