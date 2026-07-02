@@ -50,7 +50,11 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             panel.hasShadow = false
             panel.ignoresMouseEvents = true
             panel.hidesOnDeactivate = false
-            
+            // Belt-and-suspenders: the window is sized manually + non-animated via
+            // `resizeToContent` (#19), and this also stops AppKit from animating the frame on
+            // its own. Size changes should snap, never animate (macOS 26 recursion guard).
+            panel.animationBehavior = .none
+
             self.window = panel
         }
         
