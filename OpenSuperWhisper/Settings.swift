@@ -1575,460 +1575,241 @@ struct SettingsView: View {
         .background(STheme.windowBg)
     }
 
-    private var transcriptionSettings: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Language Settings
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Language Settings")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Transcription Language")
-                            .font(.subheadline)
-                        
-                        Picker("Language", selection: $viewModel.selectedLanguage) {
-                            ForEach(viewModel.supportedLanguages, id: \.self) { code in
-                                Text(LanguageUtil.languageNames[code] ?? code)
-                                    .tag(code)
-                            }
-                        }
-                        // Recreate the picker when the engine's language set changes, so its
-                        // selection never gets stuck blank on a value that left the list; and
-                        // clamp the stored language to a supported one when this view appears.
-                        .id(viewModel.supportedLanguages)
-                        .onAppear { viewModel.clampLanguageToSupported() }
-                        .pickerStyle(.menu)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.controlBackgroundColor))
-                        .cornerRadius(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text("Translate to English")
-                                    .font(.subheadline)
-                                    .foregroundColor(viewModel.canTranslate ? .primary : .secondary)
-                                Spacer()
-                                Toggle("", isOn: $viewModel.translateToEnglish)
-                                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                    .labelsHidden()
-                                    .disabled(!viewModel.canTranslate)
-                            }
-                            if !viewModel.canTranslate {
-                                Text("Only Whisper and remote servers translate; the current engine ignores this.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            } else if viewModel.translateToEnglish && viewModel.selectedEngine == "remote" {
-                                // We forward to the server's /audio/translations endpoint, but there's
-                                // no capability signal per remote model — so we can't verify the server
-                                // actually translates. Say so instead of failing silently server-side.
-                                Text("Sent to the server's translations endpoint — we can't confirm this remote model supports translation.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.top, 4)
-                        
-                        if Settings.asianLanguages.contains(viewModel.selectedLanguage) {
-                            HStack {
-                                Text("Use Asian Autocorrect")
-                                    .font(.subheadline)
-                                Spacer()
-                                Toggle("", isOn: $viewModel.useAsianAutocorrect)
-                                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                    .labelsHidden()
-                            }
-                            .padding(.top, 4)
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-                
-                // Output Options
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Output Options")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Show Timestamps")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.showTimestamps)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                        
-                        HStack {
-                            Text("Suppress Blank Audio")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.suppressBlankAudio)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Add Space After Sentence")
-                                    .font(.subheadline)
-                                Text("Appends a space when transcription ends with punctuation")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.addSpaceAfterSentence)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
+    /// Small themed text input used across the Output pane.
+    private func sInput(_ text: Binding<String>, prompt: String, width: CGFloat, mono: Bool = false) -> some View {
+        TextField("", text: text, prompt: Text(prompt))
+            .textFieldStyle(.plain)
+            .font(.system(size: 12, design: mono ? .monospaced : .default))
+            .autocorrectionDisabled(true)
+            .padding(.horizontal, 9).padding(.vertical, 5)
+            .frame(width: width)
+            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+    }
 
-                // Filler Words
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Filler Words")
-                        .font(.headline)
-                        .foregroundColor(.primary)
+    /// Themed multiline editor (regex, prompts, instructions).
+    private func sEditor(_ text: Binding<String>, height: CGFloat) -> some View {
+        TextEditor(text: text)
+            .font(.system(size: 11.5, design: .monospaced))
+            .scrollContentBackground(.hidden)
+            .padding(6)
+            .frame(height: height)
+            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+    }
 
-                    SettingRow(
-                        title: "Remove filler words",
-                        caption: "Strip um, uh, er… from transcriptions before inserting.",
-                        info: "Removes matches of the regex below (case-insensitive) from the transcription, then tidies the spacing. Off by default; the inserted text is otherwise unchanged."
-                    ) {
-                        Toggle("", isOn: $viewModel.removeFillerWords)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.removeFillerWords {
-                        TextEditor(text: $viewModel.fillerWordsPattern)
-                            .font(.system(.body, design: .monospaced))
-                            .frame(height: 56)
-                            .padding(6)
-                            .background(Color(.textBackgroundColor))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                        Text("Case-insensitive regex of filler words to remove.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // AI Cleanup
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("AI Cleanup")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    SettingRow(
-                        title: "Clean up with a local LLM (Ollama)",
-                        caption: "Fix punctuation & obvious errors via a local model after transcribing.",
-                        info: "Sends the transcription to your local Ollama server and inserts the cleaned-up result. Requires Ollama running with the model below pulled (e.g. `ollama pull llama3.2`). Adds a little latency. If Ollama isn't reachable, the raw transcription is used unchanged — nothing is lost. Everything stays on your machine."
-                    ) {
-                        Toggle("", isOn: $viewModel.aiPostProcessingEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.aiPostProcessingEnabled {
-                        HStack {
-                            Text("Model")
-                                .font(.subheadline)
-                            Spacer()
-                            TextField("llama3.2", text: $viewModel.aiOllamaModel)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 180)
-                        }
-                        HStack {
-                            Text("Ollama endpoint")
-                                .font(.subheadline)
-                            Spacer()
-                            TextField("http://localhost:11434", text: $viewModel.aiOllamaEndpoint)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 220)
-                            Button {
-                                viewModel.testOllamaConnection()
-                            } label: {
-                                Image(systemName: "bolt.horizontal.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Test the connection to Ollama")
-                        }
-
-                        HStack(spacing: 8) {
-                            Button("Test connection") { viewModel.testOllamaConnection() }
-                                .controlSize(.small)
-
-                            switch viewModel.ollamaStatus {
-                            case .unknown:
-                                EmptyView()
-                            case .checking:
-                                ProgressView().controlSize(.small)
-                                Text("Checking…").font(.caption).foregroundColor(.secondary)
-                            case .ok:
-                                Label("Connected — model ready", systemImage: "checkmark.circle.fill")
-                                    .font(.caption).foregroundColor(.green)
-                            case .modelMissing(let model):
-                                Label("Reachable, but “\(model)” isn't pulled — run: ollama pull \(model)",
-                                      systemImage: "exclamationmark.triangle.fill")
-                                    .font(.caption).foregroundColor(.orange)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            case .unreachable:
-                                Label("Can't reach Ollama — is it running? (ollama serve)",
-                                      systemImage: "xmark.circle.fill")
-                                    .font(.caption).foregroundColor(.red)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            Spacer()
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Instruction")
-                                .font(.subheadline)
-                            TextEditor(text: $viewModel.aiPostProcessingPrompt)
-                                .font(.system(.caption, design: .monospaced))
-                                .frame(height: 80)
-                                .padding(6)
-                                .background(Color(.textBackgroundColor))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                                )
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Clipboard & Paste
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Clipboard & Paste")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Copy to Clipboard")
-                                    .font(.subheadline)
-                                Text("Also place the transcription on the clipboard")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.autoCopyToClipboard)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Auto-paste Transcription")
-                                    .font(.subheadline)
-                                Text("Type the transcription into the focused app")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.autoPasteTranscription)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Paste instead of typing")
-                                    .font(.subheadline)
-                                Text("Insert via ⌘V — works in apps that ignore synthetic typing (Messages, Electron…); uses the clipboard")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.pasteInsteadOfTyping)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Notify When No Paste Target")
-                                    .font(.subheadline)
-                                Text("Show a “copied — press ⌘V” notice if no editable field is focused")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.notifyWhenNoPasteTarget)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Submit on “press enter”")
-                                    .font(.subheadline)
-                                Text("Saying “press enter” at the end removes it from the text and presses Return — submitting in Claude Code, Slack, etc.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.submitOnVoiceCommand)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Initial Prompt
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Initial Prompt")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextEditor(text: $viewModel.initialPrompt)
-                            .frame(height: 60)
-                            .padding(6)
-                            .background(Color(.textBackgroundColor))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                        
-                        Text("Optional text to guide the model's transcription")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Custom Dictionary
-                customDictionarySection
-            }
-            .padding()
+    @ViewBuilder private var ollamaStatusView: some View {
+        switch viewModel.ollamaStatus {
+        case .unknown:
+            EmptyView()
+        case .checking:
+            ProgressView().controlSize(.small)
+        case .ok:
+            Text("✓ Connected — model ready")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(STheme.ok)
+                .padding(.horizontal, 9).padding(.vertical, 2)
+                .background(Capsule().fill(STheme.okBg))
+        case .modelMissing(let model):
+            Text("Reachable, but “\(model)” isn't pulled — run: ollama pull \(model)")
+                .font(.system(size: 11))
+                .foregroundColor(STheme.warn)
+                .fixedSize(horizontal: false, vertical: true)
+        case .unreachable:
+            Text("✕ Can't reach Ollama — is it running? (ollama serve)")
+                .font(.system(size: 11))
+                .foregroundColor(.red)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
-    
-    private var customDictionarySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Custom Dictionary")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Spacer()
-                Toggle("", isOn: $viewModel.customDictionaryEnabled)
-                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                    .labelsHidden()
-            }
 
-            Text("Replace recognized words with a preferred spelling. Matching is case-insensitive and limited to whole words.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            if viewModel.customDictionaryEnabled {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Boost recognition (advanced)")
-                            .font(.subheadline)
-                        Text("Also bias the model toward these terms while listening, not just fix them afterward. Helps rare, distinctive words (e.g. “Kubernetes”) — but can over-correct short, common ones. Leave off if it replaces too much.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Toggle("", isOn: $viewModel.customDictionaryBoostEnabled)
-                        .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                        .labelsHidden()
-                }
-                .padding(.bottom, 4)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Heard")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("Replace with")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        // Spacer matching the delete button width.
-                        Color.clear.frame(width: 24, height: 1)
-                    }
-
-                    if viewModel.customDictionaryEntries.isEmpty {
-                        Text("No words yet. Add one below.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 4)
-                    }
-
-                    ForEach($viewModel.customDictionaryEntries) { $entry in
-                        HStack(spacing: 8) {
-                            TextField("Heard word", text: $entry.original, prompt: Text("git hub"))
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(maxWidth: .infinity)
-                            TextField("Preferred spelling", text: $entry.replacement, prompt: Text("GitHub"))
-                                .labelsHidden()
-                                .textFieldStyle(.roundedBorder)
-                                .frame(maxWidth: .infinity)
-                            Button(action: {
-                                viewModel.customDictionaryEntries.removeAll { $0.id == entry.id }
-                            }) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.secondary)
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Remove this entry")
-                            .frame(width: 24)
+    private var transcriptionSettings: some View {
+        SPane(title: "Output", subtitle: "What happens to your text, in pipeline order") {
+            SSection(title: "Language") {
+                SRow(title: "Transcription language") {
+                    Picker("", selection: $viewModel.selectedLanguage) {
+                        ForEach(viewModel.supportedLanguages, id: \.self) { code in
+                            Text(LanguageUtil.languageNames[code] ?? code).tag(code)
                         }
                     }
-
-                    Button(action: {
-                        viewModel.customDictionaryEntries.append(CustomDictionaryEntry())
-                    }) {
-                        Label("Add Word", systemImage: "plus.circle")
-                            .font(.subheadline)
-                    }
-                    .buttonStyle(.borderless)
-                    .padding(.top, 4)
+                    // Recreate the picker when the engine's language set changes, so its
+                    // selection never gets stuck blank on a value that left the list; and
+                    // clamp the stored language to a supported one when this view appears.
+                    .id(viewModel.supportedLanguages)
+                    .onAppear { viewModel.clampLanguageToSupported() }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .padding(.top, 4)
+                SRow(title: "Translate to English",
+                     hint: !viewModel.canTranslate
+                        ? "Only Whisper and remote servers translate; the current engine ignores this."
+                        : (viewModel.translateToEnglish && viewModel.selectedEngine == "remote"
+                            ? "We can't confirm this remote model supports translation"
+                            : nil),
+                     hintColor: viewModel.translateToEnglish && viewModel.selectedEngine == "remote" ? STheme.warn : STheme.hint) {
+                    SToggle(isOn: $viewModel.translateToEnglish, disabled: !viewModel.canTranslate)
+                }
+                if Settings.asianLanguages.contains(viewModel.selectedLanguage) {
+                    SRow(title: "Asian autocorrect", hint: "Fixes CJK spacing") {
+                        SToggle(isOn: $viewModel.useAsianAutocorrect)
+                    }
+                }
+            }
+
+            SSection(title: "Guidance") {
+                SRow(title: "Initial prompt", hint: "Optional text to guide the model's transcription") { EmptyView() }
+                sEditor($viewModel.initialPrompt, height: 48)
+            }
+
+            SSection(title: "Cleanup") {
+                SRow(title: "Remove filler words", hint: "Strip um, uh, er… before inserting") {
+                    SToggle(isOn: $viewModel.removeFillerWords)
+                }
+                if viewModel.removeFillerWords {
+                    VStack(alignment: .leading, spacing: 4) {
+                        sEditor($viewModel.fillerWordsPattern, height: 48)
+                        Text("Case-insensitive regex, applied before pasting.")
+                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    }
+                    .padding(.leading, 16)
+                }
+                HStack(spacing: 8) {
+                    Text("Clean up with a local LLM")
+                        .font(.system(size: 13)).foregroundColor(STheme.text)
+                    STag("Ollama")
+                    Spacer()
+                    SToggle(isOn: $viewModel.aiPostProcessingEnabled)
+                }
+                .frame(minHeight: 26)
+                if viewModel.aiPostProcessingEnabled {
+                    SRow(title: "Model", indented: true) {
+                        sInput($viewModel.aiOllamaModel, prompt: "llama3.2", width: 170, mono: true)
+                    }
+                    SRow(title: "Endpoint", indented: true) {
+                        HStack(spacing: 8) {
+                            Button("Test") { viewModel.testOllamaConnection() }
+                                .controlSize(.small)
+                            sInput($viewModel.aiOllamaEndpoint, prompt: "http://localhost:11434", width: 210, mono: true)
+                        }
+                    }
+                    HStack { Spacer(); ollamaStatusView }
+                        .padding(.leading, 16)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
+                        sEditor($viewModel.aiPostProcessingPrompt, height: 64)
+                    }
+                    .padding(.leading, 16)
+                }
+            }
+
+            SSection(title: "Dictionary") {
+                SRow(title: "Custom dictionary", hint: "Whole-word replacement, case-insensitive") {
+                    SToggle(isOn: $viewModel.customDictionaryEnabled)
+                }
+                if viewModel.customDictionaryEnabled {
+                    HStack(spacing: 8) {
+                        Text("Boost recognition")
+                            .font(.system(size: 12)).foregroundColor(STheme.text)
+                        STag("Advanced")
+                        InfoButton(text: "Also bias the model toward these terms while listening, not just fix them afterward. Helps rare, distinctive words (e.g. “Kubernetes”) — but can over-correct short, common ones. Leave off if it replaces too much.")
+                        Spacer()
+                        SToggle(isOn: $viewModel.customDictionaryBoostEnabled)
+                    }
+                    .padding(.leading, 16)
+                    .frame(minHeight: 24)
+
+                    VStack(spacing: 0) {
+                        HStack(spacing: 10) {
+                            Text("Heard").frame(maxWidth: .infinity, alignment: .leading)
+                            Text("Replace with").frame(maxWidth: .infinity, alignment: .leading)
+                            Color.clear.frame(width: 24, height: 1)
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundColor(STheme.sectionTitle)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(STheme.controlBg.opacity(0.6))
+
+                        if viewModel.customDictionaryEntries.isEmpty {
+                            Text("No words yet. Add one below.")
+                                .font(.system(size: 11)).foregroundColor(STheme.hint)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 14)
+                        }
+                        ForEach($viewModel.customDictionaryEntries) { $entry in
+                            HStack(spacing: 10) {
+                                TextField("", text: $entry.original, prompt: Text("git hub"))
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 12))
+                                    .frame(maxWidth: .infinity)
+                                Text("→").font(.system(size: 11)).foregroundColor(STheme.hint)
+                                TextField("", text: $entry.replacement, prompt: Text("GitHub"))
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 12))
+                                    .frame(maxWidth: .infinity)
+                                Button {
+                                    viewModel.customDictionaryEntries.removeAll { $0.id == entry.id }
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(STheme.hint)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Remove this entry")
+                                .frame(width: 24)
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 7)
+                            Rectangle().fill(STheme.border).frame(height: 1)
+                        }
+                    }
+                    .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .padding(.leading, 16)
+
+                    Button {
+                        viewModel.customDictionaryEntries.append(CustomDictionaryEntry())
+                    } label: {
+                        Label("Add word", systemImage: "plus")
+                            .font(.system(size: 11.5, weight: .medium))
+                    }
+                    .controlSize(.small)
+                    .padding(.leading, 16)
+                }
+            }
+
+            SSection(title: "Delivery") {
+                SRow(title: "Copy to clipboard", hint: "Also place the transcription on the clipboard") {
+                    SToggle(isOn: $viewModel.autoCopyToClipboard)
+                }
+                SRow(title: "Auto-paste transcription", hint: "Insert the transcription into the focused app") {
+                    SToggle(isOn: $viewModel.autoPasteTranscription)
+                }
+                SRow(title: "Paste instead of typing",
+                     hint: "⌘V instead of synthetic keystrokes — helps in Electron apps and Messages") {
+                    SToggle(isOn: $viewModel.pasteInsteadOfTyping)
+                }
+                SRow(title: "Notify when no paste target",
+                     hint: "\"Copied — press ⌘V\" if no text field is focused") {
+                    SToggle(isOn: $viewModel.notifyWhenNoPasteTarget)
+                }
+                SRow(title: "Submit on “press enter”",
+                     hint: "Saying “press enter” at the end presses Return — submitting in Claude Code, Slack, etc.") {
+                    SToggle(isOn: $viewModel.submitOnVoiceCommand)
+                }
+                SRow(title: "Show timestamps") {
+                    SToggle(isOn: $viewModel.showTimestamps)
+                }
+                SRow(title: "Suppress blank audio") {
+                    SToggle(isOn: $viewModel.suppressBlankAudio)
+                }
+                SRow(title: "Add space after sentence", hint: "Useful when dictating in bursts") {
+                    SToggle(isOn: $viewModel.addSpaceAfterSentence)
+                }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.3))
-        .cornerRadius(12)
     }
 
     private var storageSettings: some View {
