@@ -2,6 +2,12 @@ import AVFoundation
 import Foundation
 import Speech
 
+// SpeechAnalyzer/SpeechTranscriber only exist in the macOS 26 SDK. `@available` guards
+// the runtime, not compilation — so the whole engine is gated on the SDK, keyed off
+// FoundationModels (a macOS-26-only framework). Older toolchains (CI's macos-latest,
+// contributors on Xcode 16) build the stub below and simply never offer the engine.
+#if canImport(FoundationModels)
+
 /// Availability + locale bookkeeping for Apple's on-device speech stack
 /// (SpeechAnalyzer/SpeechTranscriber, macOS 26+). Model assets are downloaded and
 /// updated by the SYSTEM (AssetInventory) and shared across apps — the app never
@@ -132,3 +138,16 @@ final class AppleSpeechEngine: TranscriptionEngine {
         EngineCapabilities.supportedLanguages(engine: "apple", fluidAudioModelVersion: "")
     }
 }
+
+#else
+
+/// Old-SDK stub: the engine is never supported, so no UI or catalog entry appears
+/// and none of the SpeechAnalyzer symbols are referenced.
+enum AppleSpeechSupport {
+    static var isSupported: Bool { false }
+    static var cachedSupportedLanguages: [String] { [] }
+    static var cachedInstalledLanguages: [String] { [] }
+    static var hasInstalledModel: Bool { false }
+}
+
+#endif

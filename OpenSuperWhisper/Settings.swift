@@ -1588,9 +1588,11 @@ struct SettingsView: View {
                         SenseVoiceModelSection(viewModel: viewModel)
                     }
 #endif
+#if canImport(FoundationModels)
                     if browseEngine == "apple", #available(macOS 26.0, *) {
                         AppleSpeechModelSection(viewModel: viewModel)
                     }
+#endif
                     if browseEngine == "remote" {
                         RemoteSettingsSection(viewModel: viewModel)
                     }
