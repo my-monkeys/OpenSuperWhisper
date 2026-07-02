@@ -16,6 +16,9 @@ class TranscriptionQueue: ObservableObject {
     private var currentTranscriptionTask: Task<Void, Never>?
     private var cancelledRecordingIds: Set<UUID> = []
     private var progressCancellable: AnyCancellable?
+    // One-off model for a specific rerun (keyed by recording id). Applied for
+    // that transcription only, then the system default is restored. (F3)
+    private var modelOverrides: [UUID: DictationModelOption] = [:]
 
     private init() {
         self.transcriptionService = TranscriptionService.shared
@@ -143,7 +146,10 @@ class TranscriptionQueue: ObservableObject {
         }
     }
 
-    func requeueRecording(_ recording: Recording) async {
+    func requeueRecording(_ recording: Recording, model: DictationModelOption? = nil) async {
+        if let model {
+            modelOverrides[recording.id] = model
+        }
         let sourceURL: URL? = await Task.detached(priority: .userInitiated) {
             if let existingSource = recording.sourceFileURL,
                !existingSource.isEmpty,
@@ -245,6 +251,11 @@ class TranscriptionQueue: ObservableObject {
             )
         }
 
+        // Apply a one-off model for this rerun (from the rerun dropdown), then restore
+        // the system default once it finishes — the rerun-side analog of "Just This Time".
+        let restoreOverride = applyModelOverride(for: recording.id)
+        defer { restoreOverride() }
+
         currentTranscriptionTask = Task {
             do {
                 if isRecordingCancelled(recording.id) {
@@ -277,12 +288,20 @@ class TranscriptionQueue: ObservableObject {
                     }
                 }.value
 
+                // The model that actually produced the text — the local fallback, not the
+                // configured/override model, when a remote rerun fell back to local.
+                let (modelUsed, wasFallback) = await MainActor.run {
+                    (TranscriptionService.shared.lastUsedModel?.displayName,
+                     TranscriptionService.shared.lastUsedFallback)
+                }
                 await recordingStore.updateRecordingProgressOnlySync(
                     recording.id,
                     transcription: text,
                     progress: 1.0,
                     status: .completed,
-                    isRegeneration: false
+                    isRegeneration: false,
+                    modelUsed: modelUsed,
+                    wasFallback: wasFallback
                 )
 
             } catch {
@@ -303,4 +322,31 @@ class TranscriptionQueue: ObservableObject {
         clearCancellation(recording.id)
     }
 
+    /// Temporarily switch to a recording's one-off override model and return a
+    /// closure restoring the previous settings + engine. No override → no-op.
+    private func applyModelOverride(for recordingID: UUID) -> () -> Void {
+        guard let option = modelOverrides.removeValue(forKey: recordingID) else { return {} }
+        let prefs = AppPreferences.shared
+        let previousEngine = prefs.selectedEngine
+        let previousWhisper = prefs.selectedWhisperModelPath
+        let previousFluid = prefs.fluidAudioModelVersion
+        let previousRemote = prefs.remoteServerModel
+
+        prefs.selectedEngine = option.engine
+        switch option.engine {
+        case "whisper": prefs.selectedWhisperModelPath = option.identifier
+        case "fluidaudio": prefs.fluidAudioModelVersion = option.identifier
+        case "remote": prefs.remoteServerModel = option.identifier
+        default: break
+        }
+        transcriptionService.reloadEngine()
+
+        return {
+            prefs.selectedEngine = previousEngine
+            prefs.selectedWhisperModelPath = previousWhisper
+            prefs.fluidAudioModelVersion = previousFluid
+            prefs.remoteServerModel = previousRemote
+            self.transcriptionService.reloadEngine()
+        }
+    }
 }
