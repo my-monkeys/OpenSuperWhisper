@@ -92,7 +92,16 @@ enum AppleSpeechSupport {
     /// the system model has no cross-language auto-detect).
     @available(macOS 26.0, *)
     static func resolveLocale(language: String) async -> Locale {
-        let wanted = language == "auto" ? Locale.current : Locale(identifier: language)
+        let wanted: Locale
+        if language == "auto" {
+            wanted = Locale.current
+        } else {
+            // The picker's bare Whisper codes ("fr") name no region, and the framework's
+            // equivalence then picks an arbitrary supported variant (fr → fr_CA or fr_CH).
+            // CLDR likely-subtags ("fr" → fr-Latn-FR) land each language on its canonical
+            // region: fr_FR, en_US, pt_BR, zh_CN (Simplified), …
+            wanted = Locale(identifier: Locale.Language(identifier: language).maximalIdentifier)
+        }
         if let match = await SpeechTranscriber.supportedLocale(equivalentTo: wanted) {
             return match
         }
