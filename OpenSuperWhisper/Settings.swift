@@ -1068,26 +1068,33 @@ struct SettingRow<Trailing: View>: View {
 
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, model, transcription, history, appContext, advanced, updates, feedback
+    case dictation, models, output, rules, history, advanced, updates, feedback
     var id: String { rawValue }
+
+    /// Main navigation (sidebar top) vs utility items (sidebar footer).
+    static let main: [SettingsTab] = [.dictation, .models, .output, .rules, .history, .advanced]
+    static let footer: [SettingsTab] = [.updates, .feedback]
+
     var title: String {
         switch self {
-        case .appContext: return "App Context"
-        case .general: return "General"
-        case .model: return "Engine & Model"
-        case .transcription: return "Transcription"
-        case .history: return "History"
+        case .dictation: return "Dictation"
+        case .models: return "Models"
+        case .output: return "Output"
+        case .rules: return "Rules"
+        case .history: return "History & Privacy"
         case .advanced: return "Advanced"
         case .updates: return "Updates"
         case .feedback: return "Feedback"
         }
     }
+    // Icons carried over from the previous sidebar (kept on purpose); "Rules" is the
+    // one new tab, so it gets the one new symbol.
     var icon: String {
         switch self {
-        case .appContext: return "macwindow"
-        case .general: return "slider.horizontal.3"
-        case .model: return "cpu"
-        case .transcription: return "text.bubble"
+        case .dictation: return "slider.horizontal.3"
+        case .models: return "cpu"
+        case .output: return "text.bubble"
+        case .rules: return "arrow.triangle.branch"
         case .history: return "clock.arrow.circlepath"
         case .advanced: return "gearshape"
         case .updates: return "sparkles"
@@ -1109,7 +1116,11 @@ struct SettingsView: View {
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var isRecordingNewShortcut = false
-    @State private var selectedTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab = .dictation
+    @State private var sidebarSearch = ""
+    @FocusState private var sidebarSearchFocused: Bool
+    @State private var availableUpdateTag: String?
+    @ObservedObject private var micService = MicrophoneService.shared
     /// The engine whose models are currently being *browsed* (navigation only — the active engine
     /// in `viewModel.selectedEngine` changes only when the user clicks a model).
     @State private var browseEngine: String = AppPreferences.shared.selectedEngine
@@ -1175,14 +1186,14 @@ struct SettingsView: View {
     /// Content for the currently-selected sidebar tab.
     @ViewBuilder private var detailContent: some View {
         switch selectedTab {
-        case .appContext:    AppContextSettingsView(viewModel: viewModel)
-        case .general:       shortcutSettings
-        case .model:         modelSettings
-        case .transcription: transcriptionSettings
-        case .history:       storageSettings
-        case .advanced:      advancedSettings
-        case .updates:       UpdatesView()
-        case .feedback:      feedbackSettings
+        case .dictation: dictationSettings
+        case .models:    modelSettings
+        case .output:    transcriptionSettings
+        case .rules:     AppContextSettingsView(viewModel: viewModel)
+        case .history:   storageSettings
+        case .advanced:  advancedSettings
+        case .updates:   UpdatesView()
+        case .feedback:  feedbackSettings
         }
     }
 
@@ -1247,47 +1258,112 @@ struct SettingsView: View {
         .buttonStyle(.plain)
     }
 
-    /// One row in the left sidebar (drawer).
-    private func sidebarRow(_ tab: SettingsTab) -> some View {
+    /// One row in the left sidebar. Selection = soft copper tint (design: "teinte douce").
+    private func sidebarRow(_ tab: SettingsTab, compact: Bool = false) -> some View {
         Button {
             selectedTab = tab
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .frame(width: 20, alignment: .center)
+                    .font(.system(size: compact ? 11 : 12, weight: .medium))
+                    .frame(width: 18, alignment: .center)
+                    .foregroundColor(selectedTab == tab ? STheme.accent : STheme.hint)
                 Text(tab.title)
-                    .font(.system(size: 13))
+                    .font(.system(size: compact ? 12 : 13, weight: .medium))
                 Spacer(minLength: 0)
+                if tab == .updates && availableUpdateTag != nil {
+                    Circle().fill(STheme.accent).frame(width: 6, height: 6)
+                }
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 7)
-            .foregroundStyle(selectedTab == tab ? Color.white : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, compact ? 5 : 7)
+            .foregroundStyle(selectedTab == tab ? STheme.accent : STheme.sidebarItem)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(selectedTab == tab ? Color.accentColor : Color.clear)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selectedTab == tab ? STheme.accentSoft : Color.clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
+    /// Sidebar tabs matching the search box (matches everything when it's empty).
+    private func matchesSearch(_ tab: SettingsTab) -> Bool {
+        let q = sidebarSearch.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty || tab.title.localizedCaseInsensitiveContains(q)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            // Vertical sidebar (drawer) listing the tabs — a plain stack so it
-            // can never collapse the way a NavigationSplitView sidebar does.
-            VStack(alignment: .leading, spacing: 3) {
-                ForEach(SettingsTab.allCases) { tab in
+            // Vertical sidebar — search on top, main categories, utility footer
+            // (Updates with a badge when one is available, Feedback, Support us, version).
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 10))
+                        .foregroundColor(STheme.hint)
+                    TextField("Search…", text: $sidebarSearch)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .foregroundColor(STheme.text)
+                        .focused($sidebarSearchFocused)
+                    Text("⌘F")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(STheme.hint)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(STheme.controlBg))
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(STheme.inputBg))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(STheme.controlBorder, lineWidth: 1))
+                .padding(.bottom, 12)
+                .background(
+                    Button("") { sidebarSearchFocused = true }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .opacity(0)
+                )
+
+                ForEach(SettingsTab.main.filter(matchesSearch)) { tab in
                     sidebarRow(tab)
                 }
                 Spacer(minLength: 0)
-            }
-            .padding(10)
-            .frame(width: 212)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .background(.regularMaterial)
 
-            Divider()
+                Rectangle().fill(STheme.border).frame(height: 1).padding(.vertical, 8)
+                ForEach(SettingsTab.footer.filter(matchesSearch)) { tab in
+                    sidebarRow(tab, compact: true)
+                }
+                Button {
+                    if let url = URL(string: "https://ko-fi.com/mymonkey") { NSWorkspace.shared.open(url) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "heart")
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(width: 18, alignment: .center)
+                            .foregroundColor(STheme.hint)
+                        Text("Support us").font(.system(size: 12, weight: .medium))
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .foregroundStyle(STheme.sidebarItem)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Text("v\(UpdateChecker.currentVersion)")
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundColor(STheme.hint.opacity(0.8))
+                    .padding(.horizontal, 10).padding(.top, 6)
+            }
+            .padding(12)
+            .frame(width: 224)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(STheme.sidebarBg)
+            .task {
+                if let releases = try? await UpdateChecker.fetchReleases() {
+                    availableUpdateTag = UpdateChecker.availableUpdate(in: releases)?.tagName
+                }
+            }
+
+            Rectangle().fill(STheme.border).frame(width: 1)
 
             VStack(spacing: 0) {
                 detailContent
@@ -2164,6 +2240,67 @@ struct SettingsView: View {
     private var advancedSettings: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // App-level settings (moved here from the old General tab, per the redesign —
+                // this pane keeps the legacy styling until the Advanced screen is redesigned).
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("App")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    SettingRow(
+                        title: "App Language",
+                        caption: "Language of the app interface. Relaunch to apply."
+                    ) {
+                        Picker("", selection: $appLanguage) {
+                            Text("System").tag("system")
+                            Text("English").tag("en")
+                            Text("Français").tag("fr")
+                            Text("Deutsch").tag("de")
+                            Text("Español").tag("es")
+                            Text("Italiano").tag("it")
+                            Text("Português (BR)").tag("pt-BR")
+                            Text("Tiếng Việt").tag("vi")
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 150)
+                        .labelsHidden()
+                        .onChange(of: appLanguage) { _, newValue in
+                            LanguageManager.selected = newValue
+                            langNeedsRelaunch = true
+                        }
+                    }
+                    if langNeedsRelaunch {
+                        HStack {
+                            Text("Relaunch to apply the new language.")
+                                .font(.caption).foregroundColor(.secondary)
+                            Spacer()
+                            Button("Relaunch Now") { LanguageManager.relaunch() }
+                        }
+                    }
+                    SettingRow(
+                        title: "Launch at Login",
+                        caption: "Start OpenSuperWhisper automatically when you log in."
+                    ) {
+                        Toggle("", isOn: Binding(
+                            get: { launchAtLogin.isEnabled },
+                            set: { launchAtLogin.setEnabled($0) }
+                        ))
+                        .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
+                        .labelsHidden()
+                    }
+                    SettingRow(
+                        title: "Start in the Menu Bar",
+                        caption: "Launch without the main window — open it from the menu bar icon."
+                    ) {
+                        Toggle("", isOn: $viewModel.startHidden)
+                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
+                            .labelsHidden()
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.controlBackgroundColor).opacity(0.3))
+                .cornerRadius(12)
+
                 // Decoding Strategy
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Decoding Strategy")
@@ -2321,6 +2458,162 @@ struct SettingsView: View {
         viewModel.modifierOnlyHotkey != .none
     }
     
+    /// "Dictation" — the redesigned first screen (Settings Explorations 2a):
+    /// Trigger / Recording bar / Input, in the Atelier style.
+    private var dictationSettings: some View {
+        SPane(title: "Dictation") {
+            SSection(title: "Trigger") {
+                SRow(title: "Recording trigger") {
+                    Picker("", selection: Binding(
+                        get: { useModifierKey },
+                        set: { newValue in
+                            if !newValue {
+                                viewModel.modifierOnlyHotkey = .none
+                            } else if viewModel.modifierOnlyHotkey == .none {
+                                viewModel.modifierOnlyHotkey = .leftCommand
+                            }
+                        }
+                    )) {
+                        Text("Key Combination").tag(false)
+                        Text("Single Modifier Key").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                if useModifierKey {
+                    SRow(title: "Modifier key", hint: "One-tap to toggle recording") {
+                        Picker("", selection: $viewModel.modifierOnlyHotkey) {
+                            ForEach(ModifierKey.allCases.filter { $0 != .none }) { key in
+                                Text(key.displayName).tag(key)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    SWarnBox {
+                        Text("**⚠︎ Input Monitoring permission required.** macOS needs it to detect single modifier key presses globally. Only modifier key events (⌘ ⌥ ⇧ ⌃ Fn) are monitored — no regular keystrokes are captured.")
+                        Button("Open Input Monitoring Settings…") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(STheme.warn)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
+                    }
+                } else {
+                    SRow(title: "Shortcut") {
+                        KeyboardShortcuts.Recorder("", name: .toggleRecord)
+                            .frame(width: 150)
+                    }
+                }
+                SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
+                    SToggle(isOn: $viewModel.holdToRecord)
+                }
+                SRow(title: "Cancel shortcut") {
+                    Picker("", selection: $cancelKey) {
+                        ForEach(SettingsView.cancelKeyChoices) { choice in
+                            Text(choice.label).tag(choice.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                    .onChange(of: cancelKey) { _, newValue in
+                        if let choice = SettingsView.cancelKeyChoices.first(where: { $0.id == newValue }) {
+                            KeyboardShortcuts.setShortcut(choice.shortcut, for: .escape)
+                        }
+                    }
+                    .onAppear { cancelKey = SettingsView.currentCancelKeyID() }
+                }
+            }
+
+            SSection(title: "Recording bar") {
+                SRow(title: "Indicator position") {
+                    HStack(spacing: 8) {
+                        Button("Preview") { IndicatorWindowManager.shared.preview() }
+                            .controlSize(.small)
+                        Picker("", selection: $viewModel.indicatorPosition) {
+                            Text("Near cursor").tag("cursor")
+                            Text("Notch").tag("notch")
+                            Text("Top").tag("top")
+                            Text("Center").tag("center")
+                            Text("Bottom").tag("bottom")
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
+                SRow(title: "Show Stop button", hint: "A stop-and-transcribe button on the recording bar") {
+                    SToggle(isOn: $viewModel.showStopButtonOnIndicator)
+                }
+                SRow(title: "Show Cancel button", hint: "A discard (trash) button on the recording bar") {
+                    SToggle(isOn: $viewModel.showCancelButtonOnIndicator)
+                }
+                SRow(title: "Play sound when recording starts") {
+                    SToggle(isOn: $viewModel.playSoundOnRecordStart)
+                }
+                HStack(spacing: 8) {
+                    Text("Live transcription")
+                        .font(.system(size: 13))
+                        .foregroundColor(STheme.text)
+                        .opacity(viewModel.selectedEngine == "fluidaudio" ? 1 : 0.45)
+                    STag("Parakeet only")
+                    Spacer()
+                    SToggle(isOn: $viewModel.liveTranscriptionEnabled,
+                            disabled: viewModel.selectedEngine != "fluidaudio")
+                }
+                .frame(minHeight: 26)
+                SRow(title: "Pause media during recording",
+                     hint: "Resumes what was actually playing when you stop") {
+                    SToggle(isOn: $viewModel.pauseMediaOnRecord)
+                }
+                SRow(title: "Lower system volume while recording") {
+                    SToggle(isOn: $viewModel.reduceVolumeOnRecord)
+                }
+                if viewModel.reduceVolumeOnRecord {
+                    SRow(title: "Volume while recording", indented: true) {
+                        HStack(spacing: 10) {
+                            Slider(value: $viewModel.reduceVolumeLevel, in: 0...0.5)
+                                .controlSize(.small)
+                                .frame(width: 150)
+                                .tint(STheme.accent)
+                            Text("\(Int(viewModel.reduceVolumeLevel * 100))%")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(STheme.hint)
+                                .frame(width: 34, alignment: .trailing)
+                        }
+                    }
+                }
+            }
+
+            SSection(title: "Input") {
+                SRow(title: "Microphone", hint: "Also switchable from the menu bar") {
+                    Picker("", selection: Binding(
+                        get: { micService.selectedMicrophone?.id ?? micService.currentMicrophone?.id ?? "" },
+                        set: { newID in
+                            if let device = micService.availableMicrophones.first(where: { $0.id == newID }) {
+                                micService.selectMicrophone(device)
+                            }
+                        }
+                    )) {
+                        ForEach(micService.availableMicrophones, id: \.id) { device in
+                            Text(device.name).tag(device.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+        }
+    }
+
     private var shortcutSettings: some View {
         ScrollView {
             VStack(spacing: 20) {
