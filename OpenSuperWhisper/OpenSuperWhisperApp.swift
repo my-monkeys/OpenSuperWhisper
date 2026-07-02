@@ -135,6 +135,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         OpenSuperWhisperApp.startTranscriptionQueue()
         OpenSuperWhisperApp.startRetentionScheduler()
         observeMicrophoneChanges()
+
+        // The Apple Speech locale lists are async-only; refresh the sync caches the
+        // model catalog and language picker read (menu must never trigger a download).
+        if #available(macOS 26.0, *) {
+            Task.detached(priority: .utility) { await AppleSpeechSupport.refreshCaches() }
+        }
     }
 
     func application(_ sender: NSApplication, openFile filename: String) -> Bool {

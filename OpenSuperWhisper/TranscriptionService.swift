@@ -75,6 +75,14 @@ class TranscriptionService: ObservableObject {
 #endif
             } else if selectedEngine == "remote" {
                 engine = RemoteEngine()
+            } else if selectedEngine == "apple" {
+                if #available(macOS 26.0, *) {
+                    engine = AppleSpeechEngine()
+                } else {
+                    // A pref synced from a newer machine; the catalog never offers
+                    // "apple" here, so quietly fall back.
+                    engine = await WhisperEngine()
+                }
             } else {
                 engine = await WhisperEngine()
             }
@@ -268,6 +276,12 @@ class TranscriptionService: ObservableObject {
             switch option.engine {
             case "fluidaudio":
                 engine = await FluidAudioEngine(versionOverride: option.identifier)
+            case "apple":
+                if #available(macOS 26.0, *) {
+                    engine = AppleSpeechEngine()
+                } else {
+                    engine = await WhisperEngine()
+                }
             case "sensevoice":
 #if arch(arm64)
                 engine = SenseVoiceEngine()

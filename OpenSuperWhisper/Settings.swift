@@ -150,6 +150,13 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    func selectAppleSpeech() {
+        MainActor.assumeIsolated {
+            ModelSelectionStore.shared.select(DictationModelOption(
+                engine: "apple", identifier: "default", displayName: "Apple Speech"))
+        }
+    }
+
     @Published var availableModels: [URL] = []
     
     @Published var downloadableModels: [SettingsDownloadableModel] = []
@@ -1162,6 +1169,7 @@ struct SettingsView: View {
         case "fluidaudio": return "Parakeet"
         case "whisper": return "Whisper"
         case "sensevoice": return "SenseVoice"
+        case "apple": return "Apple Speech"
         case "remote": return "Remote"
         default: return engine
         }
@@ -1173,6 +1181,7 @@ struct SettingsView: View {
         case "fluidaudio": return "Parakeet"
         case "whisper": return "Whisper"
         case "sensevoice": return "SenseVoice"
+        case "apple": return "Apple"
         case "remote": return "Remote"
         default: return engine
         }
@@ -1184,6 +1193,8 @@ struct SettingsView: View {
             return "Most accurate, ~99 languages, and can translate to English. Runs fully on-device."
         case "sensevoice":
             return "Fast — Chinese, Cantonese, English, Japanese, Korean. Runs fully on-device."
+        case "apple":
+            return "macOS's built-in speech model — zero download in the app, managed by the system."
         case "remote":
             return "Cloud / self-hosted — any OpenAI-compatible server (Groq, speaches, LiteLLM, …)."
         default:
@@ -1525,6 +1536,9 @@ struct SettingsView: View {
 #if arch(arm64)
                 engineCard(tag: "sensevoice", name: "SenseVoice", sub: "zh · yue · ja · ko")
 #endif
+                if AppleSpeechSupport.isSupported {
+                    engineCard(tag: "apple", name: "Apple", sub: "Built into macOS")
+                }
                 engineCard(tag: "remote", name: "Remote", sub: "Your own server")
             }
             .padding(.horizontal, 24).padding(.top, 12)
@@ -1574,6 +1588,9 @@ struct SettingsView: View {
                         SenseVoiceModelSection(viewModel: viewModel)
                     }
 #endif
+                    if browseEngine == "apple", #available(macOS 26.0, *) {
+                        AppleSpeechModelSection(viewModel: viewModel)
+                    }
                     if browseEngine == "remote" {
                         RemoteSettingsSection(viewModel: viewModel)
                     }
