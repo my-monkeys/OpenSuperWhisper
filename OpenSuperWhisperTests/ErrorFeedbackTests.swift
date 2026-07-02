@@ -109,20 +109,23 @@ final class TranscriptionServiceErrorStateTests: XCTestCase {
                      "engineError should be nil immediately after reloadEngine()")
     }
 
-    func testReloadEngineSetsLoadingTrue() {
+    func testReloadEngineInvalidatesWithoutEagerLoading() {
         let service = TranscriptionService.shared
         service.reloadEngine()
-        XCTAssertTrue(service.isLoading,
-                      "isLoading should be true immediately after reloadEngine()")
+        // Lazy engine loading: reloadEngine() only INVALIDATES the active engine so the
+        // next transcription re-initializes it — it must NOT eagerly load (which would
+        // download a model just from switching engines). So it isn't "loading" now.
+        XCTAssertFalse(service.isLoading,
+                       "reloadEngine() must not eagerly load — loading is deferred to first use")
     }
 
-    func testIsEngineReadyFalseWhileReloading() {
+    func testIsEngineReadyFalseAfterReloading() {
         let service = TranscriptionService.shared
         service.reloadEngine()
-        // isEngineReady = currentEngine != nil && !isLoading
-        // isLoading is true, so isEngineReady must be false
+        // isEngineReady = currentEngine != nil && !isLoading. reloadEngine() clears
+        // currentEngine, so isEngineReady must be false until the next lazy load.
         XCTAssertFalse(service.isEngineReady,
-                       "isEngineReady should be false while reloading")
+                       "isEngineReady should be false after the engine is invalidated")
     }
 }
 
@@ -352,15 +355,17 @@ final class RecordButtonDisabledStateTests: XCTestCase {
         }
     }
 
-    func testRecordButtonDisabledDuringLoading() {
+    func testEngineSwitchDoesNotBlockRecordButton() {
         let service = TranscriptionService.shared
         service.reloadEngine()
-        // Right after reload, isLoading is true
-        XCTAssertTrue(service.isLoading, "isLoading should be true during reload")
-        // The disabled condition includes isLoading
+        // With lazy engine loading, switching engines only invalidates the current engine
+        // (the model load is deferred to the next transcription), so it does NOT put the app
+        // into a loading/error state — the record button's disabled condition
+        // (isLoading || engineError != nil) stays false. This guards that browsing engines
+        // no longer disables recording (nor triggers a download).
         let wouldBeDisabled = service.isLoading || service.engineError != nil
-        XCTAssertTrue(wouldBeDisabled,
-                      "Record button should be disabled while engine is loading")
+        XCTAssertFalse(wouldBeDisabled,
+                       "Switching engines shouldn't disable the record button (lazy load)")
     }
 }
 

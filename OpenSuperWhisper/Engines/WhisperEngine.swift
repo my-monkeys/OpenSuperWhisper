@@ -29,6 +29,14 @@ class WhisperEngine: TranscriptionEngine {
     private var _isCancelled = false
     private var _abortFlag: UnsafeMutablePointer<Bool>?
     private var progressContext: ProgressContext?
+
+    /// When set, overrides the pref-selected model path — lets the remote local-fallback
+    /// build an engine for a specific model without mutating global prefs.
+    private let modelPathOverride: String?
+
+    init(modelPathOverride: String? = nil) {
+        self.modelPathOverride = modelPathOverride
+    }
     
     private var isCancelled: Bool {
         get {
@@ -63,7 +71,7 @@ class WhisperEngine: TranscriptionEngine {
     }
     
     func initialize() async throws {
-        let modelPath = AppPreferences.shared.selectedWhisperModelPath ?? AppPreferences.shared.selectedModelPath
+        let modelPath = modelPathOverride ?? AppPreferences.shared.selectedWhisperModelPath ?? AppPreferences.shared.selectedModelPath
         guard let modelPath = modelPath else {
             throw TranscriptionError.contextInitializationFailed
         }

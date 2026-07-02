@@ -76,7 +76,7 @@ struct SenseVoiceModelSection: View {
         guard !isDownloading else { return }
         errorMessage = nil
         if isDownloaded {
-            viewModel.selectedEngine = "sensevoice"
+            viewModel.selectSenseVoice()
         } else {
             isDownloading = true
             progress = 0
@@ -88,7 +88,7 @@ struct SenseVoiceModelSection: View {
                     await MainActor.run {
                         isDownloaded = true
                         isDownloading = false
-                        viewModel.selectedEngine = "sensevoice"
+                        viewModel.selectSenseVoice()
                     }
                 } catch {
                     await MainActor.run {

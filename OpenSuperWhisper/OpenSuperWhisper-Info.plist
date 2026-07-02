@@ -31,5 +31,20 @@
 	<string>ECQpCBVVumUKoBjgcDPSlmllYiWlSAUFGh5WycBhCA0=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- The Remote engine points at ANY user-specified OpenAI-compatible server,
+		     commonly a self-hosted endpoint reached over plain HTTP at an arbitrary
+		     hostname (e.g. http://litellm.docker.lan, http://ollama.box:11434). Since
+		     the host is whatever the user types, ATS must be disabled wholesale.
+		     IMPORTANT: NSAllowsArbitraryLoads must stand ALONE here. On macOS 10.12+
+		     the presence of NSAllowsLocalNetworking (or the other granular keys) makes
+		     the system IGNORE NSAllowsArbitraryLoads, which re-blocks cleartext HTTP to
+		     non-.local hostnames like *.docker.lan. Cloud presets (Groq) are HTTPS. -->
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>OpenSuperWhisper connects to remote transcription servers on your local network (e.g. a self-hosted Whisper/LiteLLM endpoint).</string>
 </dict>
 </plist>
