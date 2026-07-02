@@ -1,140 +1,164 @@
+<div align="center">
+
 # OpenSuperWhisper
 
-> **Community fork maintained by [My-Monkey](https://my-monkey.fr).** A maintained successor to
-> [`Starmel/OpenSuperWhisper`](https://github.com/Starmel/OpenSuperWhisper) (MIT), revived to land the
-> backlog of pending contributions and keep the project moving. Thanks to the original author and every
-> contributor — merged work credits its original authors.
+**Speak. It types. In any app on your Mac — free, open-source, on-device.**
 
-OpenSuperWhisper is a macOS application that provides real-time audio transcription using the Whisper model. It offers a seamless way to record and transcribe audio with customizable settings and keyboard shortcuts.
+[![Website](https://img.shields.io/badge/Website-opensuperwhisper.com-1f3bff?style=for-the-badge)](https://opensuperwhisper.com)
+[![Latest release](https://img.shields.io/github/v/release/my-monkeys/OpenSuperWhisper?style=for-the-badge&color=0a8f57)](https://github.com/my-monkeys/OpenSuperWhisper/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-969696?style=for-the-badge)](LICENSE)
 
-<p align="center">
-  <a href="https://opensuperwhisper.com"><img src="https://img.shields.io/badge/Website-opensuperwhisper.com-1f3bff?style=for-the-badge" alt="opensuperwhisper.com" /></a>
-  <br />
-  <strong><a href="https://opensuperwhisper.com">opensuperwhisper.com</a></strong> — compare the engines head-to-head, see the real benchmark scores, and follow the <a href="https://opensuperwhisper.com/changelog">changelog</a>.
-</p>
+Hold a shortcut, speak, release — your words land in whatever app you're in.
+Four transcription engines (three fully on-device), no subscription, no account, no telemetry.
 
-<p align="center">
-<img src="docs/image.png" width="400" /> <img src="docs/image_indicator.png" width="400" />
-</p>
+<img src="docs/screenshots/history.png" width="380" alt="Transcription history — every dictation with its duration, word count and the model that transcribed it" />
 
-## Features
+</div>
 
-- 🎙️ Real-time audio recording and transcription
-- 🧠 Four transcription engines — three fully on-device ([Whisper](https://github.com/ggerganov/whisper.cpp), [Parakeet](https://github.com/AntinomyCollective/FluidAudio), [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) for Chinese/Cantonese/English/Japanese/Korean) plus [**Groq**](https://groq.com) (optional cloud, ultra-fast whisper-large-v3 — uploads audio, needs a free API key)
-- 🌍 Interface localized in **English, French, German, Spanish, Italian and Brazilian Portuguese**
-- ⌨️ Global keyboard shortcuts — key combination or single modifier key (e.g. Left ⌘, Right ⌥, Fn)
-- ✊ Hold-to-record mode — hold the shortcut to record, release to stop
-- 📁 Drag & drop audio files for transcription with queue processing
-- 🎤 Microphone selection — switch between built-in, external, Bluetooth and iPhone (Apple Continuity) mics from the menu bar
-- 🌍 Support for many languages with auto-detection — including Hebrew (with an [ivrit.ai](https://www.ivrit.ai/) fine-tuned model)
-- 📖 Custom dictionary — fix proper nouns and jargon with your own replacements (works with both engines; biases Whisper recognition)
-- 👀 Live transcription preview — see the text build up in the indicator as you speak (Parakeet)
-- 🤖 AI Cleanup — optionally tidy punctuation/casing through a local [Ollama](https://ollama.com) model, fully on-device (opt-in)
-- 🎯 Configurable recording indicator — cursor, screen edges, or a **Notch / Dynamic Island** mode (real notch or faux-notch)
-- 🧹 Cleaner output — optionally remove filler words (um, uh…) and never paste "No speech detected"
-- 🤐 Privacy & history — disable transcription history, or set retention limits (max count / age)
-- 🚀 Lifecycle — launch at login and/or start hidden in the menu bar
-- 🔇 While recording — optionally pause other apps' media or lower the system volume
-- 🪝 Post-record hook — run your own shell command after each transcription (text + audio path via env vars / JSON)
-- 🆕 In-app updates — an Updates tab (check + release notes) and a menu-bar "Check for Updates"
-- 🇯🇵🇨🇳🇰🇷 Asian language autocorrect ([autocorrect](https://github.com/huacnlee/autocorrect))
+> **Community fork maintained by [My-Monkey](https://my-monkey.fr)** — a maintained successor to
+> [`Starmel/OpenSuperWhisper`](https://github.com/Starmel/OpenSuperWhisper) (MIT). Merged work
+> credits its original authors. Compare the engines on real benchmarks at
+> [opensuperwhisper.com](https://opensuperwhisper.com).
 
-## Installation
-
-**Homebrew** (recommended):
+## Install
 
 ```sh
 brew install --cask my-monkeys/tap/opensuperwhisper
 ```
 
-> Use the full `my-monkeys/tap/` path — the bare name `opensuperwhisper` resolves to the original
-> (unmaintained) cask in homebrew-cask, not this fork.
+> ⚠️ Use the full `my-monkeys/tap/` path — the bare name `opensuperwhisper` resolves to the
+> original (unmaintained) cask in homebrew-cask, not this fork.
 
-Or download the latest **notarized** `.dmg` from the [Releases page](https://github.com/my-monkeys/OpenSuperWhisper/releases), or [build it from source](#building-locally).
+Or download the latest **notarized** `.dmg` from [Releases](https://github.com/my-monkeys/OpenSuperWhisper/releases),
+or [build from source](#building-from-source).
+
+**Requires** macOS 14 (Sonoma) or later, Apple Silicon or Intel — Homebrew picks the right build
+automatically. (The Intel build ships Whisper + Parakeet; SenseVoice is Apple-Silicon-only.)
+
+## The basics
+
+- ⌨️ **Global shortcut** — a key combination or a single modifier key (Right ⌥, Left ⌘, Fn…), with
+  hold-to-record: hold to speak, release to insert.
+- 👀 **Live preview** — watch the text build up in the recording indicator as you speak (Parakeet).
+- 📍 **Indicator where you want it** — near the cursor, at a screen edge, or docked in the
+  **notch / Dynamic Island** (real or faux). Optional on-bubble **Stop / Cancel buttons**
+  (off by default — Settings → General → Recording Behavior).
+- 📁 **Files too** — drag audio files onto the app (or `opensuperwhisper transcribe file.m4a`
+  from the terminal) and they queue up.
+- 🌍 **Speaks your language** — ~99 languages with auto-detect (incl. Hebrew via an
+  [ivrit.ai](https://www.ivrit.ai/) model), live **translation to English**, and an interface
+  localized in English, French, German, Spanish, Italian, Portuguese (BR) and Vietnamese.
+
+## Four engines, your choice
+
+| Engine | Runs | Best for |
+|---|---|---|
+| **Whisper** ([whisper.cpp](https://github.com/ggerganov/whisper.cpp)) | On-device | Accuracy, ~99 languages, translation to English |
+| **Parakeet** ([FluidAudio](https://github.com/AntinomyCollective/FluidAudio)) | On-device | Speed + live preview, 25 European languages |
+| **SenseVoice** ([sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)) | On-device | Chinese, Cantonese, English, Japanese, Korean |
+| **Remote** | Your server | Any OpenAI-compatible endpoint — Groq preset, LiteLLM, [speaches](https://github.com/speaches-ai/speaches), a box on your LAN |
+
+<div align="center">
+<img src="docs/screenshots/remote-engine.png" width="640" alt="Remote engine settings — point the app at any OpenAI-compatible server, with a Groq preset and connection test" />
+</div>
+
+The **Remote** engine sends audio to *your* chosen server (and says so, plainly). It lists the
+server's models after an authenticated **Test Connection**, retries transient network hiccups, and —
+if your server is unreachable — can **fall back to a local model** so dictation never just fails.
+Models load lazily: browsing engine tabs never triggers a surprise download.
+
+## Smart while you dictate
+
+- 🪟 **App Context** — bind a model to an app (or a website in supported browsers) and the model
+  switches automatically when you dictate there: a fast one for chat, an accurate one for email.
+  Managed from Settings → App Context or the menu-bar **Model** picker.
+- 📖 **Custom dictionary** — your proper nouns and jargon come out spelled right; boosts
+  recognition and applies replacements.
+- 🧹 **Cleaner output** — optional filler-word removal (um, uh…), automatic sentence spacing, and
+  "No speech detected" is never pasted.
+- 🤖 **AI cleanup** — optionally tidy punctuation/casing through a local [Ollama](https://ollama.com)
+  model. Fully on-device, opt-in.
+- ⏯️ **Media handling** — pause other apps' playback (and resume only what was actually playing) or
+  duck the system volume while you record.
+- 🎤 **Any microphone** — built-in, external, Bluetooth or iPhone (Continuity), switchable from the
+  menu bar.
+
+<div align="center">
+<img src="docs/screenshots/app-context.png" width="640" alt="App Context — per-app and per-site model rules" />
+</div>
+
+## A history that remembers (if you want one)
+
+Every dictation records **where** it happened (app, window title, site) and **which model**
+transcribed it. Rerun any entry with a different model from the ↻ menu; failed transcriptions
+keep their audio with a retry button instead of vanishing. Or turn history off entirely —
+nothing is persisted, and retention limits (count / age) are available in between.
+
+## Private by default
+
+On-device engines never send audio anywhere. There's no account, no telemetry, and the only
+network path is the Remote engine — which you explicitly configure and which labels itself
+clearly. History is yours to disable or cap.
 
 ## Command line
 
-OpenSuperWhisper can transcribe a file from the terminal, headless (no window/dock), reusing the
-engine and settings configured in the app:
-
 ```sh
-# via the Homebrew-installed binary
-opensuperwhisper transcribe path/to/audio.wav
+opensuperwhisper transcribe path/to/audio.wav          # text on stdout
 opensuperwhisper transcribe path/to/audio.wav --json   # { "file", "text" }
-
-# or directly, without Homebrew
-/Applications/OpenSuperWhisper.app/Contents/MacOS/OpenSuperWhisper transcribe audio.wav
 ```
 
-The transcription goes to stdout (engine logs go to stderr), so it pipes cleanly:
-`opensuperwhisper transcribe note.m4a > note.txt`. Set up a model in the app at least once first.
-
-## Requirements
-
-- macOS 14 (Sonoma) or later
-- **Apple Silicon or Intel** — `brew install` picks the right build automatically. The Intel
-  (x86_64) build ships Whisper + Parakeet; SenseVoice is Apple-Silicon-only (its onnxruntime
-  dependency ships arm64-only).
+Engine logs go to stderr, so it pipes cleanly: `opensuperwhisper transcribe note.m4a > note.txt`.
+Set up a model in the app at least once first. There's also a **post-record hook** to run your own
+shell command after each dictation (text + audio path via env vars / JSON on stdin).
 
 ## 🧪 Beta testing — we need you
 
-The surest way to make OpenSuperWhisper **safer and more stable** is real-world testing — so we're looking for **beta testers**. Try a pre-release build and tell us everything that breaks, feels off, or could be better:
+Real-world testing is what makes this stable. Pre-release builds are on the
+[Releases page](https://github.com/my-monkeys/OpenSuperWhisper/releases) (marked *Pre-release*) —
+they install alongside stable and never touch your auto-updates.
 
-- **Grab a beta** — the latest pre-release builds are under [**Releases**](https://github.com/my-monkeys/OpenSuperWhisper/releases) (marked *Pre-release*). They install alongside the stable app and don't change your auto-updates.
-- **Report a bug** (technical) — [open an issue](https://github.com/my-monkeys/OpenSuperWhisper/issues/new) with steps to reproduce, your macOS version, the engine/model in use, and logs if you have them.
-- **Send feedback** (everyone, no account needed) — use the feedback form on **[opensuperwhisper.com](https://opensuperwhisper.com)**.
+- 🐞 **Bugs** → [open an issue](https://github.com/my-monkeys/OpenSuperWhisper/issues/new) with your
+  macOS version, the engine/model in use, and steps to reproduce.
+- 💬 **Feedback** (no account needed) → the form on [opensuperwhisper.com](https://opensuperwhisper.com/#feedback).
 
-Every report, however small, helps us build something solid. 🍌
+## Support the project
 
-## Support
+OpenSuperWhisper is free forever — no Pro tier, no paywall. If it saves you time, you can
+[**buy the monkeys a banana on Ko-fi**](https://ko-fi.com/mymonkey): donations keep the nonprofit
+(association loi 1901) running and the open-source work alive. 🍌
 
-If you encounter any issues or have questions, please:
-1. Check the existing issues in the repository
-2. Create a new issue with detailed information about your problem
-3. Include system information and logs when reporting bugs
+## Building from source
 
-## Building locally
+<details>
+<summary>Clone, install the toolchain, build</summary>
 
-To build locally, you'll need:
+```sh
+git clone git@github.com:my-monkeys/OpenSuperWhisper.git
+cd OpenSuperWhisper
+git submodule update --init --recursive
+brew install cmake libomp rust ruby
+gem install xcpretty
+./run.sh build
+```
 
-    git clone git@github.com:my-monkeys/OpenSuperWhisper.git
-    cd OpenSuperWhisper
-    git submodule update --init --recursive
-    brew install cmake libomp rust ruby
-    gem install xcpretty
-    ./run.sh build
+If something breaks, `.github/workflows/build.yml` is the CI recipe that builds the app on every
+push. Maintainers: see [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for the notarized-release +
+Homebrew flow.
 
-In case of problems, consult `.github/workflows/build.yml` which is our CI workflow
-where the app gets built automatically on GitHub's CI.
-
-Maintainers: see [`docs/RELEASING.md`](docs/RELEASING.md) for the notarized-release + Homebrew flow.
+</details>
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit pull requests or create issues for bugs and feature requests.
-
-### Contribution TODO list
-
-- [x] Streaming transcription — live preview while speaking
-- [x] Custom dictionary / keyword boosting ([#19](https://github.com/Starmel/OpenSuperWhisper/issues/19))
-- [x] Background app ([#8](https://github.com/Starmel/OpenSuperWhisper/issues/8))
-- [x] Support long-press single key audio recording ([#18](https://github.com/Starmel/OpenSuperWhisper/issues/18))
-- [x] AI cleanup — optional local-LLM post-processing
-- [x] Configurable indicator position + Notch / Dynamic Island mode
-- [x] Notarized Developer ID build + Homebrew cask
-- [x] Sparkle auto-update (in-place download & install)
-- [x] SenseVoice engine — local multilingual ASR via sherpa-onnx ([#145](https://github.com/Starmel/OpenSuperWhisper/issues/145))
-- [x] Internationalization / localization — initial French
-- [x] Intel macOS compatibility ([#15](https://github.com/Starmel/OpenSuperWhisper/issues/15)) — separate x86_64 build (Whisper + Parakeet)
-- [x] CLI ([#150](https://github.com/Starmel/OpenSuperWhisper/issues/150)) — `opensuperwhisper transcribe <file>`
-- [x] Groq STT provider ([#64](https://github.com/Starmel/OpenSuperWhisper/issues/64)) — cloud whisper-large-v3
-- [x] Localization — English, French, German, Spanish, Italian, Portuguese (BR)
-- [ ] Agent mode ([#14](https://github.com/Starmel/OpenSuperWhisper/issues/14))
+Contributions are welcome — issues, focused PRs, or big ideas
+([the last community batch](https://github.com/my-monkeys/OpenSuperWhisper/pull/21) shipped a whole
+menu of features). Open items live in the
+[issue tracker](https://github.com/my-monkeys/OpenSuperWhisper/issues).
 
 ## License
 
-OpenSuperWhisper is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Whisper Models
-
-You can download Whisper model files (`.bin`) from the [Whisper.cpp Hugging Face repository](https://huggingface.co/ggerganov/whisper.cpp/tree/main). Place the downloaded `.bin` files in the app's models directory. On first launch, the app will attempt to copy a default model automatically, but you can add more models manually.
+MIT — see [LICENSE](LICENSE). Built on [whisper.cpp](https://github.com/ggerganov/whisper.cpp),
+[FluidAudio](https://github.com/AntinomyCollective/FluidAudio),
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) /
+[SenseVoice](https://github.com/FunAudioLLM/SenseVoice),
+[autocorrect](https://github.com/huacnlee/autocorrect) and
+[Sparkle](https://sparkle-project.org). 🐒
