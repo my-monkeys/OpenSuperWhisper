@@ -19,6 +19,7 @@ struct RemoteServerSettingsView: View {
     @State private var showKeyEditor = false
     @State private var autoTestTask: Task<Void, Never>?
     @State private var showAllModels = false
+    @State private var modelSearchText = ""
 
     private var hasKey: Bool { !viewModel.remoteServerAPIKey.isEmpty }
 
@@ -256,13 +257,22 @@ struct RemoteServerSettingsView: View {
     // chat models, embeddings, TTS — alongside the transcription ones. Default to
     // the models that look like speech-to-text (name heuristic); fail open when
     // nothing matches, and always offer "show all" since heuristics have misses.
-    private var visibleModels: [RemoteModelInfo] {
+    private var sttFilteredModels: [RemoteModelInfo] {
         guard !showAllModels else { return availableModels }
         let stt = availableModels.filter { RemoteModelFilter.isLikelySpeechToText($0.id) }
         return stt.isEmpty ? availableModels : stt
     }
 
-    private var hiddenModelCount: Int { availableModels.count - visibleModels.count }
+    private var visibleModels: [RemoteModelInfo] {
+        let base = sttFilteredModels
+        let query = modelSearchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return base }
+        return base.filter { $0.id.localizedCaseInsensitiveContains(query) }
+    }
+
+    // Counts only the speech-to-text filter (not the search box), so the
+    // "show all" label stays truthful while a search is active.
+    private var hiddenModelCount: Int { availableModels.count - sttFilteredModels.count }
 
     // Model list styled like the local downloaded-model list: each model from
     // GET /v1/models is a selectable row, plus a "Custom" row that reveals a
@@ -271,10 +281,44 @@ struct RemoteServerSettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Model").font(.subheadline)
 
+            // Aggregators (LiteLLM, OpenRouter-style gateways) can list hundreds of
+            // models — a filter box beats scrolling. Hidden for short lists.
+            if availableModels.count > 5 {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("", text: $modelSearchText, prompt: Text("Filter models…"))
+                        .textFieldStyle(.plain)
+                        .autocorrectionDisabled(true)
+                    if !modelSearchText.isEmpty {
+                        Button {
+                            modelSearchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+                .cornerRadius(7)
+            }
+
             // Bounded scroll box (definite height): shows ~3 models and scrolls
             // for more, so a server with many models doesn't blow up the panel.
             ScrollView {
                 VStack(spacing: 6) {
+                    if visibleModels.isEmpty && !modelSearchText.isEmpty {
+                        Text("No models match \"\(modelSearchText)\"")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 10)
+                    }
                     ForEach(visibleModels) { info in
                         modelRow(
                             name: info.id,
