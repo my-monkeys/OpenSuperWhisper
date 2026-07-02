@@ -1199,16 +1199,13 @@ struct SettingsView: View {
 
     /// "Feedback" tab — recruit beta testers and route every kind of report (#beta).
     private var feedbackSettings: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Help us improve")
-                        .font(.title2).bold()
-                    Text("OpenSuperWhisper gets better with your feedback. Hit a bug, or have an idea? Tell us — every report helps make it more stable.")
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+        SPane(title: "Feedback", subtitle: "Help us improve") {
+            Text("OpenSuperWhisper gets better with your feedback. Hit a bug, or have an idea? Tell us — every report helps make it more stable.")
+                .font(.system(size: 12))
+                .foregroundColor(STheme.hint)
+                .fixedSize(horizontal: false, vertical: true)
 
+            VStack(spacing: 10) {
                 feedbackLink(
                     title: "Report a bug",
                     subtitle: "On GitHub — steps to reproduce, your macOS version & engine, logs if you have them",
@@ -1224,11 +1221,7 @@ struct SettingsView: View {
                     subtitle: "Early features before they ship, on GitHub Releases",
                     icon: "testtube.2",
                     url: "https://github.com/my-monkeys/OpenSuperWhisper/releases")
-
-                Spacer(minLength: 0)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -1238,22 +1231,28 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(.accentColor)
-                    .frame(width: 30)
+                    .font(.system(size: 15))
+                    .foregroundColor(STheme.accent)
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline)
-                    Text(subtitle).font(.caption).foregroundColor(.secondary)
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(STheme.textBright)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Image(systemName: "arrow.up.right")
-                    .font(.caption).foregroundColor(.secondary)
+                    .font(.system(size: 10))
+                    .foregroundColor(STheme.hint)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.controlBackgroundColor))
-            .cornerRadius(10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(STheme.cardBg))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(STheme.border, lineWidth: 1))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -1350,16 +1349,18 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 HStack(spacing: 6) {
                     Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
-                        Image("github-mark")
-                            .resizable()
-                            .renderingMode(.template)
-                            .frame(width: 11, height: 11)
-                            .foregroundColor(STheme.hint.opacity(0.8))
+                        HStack(spacing: 6) {
+                            Image("github-mark")
+                                .resizable()
+                                .renderingMode(.template)
+                                .frame(width: 13, height: 13)
+                            Text("v\(UpdateChecker.currentVersion)")
+                                .font(.system(size: 10.5, design: .monospaced))
+                        }
+                        .foregroundColor(STheme.hint.opacity(0.8))
+                        .contentShape(Rectangle())
                     }
                     .help("GitHub")
-                    Text("v\(UpdateChecker.currentVersion)")
-                        .font(.system(size: 10.5, design: .monospaced))
-                        .foregroundColor(STheme.hint.opacity(0.8))
                     Spacer()
                     Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
                         Image(systemName: "star")
@@ -1883,223 +1884,119 @@ struct SettingsView: View {
         }
     }
 
+    /// "Advanced" — the redesigned engine-internals screen (Settings Explorations 2e):
+    /// App / Decoding / Model parameters / Post-record hook / Debug, in the Atelier style.
     private var advancedSettings: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // App-level settings (moved here from the old General tab, per the redesign —
-                // this pane keeps the legacy styling until the Advanced screen is redesigned).
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("App")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    SettingRow(
-                        title: "App Language",
-                        caption: "Language of the app interface. Relaunch to apply."
-                    ) {
-                        Picker("", selection: $appLanguage) {
-                            Text("System").tag("system")
-                            Text("English").tag("en")
-                            Text("Français").tag("fr")
-                            Text("Deutsch").tag("de")
-                            Text("Español").tag("es")
-                            Text("Italiano").tag("it")
-                            Text("Português (BR)").tag("pt-BR")
-                            Text("Tiếng Việt").tag("vi")
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 150)
-                        .labelsHidden()
-                        .onChange(of: appLanguage) { _, newValue in
-                            LanguageManager.selected = newValue
-                            langNeedsRelaunch = true
-                        }
+        SPane(title: "Advanced") {
+            SSection(title: "App") {
+                SRow(title: "App language", hint: "Relaunch to apply.") {
+                    Picker("", selection: $appLanguage) {
+                        Text("System").tag("system")
+                        Text("English").tag("en")
+                        Text("Français").tag("fr")
+                        Text("Deutsch").tag("de")
+                        Text("Español").tag("es")
+                        Text("Italiano").tag("it")
+                        Text("Português (BR)").tag("pt-BR")
+                        Text("Tiếng Việt").tag("vi")
                     }
-                    if langNeedsRelaunch {
-                        HStack {
-                            Text("Relaunch to apply the new language.")
-                                .font(.caption).foregroundColor(.secondary)
-                            Spacer()
-                            Button("Relaunch Now") { LanguageManager.relaunch() }
-                        }
-                    }
-                    SettingRow(
-                        title: "Launch at Login",
-                        caption: "Start OpenSuperWhisper automatically when you log in."
-                    ) {
-                        Toggle("", isOn: Binding(
-                            get: { launchAtLogin.isEnabled },
-                            set: { launchAtLogin.setEnabled($0) }
-                        ))
-                        .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                        .labelsHidden()
-                    }
-                    SettingRow(
-                        title: "Start in the Menu Bar",
-                        caption: "Launch without the main window — open it from the menu bar icon."
-                    ) {
-                        Toggle("", isOn: $viewModel.startHidden)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 150)
+                    .labelsHidden()
+                    .onChange(of: appLanguage) { _, newValue in
+                        LanguageManager.selected = newValue
+                        langNeedsRelaunch = true
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Decoding Strategy
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Decoding Strategy")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Use Beam Search")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.useBeamSearch)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                                .help("Beam search can provide better results but is slower")
-                        }
-                        
-                        if viewModel.useBeamSearch {
-                            HStack {
-                                Text("Beam Size:")
-                                    .font(.subheadline)
-                                Spacer()
-                                Stepper("\(viewModel.beamSize)", value: $viewModel.beamSize, in: 1...10)
-                                    .help("Number of beams to use in beam search")
-                                    .frame(width: 120)
-                            }
-                        }
+                if langNeedsRelaunch {
+                    SRow(title: "Relaunch to apply the new language", indented: true) {
+                        Button("Relaunch Now") { LanguageManager.relaunch() }
+                            .controlSize(.small)
                     }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-                
-                // Model Parameters
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Model Parameters")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Temperature:")
-                                    .font(.subheadline)
-                                Spacer()
-                                Text(String(format: "%.2f", viewModel.temperature))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Slider(value: $viewModel.temperature, in: 0.0...1.0, step: 0.1)
-                                .help("Higher values make the output more random")
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("No Speech Threshold:")
-                                    .font(.subheadline)
-                                Spacer()
-                                Text(String(format: "%.2f", viewModel.noSpeechThreshold))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Slider(value: $viewModel.noSpeechThreshold, in: 0.0...1.0, step: 0.1)
-                                .help("Threshold for detecting speech vs. silence")
-                        }
-                    }
+                SRow(title: "Launch at login", hint: "Start OpenSuperWhisper automatically when you log in.") {
+                    SToggle(isOn: Binding(
+                        get: { launchAtLogin.isEnabled },
+                        set: { launchAtLogin.setEnabled($0) }
+                    ))
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Post-Record Hook
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Post-Record Hook")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    SettingRow(
-                        title: "Run a command after each transcription",
-                        caption: "Launch your own script when a transcription completes.",
-                        info: "Runs via /bin/sh -c after each successful transcription, in the background. Your command receives the data as environment variables — OSW_TEXT, OSW_AUDIO_PATH (when history is on), OSW_TIMESTAMP, OSW_DURATION — and a JSON object on stdin with the same fields. Example: echo \"$OSW_TEXT\" >> ~/dictations.txt"
-                    ) {
-                        Toggle("", isOn: $viewModel.postRecordHookEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-
-                    if viewModel.postRecordHookEnabled {
-                        TextEditor(text: $viewModel.postRecordHookCommand)
-                            .font(.system(.body, design: .monospaced))
-                            .frame(height: 56)
-                            .padding(6)
-                            .background(Color(.textBackgroundColor))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Available in your command (also piped as JSON on stdin):")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            ForEach(Self.postRecordHookVariables, id: \.name) { variable in
-                                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                    Text(variable.name)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .foregroundColor(.primary)
-                                    Text("— \(variable.description)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                SRow(title: "Start in the menu bar", hint: "Launch without the main window — open it from the menu bar icon.") {
+                    SToggle(isOn: $viewModel.startHidden)
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Debug Options
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Debug Options")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    HStack {
-                        Text("Debug Mode")
-                            .font(.subheadline)
-                        Spacer()
-                        Toggle("", isOn: $viewModel.debugMode)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                            .help("Enable additional logging and debugging information")
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
             }
-            .padding()
+
+            SSection(title: "Decoding") {
+                SRow(title: "Use beam search", hint: "Can improve accuracy, at some speed cost.") {
+                    SToggle(isOn: $viewModel.useBeamSearch)
+                }
+                if viewModel.useBeamSearch {
+                    SRow(title: "Beam size", indented: true) {
+                        Stepper("\(viewModel.beamSize)", value: $viewModel.beamSize, in: 1...10)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(STheme.text)
+                            .frame(width: 90)
+                    }
+                }
+            }
+
+            SSection(title: "Model parameters") {
+                VStack(alignment: .leading, spacing: 2) {
+                    SRow(title: "Temperature", hint: "Higher values make decoding more random.") {
+                        Text(String(format: "%.2f", viewModel.temperature))
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundColor(STheme.hint)
+                    }
+                    Slider(value: $viewModel.temperature, in: 0.0...1.0, step: 0.1)
+                        .controlSize(.small)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    SRow(title: "No speech threshold", hint: "How confident the model must be to call a segment silence.") {
+                        Text(String(format: "%.2f", viewModel.noSpeechThreshold))
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundColor(STheme.hint)
+                    }
+                    Slider(value: $viewModel.noSpeechThreshold, in: 0.0...1.0, step: 0.1)
+                        .controlSize(.small)
+                }
+            }
+
+            SSection(title: "Post-record hook") {
+                SRow(title: "Run a command after each transcription", hint: "Launch your own script when a transcription completes.") {
+                    HStack(spacing: 8) {
+                        InfoButton(text: "Runs via /bin/sh -c after each successful transcription, in the background. Your command receives the data as environment variables — OSW_TEXT, OSW_AUDIO_PATH (when history is on), OSW_TIMESTAMP, OSW_DURATION — and a JSON object on stdin with the same fields. Example: echo \"$OSW_TEXT\" >> ~/dictations.txt")
+                        SToggle(isOn: $viewModel.postRecordHookEnabled)
+                    }
+                }
+                if viewModel.postRecordHookEnabled {
+                    sEditor($viewModel.postRecordHookCommand, height: 56)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Available in your command (also piped as JSON on stdin):")
+                            .font(.system(size: 11))
+                            .foregroundColor(STheme.hint)
+                            .fixedSize(horizontal: false, vertical: true)
+                        ForEach(Self.postRecordHookVariables, id: \.name) { variable in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(variable.name)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(STheme.text)
+                                Text("— \(variable.description)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(STheme.hint)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+            }
+
+            SSection(title: "Debug") {
+                SRow(title: "Debug mode", hint: "Extra logging and diagnostic output.") {
+                    SToggle(isOn: $viewModel.debugMode)
+                }
+            }
         }
     }
-    
+
     private var useModifierKey: Bool {
         viewModel.modifierOnlyHotkey != .none
     }
