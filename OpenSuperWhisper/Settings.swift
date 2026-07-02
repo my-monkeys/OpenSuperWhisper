@@ -1348,10 +1348,27 @@ struct SettingsView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                Text("v\(UpdateChecker.currentVersion)")
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundColor(STheme.hint.opacity(0.8))
-                    .padding(.horizontal, 10).padding(.top, 6)
+                HStack(spacing: 6) {
+                    Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
+                        Image("github-mark")
+                            .resizable()
+                            .renderingMode(.template)
+                            .frame(width: 11, height: 11)
+                            .foregroundColor(STheme.hint.opacity(0.8))
+                    }
+                    .help("GitHub")
+                    Text("v\(UpdateChecker.currentVersion)")
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundColor(STheme.hint.opacity(0.8))
+                    Spacer()
+                    Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
+                        Image(systemName: "star")
+                            .font(.system(size: 10))
+                            .foregroundColor(STheme.hint.opacity(0.8))
+                    }
+                    .help("Star us on GitHub")
+                }
+                .padding(.horizontal, 10).padding(.top, 6)
             }
             .padding(12)
             .frame(width: 224)
@@ -1365,44 +1382,22 @@ struct SettingsView: View {
 
             Rectangle().fill(STheme.border).frame(width: 1)
 
-            VStack(spacing: 0) {
-                detailContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                Divider()
-
-                // Footer lives inside the detail column so it never runs under the sidebar.
-                HStack {
-                    Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star")
-                                .font(.system(size: 10))
-                            Text("GitHub")
-                                .font(.system(size: 11))
-                        }
-                        .foregroundColor(.secondary)
+            detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(STheme.windowBg)
+                // The old footer's Done button carried this legacy reload; the window now
+                // just closes, so run it when the view goes away instead. (Model selection
+                // reloads through ModelSelectionStore anyway — this is belt-and-suspenders
+                // for a Whisper path that predates the stores.)
+                .onDisappear {
+                    if viewModel.selectedEngine == "whisper",
+                       viewModel.selectedModelURL != previousModelURL,
+                       let modelPath = viewModel.selectedModelURL?.path {
+                        TranscriptionService.shared.reloadModel(with: modelPath)
                     }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Button("Done") {
-                        if viewModel.selectedEngine == "whisper" {
-                            if viewModel.selectedModelURL != previousModelURL, let modelPath = viewModel.selectedModelURL?.path {
-                                TranscriptionService.shared.reloadModel(with: modelPath)
-                            }
-                        }
-                        dismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
                 }
-                .padding()
-                .background(Color(.windowBackgroundColor))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.windowBackgroundColor))
         }
+        .tint(STheme.accent)
         .frame(minWidth: 720, idealWidth: 780, minHeight: 540, idealHeight: 600)
         .onAppear {
             previousModelURL = viewModel.selectedModelURL
@@ -1430,44 +1425,141 @@ struct SettingsView: View {
         }
     }
     
+    /// Compact engine card (design 1b): name + one-line subtitle, copper when browsed.
+    private func engineCard(tag: String, name: String, sub: LocalizedStringKey) -> some View {
+        Button { browseEngine = tag } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(browseEngine == tag ? STheme.accent : STheme.text)
+                    .lineLimit(1)
+                Text(sub)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(STheme.hint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 9)
+                .fill(browseEngine == tag ? STheme.accentSoft : Color.clear))
+            .overlay(RoundedRectangle(cornerRadius: 9)
+                .stroke(browseEngine == tag ? STheme.accent : STheme.controlBorder, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// "● Active · Engine / model" pill (green — the one live-status element).
+    private var activeModelPill: some View {
+        let model = ModelCatalog.activeOption()?.displayName
+        return Text("● Active · \(engineDisplayName(viewModel.selectedEngine))\(model.map { " / \($0)" } ?? "")")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(STheme.ok)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 9).padding(.vertical, 2)
+            .background(Capsule().fill(STheme.okBg))
+            .frame(maxWidth: 340, alignment: .trailing)
+    }
+
+    /// Shared "downloading…" progress block for the local-engine lists.
+    @ViewBuilder private var downloadProgressBlock: some View {
+        if viewModel.isDownloading {
+            HStack(spacing: 12) {
+                if viewModel.downloadProgress > 0 {
+                    ProgressView(value: viewModel.downloadProgress)
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .tint(STheme.accent)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+                if let downloadingName = viewModel.downloadingModelName {
+                    Text(downloadingName)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(STheme.hint)
+                        .lineLimit(1)
+                }
+                Button("Cancel") { viewModel.cancelDownload() }
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
+        }
+    }
+
+    /// Models-directory row (Storage section of the local engines).
+    private func storageSection(path: String, open: @escaping () -> Void) -> some View {
+        SSection(title: "Storage") {
+            SRow(title: "Models directory", hint: LocalizedStringKey(path)) {
+                Button("Open in Finder", action: open)
+                    .controlSize(.small)
+            }
+        }
+    }
+
     private var modelSettings: some View {
-        ScrollView {
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Speech Recognition Engine")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    // Active engine + model — right under the title, always visible while browsing.
-                    Label("Active: \(engineDisplayName(viewModel.selectedEngine))",
-                          systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Models")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(STheme.textBright)
+                Spacer()
+                activeModelPill
+            }
+            .padding(.horizontal, 24).padding(.top, 16)
 
-                    // All engines are peers: three on-device (Parakeet / Whisper /
-                    // SenseVoice) plus Remote. Picking one shows its settings below.
-                    HStack {
-                        Spacer()
-                        Picker("", selection: $browseEngine) {
-                            Text("Parakeet").tag("fluidaudio")
-                            Text("Whisper").tag("whisper")
+            HStack(spacing: 8) {
+                engineCard(tag: "fluidaudio", name: "Parakeet", sub: "Fast, on-device")
+                engineCard(tag: "whisper", name: "Whisper", sub: "Accurate · 99 langs")
 #if arch(arm64)
-                            Text("SenseVoice").tag("sensevoice")
+                engineCard(tag: "sensevoice", name: "SenseVoice", sub: "zh · yue · ja · ko")
 #endif
-                            Text("Remote").tag("remote")
+                engineCard(tag: "remote", name: "Remote", sub: "Your own server")
+            }
+            .padding(.horizontal, 24).padding(.top, 12)
+
+            if browseEngine == "remote" {
+                HStack(spacing: 8) {
+                    Text("⚠︎")
+                    Text("Audio is uploaded to the remote server — not necessarily on-device.")
+                }
+                .font(.system(size: 11.5))
+                .foregroundColor(STheme.warn)
+                .padding(.horizontal, 11).padding(.vertical, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.warnBg))
+                .padding(.horizontal, 24).padding(.top, 10)
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if browseEngine == "whisper" {
+                        SSection(title: "Whisper models") {
+                            VStack(spacing: 8) {
+                                ForEach($viewModel.downloadableModels) { $model in
+                                    ModelDownloadItemView(model: $model, viewModel: viewModel)
+                                }
+                            }
+                            downloadProgressBlock
                         }
-                        .pickerStyle(.segmented)
-                        .fixedSize()
-                        Spacer()
+                        storageSection(path: WhisperModelManager.shared.modelsDirectory.path) {
+                            NSWorkspace.shared.open(WhisperModelManager.shared.modelsDirectory)
+                        }
+                    } else if browseEngine == "fluidaudio" {
+                        SSection(title: "Parakeet models") {
+                            VStack(spacing: 8) {
+                                ForEach($viewModel.downloadableFluidAudioModels) { $model in
+                                    FluidAudioModelDownloadItemView(model: $model, viewModel: viewModel)
+                                }
+                            }
+                            downloadProgressBlock
+                        }
+                        storageSection(path: AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent().path) {
+                            NSWorkspace.shared.open(AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent())
+                        }
                     }
-                    .padding(.top, 4)
-
-                    Text(engineBlurb(for: browseEngine))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, 8)
-
 #if arch(arm64)
                     if browseEngine == "sensevoice" {
                         SenseVoiceModelSection(viewModel: viewModel)
@@ -1476,152 +1568,13 @@ struct SettingsView: View {
                     if browseEngine == "remote" {
                         RemoteSettingsSection(viewModel: viewModel)
                     }
-
-                    if browseEngine == "whisper" {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Whisper Model")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            ScrollView {
-                                VStack(spacing: 12) {
-                                    ForEach($viewModel.downloadableModels) { $model in
-                                        ModelDownloadItemView(model: $model, viewModel: viewModel)
-                                    }
-                                }
-                            }
-                            .frame(maxHeight: 200)
-                            
-                            if viewModel.isDownloading {
-                                VStack(spacing: 8) {
-                                    HStack {
-                                        if viewModel.downloadProgress > 0 {
-                                            ProgressView(value: viewModel.downloadProgress)
-                                                .progressViewStyle(LinearProgressViewStyle())
-                                        } else {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle())
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Button("Cancel") {
-                                            viewModel.cancelDownload()
-                                        }
-                                        .buttonStyle(.bordered)
-                                    }
-                                    
-                                    if let downloadingName = viewModel.downloadingModelName {
-                                        Text("Downloading: \(downloadingName)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .padding(.top, 8)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Models Directory:")
-                                        .font(.subheadline)
-                                    Button(action: {
-                                        NSWorkspace.shared.open(WhisperModelManager.shared.modelsDirectory)
-                                    }) {
-                                        Label("Open Folder", systemImage: "folder")
-                                            .font(.subheadline)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help("Open models directory")
-                                }
-                                Text(WhisperModelManager.shared.modelsDirectory.path)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .textSelection(.enabled)
-                                    .padding(8)
-                                    .background(Color(.textBackgroundColor).opacity(0.5))
-                                    .cornerRadius(6)
-                            }
-                            .padding(.top, 8)
-                        }
-                    } else if browseEngine == "fluidaudio" {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Parakeet Model")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            ScrollView {
-                                VStack(spacing: 12) {
-                                    ForEach($viewModel.downloadableFluidAudioModels) { $model in
-                                        FluidAudioModelDownloadItemView(model: $model, viewModel: viewModel)
-                                    }
-                                }
-                            }
-                            .frame(maxHeight: 200)
-                            
-                            if viewModel.isDownloading {
-                                VStack(spacing: 8) {
-                                    HStack {
-                                        if viewModel.downloadProgress > 0 {
-                                            ProgressView(value: viewModel.downloadProgress)
-                                                .progressViewStyle(LinearProgressViewStyle())
-                                        } else {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle())
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Button("Cancel") {
-                                            viewModel.cancelDownload()
-                                        }
-                                        .buttonStyle(.bordered)
-                                    }
-                                    
-                                    if let downloadingName = viewModel.downloadingModelName {
-                                        Text("Downloading: \(downloadingName)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .padding(.top, 8)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Models Directory:")
-                                        .font(.subheadline)
-                                    Button(action: {
-                                        let cacheDir = AsrModels.defaultCacheDirectory(for: .v3)
-                                        let parentDir = cacheDir.deletingLastPathComponent()
-                                        NSWorkspace.shared.open(parentDir)
-                                    }) {
-                                        Label("Open Folder", systemImage: "folder")
-                                            .font(.subheadline)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help("Open models directory")
-                                }
-                                Text(AsrModels.defaultCacheDirectory(for: .v3).deletingLastPathComponent().path)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .textSelection(.enabled)
-                                    .padding(8)
-                                    .background(Color(.textBackgroundColor).opacity(0.5))
-                                    .cornerRadius(6)
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
+                .padding(.horizontal, 24).padding(.vertical, 14)
             }
         }
-        .padding()
+        .background(STheme.windowBg)
     }
-    
+
     private var transcriptionSettings: some View {
         ScrollView {
             VStack(spacing: 20) {

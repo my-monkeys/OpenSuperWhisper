@@ -5,18 +5,18 @@ import AppKit
 /// Shown under the "Custom" preset of the Remote engine section: free-text URL,
 /// optional API key, a model list fetched from GET /v1/models, and a request
 /// timeout. The Groq preset uses its own curated UI (see RemoteSettingsSection).
-struct RemoteServerSettingsView: View {
+struct RemoteServerSettingsView<PresetRow: View>: View {
     @ObservedObject var viewModel: SettingsViewModel
+    /// The Preset row (menu + save/delete) — owned by RemoteSettingsSection, rendered
+    /// as the first row of the Server section per the Atelier design.
+    @ViewBuilder let presetRow: () -> PresetRow
 
     @State private var testStatus: TestStatus = .idle
     @State private var availableModels: [RemoteModelInfo] = []
     @State private var isCustomModel: Bool = true
     // Server config + timeout live under disclosures so the model list stays the
     // focus once configured. Server opens by default only when nothing is set yet.
-    @State private var serverExpanded: Bool = AppPreferences.shared.remoteServerURL.isEmpty
-    @State private var timeoutExpanded: Bool = false
-    @State private var fallbackExpanded: Bool = false
-    @State private var showKeyEditor = false
+    @State private var revealKey = false
     @State private var autoTestTask: Task<Void, Never>?
     @State private var showAllModels = false
     @State private var modelSearchText = ""
@@ -36,64 +36,82 @@ struct RemoteServerSettingsView: View {
     }
 
     var body: some View {
-        // No outer scroll: server config and timeout collapse under disclosures,
-        // so the panel stays short enough to fit the window. The model list is the
-        // one bounded scroll region (see modelSection), the way Whisper/Parakeet
-        // present their model lists.
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Remote Server")
-                .font(.headline)
-                .foregroundColor(.primary)
-
-            Text("Use an OpenAI-compatible Whisper endpoint (speaches, LiteLLM, a local Ollama server, etc.) instead of a local model.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            DisclosureGroup("Server settings", isExpanded: $serverExpanded) {
-                VStack(alignment: .leading, spacing: 8) {
-                    field(title: "Server URL", placeholder: "http://localhost:11434", text: $viewModel.remoteServerURL)
-
-                    // Key entry lives behind the lock icon (popover), matching the
-                    // Groq affordance — click the lock to add/edit the key.
-                    HStack {
-                        Text("API Key (optional)")
-                            .font(.subheadline)
-                        Spacer()
-                        Button { showKeyEditor = true } label: {
-                            Image(systemName: hasKey ? "key.fill" : "lock.fill")
-                                .imageScale(.large)
-                                .foregroundColor(hasKey ? .secondary : .orange)
+        VStack(alignment: .leading, spacing: 16) {
+            SSection(title: "Server") {
+                presetRow()
+                SRow(title: "Server URL") {
+                    TextField("", text: $viewModel.remoteServerURL,
+                              prompt: Text("http://localhost:11434"))
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, design: .monospaced))
+                        .autocorrectionDisabled(true)
+                        .padding(.horizontal, 9).padding(.vertical, 5)
+                        .frame(width: 280)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+                }
+                SRow(title: "API key", hint: "Optional — only auth servers need one. Stored in your Keychain.") {
+                    HStack(spacing: 8) {
+                        Group {
+                            if revealKey {
+                                TextField("", text: $viewModel.remoteServerAPIKey,
+                                          prompt: Text("leave blank for no-auth servers"))
+                            } else {
+                                SecureField("", text: $viewModel.remoteServerAPIKey,
+                                            prompt: Text("leave blank for no-auth servers"))
+                            }
+                        }
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, design: .monospaced))
+                        .autocorrectionDisabled(true)
+                        .padding(.horizontal, 9).padding(.vertical, 5)
+                        .frame(width: 240)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+                        Button { revealKey.toggle() } label: {
+                            Image(systemName: revealKey ? "eye.slash" : "eye")
+                                .font(.system(size: 11))
+                                .foregroundColor(STheme.hint)
                         }
                         .buttonStyle(.plain)
-                        .help(hasKey ? "Edit API key" : "Add API key (open / no-auth servers need none)")
-                        .popover(isPresented: $showKeyEditor, arrowEdge: .top) { keyEditor }
+                        .help(revealKey ? "Hide key" : "Reveal key")
                     }
                 }
-                .padding(.top, 6)
-            }
-
-            // Test also refreshes the model list, so it sits right above it.
-            HStack(spacing: 12) {
-                Button("Test Connection") { runTest() }
-                    .buttonStyle(.bordered)
-                    .disabled(viewModel.remoteServerURL.isEmpty || testStatus == .testing)
-
-                statusLabel
+                HStack(spacing: 12) {
+                    Button("Test Connection") { runTest() }
+                        .controlSize(.small)
+                        .disabled(viewModel.remoteServerURL.isEmpty || testStatus == .testing)
+                    statusLabel
+                    Spacer()
+                }
             }
 
             modelSection
 
-            DisclosureGroup("Request timeout", isExpanded: $timeoutExpanded) {
-                timeoutBody
-                    .padding(.top, 6)
-            }
-
-            DisclosureGroup("Local fallback", isExpanded: $fallbackExpanded) {
+            SSection(title: "Reliability") {
+                SRow(title: "Request timeout",
+                     hint: viewModel.remoteServerTimeoutEnabled
+                        ? "Raise it for slow server-side pipelines"
+                        : "No timeout — requests wait indefinitely") {
+                    HStack(spacing: 8) {
+                        if viewModel.remoteServerTimeoutEnabled {
+                            TextField("", value: $viewModel.remoteServerTimeoutSeconds, format: .number)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12, design: .monospaced))
+                                .multilineTextAlignment(.trailing)
+                                .padding(.horizontal, 9).padding(.vertical, 4)
+                                .frame(width: 56)
+                                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+                            Text("s").font(.system(size: 11)).foregroundColor(STheme.hint)
+                        }
+                        SToggle(isOn: $viewModel.remoteServerTimeoutEnabled)
+                    }
+                }
                 fallbackBody
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 8)
         // Auto-test on open (and after edits settle) — surfaces reachability and
         // refreshes the model list without a manual click.
         .onAppear { if !viewModel.remoteServerURL.isEmpty { runTest() } else { fetchModels() } }
@@ -122,24 +140,6 @@ struct RemoteServerSettingsView: View {
         }
     }
 
-    // Inner content of the "Request timeout" disclosure. URLSession's 60s default
-    // cuts off slow server-side pipelines; toggle off for no limit, or override
-    // the seconds.
-    // API key popover — opened from the lock icon, mirroring the Groq key editor.
-    private var keyEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("API Key").font(.headline)
-            SecureField("", text: $viewModel.remoteServerAPIKey,
-                        prompt: Text("leave blank for no-auth servers"))
-                .textFieldStyle(.roundedBorder)
-            Text("Optional — only servers that require auth need a key. Stored in your Keychain.")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .frame(width: 320)
-    }
-
     /// Downloaded on-device models eligible as a fallback. When "Translate to English"
     /// is on, only translation-capable engines qualify (see EngineCapabilities) — Parakeet
     /// and SenseVoice can't translate, so they're filtered out.
@@ -158,34 +158,24 @@ struct RemoteServerSettingsView: View {
     }
 
     @ViewBuilder private var fallbackBody: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Group {
             if !hasAnyLocalModel {
-                // No on-device model to fall back to — don't show the toggle; explain why.
-                Text("To enable local fallback, download an on-device model first (Engine & Model → download a Whisper or Parakeet model).")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text("To enable local fallback, download an on-device model first (Models → Whisper or Parakeet).")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                HStack {
-                    Text("Use a local model when the server is unreachable")
-                    Spacer(minLength: 8)
-                    Toggle("", isOn: $viewModel.remoteFallbackEnabled)
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        .labelsHidden()
+                SRow(title: "Local fallback", hint: "Transcribe locally if the server is unreachable") {
+                    SToggle(isOn: $viewModel.remoteFallbackEnabled)
                 }
-
                 if viewModel.remoteFallbackEnabled {
                     let models = localFallbackModels
                     if models.isEmpty {
-                        // Has a local model, but translate-on filtered them all out (no Whisper).
-                        Text("Translate to English is on, but no Whisper model is downloaded — only Whisper supports translation. Download one under Engine & Model.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        Text("Translate to English is on, but no Whisper model is downloaded — only Whisper supports translation. Download one under Models.")
+                            .font(.system(size: 11)).foregroundColor(STheme.warn)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 16)
                     } else {
-                        HStack {
-                            Text("Fallback model").foregroundColor(.secondary)
-                            Spacer(minLength: 8)
+                        SRow(title: "Fallback model", indented: true) {
                             Picker("", selection: $viewModel.remoteFallbackModel) {
                                 ForEach(models, id: \.self) { model in
                                     Text(model.displayName).tag(DictationModelOption?.some(model))
@@ -194,24 +184,16 @@ struct RemoteServerSettingsView: View {
                             .labelsHidden()
                             .fixedSize()
                         }
-
                         if viewModel.translateToEnglish {
                             Text("Translate to English is on, so only Whisper models are offered — Parakeet and SenseVoice can't translate.")
-                                .font(.caption)
-                                .foregroundColor(.orange)
+                                .font(.system(size: 11)).foregroundColor(STheme.warn)
                                 .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, 16)
                         }
-
-                        Text("Only downloaded on-device models are listed. To add one, use Engine & Model → download.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 6)
         .onAppear { ensureFallbackSelection() }
         .onChange(of: viewModel.remoteFallbackEnabled) { _, _ in ensureFallbackSelection() }
         .onChange(of: viewModel.translateToEnglish) { _, _ in ensureFallbackSelection() }
@@ -226,31 +208,6 @@ struct RemoteServerSettingsView: View {
         guard !models.isEmpty else { return }
         if let current = viewModel.remoteFallbackModel, models.contains(current) { return }
         viewModel.remoteFallbackModel = models.first
-    }
-
-    private var timeoutBody: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle("Enforce a timeout", isOn: $viewModel.remoteServerTimeoutEnabled)
-
-            if viewModel.remoteServerTimeoutEnabled {
-                HStack(spacing: 8) {
-                    Text("Seconds:").font(.caption).foregroundColor(.secondary)
-                    TextField("", value: $viewModel.remoteServerTimeoutSeconds,
-                              format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: 80)
-                    Stepper("", value: $viewModel.remoteServerTimeoutSeconds,
-                            in: 1 ... 3600, step: 30)
-                        .labelsHidden()
-                }
-                Text("Default 60s. Raise it for slow server-side pipelines, or switch the toggle off for no limit.")
-                    .font(.caption2).foregroundColor(.secondary)
-            } else {
-                Text("No timeout — requests wait indefinitely for the server to respond.")
-                    .font(.caption2).foregroundColor(.secondary)
-            }
-        }
     }
 
     // /v1/models has no capability field, so servers list EVERYTHING they serve —
@@ -278,64 +235,55 @@ struct RemoteServerSettingsView: View {
     // GET /v1/models is a selectable row, plus a "Custom" row that reveals a
     // free-text field (for servers that don't list models, or a wildcard "*").
     private var modelSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Model").font(.subheadline)
-
+        SSection(title: "Model") {
             // Aggregators (LiteLLM, OpenRouter-style gateways) can list hundreds of
             // models — a filter box beats scrolling. Hidden for short lists.
             if availableModels.count > 5 {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 10))
+                        .foregroundColor(STheme.hint)
                     TextField("", text: $modelSearchText, prompt: Text("Filter models…"))
                         .textFieldStyle(.plain)
+                        .font(.system(size: 12))
                         .autocorrectionDisabled(true)
                     if !modelSearchText.isEmpty {
-                        Button {
-                            modelSearchText = ""
-                        } label: {
+                        Button { modelSearchText = "" } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(.system(size: 10))
+                                .foregroundColor(STheme.hint)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
-                .cornerRadius(7)
+                .padding(.horizontal, 9).padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
             }
 
-            // Bounded scroll box (definite height): shows ~3 models and scrolls
-            // for more, so a server with many models doesn't blow up the panel.
+            // Bounded scroll box (definite height): shows a handful of models and
+            // scrolls for more, so a server with many models doesn't blow up the panel.
             ScrollView {
-                VStack(spacing: 6) {
+                VStack(spacing: 0) {
                     if visibleModels.isEmpty && !modelSearchText.isEmpty {
                         Text("No models match \"\(modelSearchText)\"")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11)).foregroundColor(STheme.hint)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 14)
                     }
                     ForEach(visibleModels) { info in
                         modelRow(
                             name: info.id,
-                            description: info.ownedBy.map { "Provided by \($0)" } ?? "Reported by the server",
-                            // Green check only when Remote is the ACTIVE engine — one global
-                            // selection, so picking a Whisper/Parakeet model deselects this.
                             selected: viewModel.selectedEngine == "remote" && !isCustomModel && viewModel.remoteServerModel == info.id
                         ) {
                             isCustomModel = false
                             // Selecting a remote model activates the Remote engine (browse ≠ select).
                             viewModel.selectRemote(info.id)
                         }
+                        Rectangle().fill(STheme.border).frame(height: 1)
                     }
-
                     modelRow(
-                        name: "Custom",
-                        description: "Don't see your model? Select here and enter it below.",
+                        name: "Custom…",
                         selected: viewModel.selectedEngine == "remote" && isCustomModel
                     ) {
                         isCustomModel = true
@@ -344,7 +292,10 @@ struct RemoteServerSettingsView: View {
                     }
                 }
             }
-            .frame(height: availableModels.isEmpty ? 70 : 200)
+            .frame(height: availableModels.isEmpty ? 44 : 176)
+            .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 9))
             // Key the list to the fetched model set so a delta (e.g. Test
             // Connection surfaces a newly-granted model) forces SwiftUI to rebuild.
             .id(availableModels.map(\.id).joined(separator: "|"))
@@ -353,12 +304,19 @@ struct RemoteServerSettingsView: View {
                 Button {
                     showAllModels.toggle()
                 } label: {
-                    Text(showAllModels
-                        ? "Show only speech-to-text models"
-                        : "Show all \(availableModels.count) models (\(hiddenModelCount) don't look like speech-to-text)")
-                        .font(.caption)
+                    Group {
+                        if showAllModels {
+                            Text("Show only speech-to-text models")
+                        } else {
+                            Text("Show all \(availableModels.count) models ")
+                                .foregroundColor(STheme.text.opacity(0.85))
+                            + Text("(\(hiddenModelCount) don't look like speech-to-text)")
+                                .foregroundColor(STheme.hint)
+                        }
+                    }
+                    .font(.system(size: 11.5))
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.plain)
             }
 
             if availableModels.isEmpty {
@@ -366,55 +324,46 @@ struct RemoteServerSettingsView: View {
                 // GET /v1/models without credentials, so the list stays empty until
                 // a key is set and Test Connection runs.
                 Text("The server's models are listed here after a successful Test Connection — most providers (e.g. Groq) need the API key set first.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if isCustomModel {
                 TextField("", text: $viewModel.remoteServerModel, prompt: Text("whisper-1"))
-                    .textFieldStyle(.roundedBorder)
-                    .labelsHidden()
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, design: .monospaced))
                     .autocorrectionDisabled(true)
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
             }
         }
     }
 
-    private func modelRow(name: String, description: String, selected: Bool,
-                          onSelect: @escaping () -> Void) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.subheadline).fontWeight(.medium)
-                Text(description).font(.caption).foregroundColor(.secondary)
+    /// One model row: radio dot + mono id + ACTIVE tag when it's the live selection.
+    private func modelRow(name: String, selected: Bool, onSelect: @escaping () -> Void) -> some View {
+        Button(action: onSelect) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(selected ? STheme.accent : Color.clear)
+                    .overlay(Circle().stroke(selected ? STheme.accent : STheme.controlBorder, lineWidth: 1.5))
+                    .frame(width: 8, height: 8)
+                Text(name)
+                    .font(.system(size: 12.5, design: .monospaced))
+                    .foregroundColor(selected ? STheme.textBright : STheme.text)
+                Spacer()
+                if selected {
+                    Text("ACTIVE")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundColor(STheme.accent)
+                }
             }
-            Spacer()
-            if selected {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                    .imageScale(.large)
-            } else {
-                Button("Select", action: onSelect)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(selected ? STheme.accentSoft : Color.clear)
+            .contentShape(Rectangle())
         }
-        .padding(12)
-        .background(selected ? Color(.controlBackgroundColor).opacity(0.7) : Color(.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(8)
-        .contentShape(Rectangle())
-        .onTapGesture { onSelect() }
-    }
-
-    private func field(title: String, placeholder: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.subheadline)
-            // Use prompt: for the placeholder and hide the label. Inside a Form
-            // the TextField label argument renders as a separate left-hand label,
-            // which made the example string look like a stray second label.
-            TextField("", text: text, prompt: Text(placeholder))
-                .textFieldStyle(.roundedBorder)
-                .labelsHidden()
-                .autocorrectionDisabled(true)
-        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -425,13 +374,18 @@ struct RemoteServerSettingsView: View {
         case .testing:
             ProgressView().controlSize(.small)
         case .success(let message):
-            Label(message, systemImage: "checkmark.circle.fill")
-                .font(.caption)
-                .foregroundColor(.green)
+            Text("✓ \(message)")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(STheme.ok)
+                .padding(.horizontal, 9).padding(.vertical, 2)
+                .background(Capsule().fill(STheme.okBg))
         case .failure(let message):
-            Label(message, systemImage: "xmark.circle.fill")
-                .font(.caption)
+            Text("✕ \(message)")
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.red)
+                .padding(.horizontal, 9).padding(.vertical, 2)
+                .background(Capsule().fill(Color.red.opacity(0.12)))
+                .lineLimit(1)
         }
     }
 
