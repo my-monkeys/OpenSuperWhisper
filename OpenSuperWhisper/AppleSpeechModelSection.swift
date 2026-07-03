@@ -1,29 +1,24 @@
 import Speech
 import SwiftUI
 
-/// Apple Speech row (Settings → Models when browsing the Apple engine, macOS 26+).
-/// There is no app-side model file: macOS downloads per-language assets through
-/// AssetInventory, shares them across apps and updates them with the OS. Clicking
-/// installs the assets for the current transcription language if needed, then
-/// activates the engine — same interaction as every other engine.
+/// Apple Speech section (Settings → Models when browsing the Apple engine, macOS 26+).
+/// Works like every other engine's model list, with one row per language: Download
+/// fetches its system assets (AssetInventory — shared across apps, updated with the
+/// OS, nothing stored in the app), Select activates the Apple engine AND switches the
+/// transcription language to that row (same mechanic as the ivrit.ai Hebrew model).
+/// The active language wears the solid green check.
 @available(macOS 26.0, *)
 struct AppleSpeechModelSection: View {
     @ObservedObject var viewModel: SettingsViewModel
-    @State private var checked = false
-    @State private var isInstalled = false
-    @State private var isInstalling = false
-    @State private var progress: Double = 0
-    @State private var localeName = ""
     @State private var errorMessage: String?
-    /// Regional variants of the current language (fr → fr_FR/fr_CH/fr_CA/fr_BE) and the
-    /// one in effect. The picker only shows when there's an actual choice.
-    @State private var variants: [Locale] = []
-    @State private var selectedVariantID = ""
-    /// Every language the system model supports, with its resolved locale and asset
-    /// status — so any language can be preloaded from here, not just the current one.
+    /// Every language the system model supports, with its resolved locale and asset status.
     @State private var languages: [LangAsset] = []
     @State private var installingCode: String?
     @State private var langProgress: Double = 0
+    /// Regional variants of the active language (fr → fr_FR/fr_CH/fr_CA/fr_BE) and the
+    /// one in effect. The picker only shows when there's an actual choice.
+    @State private var variants: [Locale] = []
+    @State private var selectedVariantID = ""
 
     private struct LangAsset: Identifiable {
         let code: String
@@ -34,11 +29,29 @@ struct AppleSpeechModelSection: View {
     }
 
     var body: some View {
-        SSection(title: "System speech model") {
-            row
+        SSection(title: "Languages") {
+            if languages.isEmpty {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Checking the system speech model…")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(STheme.hint)
+                }
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(languages) { lang in
+                        languageRow(lang)
+                    }
+                }
+            }
+
+            if let errorMessage {
+                Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
+            }
+
             if variants.count > 1 {
                 SRow(title: "Regional variant",
-                     hint: "Which regional model transcribes this language — spelling and numbers follow it.") {
+                     hint: "Which regional model transcribes the selected language — spelling and numbers follow it.") {
                     Picker("", selection: $selectedVariantID) {
                         ForEach(variants, id: \.identifier) { locale in
                             Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
@@ -56,57 +69,54 @@ struct AppleSpeechModelSection: View {
                     }
                 }
             }
-            if let errorMessage {
-                Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
-            }
-            Text("Built into macOS: the model is downloaded per language by the system, shared across apps, and updated with the OS — nothing is stored in the app. Change the transcription language in Output.")
+
+            Text("The model is built into macOS: downloaded per language by the system, shared across apps, and updated with the OS — nothing is stored in the app. Selecting a language here also sets the transcription language. macOS keeps up to 5 languages reserved per app; beyond that the app rotates automatically.")
                 .font(.system(size: 11))
                 .foregroundColor(STheme.hint)
                 .fixedSize(horizontal: false, vertical: true)
-
-            if !languages.isEmpty {
-                SSection(title: "Languages") {
-                    VStack(spacing: 0) {
-                        ForEach(languages) { lang in
-                            languageRow(lang)
-                            if lang.id != languages.last?.id {
-                                Rectangle().fill(STheme.border).frame(height: 1)
-                            }
-                        }
-                    }
-                    .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
-                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
-                    Text("Preload any language's assets here; the language you dictate in is set in Output (or the menu bar).")
-                        .font(.system(size: 11))
-                        .foregroundColor(STheme.hint)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
         }
         .task(id: viewModel.selectedLanguage) { await refresh() }
     }
 
+    /// The language actually transcribing right now: Apple engine active + this row's
+    /// language selected + assets present.
+    private func isActive(_ lang: LangAsset) -> Bool {
+        viewModel.selectedEngine == "apple"
+            && lang.code == AppleSpeechSupport.effectiveLanguageCode(for: viewModel.selectedLanguage)
+            && lang.installed
+    }
+
     private func languageRow(_ lang: LangAsset) -> some View {
-        let isCurrent = lang.code == AppleSpeechSupport.effectiveLanguageCode(for: viewModel.selectedLanguage)
+        let active = isActive(lang)
         return HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(lang.name)
-                    .font(.system(size: 12.5))
-                    .foregroundColor(STheme.text)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(lang.installed ? "Installed · on-device · managed by macOS"
+                                    : "One-time system download")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 if installingCode == lang.code {
                     ProgressView(value: langProgress)
                         .progressViewStyle(.linear)
-                        .frame(width: 160, height: 5)
+                        .frame(height: 6)
                         .padding(.top, 2)
                 }
             }
-            if isCurrent { STag("Current") }
+
             Spacer(minLength: 8)
-            if lang.installed {
-                Image(systemName: "checkmark.circle")
-                    .foregroundColor(STheme.ok)
+
+            if active {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .imageScale(.large)
             } else if installingCode == lang.code {
                 ProgressView().controlSize(.small)
+            } else if lang.installed {
+                Button("Select") { select(lang) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
             } else {
                 Button {
                     installLanguage(lang)
@@ -118,75 +128,26 @@ struct AppleSpeechModelSection: View {
                 .disabled(installingCode != nil)
             }
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-    }
-
-    private var active: Bool { viewModel.selectedEngine == "apple" && isInstalled }
-
-    private var row: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Apple Speech")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                if isInstalling {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .frame(height: 6)
-                        .padding(.top, 2)
-                }
-            }
-
-            Spacer()
-
-            if active {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                    .imageScale(.large)
-            } else if isInstalling || !checked {
-                ProgressView().controlSize(.small)
-            } else if isInstalled {
-                Button("Select") { viewModel.selectAppleSpeech() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            } else {
-                Button(action: install) {
-                    Label("Download", systemImage: "arrow.down.circle")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        }
         .padding(12)
         .background(Color(.controlBackgroundColor).opacity(active ? 0.7 : 0.5))
         .cornerRadius(8)
         .contentShape(Rectangle())
         .onTapGesture {
-            if isInstalled && !active { viewModel.selectAppleSpeech() }
+            if lang.installed && !active { select(lang) }
         }
     }
 
-    private var subtitle: String {
-        let lang = localeName.isEmpty ? "your language" : localeName
-        if !checked { return "Checking \(lang) assets…" }
-        return isInstalled
-            ? "\(lang) · on-device · managed by macOS"
-            : "\(lang) · one-time system download"
+    /// Activate the Apple engine on this language — the language picker in Output and
+    /// the menu bar follow, exactly like selecting any other engine's model.
+    private func select(_ lang: LangAsset) {
+        viewModel.selectedLanguage = lang.code
+        viewModel.selectAppleSpeech()
     }
 
     private func refresh() async {
-        checked = false
         let locale = await AppleSpeechSupport.resolveLocale(language: viewModel.selectedLanguage)
-        localeName = Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
         variants = await AppleSpeechSupport.supportedVariants(for: viewModel.selectedLanguage)
         selectedVariantID = locale.identifier
-        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-        let status = await AssetInventory.status(forModules: [transcriber])
-        isInstalled = (status == .installed)
-        checked = true
         await AppleSpeechSupport.refreshCaches()
         await refreshLanguages()
     }
@@ -217,6 +178,8 @@ struct AppleSpeechModelSection: View {
             do {
                 let locale = Locale(identifier: lang.localeID)
                 let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
+                // The install reports through Foundation.Progress; poll it into
+                // SwiftUI state for the linear bar.
                 var poller: Task<Void, Never>?
                 defer { poller?.cancel() }
                 try await AppleSpeechSupport.installAssetsIfNeeded(
@@ -237,49 +200,10 @@ struct AppleSpeechModelSection: View {
                     }
                     installingCode = nil
                 }
-                await refresh()
             } catch {
                 await MainActor.run {
                     installingCode = nil
                     errorMessage = "Couldn't download \(lang.name). Check your connection and try again."
-                }
-            }
-        }
-    }
-
-    private func install() {
-        errorMessage = nil
-        isInstalling = true
-        progress = 0
-        Task {
-            do {
-                let locale = await AppleSpeechSupport.resolveLocale(language: viewModel.selectedLanguage)
-                let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-                // The install reports through Foundation.Progress; poll it into
-                // SwiftUI state for the linear bar.
-                var poller: Task<Void, Never>?
-                defer { poller?.cancel() }
-                try await AppleSpeechSupport.installAssetsIfNeeded(
-                    supporting: transcriber, locale: locale,
-                    onProgress: { systemProgress in
-                        poller?.cancel()
-                        poller = Task {
-                            while !Task.isCancelled {
-                                let fraction = systemProgress.fractionCompleted
-                                await MainActor.run { progress = fraction }
-                                try? await Task.sleep(nanoseconds: 200_000_000)
-                            }
-                        }
-                    })
-                await MainActor.run {
-                    isInstalled = true
-                    isInstalling = false
-                    viewModel.selectAppleSpeech()
-                }
-            } catch {
-                await MainActor.run {
-                    isInstalling = false
-                    errorMessage = "Couldn't download the speech assets. Check your connection and try again."
                 }
             }
         }
