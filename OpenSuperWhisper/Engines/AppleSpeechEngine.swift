@@ -87,11 +87,41 @@ enum AppleSpeechSupport {
         try await request.downloadAndInstall()
     }
 
+    /// Per-language regional overrides ("fr" → "fr_CH"), chosen by the user in the
+    /// Models pane. Absent = the canonical CLDR resolution below.
+    private static let overridesKey = "appleSpeechLocaleOverrides"
+    static var localeOverrides: [String: String] {
+        get { UserDefaults.standard.dictionary(forKey: overridesKey) as? [String: String] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: overridesKey) }
+    }
+
+    /// The effective language code for the app's language setting ("auto" = system).
+    static func effectiveLanguageCode(for language: String) -> String {
+        language == "auto"
+            ? (Locale.current.language.languageCode?.identifier ?? "en")
+            : language
+    }
+
+    /// All supported regional variants of one language (fr → fr_FR, fr_CH, fr_CA, fr_BE),
+    /// for the Models pane's variant picker.
+    @available(macOS 26.0, *)
+    static func supportedVariants(for language: String) async -> [Locale] {
+        let code = effectiveLanguageCode(for: language)
+        return await SpeechTranscriber.supportedLocales
+            .filter { $0.language.languageCode?.identifier == code }
+            .sorted { $0.identifier < $1.identifier }
+    }
+
     /// The Locale to transcribe with for the app's language setting.
     /// "auto" means the user's system language (per-transcriber locale is fixed —
     /// the system model has no cross-language auto-detect).
     @available(macOS 26.0, *)
     static func resolveLocale(language: String) async -> Locale {
+        // A user-chosen regional variant wins (Models → Apple → Regional variant).
+        if let overrideID = localeOverrides[effectiveLanguageCode(for: language)],
+           let match = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: overrideID)) {
+            return match
+        }
         let wanted: Locale
         if language == "auto" {
             wanted = Locale.current
