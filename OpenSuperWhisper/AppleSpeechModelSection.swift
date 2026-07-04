@@ -1,6 +1,14 @@
 import Speech
 import SwiftUI
 
+// SpeechTranscriber/AssetInventory and the full AppleSpeechSupport only exist in the
+// macOS 26 SDK. `@available` guards the runtime, not compilation — so gate the whole
+// file on the SDK (keyed off FoundationModels, a macOS-26-only framework), exactly like
+// AppleSpeechEngine.swift. Without this, an older toolchain (CI's Xcode 16 runner) fails
+// to compile it even though the call site is already #if-gated. No #else stub is needed:
+// the only reference (Settings) is itself behind `#if canImport(FoundationModels)`.
+#if canImport(FoundationModels)
+
 /// Apple Speech section (Settings → Models when browsing the Apple engine, macOS 26+).
 /// Works like every other engine's model list, with one row per language: Download
 /// fetches its system assets (AssetInventory — shared across apps, updated with the
@@ -209,3 +217,5 @@ struct AppleSpeechModelSection: View {
         }
     }
 }
+
+#endif
