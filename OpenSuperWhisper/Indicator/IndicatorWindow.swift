@@ -182,22 +182,33 @@ class IndicatorViewModel: ObservableObject {
                 
                 do {
                     print("start decoding...")
-                    // Live streaming is a preview only; the inserted text always comes from the
-                    // accurate file pass. Stop the preview, then transcribe the recording.
+                    // Live streaming is a preview; the inserted text normally comes from the
+                    // accurate file pass. Grab the preview text first, though: a very short clip
+                    // can come back empty from the offline file model even when the sliding-window
+                    // preview caught it — then it's the only transcription we have (#short-dictation).
+                    var streamedFallback = ""
                     if self.liveStreamingActive {
                         self.liveStreamingActive = false
+                        streamedFallback = StreamingTranscriptionController.shared.liveCaption
                         await StreamingTranscriptionController.shared.cancel()
                     }
                     let rawText = try await transcriptionService.transcribeAudio(url: tempURL, settings: Settings())
                     var text = AppPreferences.shared.cleanTranscription(rawText)
 
-                    // Nothing intelligible was said: never paste the placeholder — just give a
-                    // brief on-screen hint and finish (don't store an empty recording either).
+                    // File pass found nothing. Fall back to the live preview if it caught the
+                    // words (short clip); only with neither is it genuinely "no speech" — then
+                    // never paste the placeholder, just hint and finish (no empty recording).
                     if text == TranscriptionResult.noSpeech
                         || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        try? FileManager.default.removeItem(at: tempURL)
-                        await MainActor.run { self.showInfo("No speech detected") }
-                        return
+                        let fallback = AppPreferences.shared
+                            .cleanTranscription(streamedFallback)
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !fallback.isEmpty else {
+                            try? FileManager.default.removeItem(at: tempURL)
+                            await MainActor.run { self.showInfo("No speech detected") }
+                            return
+                        }
+                        text = fallback
                     }
 
                     // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
