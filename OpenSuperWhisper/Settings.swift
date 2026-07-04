@@ -339,8 +339,16 @@ class SettingsViewModel: ObservableObject {
         didSet {
             AppPreferences.shared.aiPostProcessingEnabled = aiPostProcessingEnabled
             // Surface connectivity right away when the user turns it on, so they aren't left
-            // wondering why their cleanup silently does nothing when Ollama isn't running.
-            if aiPostProcessingEnabled { testOllamaConnection() }
+            // wondering why their cleanup silently does nothing when the server isn't reachable.
+            if aiPostProcessingEnabled { testLLMConnection() }
+        }
+    }
+
+    /// Cleanup backend: "ollama" (local) or "remote" (OpenAI-compatible server).
+    @Published var aiProvider: String {
+        didSet {
+            AppPreferences.shared.aiProvider = aiProvider
+            if aiPostProcessingEnabled { testLLMConnection() }
         }
     }
 
@@ -356,22 +364,56 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var aiRemoteEndpoint: String {
+        didSet {
+            AppPreferences.shared.aiRemoteEndpoint = aiRemoteEndpoint
+        }
+    }
+
+    @Published var aiRemoteModel: String {
+        didSet {
+            AppPreferences.shared.aiRemoteModel = aiRemoteModel
+        }
+    }
+
+    @Published var aiRemoteAPIKey: String {
+        didSet {
+            AppPreferences.shared.aiRemoteAPIKey = aiRemoteAPIKey.isEmpty ? nil : aiRemoteAPIKey
+        }
+    }
+
     @Published var aiPostProcessingPrompt: String {
         didSet {
             AppPreferences.shared.aiPostProcessingPrompt = aiPostProcessingPrompt
         }
     }
 
-    /// Live result of the last Ollama connectivity probe, shown next to the AI-cleanup fields.
-    @Published var ollamaStatus: OllamaStatus = .unknown
+    /// Live result of the last cleanup-backend connectivity probe, shown next to the fields.
+    @Published var llmStatus: LLMStatus = .unknown
 
-    func testOllamaConnection() {
-        ollamaStatus = .checking
-        let endpoint = aiOllamaEndpoint
-        let model = aiOllamaModel
+    /// Probes the local Ollama backend. The Remote backend is owned by
+    /// RemoteCleanupSettingsView (it also fills the model list), which publishes
+    /// straight to `llmStatus`, so this only runs for Ollama.
+    func testLLMConnection() {
+        guard aiProvider != "remote" else { return }
+        llmStatus = .checking
+        let endpoint = aiOllamaEndpoint, model = aiOllamaModel
         Task { @MainActor in
-            self.ollamaStatus = await LLMPostProcessor.checkConnection(endpoint: endpoint, model: model)
+            self.llmStatus = await LLMPostProcessor.checkOllamaConnection(endpoint: endpoint, model: model)
         }
+    }
+
+    /// Prefill the Remote-cleanup fields from the Remote transcription engine's config
+    /// (same Groq/OpenAI/LiteLLM server + key is the common case). The chat model is left
+    /// for the user — the STT model (whisper…) isn't a chat model.
+    func copyRemoteEngineConfig() {
+        let prefs = AppPreferences.shared
+        aiRemoteEndpoint = prefs.remoteServerURL
+        aiRemoteAPIKey = prefs.remoteServerAPIKey ?? ""
+    }
+
+    var hasRemoteEngineConfig: Bool {
+        !AppPreferences.shared.remoteServerURL.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     @Published var removeFillerWords: Bool {
@@ -557,8 +599,12 @@ class SettingsViewModel: ObservableObject {
         self.holdToRecord = prefs.holdToRecord
         self.addSpaceAfterSentence = prefs.addSpaceAfterSentence
         self.aiPostProcessingEnabled = prefs.aiPostProcessingEnabled
+        self.aiProvider = prefs.aiProvider
         self.aiOllamaEndpoint = prefs.aiOllamaEndpoint
         self.aiOllamaModel = prefs.aiOllamaModel
+        self.aiRemoteEndpoint = prefs.aiRemoteEndpoint
+        self.aiRemoteModel = prefs.aiRemoteModel
+        self.aiRemoteAPIKey = prefs.aiRemoteAPIKey ?? ""
         self.aiPostProcessingPrompt = prefs.aiPostProcessingPrompt
         self.removeFillerWords = prefs.removeFillerWords
         self.fillerWordsPattern = prefs.fillerWordsPattern
@@ -1622,8 +1668,22 @@ struct SettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
     }
 
-    @ViewBuilder private var ollamaStatusView: some View {
-        switch viewModel.ollamaStatus {
+    @ViewBuilder private var ollamaCleanupFields: some View {
+        SRow(title: "Model", indented: true) {
+            sInput($viewModel.aiOllamaModel, prompt: "llama3.2", width: 170, mono: true)
+        }
+        SRow(title: "Endpoint", indented: true) {
+            HStack(spacing: 8) {
+                Button("Test") { viewModel.testLLMConnection() }
+                    .controlSize(.small)
+                sInput($viewModel.aiOllamaEndpoint, prompt: "http://localhost:11434", width: 210, mono: true)
+            }
+        }
+    }
+
+    @ViewBuilder private var llmStatusView: some View {
+        let isRemote = viewModel.aiProvider == "remote"
+        switch viewModel.llmStatus {
         case .unknown:
             EmptyView()
         case .checking:
@@ -1635,12 +1695,21 @@ struct SettingsView: View {
                 .padding(.horizontal, 9).padding(.vertical, 2)
                 .background(Capsule().fill(STheme.okBg))
         case .modelMissing(let model):
-            Text("Reachable, but “\(model)” isn't pulled — run: ollama pull \(model)")
+            Text(isRemote
+                ? "Reachable, but “\(model)” isn't in the server's model list"
+                : "Reachable, but “\(model)” isn't pulled — run: ollama pull \(model)")
                 .font(.system(size: 11))
                 .foregroundColor(STheme.warn)
                 .fixedSize(horizontal: false, vertical: true)
+        case .authFailed:
+            Text("✕ The server rejected the API key")
+                .font(.system(size: 11))
+                .foregroundColor(.red)
+                .fixedSize(horizontal: false, vertical: true)
         case .unreachable:
-            Text("✕ Can't reach Ollama — is it running? (ollama serve)")
+            Text(isRemote
+                ? "✕ Can't reach the server — check the URL"
+                : "✕ Can't reach Ollama — is it running? (ollama serve)")
                 .font(.system(size: 11))
                 .foregroundColor(.red)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1699,25 +1768,30 @@ struct SettingsView: View {
                     .padding(.leading, 16)
                 }
                 HStack(spacing: 8) {
-                    Text("Clean up with a local LLM")
+                    Text("Clean up with an LLM")
                         .font(.system(size: 13)).foregroundColor(STheme.text)
-                    STag("Ollama")
                     Spacer()
                     SToggle(isOn: $viewModel.aiPostProcessingEnabled)
                 }
                 .frame(minHeight: 26)
                 if viewModel.aiPostProcessingEnabled {
-                    SRow(title: "Model", indented: true) {
-                        sInput($viewModel.aiOllamaModel, prompt: "llama3.2", width: 170, mono: true)
-                    }
-                    SRow(title: "Endpoint", indented: true) {
-                        HStack(spacing: 8) {
-                            Button("Test") { viewModel.testOllamaConnection() }
-                                .controlSize(.small)
-                            sInput($viewModel.aiOllamaEndpoint, prompt: "http://localhost:11434", width: 210, mono: true)
+                    SRow(title: "Backend", indented: true) {
+                        Picker("", selection: $viewModel.aiProvider) {
+                            Text("Ollama (local)").tag("ollama")
+                            Text("Remote (OpenAI-compatible)").tag("remote")
                         }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .fixedSize()
                     }
-                    HStack { Spacer(); ollamaStatusView }
+
+                    if viewModel.aiProvider == "remote" {
+                        RemoteCleanupSettingsView(viewModel: viewModel)
+                    } else {
+                        ollamaCleanupFields
+                    }
+
+                    HStack { Spacer(); llmStatusView }
                         .padding(.leading, 16)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
