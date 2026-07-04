@@ -17,12 +17,24 @@ final class StreamingTranscriptionController: ObservableObject {
     @Published private(set) var confirmedText: String = ""
     @Published private(set) var volatileText: String = ""
 
+    /// The caption exactly as shown in the bubble (confirmed + volatile tail). Used as the
+    /// fallback transcription for very short clips, where the offline file model comes back
+    /// empty even though this preview caught the words (#short-dictation).
+    var liveCaption: String {
+        [confirmedText, volatileText].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
     private let audioEngine = AVAudioEngine()
     private var manager: SlidingWindowAsrManager?
     private var updatesTask: Task<Void, Never>?
     private var feederTask: Task<Void, Never>?
     private var bufferContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
     private(set) var isRunning = false
+    /// Bumped by every start()/cancel()/finish(). `start()` captures its value and bails out if
+    /// it changes mid-setup — a stop can land before `isRunning` is even true (so cancel/finish
+    /// no-op), and without this the half-set-up stream goes live as a zombie: it keeps feeding the
+    /// old caption and its lingering `isRunning` blocks the next recording (#stale-caption).
+    private var startGeneration = 0
 
     private init() {}
 
@@ -30,6 +42,8 @@ final class StreamingTranscriptionController: ObservableObject {
     /// file-based flow. `boostTerms` (the custom dictionary's terms) bias recognition when present.
     func start(boostTerms: [String]) async throws {
         guard !isRunning else { return }
+        startGeneration &+= 1
+        let generation = startGeneration
         confirmedText = ""
         volatileText = ""
 
@@ -53,9 +67,17 @@ final class StreamingTranscriptionController: ObservableObject {
         await configureVocabulary(on: manager, boostTerms: boostTerms)
         try await manager.loadModels(models)
         try await manager.startStreaming(source: .microphone)
+        let updates = await manager.transcriptionUpdates
+
+        // A stop (cancel/finish) or a newer start() may have landed during the async setup
+        // above — before `isRunning` was true, so it no-op'd on us. Don't go live as a zombie:
+        // tear the half-built stream down and return (#stale-caption).
+        guard generation == startGeneration else {
+            await manager.cancel()
+            return
+        }
         self.manager = manager
 
-        let updates = await manager.transcriptionUpdates
         updatesTask = Task { [weak self] in
             for await _ in updates {
                 let confirmed = await manager.confirmedTranscript
@@ -89,15 +111,19 @@ final class StreamingTranscriptionController: ObservableObject {
 
     /// Stops streaming and returns the complete transcript (nil if streaming wasn't running).
     func finish() async -> String? {
+        startGeneration &+= 1  // abort any start() still in setup
         guard isRunning, let manager = manager else { return nil }
         stopAudio()
         let text = try? await manager.finish()
         self.manager = nil
+        confirmedText = ""
+        volatileText = ""
         return text
     }
 
     /// Stops and discards (used when a recording is cancelled).
     func cancel() async {
+        startGeneration &+= 1  // abort any start() still in setup
         guard isRunning else { return }
         stopAudio()
         await manager?.cancel()
