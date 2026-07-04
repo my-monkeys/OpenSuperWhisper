@@ -18,8 +18,6 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
     // focus once configured. Server opens by default only when nothing is set yet.
     @State private var revealKey = false
     @State private var autoTestTask: Task<Void, Never>?
-    @State private var showAllModels = false
-    @State private var modelSearchText = ""
 
     private var hasKey: Bool { !viewModel.remoteServerAPIKey.isEmpty }
 
@@ -28,11 +26,6 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
         case testing
         case success(String)
         case failure(String)
-    }
-
-    struct RemoteModelInfo: Identifiable, Equatable {
-        let id: String          // model id, e.g. "whisper-1"
-        let ownedBy: String?    // OpenAI /v1/models "owned_by"
     }
 
     var body: some View {
@@ -210,160 +203,25 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
         viewModel.remoteFallbackModel = models.first
     }
 
-    // /v1/models has no capability field, so servers list EVERYTHING they serve —
-    // chat models, embeddings, TTS — alongside the transcription ones. Default to
-    // the models that look like speech-to-text (name heuristic); fail open when
-    // nothing matches, and always offer "show all" since heuristics have misses.
-    private var sttFilteredModels: [RemoteModelInfo] {
-        guard !showAllModels else { return availableModels }
-        let stt = availableModels.filter { RemoteModelFilter.isLikelySpeechToText($0.id) }
-        return stt.isEmpty ? availableModels : stt
-    }
-
-    private var visibleModels: [RemoteModelInfo] {
-        let base = sttFilteredModels
-        let query = modelSearchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return base }
-        return base.filter { $0.id.localizedCaseInsensitiveContains(query) }
-    }
-
-    // Counts only the speech-to-text filter (not the search box), so the
-    // "show all" label stays truthful while a search is active.
-    private var hiddenModelCount: Int { availableModels.count - sttFilteredModels.count }
-
-    // Model list styled like the local downloaded-model list: each model from
-    // GET /v1/models is a selectable row, plus a "Custom" row that reveals a
-    // free-text field (for servers that don't list models, or a wildcard "*").
+    // Selectable list of the server's models (STT-preferred) + a Custom row that
+    // reveals a free-text field. The list UI is shared with the Remote LLM-cleanup
+    // settings via RemoteModelListBox — here, picking a model activates the engine.
     private var modelSection: some View {
         SSection(title: "Model") {
-            // Aggregators (LiteLLM, OpenRouter-style gateways) can list hundreds of
-            // models — a filter box beats scrolling. Hidden for short lists.
-            if availableModels.count > 5 {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 10))
-                        .foregroundColor(STheme.hint)
-                    TextField("", text: $modelSearchText, prompt: Text("Filter models…"))
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12))
-                        .autocorrectionDisabled(true)
-                    if !modelSearchText.isEmpty {
-                        Button { modelSearchText = "" } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(STheme.hint)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 9).padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
-            }
-
-            // Bounded scroll box (definite height): shows a handful of models and
-            // scrolls for more, so a server with many models doesn't blow up the panel.
-            ScrollView {
-                VStack(spacing: 0) {
-                    if visibleModels.isEmpty && !modelSearchText.isEmpty {
-                        Text("No models match \"\(modelSearchText)\"")
-                            .font(.system(size: 11)).foregroundColor(STheme.hint)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 14)
-                    }
-                    ForEach(visibleModels) { info in
-                        modelRow(
-                            name: info.id,
-                            selected: viewModel.selectedEngine == "remote" && !isCustomModel && viewModel.remoteServerModel == info.id
-                        ) {
-                            isCustomModel = false
-                            // Selecting a remote model activates the Remote engine (browse ≠ select).
-                            viewModel.selectRemote(info.id)
-                        }
-                        Rectangle().fill(STheme.border).frame(height: 1)
-                    }
-                    modelRow(
-                        name: "Custom…",
-                        selected: viewModel.selectedEngine == "remote" && isCustomModel
-                    ) {
-                        isCustomModel = true
-                        // Activate Remote with whatever's in the custom field (may be edited below).
-                        viewModel.selectRemote(viewModel.remoteServerModel)
-                    }
-                }
-            }
-            .frame(height: availableModels.isEmpty ? 44 : 176)
-            .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.border, lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 9))
-            // Key the list to the fetched model set so a delta (e.g. Test
-            // Connection surfaces a newly-granted model) forces SwiftUI to rebuild.
-            .id(availableModels.map(\.id).joined(separator: "|"))
-
-            if hiddenModelCount > 0 || showAllModels {
-                Button {
-                    showAllModels.toggle()
-                } label: {
-                    Group {
-                        if showAllModels {
-                            Text("Show only speech-to-text models")
-                        } else {
-                            Text("Show all \(availableModels.count) models ")
-                                .foregroundColor(STheme.text.opacity(0.85))
-                            + Text("(\(hiddenModelCount) don't look like speech-to-text)")
-                                .foregroundColor(STheme.hint)
-                        }
-                    }
-                    .font(.system(size: 11.5))
-                }
-                .buttonStyle(.plain)
-            }
-
-            if availableModels.isEmpty {
-                // Make the auth-gated listing discoverable: Groq & co return 401 on
-                // GET /v1/models without credentials, so the list stays empty until
-                // a key is set and Test Connection runs.
-                Text("The server's models are listed here after a successful Test Connection — most providers (e.g. Groq) need the API key set first.")
-                    .font(.system(size: 11)).foregroundColor(STheme.hint)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if isCustomModel {
-                TextField("", text: $viewModel.remoteServerModel, prompt: Text("whisper-1"))
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12, design: .monospaced))
-                    .autocorrectionDisabled(true)
-                    .padding(.horizontal, 9).padding(.vertical, 5)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
-            }
+            RemoteModelListBox(
+                models: availableModels,
+                isCustom: $isCustomModel,
+                customText: $viewModel.remoteServerModel,
+                customPrompt: "whisper-1",
+                preferred: RemoteModelFilter.isLikelySpeechToText,
+                hiddenKindLabel: "speech-to-text",
+                selectedID: (viewModel.selectedEngine == "remote" && !isCustomModel) ? viewModel.remoteServerModel : nil,
+                customSelected: viewModel.selectedEngine == "remote" && isCustomModel,
+                // Selecting a remote model activates the Remote engine (browse ≠ select).
+                onPick: { viewModel.selectRemote($0) },
+                onPickCustom: { viewModel.selectRemote(viewModel.remoteServerModel) }
+            )
         }
-    }
-
-    /// One model row: radio dot + mono id + ACTIVE tag when it's the live selection.
-    private func modelRow(name: String, selected: Bool, onSelect: @escaping () -> Void) -> some View {
-        Button(action: onSelect) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(selected ? STheme.accent : Color.clear)
-                    .overlay(Circle().stroke(selected ? STheme.accent : STheme.controlBorder, lineWidth: 1.5))
-                    .frame(width: 8, height: 8)
-                Text(name)
-                    .font(.system(size: 12.5, design: .monospaced))
-                    .foregroundColor(selected ? STheme.textBright : STheme.text)
-                Spacer()
-                if selected {
-                    Text("ACTIVE")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundColor(STheme.accent)
-                }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(selected ? STheme.accentSoft : Color.clear)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -462,23 +320,11 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
     }
 
     private static func parseModels(_ data: Data) -> [RemoteModelInfo] {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let arr = json["data"] as? [[String: Any]] else { return [] }
-        return arr.compactMap { item -> RemoteModelInfo? in
-            guard let id = item["id"] as? String else { return nil }
-            return RemoteModelInfo(id: id, ownedBy: item["owned_by"] as? String)
-        }.sorted { $0.id < $1.id }
+        RemoteModelsAPI.parse(data)
     }
 
     private func modelsEndpoint(from urlString: String) -> URL? {
-        var base = urlString
-        let lower = base.lowercased()
-        if !lower.hasPrefix("http://") && !lower.hasPrefix("https://") {
-            base = "http://" + base
-        }
-        while base.hasSuffix("/") { base.removeLast() }
-        if base.hasSuffix("/v1") { base.removeLast(3) }
-        return URL(string: base + "/v1/models")
+        RemoteModelsAPI.modelsEndpoint(base: urlString)
     }
 }
 
@@ -501,5 +347,20 @@ enum RemoteModelFilter {
         let id = modelID.lowercased()
         if notSTTMarkers.contains(where: { id.contains($0) }) { return false }
         return sttMarkers.contains(where: { id.contains($0) })
+    }
+
+    // Non-chat model families to hide from the LLM-cleanup picker: transcription,
+    // speech synthesis, embeddings, reranking, moderation/safety, image gen. Chat/
+    // instruct models are the vast majority and carry no single marker, so this is
+    // a denylist — fail open to "is a chat model" and always offer "show all".
+    private static let notChatMarkers: [String] = [
+        "whisper", "transcribe", "transcription", "voxtral", "parakeet", "canary",
+        "tts", "text-to-speech", "embed", "embedding", "rerank", "reranker",
+        "moderation", "guard", "dall-e", "dalle", "stable-diffusion", "flux",
+    ]
+
+    static func isLikelyChat(_ modelID: String) -> Bool {
+        let id = modelID.lowercased()
+        return !notChatMarkers.contains(where: { id.contains($0) })
     }
 }

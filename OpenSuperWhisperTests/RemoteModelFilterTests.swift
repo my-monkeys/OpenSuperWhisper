@@ -39,4 +39,22 @@ final class RemoteModelFilterTests: XCTestCase {
         // The tts marker wins even when an stt marker is also present.
         XCTAssertFalse(RemoteModelFilter.isLikelySpeechToText("whisper-tts-hybrid"))
     }
+
+    // The LLM-cleanup picker prefers chat/instruct models: everything except the
+    // non-chat families (transcription, TTS, embeddings, rerank, moderation, image).
+    func testChatModelsAreRecognized() {
+        XCTAssertTrue(RemoteModelFilter.isLikelyChat("llama-3.1-8b-instant"))
+        XCTAssertTrue(RemoteModelFilter.isLikelyChat("llama-3.3-70b-versatile"))
+        XCTAssertTrue(RemoteModelFilter.isLikelyChat("gpt-4o-mini"))
+        XCTAssertTrue(RemoteModelFilter.isLikelyChat("gemma2-9b-it"))
+        XCTAssertTrue(RemoteModelFilter.isLikelyChat("deepseek-r1-distill-llama-70b"))
+    }
+
+    func testNonChatModelsAreExcludedFromCleanup() {
+        XCTAssertFalse(RemoteModelFilter.isLikelyChat("whisper-large-v3-turbo"))
+        XCTAssertFalse(RemoteModelFilter.isLikelyChat("gpt-4o-transcribe"))
+        XCTAssertFalse(RemoteModelFilter.isLikelyChat("playai-tts"))
+        XCTAssertFalse(RemoteModelFilter.isLikelyChat("text-embedding-3-small"))
+        XCTAssertFalse(RemoteModelFilter.isLikelyChat("llama-guard-3-8b"))
+    }
 }
