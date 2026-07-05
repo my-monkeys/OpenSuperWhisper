@@ -100,6 +100,14 @@ xcrun notarytool store-credentials osw-notary \
 
 - **`xcodebuild` needs the FULL Xcode.** `notarize_app.sh` calls `xcodebuild` — make sure the active
   developer dir is Xcode (`xcode-select -p` → `…/Xcode.app/…`, not CommandLineTools).
+- **Build releases with STABLE Xcode, never Xcode-beta.** Xcode 27 beta (Swift 6.4) miscompiles
+  MainActor isolation across an `await` of a `nonisolated(nonsending)` closure
+  ([swiftlang/swift#89214](https://github.com/swiftlang/swift/issues/89214)): it corrupts the
+  executor-tracking state, so the *next* SwiftUI button tap crashes in
+  `swift_task_isCurrentExecutorWithFlagsImpl`. 0.9.5 shipped from Xcode 27 beta and crashed on macOS
+  26/27 on every click; **0.9.5.1 is the same code rebuilt with Xcode 26.6 (Swift 6.3.3, which has
+  the fix).** `notarize_app.sh` now **refuses** a `*beta*` toolchain (override: `ALLOW_BETA_XCODE=1`).
+  Always run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./notarize_app.sh "$ID" <arch>`.
 - **`git` / `gh` / `brew` may refuse with "Xcode license not agreed".** When that happens, prefix
   just those commands with `DEVELOPER_DIR=/Library/Developer/CommandLineTools` (CLT has no license
   gate). Do **not** run `xcodebuild` under CLT. (Or accept once: `sudo xcodebuild -license accept`.)

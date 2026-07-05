@@ -19,7 +19,23 @@ DMG_NAME="${APP_NAME}-${ARCH}"
 if [ "${ARCH}" != "arm64" ] && [ "${ARCH}" != "x86_64" ]; then
   echo "ARCH must be arm64 or x86_64 (got '${ARCH}')"; exit 1
 fi
-echo "=== Building ${APP_NAME} for ${ARCH} ==="
+
+# Releases MUST be built with a STABLE Xcode. Xcode 27 beta (Swift 6.4) miscompiles
+# MainActor isolation across an await (swiftlang/swift#89214) — 0.9.5 shipped from it
+# and crashed on every button tap for macOS 26/27 users. Refuse a beta toolchain.
+# Drive the toolchain with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+XCODE_DIR="${DEVELOPER_DIR:-$(xcode-select -p 2>/dev/null)}"
+if [[ "${XCODE_DIR}" == *[Bb]eta* && "${ALLOW_BETA_XCODE:-0}" != "1" ]]; then
+  echo "❌ Refusing to build a release with a BETA Xcode:"
+  echo "     ${XCODE_DIR}"
+  echo "   Xcode 27 beta / Swift 6.4 miscompiles MainActor isolation → runtime crashes (#89214)."
+  echo "   Build with the stable Xcode instead:"
+  echo "     DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer $0 \"\$IDENTITY\" ${ARCH}"
+  echo "   (Only override if you've confirmed the toolchain is fixed:  ALLOW_BETA_XCODE=1 …)"
+  exit 1
+fi
+
+echo "=== Building ${APP_NAME} for ${ARCH} (toolchain: ${XCODE_DIR}) ==="
 
 ./Scripts/fetch-sherpa.sh
 ./Scripts/fetch-libomp-universal.sh
