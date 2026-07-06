@@ -51,6 +51,14 @@ class ShortcutManager {
     }
     
     private func setupKeyboardShortcuts() {
+        // Self-heal a cleared cancel shortcut: KeyboardShortcuts' `default:` only applies when
+        // the key is ABSENT from UserDefaults; a stored-empty value (`false`) overrides it, which
+        // leaves cancel-on-Esc silently dead — and there's no UI to re-enable it. Restore the
+        // default Esc when nothing is bound.
+        if KeyboardShortcuts.getShortcut(for: .escape) == nil {
+            KeyboardShortcuts.setShortcut(.init(.escape), for: .escape)
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleRecord) { [weak self] in
             self?.handleKeyDown()
         }

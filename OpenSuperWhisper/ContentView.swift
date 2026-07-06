@@ -5,6 +5,7 @@
 //  Created by user on 05.02.2025.
 //
 
+import AppKit
 import AVFoundation
 import Combine
 import KeyboardShortcuts
@@ -38,6 +39,8 @@ class ContentViewModel: ObservableObject {
     private var durationTimer: Timer?
     private var errorDismissTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+    /// Local keyDown monitor for Esc-to-cancel while a main-window recording is live.
+    private var escapeMonitor: Any?
     
     init() {
         recorder.$isConnecting
@@ -182,6 +185,11 @@ class ContentViewModel: ObservableObject {
     }
 
     func startRecording() {
+        // Arm Esc-to-cancel for this main-window recording via a LOCAL key monitor: the
+        // global `.escape` shortcut is unreliable while our own window is frontmost, and a
+        // local monitor also needs no Input-Monitoring grant. Removed again on stop/cancel.
+        installEscapeMonitor()
+
         // Capture where the dictation is happening (frontmost app + browser site) and
         // apply any context-aware model rule before the engine spins up. See F2.
         RecordingContext.shared.captureFrontmost()
@@ -205,11 +213,44 @@ class ContentViewModel: ObservableObject {
         }
     }
 
+    /// Discard the in-progress main-window recording (Esc): throw the audio away instead
+    /// of transcribing it, and return to idle. No-op unless a recording is actually live.
+    func cancelRecording() {
+        guard state == .recording || state == .connecting else { return }
+        removeEscapeMonitor()
+        recorder.cancelRecording()
+        stopBlinking()
+        stopDurationTimer()
+        recordingDuration = 0
+        state = .idle
+    }
+
+    /// Local key monitor that cancels the recording on the configured cancel shortcut
+    /// (default: plain Esc). Local — fires while our window is key, no permission needed.
+    private func installEscapeMonitor() {
+        guard escapeMonitor == nil else { return }
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.state == .recording || self.state == .connecting else { return event }
+            guard let shortcut = KeyboardShortcuts.getShortcut(for: .escape), let key = shortcut.key,
+                  Int(event.keyCode) == key.rawValue,
+                  event.modifierFlags.intersection([.command, .option, .control, .shift]) == shortcut.modifiers
+            else { return event }
+            self.cancelRecording()
+            return nil  // swallow the key (no system beep / propagation)
+        }
+    }
+
+    private func removeEscapeMonitor() {
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        escapeMonitor = nil
+    }
+
     func startDecoding() {
+        removeEscapeMonitor()
         state = .decoding
         stopBlinking()
         stopDurationTimer()
-        
+
         IndicatorWindowManager.shared.hide()
 
         if let tempURL = recorder.stopRecording() {
