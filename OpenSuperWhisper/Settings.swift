@@ -321,10 +321,23 @@ class SettingsViewModel: ObservableObject {
             NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
         }
     }
-    
+
+    @Published var mouseButtonHotkey: MouseButton {
+        didSet {
+            AppPreferences.shared.mouseButtonHotkey = mouseButtonHotkey.rawValue
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+        }
+    }
+
     @Published var holdToRecord: Bool {
         didSet {
             AppPreferences.shared.holdToRecord = holdToRecord
+        }
+    }
+
+    @Published var escCancelWithoutConfirmation: Bool {
+        didSet {
+            AppPreferences.shared.escCancelWithoutConfirmation = escCancelWithoutConfirmation
         }
     }
 
@@ -596,7 +609,9 @@ class SettingsViewModel: ObservableObject {
         self.liveTranscriptionEnabled = prefs.liveTranscriptionEnabled
         self.useAsianAutocorrect = prefs.useAsianAutocorrect
         self.modifierOnlyHotkey = ModifierKey(rawValue: prefs.modifierOnlyHotkey) ?? .none
+        self.mouseButtonHotkey = MouseButton(rawValue: prefs.mouseButtonHotkey) ?? .none
         self.holdToRecord = prefs.holdToRecord
+        self.escCancelWithoutConfirmation = prefs.escCancelWithoutConfirmation
         self.addSpaceAfterSentence = prefs.addSpaceAfterSentence
         self.aiPostProcessingEnabled = prefs.aiPostProcessingEnabled
         self.aiProvider = prefs.aiProvider
@@ -2097,7 +2112,21 @@ struct SettingsView: View {
     private var useModifierKey: Bool {
         viewModel.modifierOnlyHotkey != .none
     }
-    
+
+    private enum TriggerMode: Hashable {
+        case keyCombo
+        case modifier
+        case mouse
+    }
+
+    /// The three recording-trigger modes are mutually exclusive; a bound mouse button
+    /// wins over a modifier key, which wins over the regular key-combination shortcut.
+    private var triggerMode: TriggerMode {
+        if viewModel.mouseButtonHotkey != .none { return .mouse }
+        if viewModel.modifierOnlyHotkey != .none { return .modifier }
+        return .keyCombo
+    }
+
     /// "Dictation" — the redesigned first screen (Settings Explorations 2a):
     /// Trigger / Recording bar / Input, in the Atelier style.
     private var dictationSettings: some View {
@@ -2105,23 +2134,35 @@ struct SettingsView: View {
             SSection(title: "Trigger") {
                 SRow(title: "Recording trigger") {
                     Picker("", selection: Binding(
-                        get: { useModifierKey },
-                        set: { newValue in
-                            if !newValue {
+                        get: { triggerMode },
+                        set: { newMode in
+                            switch newMode {
+                            case .keyCombo:
+                                viewModel.mouseButtonHotkey = .none
                                 viewModel.modifierOnlyHotkey = .none
-                            } else if viewModel.modifierOnlyHotkey == .none {
-                                viewModel.modifierOnlyHotkey = .leftCommand
+                            case .modifier:
+                                viewModel.mouseButtonHotkey = .none
+                                if viewModel.modifierOnlyHotkey == .none {
+                                    viewModel.modifierOnlyHotkey = .leftCommand
+                                }
+                            case .mouse:
+                                viewModel.modifierOnlyHotkey = .none
+                                if viewModel.mouseButtonHotkey == .none {
+                                    viewModel.mouseButtonHotkey = .middle
+                                }
                             }
                         }
                     )) {
-                        Text("Key Combination").tag(false)
-                        Text("Single Modifier Key").tag(true)
+                        Text("Key Combination").tag(TriggerMode.keyCombo)
+                        Text("Single Modifier Key").tag(TriggerMode.modifier)
+                        Text("Mouse Button").tag(TriggerMode.mouse)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
                 }
-                if useModifierKey {
+                switch triggerMode {
+                case .modifier:
                     SRow(title: "Modifier key", hint: "One-tap to toggle recording") {
                         Picker("", selection: $viewModel.modifierOnlyHotkey) {
                             ForEach(ModifierKey.allCases.filter { $0 != .none }) { key in
@@ -2145,7 +2186,31 @@ struct SettingsView: View {
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
                     }
-                } else {
+                case .mouse:
+                    SRow(title: "Mouse button", hint: "Middle or an extra (thumb) button — click to toggle, hold when Hold to Record is on") {
+                        Picker("", selection: $viewModel.mouseButtonHotkey) {
+                            ForEach(MouseButton.allCases.filter { $0 != .none }) { button in
+                                Text(button.displayName).tag(button)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    SWarnBox {
+                        Text("**⚠︎ Accessibility permission required.** macOS needs it to detect the mouse button globally and use it only as a recording trigger. The left and right buttons are reserved; only the selected button is intercepted — no other clicks or keystrokes are captured.")
+                        Button("Open Accessibility Settings…") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(STheme.warn)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
+                    }
+                case .keyCombo:
                     SRow(title: "Shortcut") {
                         KeyboardShortcuts.Recorder("", name: .toggleRecord)
                             .frame(width: 150)
@@ -2169,6 +2234,10 @@ struct SettingsView: View {
                         }
                     }
                     .onAppear { cancelKey = SettingsView.currentCancelKeyID() }
+                }
+                SRow(title: "Cancel without confirmation",
+                     hint: "Skip the double-Esc confirmation for recordings longer than 10 seconds") {
+                    SToggle(isOn: $viewModel.escCancelWithoutConfirmation)
                 }
             }
 

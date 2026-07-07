@@ -261,6 +261,15 @@ final class AppPreferences {
     
     @UserDefault(key: "modifierOnlyHotkey", defaultValue: "none")
     var modifierOnlyHotkey: String
+
+    @UserDefault(key: "mouseButtonHotkey", defaultValue: "none")
+    var mouseButtonHotkey: String
+
+    // When false (default), pressing Esc to cancel a recording longer than
+    // ~10s first asks for confirmation (press Esc again) instead of discarding
+    // it outright — a safety net against an accidental Esc losing a long dictation.
+    @UserDefault(key: "escCancelWithoutConfirmation", defaultValue: false)
+    var escCancelWithoutConfirmation: Bool
     
     @UserDefault(key: "holdToRecord", defaultValue: true)
     var holdToRecord: Bool

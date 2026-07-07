@@ -189,6 +189,17 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         hide()
     }
 
+    /// An Esc-cancel request. Returns `true` when the recording was actually
+    /// discarded; `false` when a long recording is now waiting for a confirming
+    /// second Esc (see `IndicatorViewModel.handleCancelRequest`).
+    @discardableResult
+    func requestCancel() -> Bool {
+        guard let viewModel else { return false }
+        guard viewModel.handleCancelRequest() else { return false }
+        stopForce()
+        return true
+    }
+
     func hide() {
         KeyboardShortcuts.disable(.escape)
         

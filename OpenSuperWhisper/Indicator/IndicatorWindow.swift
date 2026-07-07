@@ -21,14 +21,23 @@ protocol IndicatorViewDelegate: AnyObject {
 
 @MainActor
 class IndicatorViewModel: ObservableObject {
+    // Esc-cancel confirmation: recordings at least this long ask for a second Esc
+    // (within the window below) before being discarded, unless the user opted out.
+    static let cancelConfirmationThreshold: TimeInterval = 10.0
+    static let cancelConfirmationWindow: TimeInterval = 5.0
+
     @Published var state: RecordingState = .idle
     @Published var isBlinking = false
+    @Published var isConfirmingCancel = false
     @Published var recorder: AudioRecorder = .shared
     @Published var isVisible = false
-    
+
+    var recordingStartedAt: Date?
+
     var delegate: IndicatorViewDelegate?
     private var blinkTimer: Timer?
     private var hideTimer: Timer?
+    private var confirmCancelTimer: Timer?
     private var liveStreamingActive = false
     private var cancellables = Set<AnyCancellable>()
     
@@ -131,6 +140,7 @@ class IndicatorViewModel: ObservableObject {
         // blocking call on the main thread — and the hotkey tap runs there (#freeze).
         state = .recording
         startBlinking()
+        recordingStartedAt = Date()
 
         Task.detached { [recorder] in
             recorder.startRecording()
@@ -154,6 +164,36 @@ class IndicatorViewModel: ObservableObject {
         }
     }
 
+    /// Decides what an Esc-cancel should do. Returns `true` when the recording
+    /// should be discarded immediately; returns `false` (and arms a short
+    /// confirmation window) when a long recording needs a confirming second Esc,
+    /// so an accidental tap doesn't throw away a long dictation.
+    func handleCancelRequest() -> Bool {
+        guard state == .recording,
+              !AppPreferences.shared.escCancelWithoutConfirmation,
+              !isConfirmingCancel,
+              let startedAt = recordingStartedAt,
+              Date().timeIntervalSince(startedAt) >= Self.cancelConfirmationThreshold
+        else {
+            return true
+        }
+
+        isConfirmingCancel = true
+        confirmCancelTimer?.invalidate()
+        confirmCancelTimer = Timer.scheduledTimer(withTimeInterval: Self.cancelConfirmationWindow, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.resetCancelConfirmation()
+            }
+        }
+        return false
+    }
+
+    private func resetCancelConfirmation() {
+        confirmCancelTimer?.invalidate()
+        confirmCancelTimer = nil
+        isConfirmingCancel = false
+    }
+
     static var shouldUseLiveStreaming: Bool {
         AppPreferences.shared.liveTranscriptionEnabled && AppPreferences.shared.selectedEngine == "fluidaudio"
     }
@@ -166,8 +206,9 @@ class IndicatorViewModel: ObservableObject {
     }
 
     func startDecoding() {
+        resetCancelConfirmation()
         stopBlinking()
-        
+
         if isTranscriptionBusy {
             recorder.cancelRecording()
             showBusyMessage()
@@ -435,6 +476,8 @@ class IndicatorViewModel: ObservableObject {
 
     func cleanup() {
         stopBlinking()
+        resetCancelConfirmation()
+        recordingStartedAt = nil
         hideTimer?.invalidate()
         hideTimer = nil
         cancellables.removeAll()
@@ -481,6 +524,29 @@ struct RecordingIndicator: View {
             .shadow(color: .red.opacity(0.5), radius: 4)
             .opacity(isBlinking ? 0.3 : 1.0)
             .animation(.easeInOut(duration: 0.4), value: isBlinking)
+    }
+}
+
+/// A thin orange bar that drains left-to-right over the confirmation window,
+/// showing how long the "press Esc again to cancel" prompt stays armed.
+struct CancelConfirmationBar: View {
+    @State private var progress: CGFloat = 1
+
+    var body: some View {
+        GeometryReader { geo in
+            Capsule()
+                .fill(Color.orange)
+                .frame(width: geo.size.width * progress, height: 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 2)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 3)
+        .onAppear {
+            withAnimation(.linear(duration: IndicatorViewModel.cancelConfirmationWindow)) {
+                progress = 0
+            }
+        }
     }
 }
 
@@ -620,14 +686,23 @@ struct IndicatorWindow: View {
                     HStack(alignment: .center, spacing: 10) {
                         RecordingIndicator(isBlinking: viewModel.isBlinking)
                             .frame(width: 16)
-                        Text("Recording…")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.secondary)
+                        if viewModel.isConfirmingCancel {
+                            Text("Press Esc to cancel")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.orange)
+                                .transition(.opacity)
+                        } else {
+                            Text("Recording…")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.secondary)
+                                .transition(.opacity)
+                        }
                         if anyIndicatorButton {
                             Spacer(minLength: 8)
                             indicatorControls
                         }
                     }
+                    .animation(.easeInOut(duration: 0.2), value: viewModel.isConfirmingCancel)
                 } else {
                     // Once text starts, drop the label: just the dot + the text, which grows
                     // (the window resizes to fit it) so everything stays visible.
@@ -713,6 +788,11 @@ struct IndicatorWindow: View {
                             .fill(Material.thinMaterial)
                     }
                     .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if viewModel.isConfirmingCancel {
+                CancelConfirmationBar()
             }
         }
         .clipShape(rect)

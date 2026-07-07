@@ -19,12 +19,13 @@ class ShortcutManager {
     private let holdThreshold: TimeInterval = 0.3
     private var holdMode = false
     private var useModifierOnlyHotkey = false
+    private var useMouseButtonHotkey = false
 
     private init() {
         print("ShortcutManager init")
-        
+
         setupKeyboardShortcuts()
-        setupModifierKeyMonitor()
+        setupRecordingTrigger()
         
         NotificationCenter.default.addObserver(
             self,
@@ -47,7 +48,7 @@ class ShortcutManager {
     }
     
     @objc private func hotkeySettingsChanged() {
-        setupModifierKeyMonitor()
+        setupRecordingTrigger()
     }
     
     private func setupKeyboardShortcuts() {
@@ -69,8 +70,10 @@ class ShortcutManager {
 
         KeyboardShortcuts.onKeyUp(for: .escape) { [weak self] in
             Task { @MainActor in
-                if self?.activeVm != nil {
-                    IndicatorWindowManager.shared.stopForce()
+                // requestCancel() discards immediately for short recordings, but a long
+                // one arms a confirmation and returns false — leave activeVm set so the
+                // next Esc (within the window) confirms the cancel.
+                if self?.activeVm != nil, IndicatorWindowManager.shared.requestCancel() {
                     self?.activeVm = nil
                 }
             }
@@ -78,27 +81,49 @@ class ShortcutManager {
         KeyboardShortcuts.disable(.escape)
     }
     
-    private func setupModifierKeyMonitor() {
-        let modifierKeyString = AppPreferences.shared.modifierOnlyHotkey
-        let modifierKey = ModifierKey(rawValue: modifierKeyString) ?? .none
-        
-        if modifierKey != .none {
+    private func setupRecordingTrigger() {
+        let modifierKey = ModifierKey(rawValue: AppPreferences.shared.modifierOnlyHotkey) ?? .none
+        let mouseButton = MouseButton(rawValue: AppPreferences.shared.mouseButtonHotkey) ?? .none
+
+        // The three trigger modes are mutually exclusive. Tear all of them down
+        // first, then enable exactly one. A configured mouse button takes priority
+        // over a modifier key, which takes priority over the regular shortcut.
+        ModifierKeyMonitor.shared.stop()
+        MouseButtonMonitor.shared.stop()
+
+        if mouseButton != .none {
+            useMouseButtonHotkey = true
+            useModifierOnlyHotkey = false
+            KeyboardShortcuts.disable(.toggleRecord)
+
+            MouseButtonMonitor.shared.onButtonDown = { [weak self] in
+                self?.handleKeyDown()
+            }
+
+            MouseButtonMonitor.shared.onButtonUp = { [weak self] in
+                self?.handleKeyUp()
+            }
+
+            MouseButtonMonitor.shared.start(mouseButton: mouseButton)
+            print("ShortcutManager: Using mouse-button hotkey: \(mouseButton.displayName)")
+        } else if modifierKey != .none {
+            useMouseButtonHotkey = false
             useModifierOnlyHotkey = true
             KeyboardShortcuts.disable(.toggleRecord)
-            
+
             ModifierKeyMonitor.shared.onKeyDown = { [weak self] in
                 self?.handleKeyDown()
             }
-            
+
             ModifierKeyMonitor.shared.onKeyUp = { [weak self] in
                 self?.handleKeyUp()
             }
-            
+
             ModifierKeyMonitor.shared.start(modifierKey: modifierKey)
             print("ShortcutManager: Using modifier-only hotkey: \(modifierKey.displayName)")
         } else {
+            useMouseButtonHotkey = false
             useModifierOnlyHotkey = false
-            ModifierKeyMonitor.shared.stop()
             KeyboardShortcuts.enable(.toggleRecord)
             print("ShortcutManager: Using regular keyboard shortcut")
         }
