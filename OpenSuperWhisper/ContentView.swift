@@ -871,6 +871,21 @@ struct RecordingRow: View {
     /// nil → rerun with the current model; otherwise rerun once with that model. (F3)
     let onRegenerate: (DictationModelOption?) -> Void
     @StateObject private var audioRecorder = AudioRecorder.shared
+    @ObservedObject private var transcriptionQueue = TranscriptionQueue.shared
+
+    /// Live "elapsed since processing started" for the row currently being transcribed,
+    /// shown next to the progress percentage (#87). Empty for queued/idle rows.
+    @ViewBuilder private var processingElapsed: some View {
+        if recording.id == transcriptionQueue.currentRecordingId,
+           let startedAt = transcriptionQueue.processingStartedAt {
+            TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                let secs = max(0, Int(context.date.timeIntervalSince(startedAt)))
+                Text(String(format: "%d:%02d", secs / 60, secs % 60))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
 
     /// Models offered in the rerun dropdown — everything usable right now across engines.
     private var rerunModels: [DictationModelOption] {
@@ -958,6 +973,8 @@ struct RecordingRow: View {
                                 .foregroundColor(.secondary)
                                 .contentTransition(.numericText())
                                 .animation(.linear(duration: 0.1), value: recording.progress)
+
+                            processingElapsed
                         }
                         
                         Text(statusText)
@@ -1097,6 +1114,8 @@ struct RecordingRow: View {
                                 .foregroundColor(.secondary)
                                 .contentTransition(.numericText())
                                 .animation(.linear(duration: 0.1), value: recording.progress)
+
+                            processingElapsed
                         }
                         
                         Text(statusText)

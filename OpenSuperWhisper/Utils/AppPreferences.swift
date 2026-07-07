@@ -270,6 +270,12 @@ final class AppPreferences {
     // it outright — a safety net against an accidental Esc losing a long dictation.
     @UserDefault(key: "escCancelWithoutConfirmation", defaultValue: false)
     var escCancelWithoutConfirmation: Bool
+
+    // When true, the Whisper model is freed from RAM (~1GB) between dictations and
+    // reloaded on demand for each one — trades a bit of start latency for memory.
+    // Off by default (the model stays resident for the fastest first word).
+    @UserDefault(key: "unloadWhisperModelWhenIdle", defaultValue: false)
+    var unloadWhisperModelWhenIdle: Bool
     
     @UserDefault(key: "holdToRecord", defaultValue: true)
     var holdToRecord: Bool

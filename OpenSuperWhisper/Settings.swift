@@ -341,6 +341,12 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var unloadWhisperModelWhenIdle: Bool {
+        didSet {
+            AppPreferences.shared.unloadWhisperModelWhenIdle = unloadWhisperModelWhenIdle
+        }
+    }
+
 
     @Published var addSpaceAfterSentence: Bool {
         didSet {
@@ -612,6 +618,7 @@ class SettingsViewModel: ObservableObject {
         self.mouseButtonHotkey = MouseButton(rawValue: prefs.mouseButtonHotkey) ?? .none
         self.holdToRecord = prefs.holdToRecord
         self.escCancelWithoutConfirmation = prefs.escCancelWithoutConfirmation
+        self.unloadWhisperModelWhenIdle = prefs.unloadWhisperModelWhenIdle
         self.addSpaceAfterSentence = prefs.addSpaceAfterSentence
         self.aiPostProcessingEnabled = prefs.aiPostProcessingEnabled
         self.aiProvider = prefs.aiProvider
@@ -1626,6 +1633,12 @@ struct SettingsView: View {
                         }
                         storageSection(path: WhisperModelManager.shared.modelsDirectory.path) {
                             NSWorkspace.shared.open(WhisperModelManager.shared.modelsDirectory)
+                        }
+                        SSection(title: "Memory") {
+                            SRow(title: "Unload model when idle",
+                                 hint: "Free the model (~1 GB) between dictations and reload it on demand — saves RAM, adds a little start latency") {
+                                SToggle(isOn: $viewModel.unloadWhisperModelWhenIdle)
+                            }
                         }
                     } else if browseEngine == "fluidaudio" {
                         SSection(title: "Parakeet models") {

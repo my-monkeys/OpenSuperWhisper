@@ -9,6 +9,10 @@ class TranscriptionQueue: ObservableObject {
 
     @Published private(set) var isProcessing = false
     @Published private(set) var currentRecordingId: UUID?
+    // When the current recording began processing, for the row's elapsed-time readout.
+    // Useful on long dropped files, especially with engines that don't report granular
+    // progress (Apple Speech, SenseVoice) where the percentage bar can't move (#87).
+    @Published private(set) var processingStartedAt: Date?
 
     private let transcriptionService: TranscriptionService
     private let recordingStore: RecordingStore
@@ -190,8 +194,10 @@ class TranscriptionQueue: ObservableObject {
     private func processQueue() async {
         while let recording = recordingStore.getNextPendingRecording() {
             currentRecordingId = recording.id
+            processingStartedAt = Date()
             await processRecording(recording)
             currentRecordingId = nil
+            processingStartedAt = nil
             // Enforce the retention limit after each recording finishes so the
             // count is held as a fixed-size buffer. In-progress recordings stay
             // excluded; they get pruned as soon as they finish on a later pass.

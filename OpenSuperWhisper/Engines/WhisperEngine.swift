@@ -71,20 +71,41 @@ class WhisperEngine: TranscriptionEngine {
     }
     
     func initialize() async throws {
+        try loadModel()
+        // Opt-in RAM saver (#171): the model just validated, so free it (~1GB) until a
+        // dictation actually needs it. Off by default — the model normally stays hot.
+        if AppPreferences.shared.unloadWhisperModelWhenIdle {
+            unloadModel()
+        }
+    }
+
+    private func loadModel() throws {
         let modelPath = modelPathOverride ?? AppPreferences.shared.selectedWhisperModelPath ?? AppPreferences.shared.selectedModelPath
         guard let modelPath = modelPath else {
             throw TranscriptionError.contextInitializationFailed
         }
-        
+
         let params = WhisperContextParams()
         context = MyWhisperContext.initFromFile(path: modelPath, params: params)
-        
+
         guard context != nil else {
             throw TranscriptionError.contextInitializationFailed
         }
     }
-    
+
+    private func unloadModel() {
+        context = nil
+    }
+
     func transcribeAudio(url: URL, settings: Settings) async throws -> String {
+        // With idle-unloading on, the model isn't held between dictations: load it on
+        // demand here and release it again once this transcription finishes (#171).
+        let unloadWhenIdle = AppPreferences.shared.unloadWhisperModelWhenIdle
+        if unloadWhenIdle && context == nil {
+            try loadModel()
+        }
+        defer { if unloadWhenIdle { unloadModel() } }
+
         guard let context = context else {
             throw TranscriptionError.contextInitializationFailed
         }
