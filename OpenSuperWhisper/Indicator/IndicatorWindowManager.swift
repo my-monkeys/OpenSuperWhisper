@@ -125,19 +125,15 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             }
         }
 
-        // Notch mode must draw *over* the menu bar (which sits above the normal floating level),
-        // otherwise the menu bar clips the top of the pill and it looks like it's hanging too low.
-        // Same recipe the MewNotch / boring.notch projects use.
-        if anchorFromTop {
-            window?.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
-            window?.collectionBehavior = [.fullScreenAuxiliary, .stationary, .canJoinAllSpaces, .ignoresCycle]
-        } else {
-            // .fullScreenAuxiliary lets the indicator appear over apps in full-screen spaces;
-            // without it the recording dialog is invisible there (#52). statusBar level keeps it
-            // above the full-screen app's content.
-            window?.level = .statusBar
-            window?.collectionBehavior = [.fullScreenAuxiliary, .stationary, .canJoinAllSpaces, .ignoresCycle]
-        }
+        // The indicator must draw over the menu bar AND over apps in a native full-screen space
+        // (dictating into a full-screen app). `.fullScreenAuxiliary` + `.canJoinAllSpaces` let the
+        // panel join the full-screen space, but that's not enough on its own: a `.statusBar`/
+        // `.mainMenu`-level window (25) is occluded by the full-screen app's system-elevated window,
+        // so the pill goes invisible there (#notch-fullscreen). `.screenSaver` (1000) is the level
+        // dedicated overlay/notch apps (Lunar, boring.notch) use to sit above full-screen content;
+        // it's also comfortably above the menu bar, so the notch pill still clears it.
+        window?.level = .screenSaver
+        window?.collectionBehavior = [.fullScreenAuxiliary, .stationary, .canJoinAllSpaces, .ignoresCycle]
 
         window?.orderFront(nil)
         return newViewModel
