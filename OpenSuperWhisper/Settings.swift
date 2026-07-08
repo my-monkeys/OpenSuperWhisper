@@ -489,6 +489,21 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// Voice commands: a leading trigger word ("whisper open slack") performs an action
+    /// instead of being typed. Opt-in. See `VoiceCommandRouter`.
+    @Published var voiceCommandsEnabled: Bool {
+        didSet {
+            AppPreferences.shared.voiceCommandsEnabled = voiceCommandsEnabled
+        }
+    }
+
+    /// The wake word that marks an utterance as a command. Default "whisper".
+    @Published var voiceCommandTrigger: String {
+        didSet {
+            AppPreferences.shared.voiceCommandTrigger = voiceCommandTrigger
+        }
+    }
+
     @Published var pauseMediaOnRecord: Bool {
         didSet {
             AppPreferences.shared.pauseMediaOnRecord = pauseMediaOnRecord
@@ -637,6 +652,8 @@ class SettingsViewModel: ObservableObject {
         self.pasteInsteadOfTyping = prefs.pasteInsteadOfTyping
         self.notifyWhenNoPasteTarget = prefs.notifyWhenNoPasteTarget
         self.submitOnVoiceCommand = prefs.submitOnVoiceCommand
+        self.voiceCommandsEnabled = prefs.voiceCommandsEnabled
+        self.voiceCommandTrigger = prefs.voiceCommandTrigger
         self.pauseMediaOnRecord = prefs.pauseMediaOnRecord
         self.reduceVolumeOnRecord = prefs.reduceVolumeOnRecord
         self.reduceVolumeLevel = prefs.reduceVolumeLevel
@@ -1826,6 +1843,18 @@ struct SettingsView: View {
                         sEditor($viewModel.aiPostProcessingPrompt, height: 64)
                     }
                     .padding(.leading, 16)
+                }
+            }
+
+            SSection(title: "Voice Commands") {
+                SRow(title: "Enable voice commands",
+                     hint: "A leading trigger word (\"\(viewModel.voiceCommandTrigger) open slack\") performs an action instead of being typed — open / switch to / quit + an app name.") {
+                    SToggle(isOn: $viewModel.voiceCommandsEnabled)
+                }
+                if viewModel.voiceCommandsEnabled {
+                    SRow(title: "Trigger word", indented: true) {
+                        sInput($viewModel.voiceCommandTrigger, prompt: "whisper", width: 160)
+                    }
                 }
             }
 
