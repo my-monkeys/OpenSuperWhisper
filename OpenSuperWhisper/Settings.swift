@@ -363,11 +363,36 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
-    /// Cleanup backend: "ollama" (local) or "remote" (OpenAI-compatible server).
-    @Published var aiProvider: String {
+    /// Cleanup backend: "builtin" (embedded llama.cpp), "ollama" (local server), or
+    /// "remote" (OpenAI-compatible server).
+    @Published var aiBackend: String {
         didSet {
-            AppPreferences.shared.aiProvider = aiProvider
+            AppPreferences.shared.aiBackend = aiBackend
             if aiPostProcessingEnabled { testLLMConnection() }
+        }
+    }
+
+    /// Whether the built-in model's GGUF is present on disk.
+    @Published var builtInModelDownloaded: Bool = LLMModelManager.shared.isDefaultModelDownloaded()
+    /// Download progress in 0...1 while the built-in model is downloading; nil when idle.
+    @Published var builtInModelDownloadProgress: Double?
+    /// Set when a built-in model download fails, for inline feedback.
+    @Published var builtInModelDownloadError: String?
+
+    /// Downloads the default built-in model (~1 GB), updating progress for the UI.
+    func downloadBuiltInModel() {
+        builtInModelDownloadError = nil
+        builtInModelDownloadProgress = 0
+        Task { @MainActor in
+            do {
+                try await LLMModelManager.shared.downloadDefaultModel { progress in
+                    Task { @MainActor in self.builtInModelDownloadProgress = progress }
+                }
+                self.builtInModelDownloaded = LLMModelManager.shared.isDefaultModelDownloaded()
+            } catch {
+                self.builtInModelDownloadError = error.localizedDescription
+            }
+            self.builtInModelDownloadProgress = nil
         }
     }
 
@@ -411,10 +436,10 @@ class SettingsViewModel: ObservableObject {
     @Published var llmStatus: LLMStatus = .unknown
 
     /// Probes the local Ollama backend. The Remote backend is owned by
-    /// RemoteCleanupSettingsView (it also fills the model list), which publishes
-    /// straight to `llmStatus`, so this only runs for Ollama.
+    /// RemoteCleanupSettingsView (it also fills the model list), and the built-in backend
+    /// has no server to probe (see `builtInModelDownloaded`), so this only runs for Ollama.
     func testLLMConnection() {
-        guard aiProvider != "remote" else { return }
+        guard aiBackend == "ollama" else { return }
         llmStatus = .checking
         let endpoint = aiOllamaEndpoint, model = aiOllamaModel
         Task { @MainActor in
@@ -486,6 +511,21 @@ class SettingsViewModel: ObservableObject {
     @Published var submitOnVoiceCommand: Bool {
         didSet {
             AppPreferences.shared.submitOnVoiceCommand = submitOnVoiceCommand
+        }
+    }
+
+    /// App-aware LLM formatting: per-app instructions, keyed by frontmost bundle identifier,
+    /// that reshape the transcription via the same LLM cleanup pass (e.g. "at Rob" -> "@Rob"
+    /// in Slack). Independent of `aiPostProcessingEnabled`: either can contribute to one pass.
+    @Published var appContextFormattingEnabled: Bool {
+        didSet {
+            AppPreferences.shared.appContextFormattingEnabled = appContextFormattingEnabled
+        }
+    }
+
+    @Published var appContextProfiles: [AppContextProfile] {
+        didSet {
+            AppPreferences.shared.appContextProfiles = appContextProfiles
         }
     }
 
@@ -621,7 +661,7 @@ class SettingsViewModel: ObservableObject {
         self.unloadWhisperModelWhenIdle = prefs.unloadWhisperModelWhenIdle
         self.addSpaceAfterSentence = prefs.addSpaceAfterSentence
         self.aiPostProcessingEnabled = prefs.aiPostProcessingEnabled
-        self.aiProvider = prefs.aiProvider
+        self.aiBackend = prefs.aiBackend
         self.aiOllamaEndpoint = prefs.aiOllamaEndpoint
         self.aiOllamaModel = prefs.aiOllamaModel
         self.aiRemoteEndpoint = prefs.aiRemoteEndpoint
@@ -637,6 +677,8 @@ class SettingsViewModel: ObservableObject {
         self.pasteInsteadOfTyping = prefs.pasteInsteadOfTyping
         self.notifyWhenNoPasteTarget = prefs.notifyWhenNoPasteTarget
         self.submitOnVoiceCommand = prefs.submitOnVoiceCommand
+        self.appContextFormattingEnabled = prefs.appContextFormattingEnabled
+        self.appContextProfiles = prefs.appContextProfiles
         self.pauseMediaOnRecord = prefs.pauseMediaOnRecord
         self.reduceVolumeOnRecord = prefs.reduceVolumeOnRecord
         self.reduceVolumeLevel = prefs.reduceVolumeLevel
@@ -1207,6 +1249,10 @@ struct SettingsView: View {
     @State private var appLanguage = LanguageManager.selected
     @State private var langNeedsRelaunch = false
     @State private var cancelKey = "esc"
+    // App-aware formatting: app picker sheet. `appPickerTargetID` is the profile being (re)assigned
+    // an app, or nil when the picker is adding a brand-new profile.
+    @State private var showingAppPicker = false
+    @State private var appPickerTargetID: UUID?
 
     /// Curated cancel-recording keys (the recorder can't capture Esc / single special keys).
     struct CancelKeyChoice: Identifiable {
@@ -1709,8 +1755,38 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder private var builtInCleanupFields: some View {
+        HStack(spacing: 8) {
+            if viewModel.builtInModelDownloaded {
+                Text("✓ Model ready — runs on-device")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(STheme.ok)
+                    .padding(.horizontal, 9).padding(.vertical, 2)
+                    .background(Capsule().fill(STheme.okBg))
+            } else if let progress = viewModel.builtInModelDownloadProgress {
+                ProgressView(value: progress).frame(width: 160).controlSize(.small)
+                Text("\(Int(progress * 100))%").font(.system(size: 11)).foregroundColor(STheme.hint)
+            } else {
+                Button("Download model (~1 GB)") { viewModel.downloadBuiltInModel() }
+                    .controlSize(.small)
+                Text("Qwen2.5 1.5B, Apache-2.0. One-time download; no server needed.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.leading, 16)
+        if let err = viewModel.builtInModelDownloadError {
+            Text("✕ \(err)")
+                .font(.system(size: 11))
+                .foregroundColor(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 16)
+        }
+    }
+
     @ViewBuilder private var llmStatusView: some View {
-        let isRemote = viewModel.aiProvider == "remote"
+        let isRemote = viewModel.aiBackend == "remote"
         switch viewModel.llmStatus {
         case .unknown:
             EmptyView()
@@ -1804,7 +1880,8 @@ struct SettingsView: View {
                 .frame(minHeight: 26)
                 if viewModel.aiPostProcessingEnabled {
                     SRow(title: "Backend", indented: true) {
-                        Picker("", selection: $viewModel.aiProvider) {
+                        Picker("", selection: $viewModel.aiBackend) {
+                            Text("Built-in (Qwen2.5 1.5B)").tag("builtin")
                             Text("Ollama (local)").tag("ollama")
                             Text("Remote (OpenAI-compatible)").tag("remote")
                         }
@@ -1813,20 +1890,99 @@ struct SettingsView: View {
                         .fixedSize()
                     }
 
-                    if viewModel.aiProvider == "remote" {
+                    switch viewModel.aiBackend {
+                    case "builtin":
+                        builtInCleanupFields
+                    case "remote":
                         RemoteCleanupSettingsView(viewModel: viewModel)
-                    } else {
+                    default:
                         ollamaCleanupFields
                     }
 
-                    HStack { Spacer(); llmStatusView }
-                        .padding(.leading, 16)
+                    if viewModel.aiBackend != "builtin" {
+                        HStack { Spacer(); llmStatusView }
+                            .padding(.leading, 16)
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
                         sEditor($viewModel.aiPostProcessingPrompt, height: 64)
                     }
                     .padding(.leading, 16)
                 }
+            }
+
+            SSection(title: "App-Aware Formatting") {
+                SRow(title: "Reformat per app",
+                     hint: "Reshape the transcription via the LLM cleanup pass, per frontmost app — e.g. \"at Rob\" → \"@Rob\" in Slack. Requires the AI Cleanup model above.") {
+                    SToggle(isOn: $viewModel.appContextFormattingEnabled)
+                }
+                if viewModel.appContextFormattingEnabled {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if viewModel.appContextProfiles.isEmpty {
+                            Text("No apps yet. Add one below.")
+                                .font(.system(size: 11)).foregroundColor(STheme.hint)
+                                .padding(.vertical, 4)
+                        }
+                        ForEach($viewModel.appContextProfiles) { $profile in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 10) {
+                                    Button {
+                                        appPickerTargetID = profile.id
+                                        showingAppPicker = true
+                                    } label: {
+                                        HStack(spacing: 10) {
+                                            Image(nsImage: InstalledApps.icon(forBundleIdentifier: profile.bundleIdentifier))
+                                                .resizable()
+                                                .frame(width: 20, height: 20)
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text(profile.appName.isEmpty ? "Choose an app…" : profile.appName)
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(profile.appName.isEmpty ? STheme.hint : STheme.text)
+                                                if !profile.bundleIdentifier.isEmpty {
+                                                    Text(profile.bundleIdentifier)
+                                                        .font(.system(size: 10))
+                                                        .foregroundColor(STheme.hint)
+                                                }
+                                            }
+                                            Image(systemName: "chevron.up.chevron.down")
+                                                .font(.system(size: 9))
+                                                .foregroundColor(STheme.hint)
+                                            Spacer()
+                                        }
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Change the app")
+
+                                    Button {
+                                        viewModel.appContextProfiles.removeAll { $0.id == profile.id }
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(STheme.hint)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Remove this app")
+                                    .frame(width: 24)
+                                }
+                                sEditor($profile.instructions, height: 56)
+                            }
+                            .padding(.bottom, 2)
+                        }
+                        Button {
+                            appPickerTargetID = nil
+                            showingAppPicker = true
+                        } label: {
+                            Label("Add App", systemImage: "plus")
+                                .font(.system(size: 11.5, weight: .medium))
+                        }
+                        .controlSize(.small)
+                    }
+                    .padding(.leading, 16)
+                }
+            }
+            .sheet(isPresented: $showingAppPicker) {
+                AppPickerSheet { app in applyPickedApp(app) }
             }
 
             SSection(title: "Dictionary") {
@@ -1936,6 +2092,19 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// Applies the app chosen in the picker: reassigns the targeted profile, or appends a new one.
+    private func applyPickedApp(_ app: InstalledApp) {
+        if let targetID = appPickerTargetID,
+           let idx = viewModel.appContextProfiles.firstIndex(where: { $0.id == targetID }) {
+            viewModel.appContextProfiles[idx].appName = app.name
+            viewModel.appContextProfiles[idx].bundleIdentifier = app.bundleIdentifier
+        } else {
+            viewModel.appContextProfiles.append(
+                AppContextProfile(bundleIdentifier: app.bundleIdentifier, appName: app.name, instructions: ""))
+        }
+        appPickerTargetID = nil
     }
 
     private var storageSettings: some View {

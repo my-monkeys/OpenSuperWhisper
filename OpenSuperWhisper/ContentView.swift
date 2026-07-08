@@ -262,7 +262,7 @@ class ContentViewModel: ObservableObject {
                     let rawText = try await transcriptionService.transcribeAudio(url: tempURL, settings: Settings())
                     let cleanedText = AppPreferences.shared.cleanTranscription(rawText)
                     // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
-                    let text = await LLMPostProcessor.process(cleanedText)
+                    let text = await LLMPostProcessor.process(cleanedText, bundleID: FocusUtils.frontmostBundleID())
 
                     if AppPreferences.shared.saveTranscriptionHistory {
                         // Capture the current recording duration
@@ -733,7 +733,7 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(minWidth: 400, idealWidth: 400)
+        .frame(minWidth: 450)
         .background(ThemePalette.windowBackground(colorScheme))
         .onAppear {
             viewModel.loadInitialData()

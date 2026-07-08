@@ -253,7 +253,7 @@ class IndicatorViewModel: ObservableObject {
                     }
 
                     // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
-                    text = await LLMPostProcessor.process(text)
+                    text = await LLMPostProcessor.process(text, bundleID: FocusUtils.frontmostBundleID())
 
                     // Trailing "press enter" voice command (opt-in): strip it from the text and
                     // remember to press Return after insertion, submitting the message/prompt.
