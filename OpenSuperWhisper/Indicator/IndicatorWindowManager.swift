@@ -73,6 +73,14 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         )
         hostingController.sizingOptions = Self.hostingSizingOptions
         window?.contentViewController = hostingController
+        // Assigning a hosting controller with empty sizingOptions as the contentViewController
+        // can leave the panel at 0×0 (seen on macOS 26; users reported it on macOS 15.7.x too):
+        // SwiftUI then lays out in a 0×0 canvas, the content preference reports 0×0, and
+        // `resizeToContent`'s `> 1` guard discards it — so the window stays 0×0 and the indicator
+        // never appears in ANY position mode (#indicator-invisible). Seed a non-zero canvas
+        // (non-animated, so no NSHostingView recursion-crash risk) so SwiftUI can lay out and
+        // size the window.
+        window?.setContentSize(NSSize(width: 380, height: 120))
 
         // Accept clicks only when an on-bubble button is enabled (so it's tappable);
         // otherwise stay fully click-through (baseline). Re-evaluated each show() so
