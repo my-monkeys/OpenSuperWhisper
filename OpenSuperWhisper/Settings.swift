@@ -1907,7 +1907,7 @@ struct SettingsView: View {
             }
 
             SSection(title: "Delivery") {
-                SRow(title: "Copy to clipboard", hint: "Also place the transcription on the clipboard") {
+                SRow(title: "Copy to clipboard", hint: "Also place the transcription on the clipboard. When off, the previous clipboard contents are preserved") {
                     SToggle(isOn: $viewModel.autoCopyToClipboard)
                 }
                 SRow(title: "Auto-paste transcription", hint: "Insert the transcription into the focused app") {
