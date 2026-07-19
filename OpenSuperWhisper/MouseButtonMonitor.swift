@@ -15,7 +15,7 @@ enum MouseButton: String, CaseIterable, Identifiable, Codable {
     var displayName: String {
         switch self {
         case .none: return "None"
-        case .middle: return "Button 3 (Middle)"
+        case .middle: return "Button 3 (Top)"
         case .button4: return "Button 4 (Back)"
         case .button5: return "Button 5 (Forward)"
         case .button6: return "Button 6 (Thumb)"
