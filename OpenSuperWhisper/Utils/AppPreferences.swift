@@ -34,6 +34,15 @@ final class AppPreferences {
         migrateGroqToRemote()
     }
 
+    /// Test seam: lets a test construct a fresh instance so the once-per-process
+    /// migrations (migrateOldPreferences + migrateGroqToRemote) can re-execute under
+    /// controlled UserDefaults. Delegates to the unchanged private designated init —
+    /// the exact same two migration calls, zero behavior change. The label parameter
+    /// is a marker only.
+    convenience init(forTesting: Bool) {
+        self.init()
+    }
+
     private func migrateOldPreferences() {
         if let oldPath = UserDefaults.standard.string(forKey: "selectedModelPath"),
            UserDefaults.standard.string(forKey: "selectedWhisperModelPath") == nil {
