@@ -18,8 +18,8 @@ enum MouseButton: String, CaseIterable, Identifiable, Codable {
         case .middle: return "Button 3 (Middle)"
         case .button4: return "Button 4 (Back)"
         case .button5: return "Button 5 (Forward)"
-        case .button6: return "Button 6"
-        case .button7: return "Button 7"
+        case .button6: return "Button 6 (Thumb)"
+        case .button7: return "Button 7 (Ring)"
         }
     }
 
