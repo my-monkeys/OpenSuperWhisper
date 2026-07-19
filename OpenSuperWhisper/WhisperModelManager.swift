@@ -47,13 +47,20 @@ class WhisperModelManager {
     private var activeDownloadTasks: [String: URLSessionDownloadTask] = [:]
     private let downloadTasksLock = NSLock()
     
-    var modelsDirectory: URL {
-        let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let modelsDirectory = applicationSupport.appendingPathComponent(Bundle.main.bundleIdentifier!).appendingPathComponent(modelsDirectoryName)
-        return modelsDirectory
-    }
-    
-    private init() {
+    /// Injected models directory. Stored (not computed) so tests can point it at a
+    /// temp dir; the default reproduces today's Application Support location exactly.
+    let modelsDirectory: URL
+
+    /// Test seam: pass a directory (e.g. a temp dir) to isolate disk operations.
+    /// `nil` (the production default, used by `shared`) keeps today's behavior.
+    init(modelsDirectory: URL? = nil) {
+        if let modelsDirectory {
+            self.modelsDirectory = modelsDirectory
+        } else {
+            let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let modelsDirectory = applicationSupport.appendingPathComponent(Bundle.main.bundleIdentifier!).appendingPathComponent(modelsDirectoryName)
+            self.modelsDirectory = modelsDirectory
+        }
         createModelsDirectoryIfNeeded()
         copyDefaultModelIfNeeded()
     }

@@ -1,6 +1,27 @@
 import AVFoundation
 import Foundation
 
+/// Platform gates that decide engine fallback. Tests inject explicit values to reach
+/// every mapping decision; production call sites use `.current`, which evaluates the
+/// same compile-time/runtime truth the inline chain did (default arg → per call).
+struct EnginePlatformGates {
+    var supportsSenseVoice: Bool
+    var supportsAppleSpeech: Bool
+
+    static var current: EnginePlatformGates {
+        var gates = EnginePlatformGates(supportsSenseVoice: false, supportsAppleSpeech: false)
+#if arch(arm64)
+        gates.supportsSenseVoice = true
+#endif
+#if canImport(FoundationModels)
+        if #available(macOS 26.0, *) {
+            gates.supportsAppleSpeech = true
+        }
+#endif
+        return gates
+    }
+}
+
 @MainActor
 class TranscriptionService: ObservableObject {
     static let shared = TranscriptionService()
@@ -62,34 +83,7 @@ class TranscriptionService: ObservableObject {
         print("Loading engine: \(selectedEngine)")
 
         let result = await Task.detached(priority: .userInitiated) { () -> Result<TranscriptionEngine?, Error> in
-            let engine: TranscriptionEngine?
-
-            if selectedEngine == "fluidaudio" {
-                engine = await FluidAudioEngine()
-            } else if selectedEngine == "sensevoice" {
-#if arch(arm64)
-                engine = SenseVoiceEngine()
-#else
-                // SenseVoice (sherpa-onnx/onnxruntime) ships arm64-only; fall back on Intel.
-                engine = await WhisperEngine()
-#endif
-            } else if selectedEngine == "remote" {
-                engine = RemoteEngine()
-            } else if selectedEngine == "apple" {
-#if canImport(FoundationModels)
-                if #available(macOS 26.0, *) {
-                    engine = AppleSpeechEngine()
-                } else {
-                    // A pref synced from a newer machine; the catalog never offers
-                    // "apple" here, so quietly fall back.
-                    engine = await WhisperEngine()
-                }
-#else
-                engine = await WhisperEngine()
-#endif
-            } else {
-                engine = await WhisperEngine()
-            }
+            let engine = await Self.makeEngine(selectedEngine: selectedEngine)
 
             do {
                 try await engine?.initialize()
@@ -271,34 +265,81 @@ class TranscriptionService: ObservableObject {
         }
     }
 
+    /// Pure engine-kind mapping for the selected-engine preference: preference string
+    /// in, un-initialized engine out. Construction only — the caller initializes inside
+    /// the same detached task, exactly as the inline chain did. Pure → `nonisolated` + testable.
+    nonisolated static func makeEngine(selectedEngine: String, gates: EnginePlatformGates = .current) async -> TranscriptionEngine? {
+        let engine: TranscriptionEngine?
+
+        if selectedEngine == "fluidaudio" {
+            engine = await FluidAudioEngine()
+        } else if selectedEngine == "sensevoice" {
+#if arch(arm64)
+            engine = gates.supportsSenseVoice ? SenseVoiceEngine() : await WhisperEngine()
+#else
+            // SenseVoice (sherpa-onnx/onnxruntime) ships arm64-only; fall back on Intel.
+            engine = await WhisperEngine()
+#endif
+        } else if selectedEngine == "remote" {
+            engine = RemoteEngine()
+        } else if selectedEngine == "apple" {
+#if canImport(FoundationModels)
+            if #available(macOS 26.0, *) {
+                // The #available wrapper is load-bearing: the compiler requires it as
+                // availability proof for the AppleSpeechEngine type. The gates parameter
+                // decides WITHIN a host that can construct the engine.
+                engine = gates.supportsAppleSpeech ? AppleSpeechEngine() : await WhisperEngine()
+            } else {
+                // A pref synced from a newer machine; the catalog never offers
+                // "apple" here, so quietly fall back.
+                engine = await WhisperEngine()
+            }
+#else
+            engine = await WhisperEngine()
+#endif
+        } else {
+            engine = await WhisperEngine()
+        }
+
+        return engine
+    }
+
+    /// Pure engine-kind mapping for a specific model option (the remote local-fallback
+    /// path): option in, un-initialized engine out. Same construction-only contract as
+    /// `makeEngine(selectedEngine:)`. Pure → `nonisolated` + testable.
+    nonisolated static func makeEngine(modelOption option: DictationModelOption, gates: EnginePlatformGates = .current) async -> TranscriptionEngine {
+        let engine: TranscriptionEngine
+        switch option.engine {
+        case "fluidaudio":
+            engine = await FluidAudioEngine(versionOverride: option.identifier)
+        case "apple":
+#if canImport(FoundationModels)
+            if #available(macOS 26.0, *) {
+                engine = gates.supportsAppleSpeech ? AppleSpeechEngine() : await WhisperEngine()
+            } else {
+                engine = await WhisperEngine()
+            }
+#else
+            engine = await WhisperEngine()
+#endif
+        case "sensevoice":
+#if arch(arm64)
+            engine = gates.supportsSenseVoice ? SenseVoiceEngine() : await WhisperEngine(modelPathOverride: option.identifier)
+#else
+            engine = await WhisperEngine(modelPathOverride: option.identifier)
+#endif
+        default: // "whisper"
+            engine = await WhisperEngine(modelPathOverride: option.identifier)
+        }
+        return engine
+    }
+
     /// Build + initialize an engine for a specific model (only for the remote
     /// local-fallback), without touching the global engine/model prefs. Runs the load
     /// off the main actor, like `ensureEngineLoaded`.
     private func makeEngine(for option: DictationModelOption) async throws -> TranscriptionEngine {
         try await Task.detached(priority: .userInitiated) { () -> TranscriptionEngine in
-            let engine: TranscriptionEngine
-            switch option.engine {
-            case "fluidaudio":
-                engine = await FluidAudioEngine(versionOverride: option.identifier)
-            case "apple":
-#if canImport(FoundationModels)
-                if #available(macOS 26.0, *) {
-                    engine = AppleSpeechEngine()
-                } else {
-                    engine = await WhisperEngine()
-                }
-#else
-                engine = await WhisperEngine()
-#endif
-            case "sensevoice":
-#if arch(arm64)
-                engine = SenseVoiceEngine()
-#else
-                engine = await WhisperEngine(modelPathOverride: option.identifier)
-#endif
-            default: // "whisper"
-                engine = await WhisperEngine(modelPathOverride: option.identifier)
-            }
+            let engine = await Self.makeEngine(modelOption: option)
             try await engine.initialize()
             return engine
         }.value

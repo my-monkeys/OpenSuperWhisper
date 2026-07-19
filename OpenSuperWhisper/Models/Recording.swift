@@ -112,6 +112,14 @@ class RecordingStore: ObservableObject {
         }
     }
 
+    /// Test seam: inject a GRDB queue (e.g. an in-memory database) instead of the
+    /// on-disk user database. Unlike the default init, a setup failure throws so the
+    /// test sees it. Production behavior is unchanged — `shared` uses the private init.
+    init(dbQueue: DatabaseQueue) throws {
+        self.dbQueue = dbQueue
+        try setupDatabase()
+    }
+
     private nonisolated func setupDatabase() throws {
         var migrator = DatabaseMigrator()
         
