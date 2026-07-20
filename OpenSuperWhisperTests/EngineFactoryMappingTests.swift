@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Commit 0, scenario 1: pin the engine-kind factory mapping behind

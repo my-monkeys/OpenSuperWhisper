@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Remote/cloud transcription failures are common and user-actionable — a wrong

@@ -1,4 +1,5 @@
 import SwiftUI
+import WhisperCore
 
 /// SenseVoice model row (Settings → Engine & Model when browsing SenseVoice). One model; clicking
 /// the row downloads it if needed, then activates SenseVoice — same interaction as every other engine.

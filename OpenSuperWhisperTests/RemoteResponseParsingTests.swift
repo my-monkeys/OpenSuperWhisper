@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// The Remote engine parses the server's success body for the transcript text

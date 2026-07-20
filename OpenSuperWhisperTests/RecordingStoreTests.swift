@@ -1,5 +1,6 @@
 import GRDB
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Commit 0, scenario 2 (store behavior): pin RecordingStore's CRUD, pending-queue

@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import AppKit
 import CoreAudio
+import WhisperCore
 
 class AudioRecorder: NSObject, ObservableObject {
     @Published var isRecording = false

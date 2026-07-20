@@ -1,5 +1,6 @@
 import XCTest
 import ApplicationServices
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Unit tests for the pure editability decision used by the "notify when no

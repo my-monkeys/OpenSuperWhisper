@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Commit 0, scenario 4: pin WhisperModelManager's disk behavior against an injected

@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// `Diag.measure` wraps potentially-blocking calls with logging. It must be a

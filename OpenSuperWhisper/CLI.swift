@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import WhisperCore
 
 /// Headless command-line transcription (#150). Reached from the app's entry point when the first
 /// argument is `transcribe`, so it reuses the exact same engines as the GUI without a second target.

@@ -1,31 +1,6 @@
 import AppKit
 import Foundation
-
-/// How context-aware model selection behaves.
-enum ContextAwareModelMode: String, CaseIterable {
-    /// Auto-switch by app, and prompt (System Default / app / once / forget) when
-    /// you change the model in the menu.
-    case ask
-    /// Auto-switch by app, but changing the model in the menu just sets the
-    /// system default — no prompt. Set up app rules in "Ask", then switch here to
-    /// stop the per-change prompts.
-    case auto
-    /// No auto-switch and no prompts.
-    case off
-
-    var label: String {
-        switch self {
-        case .ask: return "Ask on change"
-        case .auto: return "Auto · no prompt"
-        case .off: return "Off"
-        }
-    }
-
-    /// Auto-switch to an app's bound model at record-start?
-    var autoSwitches: Bool { self != .off }
-    /// Prompt for scope when the model changes in the menu?
-    var prompts: Bool { self == .ask }
-}
+import WhisperCore
 
 /// The app the user is currently targeting — refreshed at record-start and when
 /// the menu-bar picker opens — so binding a model maps to the right app.

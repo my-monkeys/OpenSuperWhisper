@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Commit 0, scenario 5: the engine file-injection smoke — the ONLY commit-0 test that

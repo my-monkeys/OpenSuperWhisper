@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Commit 0, scenario 7: pin AppPreferences' once-per-process init migrations by

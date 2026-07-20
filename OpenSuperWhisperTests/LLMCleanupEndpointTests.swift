@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// The Remote (OpenAI-compatible) cleanup backend builds `<base>/v1/chat/completions`

@@ -10,6 +10,7 @@ import Carbon
 import ApplicationServices
 import AVFoundation
 @testable import OpenSuperWhisper
+@testable import WhisperCore
 
 final class OpenSuperWhisperTests: XCTestCase {
 

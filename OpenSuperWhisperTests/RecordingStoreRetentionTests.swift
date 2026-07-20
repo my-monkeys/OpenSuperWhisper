@@ -1,5 +1,6 @@
 import GRDB
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Commit 0, scenario 3: pin the retention policy — age cutoff, max-count, active-status

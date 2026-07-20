@@ -5,6 +5,7 @@ import Foundation
 import KeyboardShortcuts
 import SwiftUI
 import FluidAudio
+import WhisperCore
 
 class SettingsViewModel: ObservableObject {
     /// True while re-syncing the @Published copies from AppPreferences (e.g. after the
@@ -2599,42 +2600,6 @@ struct SettingsView: View {
             .padding()
         }
     }
-}
-
-struct SettingsFluidAudioModel: Identifiable {
-    let id = UUID()
-    let name: String
-    let version: String
-    var isDownloaded: Bool
-    let description: String
-    var size: Int = 0   // approximate download size, MB
-    var downloadProgress: Double = 0.0
-
-    var sizeString: String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        formatter.isAdaptive = true
-        return formatter.string(fromByteCount: Int64(size) * 1_000_000)
-    }
-}
-
-struct SettingsFluidAudioModels {
-    static let availableModels = [
-        SettingsFluidAudioModel(
-            name: "Parakeet v3",
-            version: "v3",
-            isDownloaded: false,
-            description: "Multilingual, 25 languages",
-            size: 461
-        ),
-        SettingsFluidAudioModel(
-            name: "Parakeet v2",
-            version: "v2",
-            isDownloaded: false,
-            description: "English-only, higher recall",
-            size: 460
-        )
-    ]
 }
 
 enum OnboardingModelType {

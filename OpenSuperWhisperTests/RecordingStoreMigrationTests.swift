@@ -1,5 +1,6 @@
 import GRDB
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Commit 0, scenario 2 (migrations): pin the RecordingStore migration chain against
