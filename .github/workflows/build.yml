@@ -29,4 +29,53 @@ jobs:
       - name: Make run.sh executable
         run: chmod +x ./run.sh
       - name: Build with run.sh
-        run: ./run.sh build 
+        run: ./run.sh build
+      # The test step MUST reuse the build's -derivedDataPath build + the same
+      # -clonedSourcePackagesDirPath SourcePackages: any divergence re-resolves
+      # FluidAudio WITHOUT patches/fluidaudio-vocabulary-rescorer.patch applied,
+      # and the test build fails or silently diverges (banked repo gotcha).
+      # Signing overrides: runner keychains are empty — they are no-ops where
+      # signing isn't required and required where it is (build-green != test-green).
+      - name: Run unit tests
+        run: xcodebuild test -scheme OpenSuperWhisper -destination 'platform=macOS,arch=arm64' -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -only-testing:OpenSuperWhisperTests -resultBundlePath build/test-results.xcresult
+      # Count visibility via xcresulttool (deterministic bundle path above) — never
+      # parse xcodebuild stdout (parallel runners mangle lines). Informational: the
+      # exit code of the test step is the gate; skip counts are host-dependent
+      # (hardware-absent XCTSkips), so no hard count assertion here.
+      - name: Test summary
+        run: xcrun xcresulttool get test-results summary --path build/test-results.xcresult
+
+  build-ios:
+    # iOS lane gate: builds the genuinely-static whisper xcframework (ios-arm64
+    # device + ios-arm64-simulator) via the same run.sh build-ios lane developers
+    # use locally. No libomp/rust needed — the iOS lane never builds the
+    # macOS-only autocorrect dylib or stages libomp (GGML_OPENMP=OFF).
+    runs-on: macos-26
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: brew install cmake
+      - name: Make run.sh executable
+        run: chmod +x ./run.sh
+      # SPM resolve + FluidAudio patch (SHARED with the macOS flow per plan G1)
+      # + Scripts/build-xcframework-ios.sh, all inside the lane.
+      - name: Build the iOS lane (resolve + patch + whisper iOS xcframework)
+        run: ./run.sh build-ios
+      - name: Log xcframework slices
+        run: |
+          for fw in build/whisper-ios.xcframework/*/whisper.framework/whisper; do
+            echo "== $fw"
+            lipo -info "$fw"
+          done
+      # COMMIT-3 ACTIVATION: once the iOS app target + scheme exist (commit 3),
+      # add the xcodebuild iOS Simulator build step here:
+      #   xcodebuild -scheme OpenSuperWhisper-iOS -configuration Debug \
+      #     -destination 'generic/platform=iOS Simulator' \
+      #     -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages \
+      #     -skipPackagePluginValidation -skipMacroValidation \
+      #     CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build
+      # The -derivedDataPath/-clonedSourcePackagesDirPath invariant applies to
+      # that step too (see the macOS job's test-step comment).
