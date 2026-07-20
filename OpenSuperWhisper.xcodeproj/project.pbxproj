@@ -1156,9 +1156,15 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
+				"HEADER_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/include",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/ggml/include",
+				);
 				"SWIFT_INCLUDE_PATHS[sdk=macosx*]" = (
 					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Modules",
+					"$(PROJECT_DIR)/asian-autocorrect-modulemap",
 				);
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -1206,9 +1212,15 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
+				"HEADER_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/include",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/ggml/include",
+				);
 				"SWIFT_INCLUDE_PATHS[sdk=macosx*]" = (
 					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Modules",
+					"$(PROJECT_DIR)/asian-autocorrect-modulemap",
 				);
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";

@@ -1,0 +1,18 @@
+// Checked-in clang modulemap exposing the Rust autocorrect C API as module
+// `autocorrect` on macOS. WhisperCore is a framework target and cannot use an
+// Objective-C bridging header — AutocorrectWrapper's real (os(macOS)) impl
+// consumes these C functions as a clang module instead. Mirrors the
+// libwhisper/whisper-modulemap precedent. The iOS side is a no-op stub and
+// needs no module (KD #5).
+//
+// This dir sits at repo root because asian-autocorrect/ is a git submodule —
+// superproject files cannot live inside it. Header path is relative to this
+// file's directory so it stays checkout-location independent.
+// Wired into WhisperCore via SWIFT_INCLUDE_PATHS[sdk=macosx*] (third entry).
+//
+// No `link "c++"`: the dylib is a Rust C-ABI artifact (libautocorrect_swift.dylib),
+// already linked by the framework target (platformFilter=macos).
+module autocorrect {
+    header "../asian-autocorrect/autocorrect-swift/autocorrect_swift.h"
+    export *
+}
