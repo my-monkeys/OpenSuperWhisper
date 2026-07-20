@@ -38,6 +38,23 @@
 		CEAC00042D82F10000000000 /* libautocorrect_swift.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CEAC00012D82F00000000000 /* libautocorrect_swift.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		CEAC00082D82F50000000000 /* libomp.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CEAC00072D82F40000000000 /* libomp.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		5BB5E04B0000000000B2 /* libonnxruntime.1.24.4.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		5BDCC01000000000000000A1 /* libwhisper.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CF2D79ED9900FB5FFE /* libwhisper.a */; platformFilter = macos; };
+		5BDCC01100000000000000A1 /* libggml.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C52D79ED9900FB5FFE /* libggml.a */; platformFilter = macos; };
+		5BDCC01200000000000000A1 /* libggml-base.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C72D79ED9900FB5FFE /* libggml-base.a */; platformFilter = macos; };
+		5BDCC01300000000000000A1 /* libggml-blas.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C92D79ED9900FB5FFE /* libggml-blas.a */; platformFilter = macos; };
+		5BDCC01400000000000000A1 /* libggml-cpu.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CB2D79ED9900FB5FFE /* libggml-cpu.a */; platformFilter = macos; };
+		5BDCC01500000000000000A1 /* libggml-metal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CD2D79ED9900FB5FFE /* libggml-metal.a */; platformFilter = macos; };
+		5BDCC01600000000000000A1 /* libsherpa-onnx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BB5E04A0000000000A1 /* libsherpa-onnx.a */; platformFilter = macos; };
+		5BDCC01700000000000000A1 /* libautocorrect_swift.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CEAC00012D82F00000000000 /* libautocorrect_swift.dylib */; platformFilter = macos; };
+		5BDCC01800000000000000A1 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6F2D55778000C54EA6 /* Metal.framework */; };
+		5BDCC01900000000000000A1 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF702D55778000C54EA6 /* MetalKit.framework */; };
+		5BDCC01A00000000000000A1 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF752D5577D200C54EA6 /* Accelerate.framework */; };
+		5BDCC01B00000000000000A1 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6D2D55777800C54EA6 /* libc++.tbd */; };
+		5BDCC01C00000000000000A1 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB */; };
+		5BDCC01D00000000000000A1 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = CE84E17E2D56550B00C54EA7 /* FluidAudio */; };
+		5BDCC01E00000000000000A1 /* whisper-ios.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BDCC00300000000000000A1 /* whisper-ios.xcframework */; platformFilter = ios; };
+		5BDCC02000000000000000A1 /* WhisperCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BDCC00200000000000000A1 /* WhisperCore.framework */; };
+		5BDCC02100000000000000A1 /* WhisperCore.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5BDCC00200000000000000A1 /* WhisperCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -111,6 +128,13 @@
 			remoteGlobalIDString = CE57B0272D52C7BB00929AF3;
 			remoteInfo = OpenSuperWhisper;
 		};
+		5BDCC02200000000000000A1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CE57B0202D52C7BB00929AF3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5BDCC00000000000000000A1;
+			remoteInfo = WhisperCore;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -123,6 +147,7 @@
 				CEAC00042D82F10000000000 /* libautocorrect_swift.dylib in CopyFiles */,
 				CEAC00082D82F50000000000 /* libomp.dylib in CopyFiles */,
 				5BB5E04B0000000000B2 /* libonnxruntime.1.24.4.dylib in CopyFiles */,
+				5BDCC02100000000000000A1 /* WhisperCore.framework in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,6 +201,8 @@
 		CEAC00012D82F00000000000 /* libautocorrect_swift.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libautocorrect_swift.dylib; path = build/libautocorrect_swift.dylib; sourceTree = "<group>"; };
 		CEAC00072D82F40000000000 /* libomp.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libomp.dylib; path = build/libomp.dylib; sourceTree = "<group>"; };
 		5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libonnxruntime.1.24.4.dylib"; path = "build/libonnxruntime.1.24.4.dylib"; sourceTree = "<group>"; };
+		5BDCC00200000000000000A1 /* WhisperCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = WhisperCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		5BDCC00300000000000000A1 /* whisper-ios.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = "whisper-ios.xcframework"; path = "build/whisper-ios.xcframework"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -207,6 +234,11 @@
 			path = OpenSuperWhisperUITests;
 			sourceTree = "<group>";
 		};
+		5BDCC00100000000000000A1 /* WhisperCore */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WhisperCore;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -214,6 +246,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5BDCC02000000000000000A1 /* WhisperCore.framework in Frameworks */,
 				840156D52D79EDBA00FB5FFE /* libggml-metal.a in Frameworks */,
 				840156D42D79EDBA00FB5FFE /* libggml-cpu.a in Frameworks */,
 				840156D32D79EDBA00FB5FFE /* libggml-blas.a in Frameworks */,
@@ -244,6 +277,28 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5BDCC04100000000000000A1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5BDCC01500000000000000A1 /* libggml-metal.a in Frameworks */,
+				5BDCC01400000000000000A1 /* libggml-cpu.a in Frameworks */,
+				5BDCC01300000000000000A1 /* libggml-blas.a in Frameworks */,
+				5BDCC01200000000000000A1 /* libggml-base.a in Frameworks */,
+				5BDCC01100000000000000A1 /* libggml.a in Frameworks */,
+				5BDCC01000000000000000A1 /* libwhisper.a in Frameworks */,
+				5BDCC01600000000000000A1 /* libsherpa-onnx.a in Frameworks */,
+				5BDCC01700000000000000A1 /* libautocorrect_swift.dylib in Frameworks */,
+				5BDCC01800000000000000A1 /* Metal.framework in Frameworks */,
+				5BDCC01900000000000000A1 /* MetalKit.framework in Frameworks */,
+				5BDCC01A00000000000000A1 /* Accelerate.framework in Frameworks */,
+				5BDCC01B00000000000000A1 /* libc++.tbd in Frameworks */,
+				5BDCC01C00000000000000A1 /* GRDB in Frameworks */,
+				5BDCC01D00000000000000A1 /* FluidAudio in Frameworks */,
+				5BDCC01E00000000000000A1 /* whisper-ios.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,6 +349,7 @@
 				CE57B02A2D52C7BB00929AF3 /* OpenSuperWhisper */,
 				CE57B03C2D52C7BC00929AF3 /* OpenSuperWhisperTests */,
 				CE57B0462D52C7BC00929AF3 /* OpenSuperWhisperUITests */,
+				5BDCC00100000000000000A1 /* WhisperCore */,
 				CE37B60E2D54F274009D6564 /* Frameworks */,
 				CE57B0292D52C7BB00929AF3 /* Products */,
 				CE84DF772D55789800C54EA6 /* ggml-tiny.en.bin */,
@@ -306,6 +362,7 @@
 			isa = PBXGroup;
 			children = (
 				CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */,
+				5BDCC00200000000000000A1 /* WhisperCore.framework */,
 				CE57B0392D52C7BC00929AF3 /* OpenSuperWhisperTests.xctest */,
 				CE57B0432D52C7BC00929AF3 /* OpenSuperWhisperUITests.xctest */,
 			);
@@ -430,6 +487,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				5BDCC02300000000000000A1 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CE57B02A2D52C7BB00929AF3 /* OpenSuperWhisper */,
@@ -492,6 +550,30 @@
 			productReference = CE57B0432D52C7BC00929AF3 /* OpenSuperWhisperUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		5BDCC00000000000000000A1 /* WhisperCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5BDCC03000000000000000A1 /* Build configuration list for PBXNativeTarget "WhisperCore" */;
+			buildPhases = (
+				5BDCC04000000000000000A1 /* Sources */,
+				5BDCC04100000000000000A1 /* Frameworks */,
+				5BDCC04200000000000000A1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5BDCC00100000000000000A1 /* WhisperCore */,
+			);
+			name = WhisperCore;
+			packageProductDependencies = (
+				CE0EAD6D2D56ACA80067FDEE /* GRDB */,
+				CE84E17E2D56550B00C54EA7 /* FluidAudio */,
+			);
+			productName = WhisperCore;
+			productReference = 5BDCC00200000000000000A1 /* WhisperCore.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -512,6 +594,9 @@
 					CE57B0422D52C7BC00929AF3 = {
 						CreatedOnToolsVersion = 16.1;
 						TestTargetID = CE57B0272D52C7BB00929AF3;
+					};
+					5BDCC00000000000000000A1 = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -548,6 +633,7 @@
 			projectRoot = "";
 			targets = (
 				CE57B0272D52C7BB00929AF3 /* OpenSuperWhisper */,
+				5BDCC00000000000000000A1 /* WhisperCore */,
 				CE57B0382D52C7BC00929AF3 /* OpenSuperWhisperTests */,
 				CE57B0422D52C7BC00929AF3 /* OpenSuperWhisperUITests */,
 			);
@@ -621,6 +707,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5BDCC04200000000000000A1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -657,6 +750,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5BDCC04000000000000000A1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -669,6 +769,11 @@
 			isa = PBXTargetDependency;
 			target = CE57B0272D52C7BB00929AF3 /* OpenSuperWhisper */;
 			targetProxy = CE57B0442D52C7BC00929AF3 /* PBXContainerItemProxy */;
+		};
+		5BDCC02300000000000000A1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5BDCC00000000000000000A1 /* WhisperCore */;
+			targetProxy = 5BDCC02200000000000000A1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1013,6 +1118,104 @@
 			};
 			name = Release;
 		};
+		5BDCC05000000000000000A1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 5C67TFSJ2B;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(PROJECT_DIR)/build",
+					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64",
+					/opt/homebrew/opt/libomp/lib,
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				"OTHER_LDFLAGS[sdk=macosx*]" = (
+					"-lomp",
+				);
+				"OTHER_LDFLAGS[sdk=macosx*][arch=arm64]" = (
+					"-lomp",
+					"-lonnxruntime",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper.core";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
+				"SWIFT_INCLUDE_PATHS[sdk=macosx*]" = (
+					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
+					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Modules",
+				);
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		5BDCC05100000000000000A1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 5C67TFSJ2B;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GCC_OPTIMIZATION_LEVEL = s;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(PROJECT_DIR)/build",
+					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64",
+					/opt/homebrew/opt/libomp/lib,
+				);
+				LLVM_LTO = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				"OTHER_LDFLAGS[sdk=macosx*]" = (
+					"-lomp",
+				);
+				"OTHER_LDFLAGS[sdk=macosx*][arch=arm64]" = (
+					"-lomp",
+					"-lonnxruntime",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper.core";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
+				"SWIFT_INCLUDE_PATHS[sdk=macosx*]" = (
+					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
+					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Modules",
+				);
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1048,6 +1251,15 @@
 			buildConfigurations = (
 				CE57B0542D52C7BC00929AF3 /* Debug */,
 				CE57B0552D52C7BC00929AF3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5BDCC03000000000000000A1 /* Build configuration list for PBXNativeTarget "WhisperCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5BDCC05000000000000000A1 /* Debug */,
+				5BDCC05100000000000000A1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
