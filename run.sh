@@ -1,8 +1,14 @@
 #!/bin/zsh
 
 JUST_BUILD=false
+BUILD_IOS=false
 if [[ "$1" == "build" ]]; then
     JUST_BUILD=true
+elif [[ "$1" == "build-ios" ]]; then
+    BUILD_IOS=true
+elif [[ -n "$1" ]]; then
+    echo "usage: $0 [build|build-ios]"
+    exit 1
 fi
 
 # Patch FluidAudio's vocabulary rescorer to prefer longer matching spans
@@ -35,6 +41,32 @@ apply_fluidaudio_patches() {
         exit 1
     fi
 }
+
+# iOS lane: ./run.sh build-ios — SPM resolve + FluidAudio patch (SHARED with the
+# macOS flow per plan G1: both platforms consume the same patched SourcePackages
+# checkout), then the whisper iOS xcframework. The macOS-only steps below (cmake
+# libwhisper, sherpa, cargo, dylib staging, dev-codesign) never run on this lane.
+# The package-resolve invocation is duplicated from the macOS flow on purpose:
+# keeping it inline leaves everything below this branch byte-identical to the
+# pre-iOS script. The iOS app target lands in commit 3 — until then the lane
+# stops after the xcframework.
+if $BUILD_IOS; then
+    echo "Resolving Swift packages..."
+    RESOLVE_OUTPUT=$(xcodebuild -resolvePackageDependencies -scheme OpenSuperWhisper -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation 2>&1)
+    if [[ $? -ne 0 ]]; then
+        echo "$RESOLVE_OUTPUT"
+        echo "Swift package resolution failed!"
+        exit 1
+    fi
+
+    apply_fluidaudio_patches
+
+    ./Scripts/build-xcframework-ios.sh
+
+    echo "build-ios complete: build/whisper-ios.xcframework (ios-arm64 device + simulator, static)."
+    echo "The iOS app target arrives in commit 3 — nothing further to build on this lane yet."
+    exit 0
+fi
 
 # Configure libwhisper
 echo "Configuring libwhisper..."
