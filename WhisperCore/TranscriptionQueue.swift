@@ -33,6 +33,15 @@ public class TranscriptionQueue: ObservableObject {
         self.recordingStore = RecordingStore.shared
         setupProgressObserver()
     }
+
+    /// Test seam: inject an isolated RecordingStore (e.g. in-memory GRDB) instead of
+    /// the shared singleton's on-disk database. Production behavior is unchanged —
+    /// `shared` uses the private init. Mirrors RecordingStore.init(dbQueue:).
+    init(recordingStore: RecordingStore) {
+        self.transcriptionService = TranscriptionService.shared
+        self.recordingStore = recordingStore
+        setupProgressObserver()
+    }
     
     private func setupProgressObserver() {
         progressCancellable = transcriptionService.$progress
