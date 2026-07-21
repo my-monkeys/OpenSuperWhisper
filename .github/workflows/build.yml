@@ -70,12 +70,9 @@ jobs:
             echo "== $fw"
             lipo -info "$fw"
           done
-      # COMMIT-3 ACTIVATION: once the iOS app target + scheme exist (commit 3),
-      # add the xcodebuild iOS Simulator build step here:
-      #   xcodebuild -scheme OpenSuperWhisper-iOS -configuration Debug \
-      #     -destination 'generic/platform=iOS Simulator' \
-      #     -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages \
-      #     -skipPackagePluginValidation -skipMacroValidation \
-      #     CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build
-      # The -derivedDataPath/-clonedSourcePackagesDirPath invariant applies to
-      # that step too (see the macOS job's test-step comment).
+      # Commit 3: the iOS host app target + shared scheme exist. Compile-only
+      # (unsigned, generic Simulator destination — no device needed). The
+      # -derivedDataPath/-clonedSourcePackagesDirPath invariant applies here
+      # too (see the macOS job's test-step comment).
+      - name: Build iOS app (Simulator, unsigned)
+        run: xcodebuild -scheme OpenSuperWhisper-iOS -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build

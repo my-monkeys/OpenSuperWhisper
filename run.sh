@@ -63,8 +63,28 @@ if $BUILD_IOS; then
 
     ./Scripts/build-xcframework-ios.sh
 
-    echo "build-ios complete: build/whisper-ios.xcframework (ios-arm64 device + simulator, static)."
-    echo "The iOS app target arrives in commit 3 — nothing further to build on this lane yet."
+    # Commit 3: the iOS host app target exists — build it (Simulator, unsigned).
+    # Same -derivedDataPath/-clonedSourcePackagesDirPath as the rest of the lane:
+    # a divergent path re-resolves FluidAudio UNPATCHED (banked repo invariant).
+    echo "Building OpenSuperWhisper-iOS (iOS Simulator, unsigned)..."
+    IOS_BUILD_OUTPUT=$(xcodebuild -scheme OpenSuperWhisper-iOS -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build 2>&1)
+    IOS_BUILD_EXIT=$?
+
+    if command -v xcpretty &> /dev/null
+    then
+        echo "$IOS_BUILD_OUTPUT" | xcpretty --simple --color
+    else
+        echo "$IOS_BUILD_OUTPUT"
+    fi
+
+    # Check the captured xcodebuild exit (captured above — pipeline exits would
+    # clobber $?) and the log text for a failed build.
+    if [[ $IOS_BUILD_EXIT -ne 0 ]] || [[ "$IOS_BUILD_OUTPUT" =~ "BUILD FAILED" ]]; then
+        echo "iOS app build failed!"
+        exit 1
+    fi
+
+    echo "build-ios complete: build/whisper-ios.xcframework + OpenSuperWhisper-iOS (Simulator build green)."
     exit 0
 fi
 
