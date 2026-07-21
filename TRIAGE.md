@@ -110,6 +110,13 @@ interrompre (mixing) via réécriture AVAudioEngine, chevauche #147. → #126 ga
 - ⚠️ `MicrophoneService.swift:294-296` : `UnsafeMutableRawPointer` formé sur une `CFString` —
   **vrai code smell** à auditer (lié possiblement à #57 input device).
 - Warnings linker : `libomp`/`libautocorrect` bâtis pour SDK macOS 26/27 vs deployment target 14.0.
+- ⚠️ Bench whisper.cpp : abort au teardown (Metal rsets) sur large-v3-turbo en CLI (lifecycle
+  explicit-free) — upstream **llama.cpp #22593**, fenêtre de fix post-v1.9.1. Pré-existe depuis
+  b846642 (ère framework-skeleton), extraction WhisperCore exonérée, suite verte : le bench reste
+  **informationnel** comme prévu. À réévaluer au prochain bump whisper.cpp (#67).
+- ⚠️ **REQUIS avant le flip App Group + partage keychain mac↔iOS (Cycle 4, compagnon iOS)** :
+  threat-model check — scoping `keychain-access-groups`, permissions du group container, quels
+  secrets traversent la frontière. Ne pas activer le container partagé sans cette revue.
 
 ## Backlog priorisé (entrée des phases 2-3)
 

@@ -76,3 +76,10 @@ jobs:
       # too (see the macOS job's test-step comment).
       - name: Build iOS app (Simulator, unsigned)
         run: xcodebuild -scheme OpenSuperWhisper-iOS -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build
+      # Cycle-1 remediation (S-3): RUN the hosted iOS launch test, not just compile
+      # the app — the shared scheme's Testables already wire OpenSuperWhisper-iOSTests
+      # (hosted in the app; xcshareddata/xcschemes/OpenSuperWhisper-iOS.xcscheme).
+      # Named-Simulator destination per the commit-3 pin; same
+      # -derivedDataPath/-clonedSourcePackagesDirPath invariant as every step above.
+      - name: Run iOS tests (iPhone 17 Simulator)
+        run: xcodebuild test -scheme OpenSuperWhisper-iOS -configuration Debug -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17' -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO

@@ -133,6 +133,7 @@ apply_fluidaudio_patches
 # Build the app
 echo "Building OpenSuperWhisper..."
 BUILD_OUTPUT=$(xcodebuild -scheme OpenSuperWhisper -configuration Debug -jobs 8 -derivedDataPath build -quiet -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation -skipMacroValidation -UseModernBuildSystem=YES -clonedSourcePackagesDirPath SourcePackages -skipUnavailableActions CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO OTHER_CODE_SIGN_FLAGS="--entitlements OpenSuperWhisper/OpenSuperWhisper.entitlements" build 2>&1)
+BUILD_EXIT=$?
 
 # sudo gem install xcpretty
 if command -v xcpretty &> /dev/null
@@ -142,8 +143,9 @@ else
     echo "$BUILD_OUTPUT"
 fi
 
-# Check if build output contains BUILD FAILED or if the command failed
-if [[ $? -eq 0 ]] && [[ ! "$BUILD_OUTPUT" =~ "BUILD FAILED" ]]; then
+# Check the captured xcodebuild exit (captured above — pipeline exits would
+# clobber $?) and the log text for a failed build.
+if [[ $BUILD_EXIT -eq 0 ]] && [[ ! "$BUILD_OUTPUT" =~ "BUILD FAILED" ]]; then
     echo "Building successful!"
     # Re-sign with a stable identity so macOS keeps granted TCC permissions
     # across rebuilds (no-op / ad-hoc fallback when no identity is available).
