@@ -55,6 +55,9 @@
 		5BDCC01E00000000000000A1 /* whisper-ios.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BDCC00300000000000000A1 /* whisper-ios.xcframework */; platformFilters = (ios, ); };
 		5BDCC02000000000000000A1 /* WhisperCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BDCC00200000000000000A1 /* WhisperCore.framework */; };
 		5BDCC02100000000000000A1 /* WhisperCore.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5BDCC00200000000000000A1 /* WhisperCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		CE033000000000000000000016 /* WhisperCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BDCC00200000000000000A1 /* WhisperCore.framework */; };
+		CE033000000000000000000017 /* WhisperCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 5BDCC00200000000000000A1 /* WhisperCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		CE033000000000000000000018 /* ggml-tiny.en.bin in Resources */ = {isa = PBXBuildFile; fileRef = CE84DF772D55789800C54EA6 /* ggml-tiny.en.bin */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -135,6 +138,20 @@
 			remoteGlobalIDString = 5BDCC00000000000000000A1;
 			remoteInfo = WhisperCore;
 		};
+		CE03300000000000000000001A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CE57B0202D52C7BB00929AF3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CE033000000000000000000007;
+			remoteInfo = "OpenSuperWhisper-iOS";
+		};
+		CE03300000000000000000001C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CE57B0202D52C7BB00929AF3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5BDCC00000000000000000A1;
+			remoteInfo = WhisperCore;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -151,11 +168,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CE033000000000000000000012 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				CE033000000000000000000017 /* WhisperCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		840156402D79E87600FB5FFE /* libwhisper.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = libwhisper.xcodeproj; path = libwhisper/build/libwhisper.xcodeproj; sourceTree = "<group>"; };
-		840156592D79EA1A00FB5FFE /* Bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Bridge.h; sourceTree = "<group>"; };
 		CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenSuperWhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE57B0392D52C7BC00929AF3 /* OpenSuperWhisperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenSuperWhisperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE57B0432D52C7BC00929AF3 /* OpenSuperWhisperUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenSuperWhisperUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -203,6 +230,8 @@
 		5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libonnxruntime.1.24.4.dylib"; path = "build/libonnxruntime.1.24.4.dylib"; sourceTree = "<group>"; };
 		5BDCC00200000000000000A1 /* WhisperCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = WhisperCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		5BDCC00300000000000000A1 /* whisper-ios.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = "whisper-ios.xcframework"; path = "build/whisper-ios.xcframework"; sourceTree = "<group>"; };
+		CE033000000000000000000003 /* OpenSuperWhisper-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "OpenSuperWhisper-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CE033000000000000000000004 /* OpenSuperWhisper-iOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "OpenSuperWhisper-iOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -212,6 +241,13 @@
 				"OpenSuperWhisper-Info.plist",
 			);
 			target = CE57B0272D52C7BB00929AF3 /* OpenSuperWhisper */;
+		};
+		CE03300000000000000000001D /* Exceptions for "OpenSuperWhisper-iOS" folder in "OpenSuperWhisper-iOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"OpenSuperWhisper-iOS-Info.plist",
+			);
+			target = CE033000000000000000000007 /* OpenSuperWhisper-iOS */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -237,6 +273,16 @@
 		5BDCC00100000000000000A1 /* WhisperCore */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = WhisperCore;
+			sourceTree = "<group>";
+		};
+		CE033000000000000000000001 /* OpenSuperWhisper-iOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "OpenSuperWhisper-iOS";
+			sourceTree = "<group>";
+		};
+		CE033000000000000000000002 /* OpenSuperWhisper-iOSTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "OpenSuperWhisper-iOSTests";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -294,6 +340,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CE033000000000000000000010 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE033000000000000000000016 /* WhisperCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE033000000000000000000014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -336,12 +397,13 @@
 		CE57B01F2D52C7BB00929AF3 = {
 			isa = PBXGroup;
 			children = (
-				840156592D79EA1A00FB5FFE /* Bridge.h */,
 				840156402D79E87600FB5FFE /* libwhisper.xcodeproj */,
 				CE57B02A2D52C7BB00929AF3 /* OpenSuperWhisper */,
 				CE57B03C2D52C7BC00929AF3 /* OpenSuperWhisperTests */,
 				CE57B0462D52C7BC00929AF3 /* OpenSuperWhisperUITests */,
 				5BDCC00100000000000000A1 /* WhisperCore */,
+				CE033000000000000000000001 /* OpenSuperWhisper-iOS */,
+				CE033000000000000000000002 /* OpenSuperWhisper-iOSTests */,
 				CE37B60E2D54F274009D6564 /* Frameworks */,
 				CE57B0292D52C7BB00929AF3 /* Products */,
 				CE84DF772D55789800C54EA6 /* ggml-tiny.en.bin */,
@@ -355,6 +417,8 @@
 			children = (
 				CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */,
 				5BDCC00200000000000000A1 /* WhisperCore.framework */,
+				CE033000000000000000000003 /* OpenSuperWhisper-iOS.app */,
+				CE033000000000000000000004 /* OpenSuperWhisper-iOSTests.xctest */,
 				CE57B0392D52C7BC00929AF3 /* OpenSuperWhisperTests.xctest */,
 				CE57B0432D52C7BC00929AF3 /* OpenSuperWhisperUITests.xctest */,
 			);
@@ -566,6 +630,53 @@
 			productReference = 5BDCC00200000000000000A1 /* WhisperCore.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		CE033000000000000000000007 /* OpenSuperWhisper-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CE033000000000000000000009 /* Build configuration list for PBXNativeTarget "OpenSuperWhisper-iOS" */;
+			buildPhases = (
+				CE03300000000000000000000F /* Sources */,
+				CE033000000000000000000010 /* Frameworks */,
+				CE033000000000000000000011 /* Resources */,
+				CE033000000000000000000012 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CE03300000000000000000001B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CE033000000000000000000001 /* OpenSuperWhisper-iOS */,
+			);
+			name = "OpenSuperWhisper-iOS";
+			packageProductDependencies = (
+			);
+			productName = "OpenSuperWhisper-iOS";
+			productReference = CE033000000000000000000003 /* OpenSuperWhisper-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		CE033000000000000000000008 /* OpenSuperWhisper-iOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CE03300000000000000000000A /* Build configuration list for PBXNativeTarget "OpenSuperWhisper-iOSTests" */;
+			buildPhases = (
+				CE033000000000000000000013 /* Sources */,
+				CE033000000000000000000014 /* Frameworks */,
+				CE033000000000000000000015 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CE033000000000000000000019 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CE033000000000000000000002 /* OpenSuperWhisper-iOSTests */,
+			);
+			name = "OpenSuperWhisper-iOSTests";
+			packageProductDependencies = (
+			);
+			productName = "OpenSuperWhisper-iOSTests";
+			productReference = CE033000000000000000000004 /* OpenSuperWhisper-iOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -589,6 +700,13 @@
 					};
 					5BDCC00000000000000000A1 = {
 						CreatedOnToolsVersion = 26.0;
+					};
+					CE033000000000000000000007 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					CE033000000000000000000008 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = CE033000000000000000000007;
 					};
 				};
 			};
@@ -626,6 +744,8 @@
 			targets = (
 				CE57B0272D52C7BB00929AF3 /* OpenSuperWhisper */,
 				5BDCC00000000000000000A1 /* WhisperCore */,
+				CE033000000000000000000007 /* OpenSuperWhisper-iOS */,
+				CE033000000000000000000008 /* OpenSuperWhisper-iOSTests */,
 				CE57B0382D52C7BC00929AF3 /* OpenSuperWhisperTests */,
 				CE57B0422D52C7BC00929AF3 /* OpenSuperWhisperUITests */,
 			);
@@ -706,6 +826,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CE033000000000000000000011 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE033000000000000000000018 /* ggml-tiny.en.bin in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE033000000000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -749,6 +884,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CE03300000000000000000000F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE033000000000000000000013 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -766,6 +915,16 @@
 			isa = PBXTargetDependency;
 			target = 5BDCC00000000000000000A1 /* WhisperCore */;
 			targetProxy = 5BDCC02200000000000000A1 /* PBXContainerItemProxy */;
+		};
+		CE033000000000000000000019 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CE033000000000000000000007 /* OpenSuperWhisper-iOS */;
+			targetProxy = CE03300000000000000000001A /* PBXContainerItemProxy */;
+		};
+		CE03300000000000000000001B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5BDCC00000000000000000A1 /* WhisperCore */;
+			targetProxy = CE03300000000000000000001C /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1202,6 +1361,98 @@
 			};
 			name = Release;
 		};
+		CE03300000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			CODE_SIGN_ENTITLEMENTS = "OpenSuperWhisper-iOS/OpenSuperWhisper-iOS.entitlements";
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 1;
+			DEVELOPMENT_TEAM = 5C67TFSJ2B;
+			"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+			GENERATE_INFOPLIST_FILE = YES;
+			INFOPLIST_FILE = "OpenSuperWhisper-iOS/OpenSuperWhisper-iOS-Info.plist";
+			IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+			LD_RUNPATH_SEARCH_PATHS = (
+				"$(inherited)",
+				"@executable_path/Frameworks",
+			);
+			MARKETING_VERSION = 0.1.0;
+			PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper.ios";
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SDKROOT = iphoneos;
+			SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+			SWIFT_VERSION = 5.0;
+			TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		CE03300000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			CODE_SIGN_ENTITLEMENTS = "OpenSuperWhisper-iOS/OpenSuperWhisper-iOS.entitlements";
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 1;
+			DEVELOPMENT_TEAM = 5C67TFSJ2B;
+			"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+			GENERATE_INFOPLIST_FILE = YES;
+			INFOPLIST_FILE = "OpenSuperWhisper-iOS/OpenSuperWhisper-iOS-Info.plist";
+			IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+			LD_RUNPATH_SEARCH_PATHS = (
+				"$(inherited)",
+				"@executable_path/Frameworks",
+			);
+			MARKETING_VERSION = 0.1.0;
+			PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper.ios";
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SDKROOT = iphoneos;
+			SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+			SWIFT_VERSION = 5.0;
+			TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		CE03300000000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			BUNDLE_LOADER = "$(TEST_HOST)";
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 1;
+			DEVELOPMENT_TEAM = 5C67TFSJ2B;
+			"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+			GENERATE_INFOPLIST_FILE = YES;
+			IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+			MARKETING_VERSION = 0.1.0;
+			PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper.ios.tests";
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SDKROOT = iphoneos;
+			SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+			SWIFT_VERSION = 5.0;
+			TARGETED_DEVICE_FAMILY = 1;
+			TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenSuperWhisper-iOS.app/OpenSuperWhisper-iOS";
+			};
+			name = Debug;
+		};
+		CE03300000000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			BUNDLE_LOADER = "$(TEST_HOST)";
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 1;
+			DEVELOPMENT_TEAM = 5C67TFSJ2B;
+			"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+			GENERATE_INFOPLIST_FILE = YES;
+			IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+			MARKETING_VERSION = 0.1.0;
+			PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper.ios.tests";
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SDKROOT = iphoneos;
+			SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+			SWIFT_VERSION = 5.0;
+			TARGETED_DEVICE_FAMILY = 1;
+			TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenSuperWhisper-iOS.app/OpenSuperWhisper-iOS";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1246,6 +1497,24 @@
 			buildConfigurations = (
 				5BDCC05000000000000000A1 /* Debug */,
 				5BDCC05100000000000000A1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CE033000000000000000000009 /* Build configuration list for PBXNativeTarget "OpenSuperWhisper-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CE03300000000000000000000B /* Debug */,
+				CE03300000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CE03300000000000000000000A /* Build configuration list for PBXNativeTarget "OpenSuperWhisper-iOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CE03300000000000000000000D /* Debug */,
+				CE03300000000000000000000E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
