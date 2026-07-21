@@ -54,6 +54,10 @@ public struct WhisperFullParams {
     public var encoderBeginCallbackUserData: UnsafeMutableRawPointer?
     public var abortCallback: (@convention(c) (UnsafeMutableRawPointer?) -> Bool)?
     public var abortCallbackUserData: UnsafeMutableRawPointer?
+    /// Intentional low-level surface (Cycle-2 consumption path — see `MyWhisperContext.full`):
+    /// `logitsFilterCallback` and `grammarRules` below expose whisper C types in the public
+    /// API for logits-filter and grammar use cases the Swift wrapper does not model. They pin
+    /// the `whisper` clang module into the consumer's compile contract — by design, not oversight.
     public var logitsFilterCallback: (@convention(c) (OpaquePointer?, OpaquePointer?, UnsafePointer<whisper_token_data>?, Int32, UnsafeMutablePointer<Float>?, UnsafeMutableRawPointer?) -> Void)?
     public var logitsFilterCallbackUserData: UnsafeMutableRawPointer?
     public var grammarRules: [UnsafePointer<whisper_grammar_element>?]?

@@ -349,3 +349,9 @@ extension AudioRecorder: AVAudioPlayerDelegate {
         currentlyPlayingURL = nil
     }
 }
+
+/// Compile-pin for the plan's Interface Contracts: the macOS recording implementation
+/// conforms to the WhisperCore `AudioRecording` seam. Empty by design — the members
+/// already match the protocol surface exactly; the value is the compiler rejecting any
+/// future drift between this class and the seam. The iOS implementation lands at Cycle 2.
+extension AudioRecorder: AudioRecording {}

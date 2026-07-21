@@ -1,10 +1,10 @@
 import Foundation
 
+/// Notification names with at least one WhisperCore poster or observer. App-internal
+/// names (hotkeys, indicator window, settings window) live app-side in
+/// `OpenSuperWhisper/Utils/NotificationName+App.swift`.
 public extension Notification.Name {
     static let appPreferencesLanguageChanged = Notification.Name("AppPreferencesLanguageChanged")
-    static let hotkeySettingsChanged = Notification.Name("HotkeySettingsChanged")
-    static let indicatorWindowDidHide = Notification.Name("IndicatorWindowDidHide")
-    static let openSettings = Notification.Name("OpenSettings")
     /// Posted when the active engine/model changes outside the Settings view (the
     /// menu-bar Model picker), so an open Settings window re-syncs from AppPreferences.
     static let modelSelectionDidChange = Notification.Name("ModelSelectionDidChange")

@@ -1,3 +1,6 @@
+// Intentional KD #4 deviation (ratified at PR #57 review, lead ruling 2026-07-21): this
+// file carries NO `#if os(macOS) && arch(arm64)` trio guard — it is Foundation-only (no
+// sherpa import), compiles on iOS, and is forward-compatible with Cycle-2 sherpa-onnx-iOS (preparer Q7).
 import Foundation
 
 /// Downloads and locates the SenseVoice (int8) model used by the sherpa-onnx engine.
@@ -7,15 +10,11 @@ public final class SenseVoiceModelManager {
     public static let shared = SenseVoiceModelManager()
     private init() {}
 
-    private let dirName = "sensevoice-model"
     private let modelURL = URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.int8.onnx?download=true")!
     private let tokensURL = URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/tokens.txt?download=true")!
 
     var modelDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport
-            .appendingPathComponent(Bundle.main.bundleIdentifier!)
-            .appendingPathComponent(dirName)
+        StorageLocations.senseVoiceModelDirectory
     }
     var modelPath: URL { modelDirectory.appendingPathComponent("model.int8.onnx") }
     var tokensPath: URL { modelDirectory.appendingPathComponent("tokens.txt") }

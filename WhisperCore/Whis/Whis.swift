@@ -621,6 +621,12 @@ public class MyWhisperContext {
         return params
     }
     
+    /// Low-level escape hatch: runs `whisper_full` with a raw `whisper_full_params`.
+    /// The C type in the signature is INTENTIONAL public API — this is the Cycle-2
+    /// consumption path for callers (e.g. the iOS app) needing param control beyond
+    /// what `WhisperFullParams` models (`toC()` stays module-internal). Consequence:
+    /// every WhisperCore consumer must have the `whisper` clang module available at
+    /// compile time — both app targets ship it. Do not "fix" by tightening access.
     public func full(samples: [Float], params: inout whisper_full_params) -> Bool {
         guard let ctx = ctx else { return false }
         let result = samples.withUnsafeBufferPointer { buffer in

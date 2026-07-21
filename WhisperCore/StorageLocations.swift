@@ -7,11 +7,17 @@ import Foundation
 public enum StorageLocations {
 
     /// ~/Library/Application Support/<bundle-id> — the app-scoped support dir.
+    /// Hardened for framework use (Cycle-1 review): the force unwraps inherited from
+    /// the app-target per-site computations are replaced with fallbacks that reproduce
+    /// the standard locations, so production behavior is unchanged and a pathological
+    /// host degrades to a stable directory instead of crashing.
     public static var appSupportDirectory: URL {
         let applicationSupport = FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask
-        ).first!
-        return applicationSupport.appendingPathComponent(Bundle.main.bundleIdentifier!)
+        ).first ?? URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library/Application Support")
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "OpenSuperWhisper"
+        return applicationSupport.appendingPathComponent(bundleIdentifier)
     }
 
     /// <appSupport>/recordings — recorded audio files.
@@ -27,5 +33,10 @@ public enum StorageLocations {
     /// <appSupport>/whisper-models — downloaded whisper model files.
     public static var whisperModelsDirectory: URL {
         appSupportDirectory.appendingPathComponent("whisper-models")
+    }
+
+    /// <appSupport>/sensevoice-model — SenseVoice (sherpa-onnx) model + tokens.
+    public static var senseVoiceModelDirectory: URL {
+        appSupportDirectory.appendingPathComponent("sensevoice-model")
     }
 }

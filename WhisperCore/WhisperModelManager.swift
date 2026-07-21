@@ -42,8 +42,7 @@ class WhisperDownloadDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownl
 
 public class WhisperModelManager {
     public static let shared = WhisperModelManager()
-    
-    private let modelsDirectoryName = "whisper-models"
+
     private var activeDownloadTasks: [String: URLSessionDownloadTask] = [:]
     private let downloadTasksLock = NSLock()
     

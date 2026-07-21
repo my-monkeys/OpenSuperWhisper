@@ -82,11 +82,11 @@ public class TranscriptionService: ObservableObject {
         engineError = nil
         print("Loading engine: \(selectedEngine)")
 
-        let result = await Task.detached(priority: .userInitiated) { () -> Result<TranscriptionEngine?, Error> in
+        let result = await Task.detached(priority: .userInitiated) { () -> Result<TranscriptionEngine, Error> in
             let engine = await Self.makeEngine(selectedEngine: selectedEngine)
 
             do {
-                try await engine?.initialize()
+                try await engine.initialize()
                 return .success(engine)
             } catch {
                 return .failure(error)
@@ -96,7 +96,7 @@ public class TranscriptionService: ObservableObject {
         switch result {
         case .success(let engine):
             currentEngine = engine
-            loadedEngineKind = (engine != nil) ? selectedEngine : nil
+            loadedEngineKind = selectedEngine
             print("Engine loaded: \(selectedEngine)")
         case .failure(let error):
             currentEngine = nil
@@ -268,8 +268,9 @@ public class TranscriptionService: ObservableObject {
     /// Pure engine-kind mapping for the selected-engine preference: preference string
     /// in, un-initialized engine out. Construction only — the caller initializes inside
     /// the same detached task, exactly as the inline chain did. Pure → `nonisolated` + testable.
-    nonisolated static func makeEngine(selectedEngine: String, gates: EnginePlatformGates = .current) async -> TranscriptionEngine? {
-        let engine: TranscriptionEngine?
+    /// Every arm returns an engine (default arm is Whisper), so the return is non-optional.
+    nonisolated static func makeEngine(selectedEngine: String, gates: EnginePlatformGates = .current) async -> TranscriptionEngine {
+        let engine: TranscriptionEngine
 
         if selectedEngine == "fluidaudio" {
             engine = await FluidAudioEngine()
@@ -277,7 +278,8 @@ public class TranscriptionService: ObservableObject {
 #if os(macOS) && arch(arm64)
             engine = gates.supportsSenseVoice ? SenseVoiceEngine() : await WhisperEngine()
 #else
-            // SenseVoice (sherpa-onnx/onnxruntime) ships arm64-only; fall back on Intel.
+            // SenseVoice (sherpa-onnx/onnxruntime) ships macOS-arm64-only; every other
+            // platform (Intel mac, iOS) falls back to Whisper.
             engine = await WhisperEngine()
 #endif
         } else if selectedEngine == "remote" {

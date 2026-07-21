@@ -21,20 +21,20 @@ final class EngineFactoryMappingTests: XCTestCase {
         for selection in ["whisper", "", "bogus", "groq"] {
             let engine = await TranscriptionService.makeEngine(selectedEngine: selection, gates: gatesAll)
             XCTAssertTrue(engine is WhisperEngine, "\"\(selection)\" should map to WhisperEngine")
-            XCTAssertEqual(engine?.engineName, "Whisper")
+            XCTAssertEqual(engine.engineName, "Whisper")
         }
     }
 
     func testFluidaudioBuildsFluidAudioEngine() async {
         let engine = await TranscriptionService.makeEngine(selectedEngine: "fluidaudio", gates: gatesAll)
         XCTAssertTrue(engine is FluidAudioEngine)
-        XCTAssertEqual(engine?.engineName, "FluidAudio")
+        XCTAssertEqual(engine.engineName, "FluidAudio")
     }
 
     func testRemoteBuildsRemoteEngine() async {
         let engine = await TranscriptionService.makeEngine(selectedEngine: "remote", gates: gatesAll)
         XCTAssertTrue(engine is RemoteEngine)
-        XCTAssertEqual(engine?.engineName, "Remote")
+        XCTAssertEqual(engine.engineName, "Remote")
     }
 
     func testSensevoiceArmFollowsTheSenseVoiceGate() async {
