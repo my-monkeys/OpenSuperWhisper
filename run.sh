@@ -63,6 +63,23 @@ if $BUILD_IOS; then
 
     ./Scripts/build-xcframework-ios.sh
 
+    # Configure the libwhisper subproject (a generated, gitignored artifact of the
+    # macOS lane) so the pbxproj's PBXReferenceProxy entries for libwhisper.a /
+    # libggml*.a RESOLVE. Unresolvable proxies are degraded by Xcode to name-based
+    # -l flags (-lggml-metal et al.) that BYPASS their platformFilters=(macos)
+    # exclusion and reach the iOS link of WhisperCore, dying with
+    # "ld: library 'ggml-metal' not found" (PR #57 CI run 29858915375). It never
+    # reproduced on dev machines because libwhisper/build already exists there
+    # from the macOS lane. Configure-only: nothing on this lane builds the
+    # subproject's targets, and OpenMP absence is a non-fatal configure warning
+    # (GGML_OPENMP_ENABLED=OFF), so no libomp install is needed here.
+    echo "Configuring libwhisper (reference-proxy resolution only)..."
+    cmake -G Xcode -B libwhisper/build -S libwhisper
+    if [[ $? -ne 0 ]]; then
+        echo "CMake configuration failed!"
+        exit 1
+    fi
+
     # Commit 3: the iOS host app target exists — build it (Simulator, unsigned).
     # Same -derivedDataPath/-clonedSourcePackagesDirPath as the rest of the lane:
     # a divergent path re-resolves FluidAudio UNPATCHED (banked repo invariant).
