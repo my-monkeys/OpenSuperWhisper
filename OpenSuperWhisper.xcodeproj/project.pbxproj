@@ -26,6 +26,7 @@
 		840156D32D79EDBA00FB5FFE /* libggml-blas.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C92D79ED9900FB5FFE /* libggml-blas.a */; };
 		840156D42D79EDBA00FB5FFE /* libggml-cpu.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CB2D79ED9900FB5FFE /* libggml-cpu.a */; };
 		840156D52D79EDBA00FB5FFE /* libggml-metal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CD2D79ED9900FB5FFE /* libggml-metal.a */; };
+		840156E02D79EE0000FB5FFE /* libllama.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156DF2D79EE0000FB5FFE /* libllama.a */; };
 		CE0EAD6E2D56ACA80067FDEE /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB */; };
 		5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5BA9E0DA0000000000000A02 /* Sparkle */; };
 		CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6D2D55777800C54EA6 /* libc++.tbd */; };
@@ -95,6 +96,13 @@
 			proxyType = 2;
 			remoteGlobalIDString = 30B2BC75387D4C73A3820913;
 			remoteInfo = whisper;
+		};
+		840156DE2D79EE0000FB5FFE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 840156402D79E87600FB5FFE /* libwhisper.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 602D06718EE64704BBF92480;
+			remoteInfo = llama;
 		};
 		CE57B03A2D52C7BC00929AF3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -222,6 +230,7 @@
 				CE0EAD6E2D56ACA80067FDEE /* GRDB in Frameworks */,
 				CE84DF722D55778000C54EA6 /* MetalKit.framework in Frameworks */,
 				840156D02D79ED9900FB5FFE /* libwhisper.a in Frameworks */,
+				840156E02D79EE0000FB5FFE /* libllama.a in Frameworks */,
 				5BB5E04A0000000000A2 /* libsherpa-onnx.a in Frameworks */,
 				CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */,
 				840156D12D79EDA900FB5FFE /* libggml.a in Frameworks */,
@@ -257,6 +266,7 @@
 				840156CB2D79ED9900FB5FFE /* libggml-cpu.a */,
 				840156CD2D79ED9900FB5FFE /* libggml-metal.a */,
 				840156CF2D79ED9900FB5FFE /* libwhisper.a */,
+				840156DF2D79EE0000FB5FFE /* libllama.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -592,6 +602,13 @@
 			fileType = archive.ar;
 			path = libwhisper.a;
 			remoteRef = 840156CE2D79ED9900FB5FFE /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		840156DF2D79EE0000FB5FFE /* libllama.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libllama.a;
+			remoteRef = 840156DE2D79EE0000FB5FFE /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 /* End PBXReferenceProxy section */

@@ -27,6 +27,13 @@ class FocusUtils {
         return NSEvent.mouseLocation
     }
 
+    /// Bundle identifier of the app that will receive the inserted text. Resolved at insertion
+    /// time (the indicator panel doesn't steal focus, so the frontmost app is still the target),
+    /// matching when `focusedElementIsEditable` runs. Used to pick per-app formatting rules.
+    static func frontmostBundleID() -> String? {
+        NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+    }
+
     /// The indicator only needs the text caret position in "cursor" mode; every
     /// other position anchors to screen geometry. Used to skip the costly AX
     /// caret query (a main-thread hang risk) when it would be discarded anyway.
