@@ -8,16 +8,18 @@ enum MouseButton: String, CaseIterable, Identifiable, Codable {
     case button4 = "button4"
     case button5 = "button5"
     case button6 = "button6"
+    case button7 = "button7"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .none: return "None"
-        case .middle: return "Button 3 (Middle)"
+        case .middle: return "Button 3 (Top)"
         case .button4: return "Button 4 (Back)"
         case .button5: return "Button 5 (Forward)"
-        case .button6: return "Button 6"
+        case .button6: return "Button 6 (Thumb)"
+        case .button7: return "Button 7 (Ring)"
         }
     }
 
@@ -28,6 +30,7 @@ enum MouseButton: String, CaseIterable, Identifiable, Codable {
         case .button4: return "🖱4"
         case .button5: return "🖱5"
         case .button6: return "🖱6"
+        case .button7: return "🖱7"
         }
     }
 
@@ -42,6 +45,7 @@ enum MouseButton: String, CaseIterable, Identifiable, Codable {
         case .button4: return 3
         case .button5: return 4
         case .button6: return 5
+        case .button7: return 6
         }
     }
 }

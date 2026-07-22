@@ -2200,7 +2200,7 @@ struct SettingsView: View {
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
                     }
                 case .mouse:
-                    SRow(title: "Mouse button", hint: "Middle or an extra (thumb) button — click to toggle, hold when Hold to Record is on") {
+                    SRow(title: "Mouse button", hint: "Top, thumb, ring, or other extra buttons — click to toggle, hold when Hold to Record is on") {
                         Picker("", selection: $viewModel.mouseButtonHotkey) {
                             ForEach(MouseButton.allCases.filter { $0 != .none }) { button in
                                 Text(button.displayName).tag(button)
