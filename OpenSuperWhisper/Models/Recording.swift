@@ -100,8 +100,6 @@ class RecordingStore: ObservableObject {
         let appDirectory = applicationSupport.appendingPathComponent(Bundle.main.bundleIdentifier!)
         let dbPath = appDirectory.appendingPathComponent("recordings.sqlite")
 
-        print("Database path: \(dbPath.path)")
-
         do {
             try FileManager.default.createDirectory(
                 at: appDirectory, withIntermediateDirectories: true)
