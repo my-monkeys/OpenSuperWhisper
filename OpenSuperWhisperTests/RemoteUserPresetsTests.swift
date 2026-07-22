@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// CRUD + persistence round-trip for user-defined Remote presets. The API key is

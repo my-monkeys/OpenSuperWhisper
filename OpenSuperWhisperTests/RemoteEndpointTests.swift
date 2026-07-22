@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// The Remote engine builds `<base>/v1/audio/<action>` from a user-typed server

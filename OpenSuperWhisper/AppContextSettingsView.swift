@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import WhisperCore
 
 /// Settings → App Context. One place to manage context-aware model selection:
 /// the switching mode plus a list of every app/site → model rule, with inline

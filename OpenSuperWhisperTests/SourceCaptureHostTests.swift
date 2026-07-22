@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// `SourceCapture.host(of:)` extracts a bare hostname from a browser URL for the

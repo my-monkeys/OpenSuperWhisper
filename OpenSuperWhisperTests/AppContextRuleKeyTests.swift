@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// `AppContextRuleRow.parse` is the inverse of `AppContextModelRules.key`: the

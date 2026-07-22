@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// `/v1/models` has no capability field, so the Remote settings panel guesses which

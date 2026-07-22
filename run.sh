@@ -1,8 +1,14 @@
 #!/bin/zsh
 
 JUST_BUILD=false
+BUILD_IOS=false
 if [[ "$1" == "build" ]]; then
     JUST_BUILD=true
+elif [[ "$1" == "build-ios" ]]; then
+    BUILD_IOS=true
+elif [[ -n "$1" ]]; then
+    echo "usage: $0 [build|build-ios]"
+    exit 1
 fi
 
 # Patch FluidAudio's vocabulary rescorer to prefer longer matching spans
@@ -35,6 +41,69 @@ apply_fluidaudio_patches() {
         exit 1
     fi
 }
+
+# iOS lane: ./run.sh build-ios — SPM resolve + FluidAudio patch (SHARED with the
+# macOS flow per plan G1: both platforms consume the same patched SourcePackages
+# checkout), then the whisper iOS xcframework. The macOS-only steps below (cmake
+# libwhisper, sherpa, cargo, dylib staging, dev-codesign) never run on this lane.
+# The package-resolve invocation is duplicated from the macOS flow on purpose:
+# keeping it inline leaves everything below this branch byte-identical to the
+# pre-iOS script. The iOS app target lands in commit 3 — until then the lane
+# stops after the xcframework.
+if $BUILD_IOS; then
+    echo "Resolving Swift packages..."
+    RESOLVE_OUTPUT=$(xcodebuild -resolvePackageDependencies -scheme OpenSuperWhisper -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation 2>&1)
+    if [[ $? -ne 0 ]]; then
+        echo "$RESOLVE_OUTPUT"
+        echo "Swift package resolution failed!"
+        exit 1
+    fi
+
+    apply_fluidaudio_patches
+
+    ./Scripts/build-xcframework-ios.sh
+
+    # Configure the libwhisper subproject (a generated, gitignored artifact of the
+    # macOS lane) so the pbxproj's PBXReferenceProxy entries for libwhisper.a /
+    # libggml*.a RESOLVE. Unresolvable proxies are degraded by Xcode to name-based
+    # -l flags (-lggml-metal et al.) that BYPASS their platformFilters=(macos)
+    # exclusion and reach the iOS link of WhisperCore, dying with
+    # "ld: library 'ggml-metal' not found" (PR #57 CI run 29858915375). It never
+    # reproduced on dev machines because libwhisper/build already exists there
+    # from the macOS lane. Configure-only: nothing on this lane builds the
+    # subproject's targets, and OpenMP absence is a non-fatal configure warning
+    # (GGML_OPENMP_ENABLED=OFF), so no libomp install is needed here.
+    echo "Configuring libwhisper (reference-proxy resolution only)..."
+    cmake -G Xcode -B libwhisper/build -S libwhisper
+    if [[ $? -ne 0 ]]; then
+        echo "CMake configuration failed!"
+        exit 1
+    fi
+
+    # Commit 3: the iOS host app target exists — build it (Simulator, unsigned).
+    # Same -derivedDataPath/-clonedSourcePackagesDirPath as the rest of the lane:
+    # a divergent path re-resolves FluidAudio UNPATCHED (banked repo invariant).
+    echo "Building OpenSuperWhisper-iOS (iOS Simulator, unsigned)..."
+    IOS_BUILD_OUTPUT=$(xcodebuild -scheme OpenSuperWhisper-iOS -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build 2>&1)
+    IOS_BUILD_EXIT=$?
+
+    if command -v xcpretty &> /dev/null
+    then
+        echo "$IOS_BUILD_OUTPUT" | xcpretty --simple --color
+    else
+        echo "$IOS_BUILD_OUTPUT"
+    fi
+
+    # Check the captured xcodebuild exit (captured above — pipeline exits would
+    # clobber $?) and the log text for a failed build.
+    if [[ $IOS_BUILD_EXIT -ne 0 ]] || [[ "$IOS_BUILD_OUTPUT" =~ "BUILD FAILED" ]]; then
+        echo "iOS app build failed!"
+        exit 1
+    fi
+
+    echo "build-ios complete: build/whisper-ios.xcframework + OpenSuperWhisper-iOS (Simulator build green)."
+    exit 0
+fi
 
 # Configure libwhisper
 echo "Configuring libwhisper..."
@@ -81,6 +150,7 @@ apply_fluidaudio_patches
 # Build the app
 echo "Building OpenSuperWhisper..."
 BUILD_OUTPUT=$(xcodebuild -scheme OpenSuperWhisper -configuration Debug -jobs 8 -derivedDataPath build -quiet -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation -skipMacroValidation -UseModernBuildSystem=YES -clonedSourcePackagesDirPath SourcePackages -skipUnavailableActions CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO OTHER_CODE_SIGN_FLAGS="--entitlements OpenSuperWhisper/OpenSuperWhisper.entitlements" build 2>&1)
+BUILD_EXIT=$?
 
 # sudo gem install xcpretty
 if command -v xcpretty &> /dev/null
@@ -90,8 +160,9 @@ else
     echo "$BUILD_OUTPUT"
 fi
 
-# Check if build output contains BUILD FAILED or if the command failed
-if [[ $? -eq 0 ]] && [[ ! "$BUILD_OUTPUT" =~ "BUILD FAILED" ]]; then
+# Check the captured xcodebuild exit (captured above — pipeline exits would
+# clobber $?) and the log text for a failed build.
+if [[ $BUILD_EXIT -eq 0 ]] && [[ ! "$BUILD_OUTPUT" =~ "BUILD FAILED" ]]; then
     echo "Building successful!"
     # Re-sign with a stable identity so macOS keeps granted TCC permissions
     # across rebuilds (no-op / ad-hoc fallback when no identity is available).

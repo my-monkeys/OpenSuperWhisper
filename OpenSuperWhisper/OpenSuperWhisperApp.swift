@@ -10,6 +10,7 @@ import SwiftUI
 import AppKit
 import Combine
 import UniformTypeIdentifiers
+import WhisperCore
 
 @main
 enum AppMain {
@@ -130,6 +131,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
                 window.orderOut(nil)
                 NSApplication.shared.setActivationPolicy(.accessory)
             }
+        }
+
+        // Wire the consent seam for the history-disabled prompt (Option A ruling):
+        // byte-identical to the pre-extraction inline NSAlert in addFileToQueue.
+        TranscriptionQueue.shared.confirmEnableHistory = {
+            let alert = NSAlert()
+            alert.messageText = "Transcription History Disabled"
+            alert.informativeText = "Transcription saving is currently disabled. Would you like to enable it so this recording can be saved?"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Enable & Save")
+            alert.addButton(withTitle: "Cancel")
+            return alert.runModal() == .alertFirstButtonReturn
         }
 
         OpenSuperWhisperApp.startTranscriptionQueue()

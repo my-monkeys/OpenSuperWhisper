@@ -2,6 +2,7 @@ import AVFoundation
 import Cocoa
 import Combine
 import SwiftUI
+import WhisperCore
 
 enum RecordingState: Equatable {
     case idle

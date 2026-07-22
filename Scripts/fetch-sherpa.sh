@@ -20,6 +20,24 @@ if [ ! -d "$VENDOR/sherpa-onnx.xcframework" ]; then
   rm -rf "$tmp" /tmp/sherpa-xcf.tar.bz2
 fi
 
+# WhisperCore consumes sherpa-onnx as a clang module (framework targets cannot use
+# bridging headers), but the vendored xcframework ships no modulemap and its
+# static-library (XFWK) layout does not auto-discover one. Write it idempotently —
+# unconditional rewrite so a stale map self-heals.
+# Wired to the WhisperCore target via SWIFT_INCLUDE_PATHS[sdk=macosx*] pointing at
+# this Modules dir.
+# NOTE: the header path is relative to this modulemap's directory (Modules/) —
+# clang's dependency scanner resolves modulemap-declared headers ONLY relative to
+# the modulemap location (no include-search-path fallback, verified 2026-07-20),
+# so "../Headers/" is load-bearing. The architect-pinned form
+# `header "sherpa-onnx/c-api/c-api.h"` fails the scanner from this location.
+if [ -d "$VENDOR/sherpa-onnx.xcframework" ]; then
+  mkdir -p "$VENDOR/sherpa-onnx.xcframework/macos-arm64_x86_64/Modules"
+  cat > "$VENDOR/sherpa-onnx.xcframework/macos-arm64_x86_64/Modules/module.modulemap" << 'SHERPA_MODULEMAP_EOF'
+module sherpa_onnx { header "../Headers/sherpa-onnx/c-api/c-api.h" link "c++" export * }
+SHERPA_MODULEMAP_EOF
+fi
+
 if [ ! -f "$VENDOR/onnxruntime/libonnxruntime.${ORT_VER}.dylib" ]; then
   echo "Fetching onnxruntime ${ORT_VER} dylib…"
   curl -fsSL "${BASE}/sherpa-onnx-v${SHERPA_VER}-onnxruntime-${ORT_VER}-osx-arm64-shared.tar.bz2" -o /tmp/ort.tar.bz2

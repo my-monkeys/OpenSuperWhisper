@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Guards the fix for the indicator-window layout-recursion crash (#11, #15, #19).
