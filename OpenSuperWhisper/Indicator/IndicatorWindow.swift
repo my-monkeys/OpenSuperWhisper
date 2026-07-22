@@ -252,6 +252,24 @@ class IndicatorViewModel: ObservableObject {
                         text = fallback
                     }
 
+                    // Voice command (opt-in): a leading trigger word ("whisper open slack") performs
+                    // an action instead of being typed. Skips LLM cleanup, history, and insertion.
+                    if AppPreferences.shared.voiceCommandsEnabled {
+                        switch VoiceCommandRouter.classify(text, trigger: AppPreferences.shared.voiceCommandTrigger) {
+                        case .command(let command):
+                            try? FileManager.default.removeItem(at: tempURL)
+                            let feedback = await VoiceCommandRouter.execute(command)
+                            await MainActor.run { self.showInfo(feedback) }
+                            return
+                        case .unrecognized:
+                            try? FileManager.default.removeItem(at: tempURL)
+                            await MainActor.run { self.showInfo("Sorry, I didn't catch that command") }
+                            return
+                        case .dictation:
+                            break
+                        }
+                    }
+
                     // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
                     text = await LLMPostProcessor.process(text)
 

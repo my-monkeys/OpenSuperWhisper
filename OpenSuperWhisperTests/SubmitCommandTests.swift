@@ -8,7 +8,7 @@ import XCTest
 final class SubmitCommandTests: XCTestCase {
 
     private func parse(_ s: String) -> (text: String, submit: Bool) {
-        AppPreferences.parseSubmitCommand(s)
+        VoiceCommandRouter.parseSubmitCommand(s)
     }
 
     func testStripsTrailingCommand() {
