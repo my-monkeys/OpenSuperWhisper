@@ -16,7 +16,9 @@ struct RemoteCleanupSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SRow(title: "Server", indented: true) {
+            SRow(title: "Server",
+                 hint: "Without a scheme, plain http:// (unencrypted) is used — type https:// explicitly for TLS.",
+                 indented: true) {
                 TextField("", text: $viewModel.aiRemoteEndpoint,
                           prompt: Text("https://api.groq.com/openai/v1"))
                     .textFieldStyle(.plain)

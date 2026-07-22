@@ -110,8 +110,6 @@ public class RecordingStore: ObservableObject {
         let appDirectory = StorageLocations.appSupportDirectory
         let dbPath = StorageLocations.recordingsDatabaseURL
 
-        print("Database path: \(dbPath.path)")
-
         do {
             try FileManager.default.createDirectory(
                 at: appDirectory, withIntermediateDirectories: true)

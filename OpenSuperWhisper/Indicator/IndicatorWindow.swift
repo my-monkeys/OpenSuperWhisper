@@ -423,8 +423,15 @@ class IndicatorViewModel: ObservableObject {
             // check can't read (Messages, Electron), and is a harmless no-op otherwise (the text
             // is on the clipboard). So no editable-target gate — it only ever produces false
             // negatives that wrongly suppress a valid paste (#paste-messages).
-            if !prefs.autoCopyToClipboard { ClipboardUtil.copyToClipboard(finalText) }
-            Diag.measure("TextInserter.paste") { TextInserter.paste() }
+            if prefs.autoCopyToClipboard {
+                Diag.measure("TextInserter.paste") { TextInserter.paste() }
+            } else {
+                // The clipboard is only the paste vehicle here — the user opted out of keeping
+                // the text on it (#44) — so put the previous contents back after the ⌘V lands.
+                ClipboardUtil.borrowForPaste(finalText) {
+                    Diag.measure("TextInserter.paste") { TextInserter.paste() }
+                }
+            }
             return false
         }
 
