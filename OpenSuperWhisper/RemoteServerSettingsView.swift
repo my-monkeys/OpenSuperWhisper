@@ -32,7 +32,8 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
         VStack(alignment: .leading, spacing: 16) {
             SSection(title: "Server") {
                 presetRow()
-                SRow(title: "Server URL") {
+                SRow(title: "Server URL",
+                     hint: "Without a scheme, plain http:// (unencrypted) is used — type https:// explicitly for TLS.") {
                     TextField("", text: $viewModel.remoteServerURL,
                               prompt: Text("http://localhost:11434"))
                         .textFieldStyle(.plain)
