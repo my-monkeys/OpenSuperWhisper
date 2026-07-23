@@ -119,10 +119,20 @@ interrompre (mixing) via réécriture AVAudioEngine, chevauche #147. → #126 ga
   merge upstream. (Historique : pré-existait depuis b846642 ère framework-skeleton,
   extraction WhisperCore exonérée, suite verte — le bench restait informationnel ;
   tracker d'origine côté llama.cpp : #22593.)
-- ⚠️ **Double lien statique app ↔ WhisperCore.framework** : GRDB était lié des deux côtés
-  (cible app + framework embarqué) sans aucun `import GRDB` côté app — lien vestigial
-  **supprimé dans cette PR** (WhisperCore garde le sien : il utilise GRDB). **FluidAudio
-  reste lié deux fois**, cas plus délicat : l'état statique interne n'est plus partagé
+- ⚠️ **Liens GRDB / FluidAudio app ↔ WhisperCore.framework** : le lien GRDB côté app
+  N'est PAS vestigial malgré zéro `import GRDB` sous OpenSuperWhisper/ — il est **porteur
+  de la synthèse dynamique du PackageProduct** Xcode : WhisperCore et le bundle de tests
+  partagent une seule copie de GRDB. Le supprimer fait embarquer à chaque image sa copie
+  statique privée (77 symboles SchedulingWatchdog par image) : la clé watchdog, statique
+  par copie liée, fait échouer migrator.migrate en queue-confinement — EXC_BREAKPOINT sur
+  toute suite à seam in-memory (prouvé par A/B mono-variable — thread review PR #57 ;
+  classe documentée upstream : GRDB issue #1031). Sévérité : GRDBPrecondition est un
+  `fatalError` `@inline(__always)` NON restreint au DEBUG (GRDB/Utils/Utils.swift:31) —
+  la duplication crasherait aussi en RELEASE sur tout chemin cross-image ; l'app livrée
+  n'est saine aujourd'hui que par confinement en une seule copie (« architecture-luck »,
+  pas une protection du build). Tout dédoublonnage futur passe par le produit dynamique
+  explicite de GRDB pour WhisperCore+tests, en changement SÉPARÉ et vérifié.
+  **FluidAudio reste lié deux fois**, cas plus délicat : l'état statique interne n'est plus partagé
   entre le `StreamingTranscriptionController` (côté app) et le `FluidAudioEngine` (côté
   framework). Dédoublonnage différé à une PR dédiée (maintainer : « let's not discover
   it in a release ») — à résoudre avant toute dépendance à un état partagé app/framework.
