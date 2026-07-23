@@ -26,7 +26,6 @@
 		840156D32D79EDBA00FB5FFE /* libggml-blas.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C92D79ED9900FB5FFE /* libggml-blas.a */; };
 		840156D42D79EDBA00FB5FFE /* libggml-cpu.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CB2D79ED9900FB5FFE /* libggml-cpu.a */; };
 		840156D52D79EDBA00FB5FFE /* libggml-metal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CD2D79ED9900FB5FFE /* libggml-metal.a */; };
-		CE0EAD6E2D56ACA80067FDEE /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB */; };
 	CEAC00102D90000000000001 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB */; };
 		5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5BA9E0DA0000000000000A02 /* Sparkle */; };
 		CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6D2D55777800C54EA6 /* libc++.tbd */; };
@@ -295,7 +294,6 @@
 				5BDCC02000000000000000A1 /* WhisperCore.framework in Frameworks */,
 				CE84DF762D5577D200C54EA6 /* Accelerate.framework in Frameworks */,
 				CE84DF712D55778000C54EA6 /* Metal.framework in Frameworks */,
-				CE0EAD6E2D56ACA80067FDEE /* GRDB in Frameworks */,
 				CE84DF722D55778000C54EA6 /* MetalKit.framework in Frameworks */,
 				CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */,
 				CE84E17D2D56550B00C54EA6 /* KeyboardShortcuts in Frameworks */,
@@ -551,7 +549,6 @@
 			name = OpenSuperWhisper;
 			packageProductDependencies = (
 				CE84E17C2D56550B00C54EA6 /* KeyboardShortcuts */,
-				CE0EAD6D2D56ACA80067FDEE /* GRDB */,
 				CE84E17E2D56550B00C54EA7 /* FluidAudio */,
 				5BA9E0DA0000000000000A02 /* Sparkle */,
 			);
