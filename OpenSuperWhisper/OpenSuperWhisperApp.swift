@@ -113,7 +113,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private var modelSubmenu: NSMenu?
     private var microphoneService = MicrophoneService.shared
     private var microphoneObserver: AnyCancellable?
-    
+
+    // Wire the consent seam for the history-disabled prompt (Option A ruling) in
+    // willFinishLaunching, not didFinishLaunching: a file-open-at-launch delivers
+    // application(_:openFiles:) BETWEEN willFinish and didFinish, and the unwired
+    // fail-safe (nil = cancel) silently dropped the file instead of prompting
+    // (PR #57 maintainer review). Alert body byte-identical to the pre-extraction
+    // inline NSAlert in addFileToQueue.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        TranscriptionQueue.shared.confirmEnableHistory = {
+            let alert = NSAlert()
+            alert.messageText = "Transcription History Disabled"
+            alert.informativeText = "Transcription saving is currently disabled. Would you like to enable it so this recording can be saved?"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Enable & Save")
+            alert.addButton(withTitle: "Cancel")
+            return alert.runModal() == .alertFirstButtonReturn
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         setupStatusBarItem()
@@ -131,18 +149,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
                 window.orderOut(nil)
                 NSApplication.shared.setActivationPolicy(.accessory)
             }
-        }
-
-        // Wire the consent seam for the history-disabled prompt (Option A ruling):
-        // byte-identical to the pre-extraction inline NSAlert in addFileToQueue.
-        TranscriptionQueue.shared.confirmEnableHistory = {
-            let alert = NSAlert()
-            alert.messageText = "Transcription History Disabled"
-            alert.informativeText = "Transcription saving is currently disabled. Would you like to enable it so this recording can be saved?"
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "Enable & Save")
-            alert.addButton(withTitle: "Cancel")
-            return alert.runModal() == .alertFirstButtonReturn
         }
 
         OpenSuperWhisperApp.startTranscriptionQueue()
