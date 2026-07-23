@@ -110,10 +110,22 @@ interrompre (mixing) via réécriture AVAudioEngine, chevauche #147. → #126 ga
 - ⚠️ `MicrophoneService.swift:294-296` : `UnsafeMutableRawPointer` formé sur une `CFString` —
   **vrai code smell** à auditer (lié possiblement à #57 input device).
 - Warnings linker : `libomp`/`libautocorrect` bâtis pour SDK macOS 26/27 vs deployment target 14.0.
-- ⚠️ Bench whisper.cpp : abort au teardown (Metal rsets) sur large-v3-turbo en CLI (lifecycle
-  explicit-free) — upstream **llama.cpp #22593**, fenêtre de fix post-v1.9.1. Pré-existe depuis
-  b846642 (ère framework-skeleton), extraction WhisperCore exonérée, suite verte : le bench reste
-  **informationnel** comme prévu. À réévaluer au prochain bump whisper.cpp (#67).
+- ✅ Bench whisper.cpp : l'abort au teardown (Metal rsets) sur large-v3-turbo en CLI
+  (lifecycle explicit-free, #56) est **résolu sur le pin courant** — #68 a pointé le
+  submodule vers my-monkeys/whisper.cpp (v1.9.1 + cherry-pick ggml-org/whisper.cpp#3870 :
+  les residency sets reliquats sont libérés au teardown au lieu d'aborter ; validé dans
+  #68, patché → exit 0). L'upstream #3870 reste **non mergé** : tout bump futur doit
+  conserver le cherry-pick (branche fork `osw/v1.9.1-rsets-teardown-fix`) ou attendre le
+  merge upstream. (Historique : pré-existait depuis b846642 ère framework-skeleton,
+  extraction WhisperCore exonérée, suite verte — le bench restait informationnel ;
+  tracker d'origine côté llama.cpp : #22593.)
+- ⚠️ **Double lien statique app ↔ WhisperCore.framework** : GRDB était lié des deux côtés
+  (cible app + framework embarqué) sans aucun `import GRDB` côté app — lien vestigial
+  **supprimé dans cette PR** (WhisperCore garde le sien : il utilise GRDB). **FluidAudio
+  reste lié deux fois**, cas plus délicat : l'état statique interne n'est plus partagé
+  entre le `StreamingTranscriptionController` (côté app) et le `FluidAudioEngine` (côté
+  framework). Dédoublonnage différé à une PR dédiée (maintainer : « let's not discover
+  it in a release ») — à résoudre avant toute dépendance à un état partagé app/framework.
 - ⚠️ **REQUIS avant le flip App Group + partage keychain mac↔iOS (Cycle 4, compagnon iOS)** :
   threat-model check — scoping `keychain-access-groups`, permissions du group container, quels
   secrets traversent la frontière. Ne pas activer le container partagé sans cette revue.
@@ -124,7 +136,9 @@ interrompre (mixing) via réécriture AVAudioEngine, chevauche #147. → #126 ga
 - [x] #132 feedback erreur (résout #117 P0) · #116 spinner · #137 cold-start · #129 race clipboard · #105 fastlane — **intégrés + testés** sur `feat/phase2-quickwins`
 - [x] feature maison **notify-when-no-paste-target** (filet presse-papier) — livrée + 8 tests
 - [ ] ~~#100 asian-autocorrect~~ → **rejeté** (casse le build, voir tableau)
-- [ ] #67 bump whisper.cpp (à **tester** après rebase ; conflit run.sh + change l'API → à part)
+- [x] #67 bump whisper.cpp — **supplanté** : master porte v1.9.1 + fix teardown #3870
+      via #68 (pin fork my-monkeys/whisper.cpp, hérité par cette PR) ; la PR dependabot
+      upstream est dépassée.
 - [ ] **Feature neuve clipboard-fallback** : toujours copier la transcription au presse-papier
       (issue #80), au-dessus des réglages clipboard déjà mergés (#133), en intégrant le fix de race #129.
 
