@@ -187,6 +187,23 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         }
     }
 
+    /// Briefly show a status message (error / info) WITHOUT recording. Used by the background
+    /// `DictationPipeline` to surface a failure, "no speech", or the "copied — press ⌘V" notice now
+    /// that transcription no longer runs in a live indicator. Skipped while a recording is in
+    /// progress so it never interrupts the live recording bubble. The message auto-hides via the
+    /// view model's own timer (showError/showInfo). (parallel-recording #3)
+    func flash(_ state: RecordingState) {
+        if let current = viewModel, current.state == .recording || current.state == .connecting {
+            return
+        }
+        let vm = show(nearPoint: FocusUtils.getCurrentCursorPosition())
+        switch state {
+        case .error(let message): vm.showError(message)
+        case .info(let message): vm.showInfo(message)
+        default: vm.showBusyMessage()
+        }
+    }
+
     func stopRecording() {
         viewModel?.startDecoding()
     }

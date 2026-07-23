@@ -227,12 +227,14 @@ class IndicatorViewModel: ObservableObject {
             return
         }
 
-        // Snapshot the record-start context now (it's still THIS recording's — the next
-        // recording's captureFrontmost hasn't run yet) so the history row stays accurate even
-        // though the clip is transcribed later, in the background.
+        // Snapshot the record-start context AND the active model now (both still belong to THIS
+        // recording — the next recording's captureFrontmost / model switch hasn't run yet) so the
+        // history row and the transcription model stay accurate even though the clip is transcribed
+        // later, in the background. (parallel-recording, #model-snapshot)
         let ctx = RecordingContext.shared
         let snapshot = DictationPipeline.ContextSnapshot(
             appName: ctx.appName, windowTitle: ctx.windowTitle, fullURL: ctx.fullURL)
+        let modelOption = ModelCatalog.activeOption()
 
         // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
         // queue in recording-start order, so the user can immediately start the next recording
@@ -241,7 +243,8 @@ class IndicatorViewModel: ObservableObject {
             tempURL: tempURL,
             startedAt: recordingStartedAt ?? Date(),
             streamedFallback: streamedFallback,
-            context: snapshot)
+            context: snapshot,
+            modelOption: modelOption)
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.
         delegate?.didFinishDecoding()
@@ -391,6 +394,9 @@ struct IndicatorWindow: View {
     var onContentResize: (CGSize) -> Void = { _ in }
     @ObservedObject private var streaming = StreamingTranscriptionController.shared
     @ObservedObject private var notch = NotchTuning.shared
+    // Surfaces how many earlier clips are still transcribing in the background, so starting a new
+    // recording while others are queued shows the backlog. (parallel-recording #3)
+    @ObservedObject private var pipeline = DictationPipeline.shared
     @Environment(\.colorScheme) private var colorScheme
     
     private var backgroundColor: Color {
@@ -498,7 +504,7 @@ struct IndicatorWindow: View {
                                 .foregroundColor(.orange)
                                 .transition(.opacity)
                         } else {
-                            Text("Recording…")
+                            Text(pipeline.pendingCount > 0 ? "Recording… · \(pipeline.pendingCount) queued" : "Recording…")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.secondary)
                                 .transition(.opacity)
