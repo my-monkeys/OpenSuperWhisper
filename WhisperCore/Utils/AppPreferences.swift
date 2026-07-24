@@ -313,10 +313,10 @@ public final class AppPreferences {
     // other two prefs. These remember each mode's last choice so switching
     // back restores it instead of the hardcoded default.
     @UserDefault(key: "lastModifierOnlyHotkey", defaultValue: "leftCommand")
-    var lastModifierOnlyHotkey: String
+    public var lastModifierOnlyHotkey: String
 
     @UserDefault(key: "lastMouseButtonHotkey", defaultValue: "middle")
-    var lastMouseButtonHotkey: String
+    public var lastMouseButtonHotkey: String
 
     // When false (default), pressing Esc to cancel a recording longer than
     // ~10s first asks for confirmation (press Esc again) instead of discarding
