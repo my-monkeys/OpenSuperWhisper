@@ -147,8 +147,12 @@ class AudioRecorder: NSObject, ObservableObject {
             playNotificationSound()
         }
 
+        // A UUID suffix keeps each recording's temp file unique. Without it, two recordings
+        // started in the same wall-clock second share a path — and starting the next recording
+        // would truncate the previous clip's file while the background pipeline is still reading
+        // it to transcribe. (parallel-recording)
         let timestamp = Int(Date().timeIntervalSince1970)
-        let filename = "\(timestamp).wav"
+        let filename = "rec-\(timestamp)-\(UUID().uuidString.prefix(8)).wav"
         let fileURL = temporaryDirectory.appendingPathComponent(filename)
         currentRecordingURL = fileURL
 

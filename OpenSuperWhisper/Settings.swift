@@ -1066,33 +1066,6 @@ struct InfoButton: View {
     }
 }
 
-/// A standard setting row: title (+ optional ⓘ with full details), a short caption, and a
-/// trailing control (e.g. a Toggle).
-struct SettingRow<Trailing: View>: View {
-    let title: LocalizedStringKey
-    let caption: LocalizedStringKey
-    var info: LocalizedStringKey? = nil
-    @ViewBuilder let trailing: () -> Trailing
-
-    var body: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Text(title).font(.subheadline)
-                    if let info { InfoButton(text: info) }
-                }
-                Text(caption)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Spacer()
-            trailing()
-        }
-    }
-}
-
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
     case dictation, models, output, rules, history, advanced, updates, feedback
@@ -1142,7 +1115,6 @@ struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
     @Environment(\.dismiss) var dismiss
-    @State private var isRecordingNewShortcut = false
     @State private var selectedTab: SettingsTab = .dictation
     @State private var sidebarSearch = ""
     @FocusState private var sidebarSearchFocused: Bool
@@ -2070,10 +2042,6 @@ struct SettingsView: View {
         }
     }
 
-    private var useModifierKey: Bool {
-        viewModel.modifierOnlyHotkey != .none
-    }
-
     private enum TriggerMode: Hashable {
         case keyCombo
         case modifier
@@ -2097,20 +2065,27 @@ struct SettingsView: View {
                     Picker("", selection: Binding(
                         get: { triggerMode },
                         set: { newMode in
+                            // Remember the outgoing mode's choice so switching modes
+                            // round-trips (leaving Single Modifier used to reset it
+                            // to Left Command).
+                            if viewModel.modifierOnlyHotkey != .none {
+                                AppPreferences.shared.lastModifierOnlyHotkey = viewModel.modifierOnlyHotkey.rawValue
+                            }
+                            if viewModel.mouseButtonHotkey != .none {
+                                AppPreferences.shared.lastMouseButtonHotkey = viewModel.mouseButtonHotkey.rawValue
+                            }
                             switch newMode {
                             case .keyCombo:
                                 viewModel.mouseButtonHotkey = .none
                                 viewModel.modifierOnlyHotkey = .none
                             case .modifier:
                                 viewModel.mouseButtonHotkey = .none
-                                if viewModel.modifierOnlyHotkey == .none {
-                                    viewModel.modifierOnlyHotkey = .leftCommand
-                                }
+                                viewModel.modifierOnlyHotkey =
+                                    ModifierKey(rawValue: AppPreferences.shared.lastModifierOnlyHotkey) ?? .leftCommand
                             case .mouse:
                                 viewModel.modifierOnlyHotkey = .none
-                                if viewModel.mouseButtonHotkey == .none {
-                                    viewModel.mouseButtonHotkey = .middle
-                                }
+                                viewModel.mouseButtonHotkey =
+                                    MouseButton(rawValue: AppPreferences.shared.lastMouseButtonHotkey) ?? .middle
                             }
                         }
                     )) {
@@ -2172,9 +2147,9 @@ struct SettingsView: View {
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
                     }
                 case .keyCombo:
-                    SRow(title: "Shortcut") {
-                        KeyboardShortcuts.Recorder("", name: .toggleRecord)
-                            .frame(width: 150)
+                    SRow(title: "Shortcut", hint: "Click, then press a combination with ⌘, ⌥ or ⌃ — ⌫ clears it") {
+                        ShortcutRecorderField(name: .toggleRecord)
+                            .frame(width: 170)
                     }
                 }
                 SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
@@ -2281,323 +2256,6 @@ struct SettingsView: View {
                     .fixedSize()
                 }
             }
-        }
-    }
-
-    private var shortcutSettings: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Recording Trigger
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Recording Trigger")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    VStack(alignment: .leading, spacing: 16) {
-                        Picker("", selection: Binding(
-                            get: { useModifierKey },
-                            set: { newValue in
-                                if !newValue {
-                                    viewModel.modifierOnlyHotkey = .none
-                                } else if viewModel.modifierOnlyHotkey == .none {
-                                    viewModel.modifierOnlyHotkey = .leftCommand
-                                }
-                            }
-                        )) {
-                            Text("Key Combination").tag(false)
-                            Text("Single Modifier Key").tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                        
-                        if useModifierKey {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Modifier Key")
-                                        .font(.subheadline)
-                                    Spacer()
-                                    Picker("", selection: $viewModel.modifierOnlyHotkey) {
-                                        ForEach(ModifierKey.allCases.filter { $0 != .none }) { key in
-                                            Text(key.displayName).tag(key)
-                                        }
-                                    }
-                                    .pickerStyle(.menu)
-                                    .frame(width: 200)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(Color(.textBackgroundColor).opacity(0.5))
-                                .cornerRadius(8)
-                                
-                                Text("One-tap to toggle recording")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-
-                                Text("⚠️ This mode requires Input Monitoring permission. macOS requires this to detect single modifier key presses globally. Only modifier key events (⌘, ⌥, ⇧, ⌃, Fn) are monitored — no regular keystrokes are captured.")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.top, 4)
-
-                                Button("Open Input Monitoring Settings…") {
-                                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                                        NSWorkspace.shared.open(url)
-                                    }
-                                }
-                                .font(.caption)
-                            }
-                        } else {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Shortcut")
-                                        .font(.subheadline)
-                                    Spacer()
-                                    KeyboardShortcuts.Recorder("", name: .toggleRecord)
-                                        .frame(width: 150)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(Color(.textBackgroundColor).opacity(0.5))
-                                .cornerRadius(8)
-                                
-                                if isRecordingNewShortcut {
-                                    Text("Press your new shortcut combination...")
-                                        .foregroundColor(.secondary)
-                                        .font(.subheadline)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-                
-                // Recording Behavior
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Recording Behavior")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        SettingRow(
-                            title: "Indicator position",
-                            caption: "Where the recording indicator appears.",
-                            info: "Near cursor (default) shows it just above your text caret. Top, Center or Bottom pin it to the middle of the screen instead."
-                        ) {
-                            HStack(spacing: 8) {
-                                Picker("", selection: $viewModel.indicatorPosition) {
-                                    Text("Near cursor").tag("cursor")
-                                    Text("Notch").tag("notch")
-                                    Text("Top").tag("top")
-                                    Text("Center").tag("center")
-                                    Text("Bottom").tag("bottom")
-                                }
-                                .labelsHidden()
-                                .frame(width: 140)
-                                Button("Preview") {
-                                    IndicatorWindowManager.shared.preview()
-                                }
-                                .controlSize(.small)
-                                .help("Briefly show the indicator at this position")
-                            }
-                        }
-
-                        SettingRow(
-                            title: "Cancel Shortcut",
-                            caption: "Press while recording to discard it.",
-                            info: "Press this key during recording to cancel and discard it without transcribing. Esc is the default; the ⌘/⌥/⌃ combos are there in case Esc conflicts with something else."
-                        ) {
-                            Picker("", selection: $cancelKey) {
-                                ForEach(SettingsView.cancelKeyChoices) { choice in
-                                    Text(choice.label).tag(choice.id)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(width: 140)
-                            .onChange(of: cancelKey) { _, id in
-                                if let choice = SettingsView.cancelKeyChoices.first(where: { $0.id == id }) {
-                                    KeyboardShortcuts.setShortcut(choice.shortcut, for: .escape)
-                                }
-                            }
-                            .onAppear { cancelKey = SettingsView.currentCancelKeyID() }
-                        }
-
-                        SettingRow(
-                            title: "Show Stop Button on Recording Bar",
-                            caption: "A stop-and-transcribe button on the recording indicator."
-                        ) {
-                            Toggle("", isOn: $viewModel.showStopButtonOnIndicator)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        SettingRow(
-                            title: "Show Cancel Button on Recording Bar",
-                            caption: "A discard (trash) button on the recording indicator."
-                        ) {
-                            Toggle("", isOn: $viewModel.showCancelButtonOnIndicator)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Hold to Record")
-                                    .font(.subheadline)
-                                Text("Hold the shortcut to record, release to stop")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $viewModel.holdToRecord)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                        }
-                        
-                        HStack {
-                            Text("Play sound when recording starts")
-                                .font(.subheadline)
-                            Spacer()
-                            Toggle("", isOn: $viewModel.playSoundOnRecordStart)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                                .help("Play a notification sound when recording begins")
-                        }
-
-                        SettingRow(
-                            title: "Live transcription",
-                            caption: "Preview your speech in the indicator as you talk (Parakeet only).",
-                            info: "The text appears after a short delay and is a rough live preview — it may differ from the final result. The text that actually gets inserted always comes from the full, accurate transcription, not from this preview."
-                        ) {
-                            Toggle("", isOn: $viewModel.liveTranscriptionEnabled)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                                .disabled(viewModel.selectedEngine != "fluidaudio")
-                                .help("Show the transcription live while recording (Parakeet only)")
-                        }
-                        .opacity(viewModel.selectedEngine == "fluidaudio" ? 1 : 0.5)
-
-                        SettingRow(
-                            title: "Pause media during recording",
-                            caption: "Pause other apps' playback while recording, then resume.",
-                            info: "Pauses the system's active player while recording, then resumes what was playing. If the app can't detect what was playing (unsigned builds), it leaves playback paused — press play to resume. Acts on the system's active player, so it can't independently restore several sources at once."
-                        ) {
-                            Toggle("", isOn: $viewModel.pauseMediaOnRecord)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                                .help("Automatically pause media playback when recording starts")
-                        }
-
-                        SettingRow(
-                            title: "Lower system volume while recording",
-                            caption: "Temporarily reduce the output volume, then restore it."
-                        ) {
-                            Toggle("", isOn: $viewModel.reduceVolumeOnRecord)
-                                .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                                .labelsHidden()
-                                .help("Lower the system output volume while recording, then restore it")
-                        }
-
-                        if viewModel.reduceVolumeOnRecord {
-                            HStack {
-                                Text("Volume while recording")
-                                    .font(.subheadline)
-                                Spacer()
-                                Slider(value: $viewModel.reduceVolumeLevel, in: 0...0.5)
-                                    .frame(width: 160)
-                                Text("\(Int((viewModel.reduceVolumeLevel * 100).rounded()))%")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 44, alignment: .trailing)
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Startup
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Startup")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    SettingRow(
-                        title: "Launch at Login",
-                        caption: "Start OpenSuperWhisper automatically when you log in."
-                    ) {
-                        Toggle("", isOn: Binding(
-                            get: { launchAtLogin.isEnabled },
-                            set: { launchAtLogin.setEnabled($0) }
-                        ))
-                        .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                        .labelsHidden()
-                    }
-
-                    SettingRow(
-                        title: "Start in the Menu Bar",
-                        caption: "Launch without the main window — open it from the menu bar icon.",
-                        info: "Launches straight into the menu bar with no window shown. Open the window anytime from the menu bar icon. Takes effect on next launch."
-                    ) {
-                        Toggle("", isOn: $viewModel.startHidden)
-                            .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                            .labelsHidden()
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-
-                // Interface Language
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Language")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    SettingRow(
-                        title: "App Language",
-                        caption: "Language of the app interface. Relaunch to apply.",
-                        info: "Overrides your Mac's language for OpenSuperWhisper only. \"System\" follows your Mac's language. This is separate from the transcription language."
-                    ) {
-                        Picker("", selection: $appLanguage) {
-                            Text("System").tag("system")
-                            Text("English").tag("en")
-                            Text("Français").tag("fr")
-                            Text("Deutsch").tag("de")
-                            Text("Español").tag("es")
-                            Text("Italiano").tag("it")
-                            Text("Português (BR)").tag("pt-BR")
-                            Text("Tiếng Việt").tag("vi")
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 150)
-                        .labelsHidden()
-                        .onChange(of: appLanguage) { _, newValue in
-                            LanguageManager.selected = newValue
-                            langNeedsRelaunch = true
-                        }
-                    }
-
-                    if langNeedsRelaunch {
-                        HStack {
-                            Text("Relaunch to apply the new language.")
-                                .font(.caption).foregroundColor(.secondary)
-                            Spacer()
-                            Button("Relaunch Now") { LanguageManager.relaunch() }
-                        }
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor).opacity(0.3))
-                .cornerRadius(12)
-            }
-            .padding()
         }
     }
 }

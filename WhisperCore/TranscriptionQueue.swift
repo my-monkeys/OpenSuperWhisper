@@ -264,10 +264,14 @@ public class TranscriptionQueue: ObservableObject {
             )
         }
 
-        // Apply a one-off model for this rerun (from the rerun dropdown), then restore
-        // the system default once it finishes — the rerun-side analog of "Just This Time".
-        let restoreOverride = applyModelOverride(for: recording.id)
-        defer { restoreOverride() }
+        // Pull this rerun's one-off model (from the rerun dropdown) and hand it to
+        // transcribeAudio, which swaps + restores the engine *inside* the shared engine gate.
+        // The old applyModelOverride path called reloadEngine() out here, before acquiring the
+        // gate — tearing the engine down under an in-flight (dictation) transcription that still
+        // held it. Routing it through the parameter keeps the swap serialized with everything
+        // else. `applyOneOffModel` treats nil / already-active as a no-op, so a plain rerun is
+        // unchanged. (parallel-recording review)
+        let overrideOption = modelOverrides.removeValue(forKey: recording.id)
 
         currentTranscriptionTask = Task {
             do {
@@ -280,7 +284,7 @@ public class TranscriptionQueue: ObservableObject {
                 }
 
                 let settings = Settings()
-                let text = try await transcriptionService.transcribeAudio(url: sourceURL, settings: settings)
+                let text = try await transcriptionService.transcribeAudio(url: sourceURL, settings: settings, modelOverride: overrideOption)
 
                 if isRecordingCancelled(recording.id) || Task.isCancelled {
                     return
@@ -335,31 +339,4 @@ public class TranscriptionQueue: ObservableObject {
         clearCancellation(recording.id)
     }
 
-    /// Temporarily switch to a recording's one-off override model and return a
-    /// closure restoring the previous settings + engine. No override → no-op.
-    private func applyModelOverride(for recordingID: UUID) -> () -> Void {
-        guard let option = modelOverrides.removeValue(forKey: recordingID) else { return {} }
-        let prefs = AppPreferences.shared
-        let previousEngine = prefs.selectedEngine
-        let previousWhisper = prefs.selectedWhisperModelPath
-        let previousFluid = prefs.fluidAudioModelVersion
-        let previousRemote = prefs.remoteServerModel
-
-        prefs.selectedEngine = option.engine
-        switch option.engine {
-        case "whisper": prefs.selectedWhisperModelPath = option.identifier
-        case "fluidaudio": prefs.fluidAudioModelVersion = option.identifier
-        case "remote": prefs.remoteServerModel = option.identifier
-        default: break
-        }
-        transcriptionService.reloadEngine()
-
-        return {
-            prefs.selectedEngine = previousEngine
-            prefs.selectedWhisperModelPath = previousWhisper
-            prefs.fluidAudioModelVersion = previousFluid
-            prefs.remoteServerModel = previousRemote
-            self.transcriptionService.reloadEngine()
-        }
-    }
 }

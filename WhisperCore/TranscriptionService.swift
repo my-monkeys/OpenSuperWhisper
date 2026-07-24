@@ -25,7 +25,11 @@ struct EnginePlatformGates {
 @MainActor
 public class TranscriptionService: ObservableObject {
     public static let shared = TranscriptionService()
-    
+
+    /// One-permit gate serializing every transcription across the whole app. See the note in
+    /// `transcribeAudio` — the engines share one non-thread-safe context. (parallel-recording #2)
+    private static let engineGate = AsyncSemaphore(1)
+
     @Published public private(set) var isTranscribing = false
     @Published public private(set) var transcribedText = ""
     @Published public private(set) var currentSegment = ""
@@ -123,8 +127,56 @@ public class TranscriptionService: ObservableObject {
             reloadEngine()
         }
     }
+
+    /// Temporarily switch to `option` for one transcription and return a closure that restores the
+    /// previous engine/model. No-op (returns an empty closure) when `option` is nil or already the
+    /// active model. Called from inside `transcribeAudio`'s serialization gate so the swap can't
+    /// leak to a concurrent caller — every one-off model (dictation clip AND the rerun dropdown,
+    /// which now passes its option through `transcribeAudio(modelOverride:)`) runs through here.
+    private func applyOneOffModel(_ option: DictationModelOption?) -> () -> Void {
+        guard let option else { return {} }
+        let current = ModelCatalog.activeOption()
+        if current?.engine == option.engine && current?.identifier == option.identifier { return {} }
+
+        let prefs = AppPreferences.shared
+        let previousEngine = prefs.selectedEngine
+        let previousWhisper = prefs.selectedWhisperModelPath
+        let previousFluid = prefs.fluidAudioModelVersion
+        let previousRemote = prefs.remoteServerModel
+
+        prefs.selectedEngine = option.engine
+        switch option.engine {
+        case "whisper": prefs.selectedWhisperModelPath = option.identifier
+        case "fluidaudio": prefs.fluidAudioModelVersion = option.identifier
+        case "remote": prefs.remoteServerModel = option.identifier
+        default: break
+        }
+        reloadEngine()
+
+        return {
+            prefs.selectedEngine = previousEngine
+            prefs.selectedWhisperModelPath = previousWhisper
+            prefs.fluidAudioModelVersion = previousFluid
+            prefs.remoteServerModel = previousRemote
+            self.reloadEngine()
+        }
+    }
     
-    public func transcribeAudio(url: URL, settings: Settings) async throws -> String {
+    public func transcribeAudio(url: URL, settings: Settings, modelOverride: DictationModelOption? = nil) async throws -> String {
+        // Serialize every transcription across the app (dictation pipeline, file-drop queue,
+        // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
+        // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
+        // would crash or corrupt output. (parallel-recording #2)
+        await Self.engineGate.wait()
+        // Apply a per-call model INSIDE the gate — the clip was recorded under this model, but a
+        // later recording may since have switched the global one — so it can't leak to a concurrent
+        // caller, and restore it before releasing. No-op when nil or already active. (#model-snapshot)
+        let restoreModel = applyOneOffModel(modelOverride)
+        defer {
+            restoreModel()
+            Task { await Self.engineGate.signal() }
+        }
+
         await MainActor.run {
             self.progress = 0.0
             self.conversionProgress = 0.0
@@ -367,4 +419,31 @@ public enum TranscriptionError: Error {
     case contextInitializationFailed
     case audioConversionFailed
     case processingFailed
+}
+
+/// Minimal async counting semaphore. Used as a 1-permit mutex to serialize transcriptions across
+/// the app (see `TranscriptionService.transcribeAudio`). Correct under actor reentrancy: `signal`
+/// hands the permit directly to the first waiter instead of bumping the count, so a waiter resumed
+/// by `signal` stays mutually exclusive with everyone else.
+actor AsyncSemaphore {
+    private var permits: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(_ permits: Int = 1) { self.permits = permits }
+
+    func wait() async {
+        if permits > 0 {
+            permits -= 1
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func signal() {
+        if !waiters.isEmpty {
+            waiters.removeFirst().resume()   // hand the held permit straight to the next waiter
+        } else {
+            permits += 1
+        }
+    }
 }

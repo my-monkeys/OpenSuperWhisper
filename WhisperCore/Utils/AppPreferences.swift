@@ -309,6 +309,15 @@ public final class AppPreferences {
     @UserDefault(key: "mouseButtonHotkey", defaultValue: "none")
     public var mouseButtonHotkey: String
 
+    // The trigger modes are mutually exclusive, so switching modes clears the
+    // other two prefs. These remember each mode's last choice so switching
+    // back restores it instead of the hardcoded default.
+    @UserDefault(key: "lastModifierOnlyHotkey", defaultValue: "leftCommand")
+    var lastModifierOnlyHotkey: String
+
+    @UserDefault(key: "lastMouseButtonHotkey", defaultValue: "middle")
+    var lastMouseButtonHotkey: String
+
     // When false (default), pressing Esc to cancel a recording longer than
     // ~10s first asks for confirmation (press Esc again) instead of discarding
     // it outright — a safety net against an accidental Esc losing a long dictation.
