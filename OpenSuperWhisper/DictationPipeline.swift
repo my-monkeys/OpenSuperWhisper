@@ -116,6 +116,13 @@ final class DictationPipeline: ObservableObject {
                 rawText = try await transcriptionService.transcribeAudio(
                     url: item.tempURL, settings: settings, modelOverride: item.modelOption)
             }
+            // Which model actually produced this text — snapshot it *now*, before the LLM and
+            // audio-duration awaits below. transcribeAudio has returned so these are still this
+            // item's values, but its engine gate is already released: during those awaits a
+            // file-drop/rerun transcription could acquire the gate and overwrite
+            // `lastUsedModel`/`lastUsedFallback`, mislabeling this history row. (parallel-recording review)
+            let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
+            let wasFallback = transcriptionService.lastUsedFallback
             var text = AppPreferences.shared.cleanTranscription(rawText)
 
             // File pass found nothing. Fall back to the live preview if it caught the words (short
@@ -168,7 +175,8 @@ final class DictationPipeline: ObservableObject {
                 await storeRecording(
                     id: recordingId, timestamp: timestamp, fileName: fileName,
                     finalURL: finalURL, transcription: text,
-                    status: .completed, progress: 1.0, context: item.context)
+                    status: .completed, progress: 1.0, context: item.context,
+                    modelUsed: modelUsed, wasFallback: wasFallback)
             } else {
                 try? FileManager.default.removeItem(at: item.tempURL)
             }
@@ -199,7 +207,8 @@ final class DictationPipeline: ObservableObject {
                 await storeRecording(
                     id: saved.id, timestamp: saved.timestamp, fileName: saved.fileName,
                     finalURL: saved.url, transcription: "Transcription failed — click ↻ to try again.",
-                    status: .failed, progress: 0, context: item.context)
+                    status: .failed, progress: 0, context: item.context,
+                    modelUsed: nil, wasFallback: false)
             } else {
                 try? FileManager.default.removeItem(at: item.tempURL)
             }
@@ -212,13 +221,12 @@ final class DictationPipeline: ObservableObject {
     /// indicator view model so the save path is shared and can't drift.
     private func storeRecording(id: UUID, timestamp: Date, fileName: String, finalURL: URL,
                                 transcription: String, status: RecordingStatus, progress: Float,
-                                context: ContextSnapshot) async {
+                                context: ContextSnapshot,
+                                modelUsed: String?, wasFallback: Bool) async {
+        // `modelUsed`/`wasFallback` are captured by the caller right after `transcribeAudio`
+        // returns — NOT read here, because the `await` below can suspend long enough for another
+        // transcription to overwrite them on the shared service. (parallel-recording review)
         let realDuration = await IndicatorViewModel.audioDuration(of: finalURL)
-        // The model that actually produced the text (the local fallback, not the configured remote
-        // model, when the server was unreachable). Safe to read now: serial processing + the engine
-        // gate mean no other transcription ran between this item's `transcribeAudio` and here.
-        let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
-        let wasFallback = transcriptionService.lastUsedFallback
         recordingStore.addRecording(Recording(
             id: id,
             timestamp: timestamp,

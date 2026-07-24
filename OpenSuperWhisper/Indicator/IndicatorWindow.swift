@@ -147,10 +147,11 @@ class IndicatorViewModel: ObservableObject {
 
         // Live transcription (Parakeet only): stream in parallel with the WAV recorder so the
         // indicator can show the text as the user speaks. Falls back to the file pass on stop.
-        // Skipped while the background pipeline is transcribing: the live stream and the file
-        // pass would otherwise contend on the same FluidAudio engine. The file pass on stop
-        // still produces the text; only the on-bubble preview is dropped for this clip.
-        if Self.shouldUseLiveStreaming && !DictationPipeline.shared.isProcessing {
+        // Skipped while ANY transcription is in flight — the background dictation pipeline OR the
+        // file-drop `TranscriptionQueue` (`isTranscriptionBusy`) — since the live stream and that
+        // pass would otherwise contend on the same engine. The file pass on stop still produces
+        // the text; only the on-bubble preview is dropped for this clip. (parallel-recording review)
+        if Self.shouldUseLiveStreaming && !DictationPipeline.shared.isProcessing && !isTranscriptionBusy {
             liveStreamingActive = true
             let terms = (AppPreferences.shared.customDictionaryEnabled && AppPreferences.shared.customDictionaryBoostEnabled)
                 ? CustomDictionary.boostTerms(entries: AppPreferences.shared.customDictionaryEntries)

@@ -136,8 +136,9 @@ class TranscriptionService: ObservableObject {
 
     /// Temporarily switch to `option` for one transcription and return a closure that restores the
     /// previous engine/model. No-op (returns an empty closure) when `option` is nil or already the
-    /// active model. Mirrors `TranscriptionQueue.applyModelOverride`, but is called from inside
-    /// `transcribeAudio`'s serialization gate so the swap can't leak to a concurrent caller.
+    /// active model. Called from inside `transcribeAudio`'s serialization gate so the swap can't
+    /// leak to a concurrent caller — every one-off model (dictation clip AND the rerun dropdown,
+    /// which now passes its option through `transcribeAudio(modelOverride:)`) runs through here.
     private func applyOneOffModel(_ option: DictationModelOption?) -> () -> Void {
         guard let option else { return {} }
         let current = ModelCatalog.activeOption()
