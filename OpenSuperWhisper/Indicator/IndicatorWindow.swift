@@ -112,10 +112,9 @@ class IndicatorViewModel: ObservableObject {
     }
     
     func startRecording() {
-        if isTranscriptionBusy {
-            showBusyMessage()
-            return
-        }
+        // No busy check: a previous dictation may still be transcribing in the background
+        // (DictationPipeline). Recording is decoupled from transcription, so a new recording
+        // can always start — that's the point of parallel recording. (parallel-recording)
 
         // No input device — surface it instead of optimistically showing "recording" and silently
         // capturing nothing (#157). `getActiveMicrophone()` reads the cached device, so this stays
@@ -148,7 +147,11 @@ class IndicatorViewModel: ObservableObject {
 
         // Live transcription (Parakeet only): stream in parallel with the WAV recorder so the
         // indicator can show the text as the user speaks. Falls back to the file pass on stop.
-        if Self.shouldUseLiveStreaming {
+        // Skipped while ANY transcription is in flight — the background dictation pipeline OR the
+        // file-drop `TranscriptionQueue` (`isTranscriptionBusy`) — since the live stream and that
+        // pass would otherwise contend on the same engine. The file pass on stop still produces
+        // the text; only the on-bubble preview is dropped for this clip. (parallel-recording review)
+        if Self.shouldUseLiveStreaming && !DictationPipeline.shared.isProcessing && !isTranscriptionBusy {
             liveStreamingActive = true
             let terms = (AppPreferences.shared.customDictionaryEnabled && AppPreferences.shared.customDictionaryBoostEnabled)
                 ? CustomDictionary.boostTerms(entries: AppPreferences.shared.customDictionaryEntries)
@@ -209,245 +212,45 @@ class IndicatorViewModel: ObservableObject {
         resetCancelConfirmation()
         stopBlinking()
 
-        if isTranscriptionBusy {
-            recorder.cancelRecording()
-            showBusyMessage()
+        // Grab the live-streaming preview text (if any) BEFORE cancelling the stream, then hand
+        // off. A very short clip can come back empty from the offline file pass even when the
+        // sliding-window preview caught it — the pipeline uses this as its fallback. (#short-dictation)
+        var streamedFallback = ""
+        if liveStreamingActive {
+            liveStreamingActive = false
+            streamedFallback = StreamingTranscriptionController.shared.liveCaption
+            Task { await StreamingTranscriptionController.shared.cancel() }
+        }
+
+        guard let tempURL = recorder.stopRecording() else {
+            print("!!! Not found record url !!!")
+            delegate?.didFinishDecoding()
             return
         }
-        
-        state = .decoding
-        
-        if let tempURL = recorder.stopRecording() {
-            Task { [weak self] in
-                guard let self = self else { return }
-                
-                do {
-                    print("start decoding...")
-                    // Live streaming is a preview; the inserted text normally comes from the
-                    // accurate file pass. Grab the preview text first, though: a very short clip
-                    // can come back empty from the offline file model even when the sliding-window
-                    // preview caught it — then it's the only transcription we have (#short-dictation).
-                    var streamedFallback = ""
-                    if self.liveStreamingActive {
-                        self.liveStreamingActive = false
-                        streamedFallback = StreamingTranscriptionController.shared.liveCaption
-                        await StreamingTranscriptionController.shared.cancel()
-                    }
-                    let rawText = try await transcriptionService.transcribeAudio(url: tempURL, settings: Settings())
-                    var text = AppPreferences.shared.cleanTranscription(rawText)
 
-                    // File pass found nothing. Fall back to the live preview if it caught the
-                    // words (short clip); only with neither is it genuinely "no speech" — then
-                    // never paste the placeholder, just hint and finish (no empty recording).
-                    if text == TranscriptionResult.noSpeech
-                        || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        let fallback = AppPreferences.shared
-                            .cleanTranscription(streamedFallback)
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !fallback.isEmpty else {
-                            try? FileManager.default.removeItem(at: tempURL)
-                            await MainActor.run { self.showInfo("No speech detected") }
-                            return
-                        }
-                        text = fallback
-                    }
-
-                    // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
-                    text = await LLMPostProcessor.process(text)
-
-                    // Trailing "press enter" voice command (opt-in): strip it from the text and
-                    // remember to press Return after insertion, submitting the message/prompt.
-                    let (strippedText, shouldSubmit) = AppPreferences.shared.stripSubmitCommand(text)
-                    text = strippedText
-                    let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-
-                    var hookAudioPath: String? = nil
-                    if hasText && AppPreferences.shared.saveTranscriptionHistory {
-                        // Create a new Recording instance
-                        let timestamp = Date()
-                        let fileName = "\(Int(timestamp.timeIntervalSince1970)).wav"
-                        let recordingId = UUID()
-                        let finalURL = Recording(
-                            id: recordingId,
-                            timestamp: timestamp,
-                            fileName: fileName,
-                            transcription: text,
-                            duration: 0,
-                            status: .completed,
-                            progress: 1.0,
-                            sourceFileURL: nil
-                        ).url
-
-                        // Move the temporary recording to final location
-                        try recorder.moveTemporaryRecording(from: tempURL, to: finalURL)
-                        hookAudioPath = finalURL.path
-
-                        await self.storeRecording(
-                            id: recordingId, timestamp: timestamp, fileName: fileName,
-                            finalURL: finalURL, transcription: text,
-                            status: .completed, progress: 1.0)
-                    } else {
-                        // Delete the temporary recording immediately
-                        try? FileManager.default.removeItem(at: tempURL)
-                    }
-
-                    let pasteTargetMissing = hasText ? insertText(text) : false
-                    print("Transcription result: \(text)")
-                    if hasText {
-                        PostRecordHook.runIfEnabled(text: text, audioPath: hookAudioPath, timestamp: Date(), duration: 0)
-                    }
-
-                    // Submit only when auto-paste actually inserted text somewhere (or the user said
-                    // just "press enter" to submit existing content). A Return with no paste target
-                    // would fire into whatever happens to be focused. The short settle delay lets the
-                    // pasted text land in the field before Return reaches it.
-                    if shouldSubmit && AppPreferences.shared.autoPasteTranscription && !pasteTargetMissing {
-                        try? await Task.sleep(nanoseconds: 120_000_000)
-                        TextInserter.pressReturn()
-                    }
-                    await MainActor.run {
-                        if pasteTargetMissing {
-                            self.showInfo("Copied — press ⌘V to paste")
-                        } else {
-                            self.delegate?.didFinishDecoding()
-                        }
-                    }
-                    return
-                } catch {
-                    print("Error transcribing audio: \(error)")
-                    // Don't lose the audio on failure (e.g. an intermittent remote 405 /
-                    // network blip after a long dictation). When history is on, keep the
-                    // recording with a .failed status + retry message so it shows in the log
-                    // and can be re-run with the regenerate (↻) button. Otherwise discard.
-                    if AppPreferences.shared.saveTranscriptionHistory,
-                       let saved = self.persistFailedRecording(tempURL: tempURL) {
-                        await self.storeRecording(
-                            id: saved.id, timestamp: saved.timestamp, fileName: saved.fileName,
-                            finalURL: saved.url, transcription: "Transcription failed — click ↻ to try again.",
-                            status: .failed, progress: 0)
-                    } else {
-                        try? FileManager.default.removeItem(at: tempURL)
-                    }
-                    await MainActor.run {
-                        self.showError("Transcription failed: \(error.localizedDescription)")
-                    }
-                    return
-                }
-            }
-        } else {
-
-            print("!!! Not found record url !!!")
-
-            Task {
-                await MainActor.run {
-                    self.delegate?.didFinishDecoding()
-                }
-            }
-        }
-    }
-
-    /// Insert a recording (already at its final URL) into the store with the measured
-    /// audio duration and the captured source context (app / window / URL / model used).
-    /// Shared by the success and failure paths so their metadata wiring can't drift.
-    private func storeRecording(id: UUID, timestamp: Date, fileName: String, finalURL: URL,
-                                transcription: String, status: RecordingStatus, progress: Float) async {
-        let realDuration = await Self.audioDuration(of: finalURL)
+        // Snapshot the record-start context AND the active model now (both still belong to THIS
+        // recording — the next recording's captureFrontmost / model switch hasn't run yet) so the
+        // history row and the transcription model stay accurate even though the clip is transcribed
+        // later, in the background. (parallel-recording, #model-snapshot)
         let ctx = RecordingContext.shared
-        // The model that actually produced the text (which is the local fallback, not
-        // the configured remote model, when the server was unreachable).
-        let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
-        let wasFallback = transcriptionService.lastUsedFallback
-        await MainActor.run {
-            self.recordingStore.addRecording(Recording(
-                id: id,
-                timestamp: timestamp,
-                fileName: fileName,
-                transcription: transcription,
-                duration: realDuration,
-                status: status,
-                progress: progress,
-                sourceFileURL: nil,
-                sourceAppName: ctx.appName,
-                sourceWindowTitle: ctx.windowTitle,
-                sourceURL: ctx.fullURL,
-                modelUsed: modelUsed,
-                wasFallback: wasFallback
-            ))
-        }
+        let snapshot = DictationPipeline.ContextSnapshot(
+            appName: ctx.appName, windowTitle: ctx.windowTitle, fullURL: ctx.fullURL)
+        let modelOption = ModelCatalog.activeOption()
+
+        // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
+        // queue in recording-start order, so the user can immediately start the next recording
+        // instead of waiting for this one to finish. (parallel-recording)
+        DictationPipeline.shared.enqueue(
+            tempURL: tempURL,
+            startedAt: recordingStartedAt ?? Date(),
+            streamedFallback: streamedFallback,
+            context: snapshot,
+            modelOption: modelOption)
+
+        // Free the indicator right away so the next hotkey press starts a fresh recording.
+        delegate?.didFinishDecoding()
     }
 
-    /// Move a temp recording to its permanent location after a FAILED transcription
-    /// so the audio survives and can be re-run from the history list. Returns the
-    /// saved identity, or nil if the file move failed (then the temp is discarded).
-    private func persistFailedRecording(tempURL: URL) -> (id: UUID, timestamp: Date, fileName: String, url: URL)? {
-        let timestamp = Date()
-        let fileName = "\(Int(timestamp.timeIntervalSince1970)).wav"
-        let id = UUID()
-        let finalURL = Recording(
-            id: id,
-            timestamp: timestamp,
-            fileName: fileName,
-            transcription: "",
-            duration: 0,
-            status: .failed,
-            progress: 0,
-            sourceFileURL: nil
-        ).url
-        do {
-            try recorder.moveTemporaryRecording(from: tempURL, to: finalURL)
-            return (id, timestamp, fileName, finalURL)
-        } catch {
-            print("Failed to persist failed recording: \(error)")
-            return nil
-        }
-    }
-
-    /// Returns `true` when auto-paste ran but no editable field was focused,
-    /// so the caller can surface a "copied — press ⌘V" notice. When no target
-    /// is found, typing is skipped and the text is left on the clipboard.
-    @discardableResult
-    func insertText(_ text: String) -> Bool {
-        let finalText = Self.applyPostProcessing(text)
-        let prefs = AppPreferences.shared
-
-        // Optional, independent clipboard stash (never the insertion mechanism).
-        if prefs.autoCopyToClipboard {
-            ClipboardUtil.copyToClipboard(finalText)
-        }
-
-        guard prefs.autoPasteTranscription else { return false }
-
-        if prefs.pasteInsteadOfTyping {
-            // Paste is universal: ⌘V lands in any text field, including apps the accessibility
-            // check can't read (Messages, Electron), and is a harmless no-op otherwise (the text
-            // is on the clipboard). So no editable-target gate — it only ever produces false
-            // negatives that wrongly suppress a valid paste (#paste-messages).
-            if prefs.autoCopyToClipboard {
-                Diag.measure("TextInserter.paste") { TextInserter.paste() }
-            } else {
-                // The clipboard is only the paste vehicle here — the user opted out of keeping
-                // the text on it (#44) — so put the previous contents back after the ⌘V lands.
-                ClipboardUtil.borrowForPaste(finalText) {
-                    Diag.measure("TextInserter.paste") { TextInserter.paste() }
-                }
-            }
-            return false
-        }
-
-        // Typing mode: synthetic keystrokes go wherever focus is, so only type when we're
-        // confident there's an editable target; otherwise stash on the clipboard and notify ⌘V.
-        let targetMissing = prefs.notifyWhenNoPasteTarget
-            && Diag.measure("focusedElementIsEditable") { FocusUtils.focusedElementIsEditable() } == false
-        if targetMissing {
-            if !prefs.autoCopyToClipboard {
-                ClipboardUtil.copyToClipboard(finalText)
-            }
-            return true
-        }
-        Diag.measure("TextInserter.type") { TextInserter.type(finalText) }
-        return false
-    }
-    
     static func applyPostProcessing(_ text: String) -> String {
         guard AppPreferences.shared.addSpaceAfterSentence else { return text }
         // Some models emit run-on sentences with no space after the period ("regularly.Using" — #107).
@@ -592,6 +395,9 @@ struct IndicatorWindow: View {
     var onContentResize: (CGSize) -> Void = { _ in }
     @ObservedObject private var streaming = StreamingTranscriptionController.shared
     @ObservedObject private var notch = NotchTuning.shared
+    // Surfaces how many earlier clips are still transcribing in the background, so starting a new
+    // recording while others are queued shows the backlog. (parallel-recording #3)
+    @ObservedObject private var pipeline = DictationPipeline.shared
     @Environment(\.colorScheme) private var colorScheme
     
     private var backgroundColor: Color {
@@ -699,7 +505,7 @@ struct IndicatorWindow: View {
                                 .foregroundColor(.orange)
                                 .transition(.opacity)
                         } else {
-                            Text("Recording…")
+                            Text(pipeline.pendingCount > 0 ? "Recording… · \(pipeline.pendingCount) queued" : "Recording…")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.secondary)
                                 .transition(.opacity)
