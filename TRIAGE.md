@@ -120,18 +120,42 @@ interrompre (mixing) via réécriture AVAudioEngine, chevauche #147. → #126 ga
   extraction WhisperCore exonérée, suite verte — le bench restait informationnel ;
   tracker d'origine côté llama.cpp : #22593.)
 - ⚠️ **Liens GRDB / FluidAudio app ↔ WhisperCore.framework** : le lien GRDB côté app
-  N'est PAS vestigial malgré zéro `import GRDB` sous OpenSuperWhisper/ — il est **porteur
-  de la synthèse dynamique du PackageProduct** Xcode : WhisperCore et le bundle de tests
-  partagent une seule copie de GRDB. Le supprimer fait embarquer à chaque image sa copie
+  était **porteur de la synthèse dynamique du PackageProduct** Xcode malgré zéro
+  `import GRDB` sous OpenSuperWhisper/ : WhisperCore et le bundle de tests partageaient
+  ainsi une seule copie de GRDB. Le supprimer faisait embarquer à chaque image sa copie
   statique privée (77 symboles SchedulingWatchdog par image) : la clé watchdog, statique
   par copie liée, fait échouer migrator.migrate en queue-confinement — EXC_BREAKPOINT sur
   toute suite à seam in-memory (prouvé par A/B mono-variable — thread review PR #57 ;
   classe documentée upstream : GRDB issue #1031). Sévérité : GRDBPrecondition est un
   `fatalError` `@inline(__always)` NON restreint au DEBUG (GRDB/Utils/Utils.swift:31) —
-  la duplication crasherait aussi en RELEASE sur tout chemin cross-image ; l'app livrée
-  n'est saine aujourd'hui que par confinement en une seule copie (« architecture-luck »,
-  pas une protection du build). Tout dédoublonnage futur passe par le produit dynamique
-  explicite de GRDB pour WhisperCore+tests, en changement SÉPARÉ et vérifié.
+  la duplication crasherait aussi en RELEASE sur tout chemin cross-image. Ce confinement
+  par synthèse était en outre **dépendant de la toolchain** : tenu sur Xcode stable, le
+  Xcode 26 BÊTA du mainteneur embarque GRDB en statique quoi qu'il arrive (constat
+  2026-07-24 — 24/24 tests à seam in-memory rouges sur dfbbddd non modifié chez lui) :
+  « architecture-luck », pas une protection du build. **Correctif livré dans #57** : le
+  produit dynamique EXPLICITE `GRDB-dynamic` (GRDB 7.5.0) remplace la synthèse — un seul
+  XCSwiftPackageProductDependency partagé (app + WhisperCore + tests), seul son
+  `productName` change ; WhisperCore et le bundle de tests ne contiennent plus aucun
+  symbole SchedulingWatchdog statique et déclarent `@rpath/GRDB-dynamic.framework`
+  (nm/otool). Trois pièges mesurés sur cette toolchain : (1) le produit dynamique explicite
+  n'est PAS auto-embarqué dans le bundle — seuls les PackageProducts SYNTHÉTISÉS et les
+  xcframeworks binaires (Sparkle) le sont ; (2) sur Xcode 26.6 / objectVersion 77, les
+  phases de copie IGNORENT SILENCIEUSEMENT les produits de package : QUATRE sérialisations
+  falsifiées (entrée productRef dans « Embed Frameworks » avec CodeSignOnCopy ±
+  RemoveHeadersOnCopy ; ATTRIBUTES sur l'entrée Frameworks ; fileRef vers
+  PackageFrameworks — toutes sans effet même en build propre, alors que la même phase lie
+  les produits des targets du projet (WhisperCore) et les fichiers sur disque (dylibs) ;
+  le projet de référence groue/GRDB ios-dynamic date d'objectVersion 55). Mécanisme
+  inféré : le graphe de tâches d'une phase de copie ne lie que les références dont le
+  fichier existe à la construction du graphe — un produit de package ne matérialise son
+  framework qu'en cours de build. L'embarqué est donc porté par une phase Run Script
+  « Embed GRDB-dynamic » (ditto + codesign si CODE_SIGNING_ALLOWED) sur la cible app, plus
+  une ligne de signature dédiée dans notarize_app.sh ; (3) DEBUG masque tout cela : rpath
+  absolu vers le répertoire de build — l'app RELEASE avortait au lancement (dyld
+  Library-not-loaded, rc=134) pendant que tests et CI (100 % DEBUG) restaient verts ;
+  aucune gate automatisée ne couvre l'embarqué Release, vérification locale uniquement.
+  Ne JAMAIS co-déclarer le produit statique `GRDB` à côté : la résolution simultanée
+  statique+dynamique recréerait la classe de crash.
   **FluidAudio reste lié deux fois**, cas plus délicat : l'état statique interne n'est plus partagé
   entre le `StreamingTranscriptionController` (côté app) et le `FluidAudioEngine` (côté
   framework). Dédoublonnage différé à une PR dédiée (maintainer : « let's not discover
