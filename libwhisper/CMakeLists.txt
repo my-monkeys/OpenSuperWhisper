@@ -25,10 +25,13 @@ add_subdirectory(whisper.cpp)
 # avoids duplicate-symbol link errors. Order here is load-bearing — do not move
 # llama.cpp before whisper.cpp.
 #
-# Pinned llama.cpp tag: b5630 (2025-06-10). Reconciled to whisper.cpp's vendored
-# ggml, which was last synced on 2025-06-10; the public ggml headers
-# (ggml/include/*.h) are byte-identical between the two checkouts, so ABI skew risk
-# is minimal. If either submodule is bumped, re-verify with:
+# Pinned llama.cpp tag: b9878 (2026-07-05), chosen to match whisper.cpp v1.9.1's
+# vendored ggml — the public ggml headers (ggml/include/*.h) are byte-identical
+# between the two checkouts. That match is a HARD requirement, not a nicety: llama's
+# sources compile against whisper's ggml headers, so a mismatched pin fails outright
+# (an older llama.cpp expected the long-gone `GGML_KQ_MASK_PAD` macro). Whenever
+# either submodule is bumped, pick a llama.cpp tag from the same ggml era and
+# re-verify with:
 #   diff -rq whisper.cpp/ggml/include llama.cpp/ggml/include
 set(LLAMA_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)

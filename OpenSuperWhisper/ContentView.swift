@@ -262,7 +262,11 @@ class ContentViewModel: ObservableObject {
                     let rawText = try await transcriptionService.transcribeAudio(url: tempURL, settings: Settings())
                     let cleanedText = AppPreferences.shared.cleanTranscription(rawText)
                     // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
-                    let text = await LLMPostProcessor.process(cleanedText, bundleID: FocusUtils.frontmostBundleID())
+                    // App-aware formatting keys off the app captured at record-start, not the
+                    // frontmost app: recording from the main window makes OSW itself frontmost, so
+                    // asking the workspace here would never match a profile.
+                    let text = await LLMPostProcessor.process(
+                        cleanedText, bundleID: RecordingContext.shared.bundleID)
 
                     if AppPreferences.shared.saveTranscriptionHistory {
                         // Capture the current recording duration
@@ -733,7 +737,7 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(minWidth: 450)
+        .frame(minWidth: 400, idealWidth: 400)
         .background(ThemePalette.windowBackground(colorScheme))
         .onAppear {
             viewModel.loadInitialData()

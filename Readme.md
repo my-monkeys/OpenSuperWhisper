@@ -71,13 +71,17 @@ Models load lazily: browsing engine tabs never triggers a surprise download.
 
 - 🪟 **Rules** — bind a model to an app (or a website in supported browsers) and the model
   switches automatically when you dictate there: a fast one for chat, an accurate one for email.
+  The same tab holds **per-app formatting** rules, so the cleanup pass knows that "at Rob" means
+  "@Rob" in Slack and "src slash main dot swift" means `src/main.swift` in a terminal.
   Managed from Settings → Rules or the menu-bar **Model** picker.
 - 📖 **Custom dictionary** — your proper nouns and jargon come out spelled right; boosts
   recognition and applies replacements.
 - 🧹 **Cleaner output** — optional filler-word removal (um, uh…), automatic sentence spacing, and
   "No speech detected" is never pasted.
-- 🤖 **AI cleanup** — optionally tidy punctuation/casing through a local [Ollama](https://ollama.com)
-  model. Fully on-device, opt-in.
+- 🤖 **AI cleanup** — optionally tidy punctuation/casing with an LLM: the **built-in** model
+  (Qwen2.5 1.5B, one-time ~1 GB download, no server to run), a local
+  [Ollama](https://ollama.com) server, or any OpenAI-compatible endpoint. Opt-in; the first two
+  stay fully on-device, and the transcription is returned verbatim if the model misbehaves.
 - ⏯️ **Media handling** — pause other apps' playback (and resume only what was actually playing) or
   duck the system volume while you record.
 - 🎤 **Any microphone** — built-in, external, Bluetooth or iPhone (Continuity), switchable from the

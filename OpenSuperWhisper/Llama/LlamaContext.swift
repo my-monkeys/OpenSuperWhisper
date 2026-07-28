@@ -2,13 +2,13 @@
 //  LlamaContext.swift
 //  OpenSuperWhisper
 //
-//  Swift wrapper over the llama.cpp C API (pinned tag b5630, 2025-06-10), mirroring
+//  Swift wrapper over the llama.cpp C API (pinned tag b9878, 2026-07-05), mirroring
 //  the structure of Whis/Whis.swift. Holds OpaquePointers for the llama_model and
 //  llama_context and exposes a minimal text-generation API used by the built-in LLM
 //  cleanup backend.
 //
 //  This file is written against the signatures declared in
-//  libwhisper/llama.cpp/include/llama.h at tag b5630. The relevant declarations:
+//  libwhisper/llama.cpp/include/llama.h at tag b9878. The relevant declarations:
 //
 //    void                  llama_backend_init(void);
 //    void                  llama_backend_free(void);
@@ -38,6 +38,9 @@
 //    llama_batch           llama_batch_get_one(llama_token * tokens, int32_t n_tokens);
 //    int32_t               llama_decode(llama_context * ctx, llama_batch batch);
 //    uint32_t              llama_n_ctx(const llama_context * ctx);
+//    llama_memory_t        llama_get_memory(const llama_context * ctx);
+//    void                  llama_memory_clear(llama_memory_t mem, bool data);
+//    void                  llama_sampler_reset(llama_sampler * smpl);
 //    llama_sampler_chain_params llama_sampler_chain_default_params(void);
 //    llama_sampler *       llama_sampler_chain_init(llama_sampler_chain_params params);
 //    void                  llama_sampler_chain_add(llama_sampler * chain, llama_sampler * smpl);
@@ -52,13 +55,15 @@
 //
 //  struct llama_chat_message { const char * role; const char * content; }
 //
-//  NOTE: This file is NOT compile-verified in this workstream (the consolidated app
-//  build is run separately). The signatures above are copied verbatim from the pinned
-//  header; if the submodule is bumped, re-verify them.
+//  NOTE: the signatures above are copied verbatim from the pinned header; if the
+//  submodule is bumped, re-verify them.
 //
 
 import Foundation
 
+/// NOT thread-safe: `llama_context` holds the KV cache and must be used by one caller at a
+/// time. Every access goes through `BuiltInLlamaBackend`'s serial inference queue, which is
+/// also what owns this object's lifetime.
 public final class LlamaContext {
 
     public typealias LlamaToken = Int32
@@ -230,18 +235,21 @@ public final class LlamaContext {
         return Array(tokens.prefix(Int(n)))
     }
 
-    private func piece(for token: LlamaToken) -> String {
-        guard let vocab else { return "" }
+    /// Raw UTF-8 bytes of a token's piece. Deliberately NOT decoded per token: a BPE token can end
+    /// mid-character (accented text, CJK, emoji), so decoding each piece on its own turns the split
+    /// character into U+FFFD. Callers accumulate the bytes and decode the whole run once.
+    private func pieceBytes(for token: LlamaToken) -> [UInt8] {
+        guard let vocab else { return [] }
         var buf = [CChar](repeating: 0, count: 128)
         let n = llama_token_to_piece(vocab, token, &buf, Int32(buf.count), 0, /* special */ false)
         if n < 0 {
             buf = [CChar](repeating: 0, count: Int(-n))
             let n2 = llama_token_to_piece(vocab, token, &buf, Int32(buf.count), 0, false)
-            guard n2 > 0 else { return "" }
-            return String(decoding: buf.prefix(Int(n2)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            guard n2 > 0 else { return [] }
+            return buf.prefix(Int(n2)).map { UInt8(bitPattern: $0) }
         }
-        guard n > 0 else { return "" }
-        return String(decoding: buf.prefix(Int(n)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        guard n > 0 else { return [] }
+        return buf.prefix(Int(n)).map { UInt8(bitPattern: $0) }
     }
 
     private func isEndOfGeneration(_ token: LlamaToken) -> Bool {
@@ -256,6 +264,16 @@ public final class LlamaContext {
     public func generate(system: String, user: String, maxTokens: Int = 512) -> String {
         guard let ctx, let sampler else { return "" }
 
+        // Every call is an independent completion, so start from an empty KV cache. This is not
+        // optional hygiene: `llama_batch_get_one` carries no explicit positions, so llama continues
+        // from wherever the last decode stopped. Without the clear, dictation N+1 decodes appended
+        // to N — earlier dictations leak into this one's context — and once the accumulated tokens
+        // pass `n_ctx`, `llama_decode` fails outright and every later cleanup returns "" (a silent
+        // no-op until the app restarts). The sampler is reset for the same reason: its accepted-token
+        // history belongs to the previous generation.
+        llama_memory_clear(llama_get_memory(ctx), true)
+        llama_sampler_reset(sampler)
+
         let prompt = formatChatPrompt(system: system, user: user)
         var promptTokens = tokenize(prompt, addSpecial: true)
         guard !promptTokens.isEmpty else { return "" }
@@ -267,7 +285,7 @@ public final class LlamaContext {
         }
 
         // Decode the prompt as one batch (llama_batch_get_one tracks positions for seq 0).
-        var output = ""
+        var outputBytes: [UInt8] = []
         var batchOK = promptTokens.withUnsafeMutableBufferPointer { buf -> Bool in
             let batch = llama_batch_get_one(buf.baseAddress, Int32(buf.count))
             return llama_decode(ctx, batch) == 0
@@ -283,7 +301,7 @@ public final class LlamaContext {
             if isEndOfGeneration(nextToken) { break }
 
             llama_sampler_accept(sampler, nextToken)
-            output += piece(for: nextToken)
+            outputBytes.append(contentsOf: pieceBytes(for: nextToken))
 
             // Feed the sampled token back in for the next step.
             var single = [LlamaToken](arrayLiteral: nextToken)
@@ -296,6 +314,9 @@ public final class LlamaContext {
             generated += 1
         }
 
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        // One decode over the whole byte run, so multi-byte characters that straddled two tokens
+        // survive intact.
+        return String(decoding: outputBytes, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

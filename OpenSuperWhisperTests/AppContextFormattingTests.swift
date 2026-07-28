@@ -101,4 +101,54 @@ final class AppContextFormattingTests: XCTestCase {
         // Input under 20 chars skips the ratio check, so even a large relative change passes.
         XCTAssertTrue(LLMPostProcessor.passesLengthGuard(input: "ok", output: "OK."))
     }
+
+    func testLengthGuardRejectsHeavyShrinkWithoutProfile() {
+        // Prose cleanup returns roughly the same text; a 0.2x collapse means the model
+        // went off-contract, so the raw transcription wins.
+        XCTAssertFalse(LLMPostProcessor.passesLengthGuard(
+            input: "send the report to the team please", output: "sent it"))
+    }
+
+    func testLengthGuardAllowsCondensingWithProfile() {
+        // The shipped Terminal preset's own examples condense hard — they must survive the
+        // guard, or app-aware formatting silently does nothing.
+        XCTAssertTrue(LLMPostProcessor.passesLengthGuard(
+            input: "three zero zero zero", output: "3000", condensingAllowed: true))
+        XCTAssertTrue(LLMPostProcessor.passesLengthGuard(
+            input: "open paren close paren", output: "()", condensingAllowed: true))
+        XCTAssertTrue(LLMPostProcessor.passesLengthGuard(
+            input: "ENG dash one zero five one six", output: "ENG-10516", condensingAllowed: true))
+    }
+
+    func testLengthGuardStillRejectsCollapseToNothingWithProfile() {
+        // A profile relaxes the floor, it doesn't remove it: a one-word reply to a long
+        // dictation is still the model answering instead of transforming.
+        let input = String(repeating: "convert this spoken text into symbols. ", count: 6)
+        XCTAssertFalse(LLMPostProcessor.passesLengthGuard(
+            input: input, output: "OK.", condensingAllowed: true))
+        XCTAssertFalse(LLMPostProcessor.passesLengthGuard(
+            input: input, output: "   ", condensingAllowed: true))
+    }
+
+    /// Stand-in for an external backend (Ollama / Remote), which must inherit the opt-out.
+    private struct StubBackend: LLMCleanupBackend {
+        var isReady = true
+        func generate(system: String, user: String) async throws -> String { "" }
+    }
+
+    func testExternalBackendsOptOutOfRatioGuard() {
+        // Only the small built-in model asks for the ratio check; external backends keep the
+        // original blank-output-only behaviour, so a deliberately condensing custom instruction
+        // on a big model isn't rejected.
+        XCTAssertFalse(StubBackend().enforcesLengthRatio)
+        XCTAssertTrue(BuiltInLlamaBackend.shared.enforcesLengthRatio)
+    }
+
+    func testLengthGuardStillRejectsBlowupWithProfile() {
+        // The ceiling is unchanged by a profile — an explanation is an explanation.
+        let input = "git checkout dash b feature slash login"
+        XCTAssertFalse(LLMPostProcessor.passesLengthGuard(
+            input: input, output: String(repeating: "x", count: input.count * 4),
+            condensingAllowed: true))
+    }
 }

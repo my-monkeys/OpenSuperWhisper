@@ -19,6 +19,7 @@ final class DictationPipeline: ObservableObject {
     /// shows where THIS clip was dictated — not wherever focus moved to by the time it's processed.
     struct ContextSnapshot {
         var appName: String? = nil
+        var bundleID: String? = nil
         var windowTitle: String? = nil
         var fullURL: String? = nil
     }
@@ -141,8 +142,11 @@ final class DictationPipeline: ObservableObject {
                 text = fallback
             }
 
-            // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
-            text = await LLMPostProcessor.process(text)
+            // Optional LLM cleanup (no-op when disabled; returns the raw text on failure). The
+            // app-aware formatting rules are keyed off the app that was frontmost when the clip was
+            // RECORDED — the app the user was dictating into — not whatever is frontmost now that
+            // the background queue got to it. (parallel-recording)
+            text = await LLMPostProcessor.process(text, bundleID: item.context.bundleID)
 
             // Trailing "press enter" voice command (opt-in): strip it and remember to press Return
             // after insertion, submitting the message/prompt.

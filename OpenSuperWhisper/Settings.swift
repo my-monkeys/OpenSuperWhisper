@@ -363,12 +363,19 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// True when anything needs the LLM: prose cleanup or the per-app formatting rules. Both feed
+    /// the same backend, so this is what gates the backend UI and its connection probe.
+    var llmCleanupInUse: Bool { aiPostProcessingEnabled || appContextFormattingEnabled }
+
     /// Cleanup backend: "builtin" (embedded llama.cpp), "ollama" (local server), or
     /// "remote" (OpenAI-compatible server).
     @Published var aiBackend: String {
         didSet {
             AppPreferences.shared.aiBackend = aiBackend
-            if aiPostProcessingEnabled { testLLMConnection() }
+            if llmCleanupInUse { testLLMConnection() }
+            // Warm the ~1 GB context now, while the user is here in Settings, so their first
+            // dictation doesn't wait several seconds for it. Released again after an idle spell.
+            if aiBackend == "builtin" { BuiltInLlamaBackend.shared.preload() }
         }
     }
 
@@ -389,6 +396,9 @@ class SettingsViewModel: ObservableObject {
                     Task { @MainActor in self.builtInModelDownloadProgress = progress }
                 }
                 self.builtInModelDownloaded = LLMModelManager.shared.isDefaultModelDownloaded()
+                // Load it straight away: the download already made them wait, and this keeps the
+                // load out of their first dictation.
+                BuiltInLlamaBackend.shared.preload()
             } catch {
                 self.builtInModelDownloadError = error.localizedDescription
             }
@@ -514,12 +524,19 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
-    /// App-aware LLM formatting: per-app instructions, keyed by frontmost bundle identifier,
-    /// that reshape the transcription via the same LLM cleanup pass (e.g. "at Rob" -> "@Rob"
-    /// in Slack). Independent of `aiPostProcessingEnabled`: either can contribute to one pass.
+    /// App-aware LLM formatting: per-app instructions, keyed by the bundle identifier of the app
+    /// dictated into, that reshape the transcription via the same LLM cleanup pass (e.g. "at Rob"
+    /// -> "@Rob" in Slack). Independent of `aiPostProcessingEnabled`: either can contribute to one
+    /// pass. Edited in Settings → Rules; the shared backend is configured in Output → Cleanup.
     @Published var appContextFormattingEnabled: Bool {
         didSet {
             AppPreferences.shared.appContextFormattingEnabled = appContextFormattingEnabled
+            // Same reasoning as the general-cleanup toggle: this feature also needs the backend,
+            // so probe/warm it now instead of failing silently on the next dictation.
+            if appContextFormattingEnabled {
+                testLLMConnection()
+                if aiBackend == "builtin" { BuiltInLlamaBackend.shared.preload() }
+            }
         }
     }
 
@@ -1221,10 +1238,6 @@ struct SettingsView: View {
     @State private var appLanguage = LanguageManager.selected
     @State private var langNeedsRelaunch = false
     @State private var cancelKey = "esc"
-    // App-aware formatting: app picker sheet. `appPickerTargetID` is the profile being (re)assigned
-    // an app, or nil when the picker is adding a brand-new profile.
-    @State private var showingAppPicker = false
-    @State private var appPickerTargetID: UUID?
 
     /// Curated cancel-recording keys (the recorder can't capture Esc / single special keys).
     struct CancelKeyChoice: Identifiable {
@@ -1703,15 +1716,10 @@ struct SettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
     }
 
-    /// Themed multiline editor (regex, prompts, instructions).
+    /// Themed multiline editor (regex, prompts, instructions). See `SEditor`, shared with
+    /// the Rules pane.
     private func sEditor(_ text: Binding<String>, height: CGFloat) -> some View {
-        TextEditor(text: text)
-            .font(.system(size: 11.5, design: .monospaced))
-            .scrollContentBackground(.hidden)
-            .padding(6)
-            .frame(height: height)
-            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+        SEditor(text: text, height: height)
     }
 
     @ViewBuilder private var ollamaCleanupFields: some View {
@@ -1735,6 +1743,9 @@ struct SettingsView: View {
                     .foregroundColor(STheme.ok)
                     .padding(.horizontal, 9).padding(.vertical, 2)
                     .background(Capsule().fill(STheme.okBg))
+                Text("Loads on first use (a few seconds), then frees its ~1 GB after 5 minutes idle.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if let progress = viewModel.builtInModelDownloadProgress {
                 ProgressView(value: progress).frame(width: 160).controlSize(.small)
                 Text("\(Int(progress * 100))%").font(.system(size: 11)).foregroundColor(STheme.hint)
@@ -1850,7 +1861,10 @@ struct SettingsView: View {
                     SToggle(isOn: $viewModel.aiPostProcessingEnabled)
                 }
                 .frame(minHeight: 26)
-                if viewModel.aiPostProcessingEnabled {
+                // One backend serves BOTH this prose cleanup and the per-app formatting rules in
+                // Settings → Rules, so it stays visible while either is on — otherwise someone
+                // using formatting only would have nowhere to pick a backend or download a model.
+                if viewModel.aiPostProcessingEnabled || viewModel.appContextFormattingEnabled {
                     SRow(title: "Backend", indented: true) {
                         Picker("", selection: $viewModel.aiBackend) {
                             Text("Built-in (Qwen2.5 1.5B)").tag("builtin")
@@ -1860,6 +1874,11 @@ struct SettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.segmented)
                         .fixedSize()
+                    }
+                    if !viewModel.aiPostProcessingEnabled {
+                        Text("Used by the per-app formatting rules in Rules.")
+                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .padding(.leading, 16)
                     }
 
                     switch viewModel.aiBackend {
@@ -1875,86 +1894,14 @@ struct SettingsView: View {
                         HStack { Spacer(); llmStatusView }
                             .padding(.leading, 16)
                     }
+                }
+                if viewModel.aiPostProcessingEnabled {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
                         sEditor($viewModel.aiPostProcessingPrompt, height: 64)
                     }
                     .padding(.leading, 16)
                 }
-            }
-
-            SSection(title: "App-Aware Formatting") {
-                SRow(title: "Reformat per app",
-                     hint: "Reshape the transcription via the LLM cleanup pass, per frontmost app — e.g. \"at Rob\" → \"@Rob\" in Slack. Requires the AI Cleanup model above.") {
-                    SToggle(isOn: $viewModel.appContextFormattingEnabled)
-                }
-                if viewModel.appContextFormattingEnabled {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if viewModel.appContextProfiles.isEmpty {
-                            Text("No apps yet. Add one below.")
-                                .font(.system(size: 11)).foregroundColor(STheme.hint)
-                                .padding(.vertical, 4)
-                        }
-                        ForEach($viewModel.appContextProfiles) { $profile in
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(spacing: 10) {
-                                    Button {
-                                        appPickerTargetID = profile.id
-                                        showingAppPicker = true
-                                    } label: {
-                                        HStack(spacing: 10) {
-                                            Image(nsImage: InstalledApps.icon(forBundleIdentifier: profile.bundleIdentifier))
-                                                .resizable()
-                                                .frame(width: 20, height: 20)
-                                            VStack(alignment: .leading, spacing: 1) {
-                                                Text(profile.appName.isEmpty ? "Choose an app…" : profile.appName)
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(profile.appName.isEmpty ? STheme.hint : STheme.text)
-                                                if !profile.bundleIdentifier.isEmpty {
-                                                    Text(profile.bundleIdentifier)
-                                                        .font(.system(size: 10))
-                                                        .foregroundColor(STheme.hint)
-                                                }
-                                            }
-                                            Image(systemName: "chevron.up.chevron.down")
-                                                .font(.system(size: 9))
-                                                .foregroundColor(STheme.hint)
-                                            Spacer()
-                                        }
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help("Change the app")
-
-                                    Button {
-                                        viewModel.appContextProfiles.removeAll { $0.id == profile.id }
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(STheme.hint)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help("Remove this app")
-                                    .frame(width: 24)
-                                }
-                                sEditor($profile.instructions, height: 56)
-                            }
-                            .padding(.bottom, 2)
-                        }
-                        Button {
-                            appPickerTargetID = nil
-                            showingAppPicker = true
-                        } label: {
-                            Label("Add App", systemImage: "plus")
-                                .font(.system(size: 11.5, weight: .medium))
-                        }
-                        .controlSize(.small)
-                    }
-                    .padding(.leading, 16)
-                }
-            }
-            .sheet(isPresented: $showingAppPicker) {
-                AppPickerSheet { app in applyPickedApp(app) }
             }
 
             SSection(title: "Dictionary") {
@@ -2064,19 +2011,6 @@ struct SettingsView: View {
                 }
             }
         }
-    }
-
-    /// Applies the app chosen in the picker: reassigns the targeted profile, or appends a new one.
-    private func applyPickedApp(_ app: InstalledApp) {
-        if let targetID = appPickerTargetID,
-           let idx = viewModel.appContextProfiles.firstIndex(where: { $0.id == targetID }) {
-            viewModel.appContextProfiles[idx].appName = app.name
-            viewModel.appContextProfiles[idx].bundleIdentifier = app.bundleIdentifier
-        } else {
-            viewModel.appContextProfiles.append(
-                AppContextProfile(bundleIdentifier: app.bundleIdentifier, appName: app.name, instructions: ""))
-        }
-        appPickerTargetID = nil
     }
 
     private var storageSettings: some View {

@@ -33,6 +33,7 @@ final class AppPreferences {
         migrateOldPreferences()
         seedAppContextPresetsIfNeeded()
         migrateGroqToRemote()
+        migrateAIProviderToBackend()
     }
 
     private func migrateOldPreferences() {
@@ -60,7 +61,20 @@ final class AppPreferences {
         }
         selectedEngine = "remote"
     }
-    
+
+    /// The cleanup-backend key was renamed `aiProvider` → `aiBackend` when the built-in llama.cpp
+    /// backend added a third value ("builtin"). Carry the stored choice over once, so someone who
+    /// had picked "remote" isn't silently dropped back onto the "ollama" default. Idempotent: it
+    /// only runs while the new key is unset, and the old key is never read again afterwards.
+    private func migrateAIProviderToBackend() {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: "aiBackend") == nil,
+              let old = defaults.string(forKey: "aiProvider"),
+              !old.isEmpty
+        else { return }
+        aiBackend = old
+    }
+
     // Engine settings
     @UserDefault(key: "selectedEngine", defaultValue: "whisper")
     var selectedEngine: String
@@ -331,7 +345,8 @@ final class AppPreferences {
 
     /// Which LLM backend serves cleanup/formatting: "ollama" (external server), "builtin"
     /// (embedded llama.cpp), or "remote" (any OpenAI-compatible /v1/chat/completions server —
-    /// Groq, OpenAI, LiteLLM…). Defaults to "ollama".
+    /// Groq, OpenAI, LiteLLM…). Defaults to "ollama". Renamed from the older `aiProvider` key,
+    /// which `migrateAIProviderToBackend()` carries over for existing users.
     @UserDefault(key: "aiBackend", defaultValue: "ollama")
     var aiBackend: String
 

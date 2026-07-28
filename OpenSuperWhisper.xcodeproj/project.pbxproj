@@ -834,7 +834,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				INFOPLIST_FILE = "OpenSuperWhisper/OpenSuperWhisper-Info.plist";
@@ -901,7 +902,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				INFOPLIST_FILE = "OpenSuperWhisper/OpenSuperWhisper-Info.plist";
@@ -954,7 +956,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
@@ -979,7 +982,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;

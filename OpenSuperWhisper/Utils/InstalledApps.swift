@@ -49,19 +49,6 @@ enum InstalledApps {
         return InstalledApp(bundleIdentifier: bid, name: name, url: url)
     }
 
-    /// Best match for a spoken app name ("slack" → Slack), preferring exact, then prefix, then the
-    /// shortest containing name (so "slack" picks "Slack" over "Slack Helper"). Pure; testable.
-    static func bestMatch(forSpokenName query: String, in apps: [InstalledApp]) -> InstalledApp? {
-        let q = query.lowercased()
-            .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
-        guard !q.isEmpty else { return nil }
-        if let exact = apps.first(where: { $0.name.lowercased() == q }) { return exact }
-        if let prefix = apps.first(where: { $0.name.lowercased().hasPrefix(q) }) { return prefix }
-        return apps
-            .filter { $0.name.lowercased().contains(q) }
-            .min { $0.name.count < $1.name.count }
-    }
-
     /// Icon for a discovered app.
     static func icon(for url: URL) -> NSImage {
         NSWorkspace.shared.icon(forFile: url.path)

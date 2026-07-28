@@ -7,7 +7,17 @@ protocol LLMCleanupBackend {
     /// Whether the backend can serve a request right now (e.g. the built-in model is downloaded
     /// and loaded). When false, `LLMPostProcessor` skips cleanup and returns the raw text.
     var isReady: Bool { get }
+    /// Whether `LLMPostProcessor` should apply its output-length ratio check to this backend's
+    /// output (see `passesLengthGuard`). True only for the small built-in model, which is the one
+    /// weak enough to answer the transcription instead of transforming it. Ollama/Remote keep the
+    /// original blank-output-only check, so a user who repurposed the instruction on a big model
+    /// (condensing, expanding) isn't second-guessed.
+    var enforcesLengthRatio: Bool { get }
     func generate(system: String, user: String) async throws -> String
+}
+
+extension LLMCleanupBackend {
+    var enforcesLengthRatio: Bool { false }
 }
 
 /// Result of probing an LLM-cleanup backend for the settings UI.
@@ -63,9 +73,15 @@ enum LLMPostProcessor {
         do {
             let raw = try await backend.generate(system: system, user: wrapUserText(text))
             let result = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            // Reject blank or wildly-off output (a model that "answered" instead of transforming),
-            // falling back to the verbatim transcription rather than losing or mangling it.
-            guard passesLengthGuard(input: text, output: result) else { return text }
+            // Blank output always falls back to the verbatim transcription. The length-ratio check
+            // on top of that runs only for backends that ask for it (the small built-in model), and
+            // an active app profile relaxes its shrink floor because those rules condense on
+            // purpose — see `passesLengthGuard`.
+            guard !result.isEmpty else { return text }
+            if backend.enforcesLengthRatio,
+               !passesLengthGuard(input: text, output: result, condensingAllowed: prof != nil) {
+                return text
+            }
             return result
         } catch {
             print("AI post-processing failed, using the raw transcription: \(error)")
@@ -113,16 +129,24 @@ enum LLMPostProcessor {
     }
 
     /// Sanity-checks LLM output against its input to catch a model that ignored the transform-only
-    /// contract (e.g. answered a question, returned an explanation, or emptied the text). Rejects
-    /// blank/whitespace output, and output whose length deviates wildly from the input (< 0.3x or
-    /// > 3x). Very short inputs (< 20 chars) skip the ratio check: at that length a legitimate
-    /// transform ("ok" -> "OK.") can easily double or halve, so the ratio is too noisy to trust.
-    static func passesLengthGuard(input: String, output: String) -> Bool {
+    /// contract (e.g. answered a question, returned an explanation, or emptied the text). Blank
+    /// output is always rejected; beyond that the check is a length ratio, skipped for inputs under
+    /// 20 characters where a legitimate transform ("ok" -> "OK.") can easily double or halve.
+    ///
+    /// The ceiling (3x) catches the classic failure — the model explains or answers instead of
+    /// rewriting. The floor depends on what was asked for: prose cleanup returns roughly the same
+    /// text, so a big shrink means it went off-contract (0.3x). App formatting rules, though,
+    /// condense on purpose — the shipped Terminal preset turns "three zero zero zero" into "3000"
+    /// (0.2x) and "open paren close paren" into "()" — so an active profile drops the floor to 0.05x,
+    /// low enough for symbol/digit collapsing while still rejecting a one-word "OK." reply to a long
+    /// dictation.
+    static func passesLengthGuard(input: String, output: String,
+                                  condensingAllowed: Bool = false) -> Bool {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return false }
         if input.count < 20 { return true }
-        let ratio = Double(output.count) / Double(input.count)
-        return ratio >= 0.3 && ratio <= 3.0
+        let ratio = Double(trimmed.count) / Double(input.count)
+        return ratio >= (condensingAllowed ? 0.05 : 0.3) && ratio <= 3.0
     }
 
     /// Wraps the transcription so even a weak model treats it as text to correct rather than a
