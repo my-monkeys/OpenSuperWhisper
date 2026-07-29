@@ -9,6 +9,10 @@ import SwiftUI
 extension KeyboardShortcuts.Name {
     static let toggleRecord = Self("toggleRecord", default: .init(.backtick, modifiers: .option))
     static let escape = Self("escape", default: .init(.escape))
+    /// Re-pastes the last transcription. Deliberately unbound by default — it is opt-in, and
+    /// claiming a global combination for every user isn't ours to do. ⌃⌘V is a natural pick: it
+    /// sits next to ⌘V without colliding with it or with paste-and-match-style (⌥⇧⌘V).
+    static let pasteLastTranscription = Self("pasteLastTranscription")
 }
 
 class ShortcutManager {
@@ -66,6 +70,15 @@ class ShortcutManager {
 
         KeyboardShortcuts.onKeyUp(for: .toggleRecord) { [weak self] in
             self?.handleKeyUp()
+        }
+
+        // On key-UP: the handler waits for the modifiers to lift before synthesizing ⌘V, and
+        // starting that wait only once the key is released keeps a held-down shortcut from
+        // firing repeatedly.
+        KeyboardShortcuts.onKeyUp(for: .pasteLastTranscription) {
+            Task { @MainActor in
+                await PasteLastTranscript.run()
+            }
         }
 
         KeyboardShortcuts.onKeyUp(for: .escape) { [weak self] in

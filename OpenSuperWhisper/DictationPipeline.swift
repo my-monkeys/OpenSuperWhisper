@@ -269,47 +269,11 @@ final class DictationPipeline: ObservableObject {
     }
 
     /// Returns `true` when auto-paste ran but no editable field was focused, so the caller can leave
-    /// the text on the clipboard and notify ⌘V. When no target is found, typing is skipped. Moved
-    /// here from the indicator view model; behaviour matches master incl. the #45 clipboard restore.
+    /// the text on the clipboard and notify ⌘V. When no target is found, typing is skipped. The
+    /// insertion policy itself lives in `TranscriptInserter`, shared with the re-paste shortcut.
     @discardableResult
     private func insertText(_ text: String) -> Bool {
-        let finalText = IndicatorViewModel.applyPostProcessing(text)
-        let prefs = AppPreferences.shared
-
-        // Optional, independent clipboard stash (never the insertion mechanism).
-        if prefs.autoCopyToClipboard {
-            ClipboardUtil.copyToClipboard(finalText)
-        }
-
-        guard prefs.autoPasteTranscription else { return false }
-
-        if prefs.pasteInsteadOfTyping {
-            // Paste is universal: ⌘V lands in any text field, including apps the accessibility check
-            // can't read (Messages, Electron), and is a harmless no-op otherwise. So no editable-
-            // target gate — it only ever produces false negatives (#paste-messages).
-            if prefs.autoCopyToClipboard {
-                Diag.measure("TextInserter.paste") { TextInserter.paste() }
-            } else {
-                // The clipboard is only the paste vehicle here — the user opted out of keeping the
-                // text on it (#44) — so put the previous contents back after the ⌘V lands.
-                ClipboardUtil.borrowForPaste(finalText) {
-                    Diag.measure("TextInserter.paste") { TextInserter.paste() }
-                }
-            }
-            return false
-        }
-
-        // Typing mode: synthetic keystrokes go wherever focus is, so only type when we're confident
-        // there's an editable target; otherwise stash on the clipboard and notify ⌘V.
-        let targetMissing = prefs.notifyWhenNoPasteTarget
-            && Diag.measure("focusedElementIsEditable") { FocusUtils.focusedElementIsEditable() } == false
-        if targetMissing {
-            if !prefs.autoCopyToClipboard {
-                ClipboardUtil.copyToClipboard(finalText)
-            }
-            return true
-        }
-        Diag.measure("TextInserter.type") { TextInserter.type(finalText) }
-        return false
+        TranscriptInserter.insert(IndicatorViewModel.applyPostProcessing(text),
+                                  honorAutoPastePreference: true)
     }
 }

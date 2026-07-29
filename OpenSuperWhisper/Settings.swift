@@ -2207,6 +2207,11 @@ struct SettingsView: View {
                 SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
                     SToggle(isOn: $viewModel.holdToRecord)
                 }
+                SRow(title: "Paste last transcription",
+                     hint: "Inserts your most recent transcription again, wherever the cursor is. Unbound by default — ⌫ clears it") {
+                    ShortcutRecorderField(name: .pasteLastTranscription)
+                        .frame(width: 170)
+                }
                 SRow(title: "Cancel shortcut") {
                     Picker("", selection: $cancelKey) {
                         ForEach(SettingsView.cancelKeyChoices) { choice in
