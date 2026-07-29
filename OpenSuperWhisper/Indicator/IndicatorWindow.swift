@@ -28,6 +28,8 @@ class IndicatorViewModel: ObservableObject {
 
     @Published var state: RecordingState = .idle
     @Published var isBlinking = false
+    /// The recording has been pinned hands-free and no longer depends on the trigger key.
+    @Published var isLatched = false
     @Published var isConfirmingCancel = false
     @Published var recorder: AudioRecorder = .shared
     @Published var isVisible = false
@@ -211,6 +213,7 @@ class IndicatorViewModel: ObservableObject {
     func startDecoding() {
         resetCancelConfirmation()
         stopBlinking()
+        isLatched = false
 
         // Grab the live-streaming preview text (if any) BEFORE cancelling the stream, then hand
         // off. A very short clip can come back empty from the offline file pass even when the
@@ -287,6 +290,7 @@ class IndicatorViewModel: ObservableObject {
     func cleanup() {
         stopBlinking()
         resetCancelConfirmation()
+        isLatched = false
         recordingStartedAt = nil
         hideTimer?.invalidate()
         hideTimer = nil
@@ -317,7 +321,11 @@ class IndicatorViewModel: ObservableObject {
 
 struct RecordingIndicator: View {
     let isBlinking: Bool
-    
+    /// Hands-free: the dot swells, stops blinking and gains a slow outward pulse. The change has to
+    /// be legible at a glance and from the corner of the eye — it is the only signal that it is now
+    /// safe to let go of the trigger key.
+    var isLatched: Bool = false
+
     var body: some View {
         Circle()
             .fill(
@@ -330,10 +338,29 @@ struct RecordingIndicator: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .frame(width: 8, height: 8)
-            .shadow(color: .red.opacity(0.5), radius: 4)
-            .opacity(isBlinking ? 0.3 : 1.0)
+            .frame(width: isLatched ? 11 : 8, height: isLatched ? 11 : 8)
+            .shadow(color: .red.opacity(0.5), radius: isLatched ? 6 : 4)
+            // Latched reads as steady-and-pulsing rather than blinking: a solid dot says the
+            // recording no longer depends on anything being held down.
+            .opacity(isLatched ? 1.0 : (isBlinking ? 0.3 : 1.0))
+            .overlay { if isLatched { LatchPulse() } }
             .animation(.easeInOut(duration: 0.4), value: isBlinking)
+            .animation(.spring(response: 0.32, dampingFraction: 0.55), value: isLatched)
+    }
+}
+
+/// The ring that expands out of the latched dot and fades, once per beat. Deliberately slow: it is
+/// an ambient "still going" cue, not something to keep looking at.
+private struct LatchPulse: View {
+    @State private var expanded = false
+
+    var body: some View {
+        Circle()
+            .stroke(Color.red.opacity(0.55), lineWidth: 1.5)
+            .scaleEffect(expanded ? 2.1 : 1)
+            .opacity(expanded ? 0 : 0.7)
+            .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false), value: expanded)
+            .onAppear { expanded = true }
     }
 }
 
@@ -497,7 +524,7 @@ struct IndicatorWindow: View {
                 if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
                     HStack(alignment: .center, spacing: 10) {
-                        RecordingIndicator(isBlinking: viewModel.isBlinking)
+                        RecordingIndicator(isBlinking: viewModel.isBlinking, isLatched: viewModel.isLatched)
                             .frame(width: 16)
                         if viewModel.isConfirmingCancel {
                             Text("Press Esc to cancel")
@@ -505,6 +532,10 @@ struct IndicatorWindow: View {
                                 .foregroundColor(.orange)
                                 .transition(.opacity)
                         } else {
+                            // Latching deliberately leaves this line alone. A longer string is
+                            // truncated rather than widening the bubble, and swapping the label
+                            // makes latched and unlatched recordings look like different things
+                            // when they aren't — the dot carries the state.
                             Text(pipeline.pendingCount > 0 ? "Recording… · \(pipeline.pendingCount) queued" : "Recording…")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.secondary)
@@ -522,7 +553,7 @@ struct IndicatorWindow: View {
                     // Center-aligned: with the (taller) on-bubble buttons enabled, .top
                     // alignment pinned a single caption line above the vertical middle.
                     HStack(alignment: .center, spacing: 10) {
-                        RecordingIndicator(isBlinking: viewModel.isBlinking)
+                        RecordingIndicator(isBlinking: viewModel.isBlinking, isLatched: viewModel.isLatched)
                             .frame(width: 16)
                         (Text(streaming.confirmedText).foregroundColor(.primary)
                             + Text(streaming.confirmedText.isEmpty ? "" : " ")

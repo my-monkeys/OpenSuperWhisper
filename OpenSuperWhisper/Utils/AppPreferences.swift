@@ -289,6 +289,12 @@ final class AppPreferences {
     @UserDefault(key: "holdToRecord", defaultValue: true)
     var holdToRecord: Bool
 
+    /// Space (or a double-tap of the trigger) pins an in-progress recording so it survives letting
+    /// go of the trigger key. Opt-in: it needs Accessibility and installs a keyboard event tap, so
+    /// nobody gets that footprint without asking for it.
+    @UserDefault(key: "latchRecordingWithSpace", defaultValue: false)
+    var latchRecordingWithSpace: Bool
+
     @UserDefault(key: "addSpaceAfterSentence", defaultValue: true)
     var addSpaceAfterSentence: Bool
 

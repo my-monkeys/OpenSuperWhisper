@@ -102,7 +102,9 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
-    private func playNotificationSound() {
+    /// The short chime used to confirm a recording state change. Internal rather than private so
+    /// the Space latch can reuse it — same class of feedback, same preference.
+    func playNotificationSound() {
         // Try to play using NSSound first
         guard let soundURL = Bundle.main.url(forResource: "notification", withExtension: "mp3") else {
             print("Failed to find notification sound file")

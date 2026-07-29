@@ -207,6 +207,11 @@ class IndicatorWindowManager: IndicatorViewDelegate {
     func stopRecording() {
         viewModel?.startDecoding()
     }
+
+    /// Reflect the hands-free latch in the bubble. No-op when nothing is showing.
+    func setLatched(_ latched: Bool) {
+        viewModel?.isLatched = latched
+    }
     
     func stopForce() {
         viewModel?.cancelRecording()
