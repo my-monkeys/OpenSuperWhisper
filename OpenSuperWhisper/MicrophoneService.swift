@@ -60,6 +60,23 @@ class MicrophoneService: ObservableObject {
             self?.refreshAvailableMicrophones()
             self?.updateCurrentMicrophone()
         }
+
+        #if os(macOS)
+        // Follow the system input device itself, not just connect/disconnect: switching input in
+        // Sound settings changes no device list, so without this the app keeps recording from the
+        // previous mic while claiming to follow the system default.
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &address, .main
+        ) { [weak self] _, _ in
+            guard let self, self.followsSystemDefault else { return }
+            self.updateCurrentMicrophone()
+        }
+        #endif
     }
     
     func refreshAvailableMicrophones() {
@@ -153,11 +170,34 @@ class MicrophoneService: ObservableObject {
         return availableMicrophones.contains(where: { $0.id == device.id })
     }
     
+    /// Picker value meaning "whatever macOS is using", as opposed to a pinned device.
+    static let systemDefaultID = "__systemDefault__"
+
+    /// True while no specific device is pinned, so the app follows the system input.
+    var followsSystemDefault: Bool { selectedMicrophone == nil }
+
+    /// The device to record from when nothing is pinned. Prefers the system input, which is
+    /// what the user set in Sound settings and what every other app on the Mac will use.
+    /// Falls back to the built-in mic, then to anything, so a machine whose default input
+    /// CoreAudio can't resolve still records.
     func getDefaultMicrophone() -> AudioDevice? {
+        if let systemDefault = systemDefaultMicrophone() {
+            return systemDefault
+        }
         if let builtIn = availableMicrophones.first(where: { $0.isBuiltIn }) {
             return builtIn
         }
         return availableMicrophones.first
+    }
+
+    /// The current system input device, matched against the discovered list by UID.
+    func systemDefaultMicrophone() -> AudioDevice? {
+        #if os(macOS)
+        guard let uid = systemDefaultInputUID() else { return nil }
+        return availableMicrophones.first { $0.id == uid }
+        #else
+        return nil
+        #endif
     }
     
     func selectMicrophone(_ device: AudioDevice) {
@@ -279,6 +319,33 @@ class MicrophoneService: ObservableObject {
     }
     
     #if os(macOS)
+    /// UID of the system input device (`kAudioHardwarePropertyDefaultInputDevice` resolved to
+    /// its UID, which is what `AVCaptureDevice.uniqueID` reports).
+    private func systemDefaultInputUID() -> String? {
+        var defaultAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID = AudioDeviceID()
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                         &defaultAddress, 0, nil, &size, &deviceID) == noErr,
+              deviceID != kAudioObjectUnknown
+        else { return nil }
+
+        var uidAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var uid: CFString = "" as CFString
+        var uidSize = UInt32(MemoryLayout<CFString>.size)
+        guard AudioObjectGetPropertyData(deviceID, &uidAddress, 0, nil, &uidSize, &uid) == noErr
+        else { return nil }
+        return uid as String
+    }
+
     func getCoreAudioDeviceID(for device: AudioDevice) -> AudioDeviceID? {
         var deviceID = device.id as CFString
         var audioDeviceID = AudioDeviceID()

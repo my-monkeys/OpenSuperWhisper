@@ -2398,15 +2398,26 @@ struct SettingsView: View {
             }
 
             SSection(title: "Input") {
-                SRow(title: "Microphone", hint: "Also switchable from the menu bar") {
+                SRow(title: "Microphone",
+                     hint: micService.followsSystemDefault
+                        ? "Following the system input\(micService.currentMicrophone.map { " (\($0.name))" } ?? "") — switch headsets and it follows"
+                        : "Also switchable from the menu bar") {
                     Picker("", selection: Binding(
-                        get: { micService.selectedMicrophone?.id ?? micService.currentMicrophone?.id ?? "" },
+                        get: {
+                            micService.followsSystemDefault
+                                ? MicrophoneService.systemDefaultID
+                                : (micService.selectedMicrophone?.id ?? MicrophoneService.systemDefaultID)
+                        },
                         set: { newID in
-                            if let device = micService.availableMicrophones.first(where: { $0.id == newID }) {
+                            if newID == MicrophoneService.systemDefaultID {
+                                micService.resetToDefault()
+                            } else if let device = micService.availableMicrophones.first(where: { $0.id == newID }) {
                                 micService.selectMicrophone(device)
                             }
                         }
                     )) {
+                        Text("System Default").tag(MicrophoneService.systemDefaultID)
+                        Divider()
                         ForEach(micService.availableMicrophones, id: \.id) { device in
                             Text(device.name).tag(device.id)
                         }
