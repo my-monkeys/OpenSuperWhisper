@@ -300,6 +300,16 @@ final class AppPreferences {
     @UserDefault(key: "lastMouseButtonHotkey", defaultValue: "middle")
     var lastMouseButtonHotkey: String
 
+    /// A second mouse button that dictates and then presses Return, for apps where dictation
+    /// is followed by submitting (chat prompts, search fields). Same outcome as the spoken
+    /// "press enter" command, without saying it. "none" disables it. (#50)
+    @UserDefault(key: "submitMouseButtonHotkey", defaultValue: "none")
+    var submitMouseButtonHotkey: String
+
+    /// Single modifier for the same dictate-and-submit action. (#50)
+    @UserDefault(key: "submitModifierOnlyHotkey", defaultValue: "none")
+    var submitModifierOnlyHotkey: String
+
     // When false (default), pressing Esc to cancel a recording longer than
     // ~10s first asks for confirmation (press Esc again) instead of discarding
     // it outright — a safety net against an accidental Esc losing a long dictation.

@@ -281,6 +281,27 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var submitMouseButtonHotkey: MouseButton {
+        didSet {
+            AppPreferences.shared.submitMouseButtonHotkey = submitMouseButtonHotkey.rawValue
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+        }
+    }
+
+    @Published var submitModifierOnlyHotkey: ModifierKey {
+        didSet {
+            AppPreferences.shared.submitModifierOnlyHotkey = submitModifierOnlyHotkey.rawValue
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+        }
+    }
+
+    /// Cancel and paste-last are key-combination only, but the recorder field needs bindings,
+    /// so these stay parked at `.none`.
+    @Published var cancelMouseButtonUnused: MouseButton = .none
+    @Published var cancelModifierUnused: ModifierKey = .none
+    @Published var pasteMouseButtonUnused: MouseButton = .none
+    @Published var pasteModifierUnused: ModifierKey = .none
+
     @Published var indicatorMeterMode: String {
         didSet {
             AppPreferences.shared.indicatorMeterMode = indicatorMeterMode
@@ -672,6 +693,8 @@ class SettingsViewModel: ObservableObject {
         self.startHidden = prefs.startHidden
         self.indicatorPosition = prefs.indicatorPosition
         self.indicatorMeterMode = prefs.indicatorMeterMode
+        self.submitMouseButtonHotkey = MouseButton(rawValue: prefs.submitMouseButtonHotkey) ?? .none
+        self.submitModifierOnlyHotkey = ModifierKey(rawValue: prefs.submitModifierOnlyHotkey) ?? .none
         self.showStopButtonOnIndicator = prefs.showStopButtonOnIndicator
         self.showCancelButtonOnIndicator = prefs.showCancelButtonOnIndicator
         self.remoteFallbackEnabled = prefs.remoteFallbackEnabled
@@ -1244,25 +1267,8 @@ struct SettingsView: View {
     @State private var previousModelURL: URL?
     @State private var appLanguage = LanguageManager.selected
     @State private var langNeedsRelaunch = false
-    @State private var cancelKey = "esc"
 
     /// Curated cancel-recording keys (the recorder can't capture Esc / single special keys).
-    struct CancelKeyChoice: Identifiable {
-        let id: String
-        let label: String
-        let shortcut: KeyboardShortcuts.Shortcut
-    }
-    static let cancelKeyChoices: [CancelKeyChoice] = [
-        .init(id: "esc", label: "Esc", shortcut: .init(.escape)),
-        .init(id: "cmd-esc", label: "⌘ Esc", shortcut: .init(.escape, modifiers: .command)),
-        .init(id: "opt-esc", label: "⌥ Esc", shortcut: .init(.escape, modifiers: .option)),
-        .init(id: "ctrl-esc", label: "⌃ Esc", shortcut: .init(.escape, modifiers: .control)),
-        .init(id: "cmd-period", label: "⌘ .", shortcut: .init(.period, modifiers: .command)),
-    ]
-    static func currentCancelKeyID() -> String {
-        let current = KeyboardShortcuts.getShortcut(for: .escape)
-        return cancelKeyChoices.first { $0.shortcut == current }?.id ?? "esc"
-    }
 
     /// One-line description of the selected engine, to help users choose.
     /// Engine → display name for the "active engine" indicator.
@@ -2204,143 +2210,52 @@ struct SettingsView: View {
         }
     }
 
-    private enum TriggerMode: Hashable {
-        case keyCombo
-        case modifier
-        case mouse
-    }
-
     /// The three recording-trigger modes are mutually exclusive; a bound mouse button
     /// wins over a modifier key, which wins over the regular key-combination shortcut.
-    private var triggerMode: TriggerMode {
-        if viewModel.mouseButtonHotkey != .none { return .mouse }
-        if viewModel.modifierOnlyHotkey != .none { return .modifier }
-        return .keyCombo
-    }
-
     /// "Dictation" — the redesigned first screen (Settings Explorations 2a):
     /// Trigger / Recording bar / Input, in the Atelier style.
     private var dictationSettings: some View {
         SPane(title: "Dictation") {
             SSection(title: "Trigger") {
-                SRow(title: "Recording trigger") {
-                    Picker("", selection: Binding(
-                        get: { triggerMode },
-                        set: { newMode in
-                            // Remember the outgoing mode's choice so switching modes
-                            // round-trips (leaving Single Modifier used to reset it
-                            // to Left Command).
-                            if viewModel.modifierOnlyHotkey != .none {
-                                AppPreferences.shared.lastModifierOnlyHotkey = viewModel.modifierOnlyHotkey.rawValue
-                            }
-                            if viewModel.mouseButtonHotkey != .none {
-                                AppPreferences.shared.lastMouseButtonHotkey = viewModel.mouseButtonHotkey.rawValue
-                            }
-                            switch newMode {
-                            case .keyCombo:
-                                viewModel.mouseButtonHotkey = .none
-                                viewModel.modifierOnlyHotkey = .none
-                            case .modifier:
-                                viewModel.mouseButtonHotkey = .none
-                                viewModel.modifierOnlyHotkey =
-                                    ModifierKey(rawValue: AppPreferences.shared.lastModifierOnlyHotkey) ?? .leftCommand
-                            case .mouse:
-                                viewModel.modifierOnlyHotkey = .none
-                                viewModel.mouseButtonHotkey =
-                                    MouseButton(rawValue: AppPreferences.shared.lastMouseButtonHotkey) ?? .middle
-                            }
-                        }
-                    )) {
-                        Text("Key Combination").tag(TriggerMode.keyCombo)
-                        Text("Single Modifier Key").tag(TriggerMode.modifier)
-                        Text("Mouse Button").tag(TriggerMode.mouse)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                switch triggerMode {
-                case .modifier:
-                    SRow(title: "Modifier key", hint: "One-tap to toggle recording") {
-                        Picker("", selection: $viewModel.modifierOnlyHotkey) {
-                            ForEach(ModifierKey.allCases.filter { $0 != .none }) { key in
-                                Text(key.displayName).tag(key)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                    SWarnBox {
-                        Text("**⚠︎ Input Monitoring permission required.** macOS needs it to detect single modifier key presses globally. Only modifier key events (⌘ ⌥ ⇧ ⌃ Fn) are monitored — no regular keystrokes are captured.")
-                        Button("Open Input Monitoring Settings…") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundColor(STheme.warn)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
-                    }
-                case .mouse:
-                    SRow(title: "Mouse button", hint: "Middle or other extra buttons — click to toggle, hold when Hold to Record is on") {
-                        Picker("", selection: $viewModel.mouseButtonHotkey) {
-                            ForEach(MouseButton.allCases.filter { $0 != .none }) { button in
-                                Text(button.displayName).tag(button)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                    SWarnBox {
-                        Text("**⚠︎ Accessibility permission required.** macOS needs it to detect the mouse button globally and use it only as a recording trigger. The left and right buttons are reserved; only the selected button is intercepted — no other clicks or keystrokes are captured.")
-                        Button("Open Accessibility Settings…") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundColor(STheme.warn)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
-                    }
-                case .keyCombo:
-                    SRow(title: "Shortcut", hint: "Click, then press a combination with ⌘, ⌥ or ⌃ — ⌫ clears it") {
-                        ShortcutRecorderField(name: .toggleRecord)
-                            .frame(width: 132)
-                    }
-                }
-                SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
-                    SToggle(isOn: $viewModel.holdToRecord)
+                SRow(title: "Recording trigger",
+                     hint: "Click, then do it: press a combination with ⌘ ⌥ ⌃, tap a single modifier on its own, or click a spare mouse button. ⌫ clears it") {
+                    TriggerRecorderField(name: .toggleRecord,
+                                         mouseButton: $viewModel.mouseButtonHotkey,
+                                         modifierKey: $viewModel.modifierOnlyHotkey)
+                        .frame(width: 168)
                 }
                 SRow(title: "Paste last transcription",
                      hint: "Inserts your most recent transcription again, wherever the cursor is. Unbound by default — ⌫ clears it") {
-                    ShortcutRecorderField(name: .pasteLastTranscription)
-                        .frame(width: 132)
+                    TriggerRecorderField(name: .pasteLastTranscription,
+                                         mouseButton: $viewModel.pasteMouseButtonUnused,
+                                         modifierKey: $viewModel.pasteModifierUnused,
+                                         allowsMouse: false,
+                                         allowsModifier: false)
+                        .frame(width: 168)
                 }
-                SRow(title: "Cancel shortcut") {
-                    Picker("", selection: $cancelKey) {
-                        ForEach(SettingsView.cancelKeyChoices) { choice in
-                            Text(choice.label).tag(choice.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .fixedSize()
-                    .onChange(of: cancelKey) { _, newValue in
-                        if let choice = SettingsView.cancelKeyChoices.first(where: { $0.id == newValue }) {
-                            KeyboardShortcuts.setShortcut(choice.shortcut, for: .escape)
-                        }
-                    }
-                    .onAppear { cancelKey = SettingsView.currentCancelKeyID() }
+                SRow(title: "Cancel shortcut",
+                     hint: "Discards the recording. Esc on its own is fine here; ⌫ clears it") {
+                    TriggerRecorderField(name: .escape,
+                                         mouseButton: $viewModel.cancelMouseButtonUnused,
+                                         modifierKey: $viewModel.cancelModifierUnused,
+                                         allowsMouse: false,
+                                         allowsModifier: false,
+                                         allowsBareEscape: true)
+                        .frame(width: 168)
+                }
+                SRow(title: "Stop and submit",
+                     hint: "Ends the recording and presses Return, so the message sends itself. Only works while recording — it never starts one. Unbound by default; ⌫ clears it") {
+                    TriggerRecorderField(name: .toggleRecordAndSubmit,
+                                         mouseButton: $viewModel.submitMouseButtonHotkey,
+                                         modifierKey: $viewModel.submitModifierOnlyHotkey)
+                        .frame(width: 168)
                 }
                 SRow(title: "Cancel without confirmation",
                      hint: "Skip the double-Esc confirmation for recordings longer than 10 seconds") {
                     SToggle(isOn: $viewModel.escCancelWithoutConfirmation)
+                }
+                SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
+                    SToggle(isOn: $viewModel.holdToRecord)
                 }
             }
 

@@ -33,6 +33,10 @@ class IndicatorViewModel: ObservableObject {
     @Published var isVisible = false
 
     var recordingStartedAt: Date?
+    /// Set by the trigger when this take should be submitted after insertion (#50). Carried
+    /// on the queued clip rather than read at paste time: transcription runs in the
+    /// background now, so the next recording may already have started by then.
+    var submitAfterInsert = false
 
     var delegate: IndicatorViewDelegate?
     private var blinkTimer: Timer?
@@ -246,7 +250,8 @@ class IndicatorViewModel: ObservableObject {
             startedAt: recordingStartedAt ?? Date(),
             streamedFallback: streamedFallback,
             context: snapshot,
-            modelOption: modelOption)
+            modelOption: modelOption,
+            submitAfterInsert: submitAfterInsert)
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.
         delegate?.didFinishDecoding()
