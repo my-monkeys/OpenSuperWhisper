@@ -164,16 +164,21 @@ struct AppleSpeechModelSection: View {
     /// canonical) with the asset status. "mul" is the framework's multilingual pseudo
     /// entry — not a language anyone dictates in.
     private func refreshLanguages() async {
+        // Ask what is on this Mac, not what is allocated to this app. `AssetInventory.status`
+        // answers the second question: macOS reserves at most 5 locales per app, and a language
+        // whose assets are installed system-wide but not currently reserved here comes back
+        // `.supported`, not `.installed`. That rendered a Download button for models that were
+        // already present, and pressing it "downloaded" them instantly because
+        // `assetInstallationRequest` had nothing to fetch and returned nil (#46).
+        let installedLocales = await SpeechTranscriber.installedLocales
         var rows: [LangAsset] = []
         for code in AppleSpeechSupport.cachedSupportedLanguages where code != "mul" {
             let locale = await AppleSpeechSupport.resolveLocale(language: code)
-            let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-            let status = await AssetInventory.status(forModules: [transcriber])
             rows.append(LangAsset(
                 code: code,
                 localeID: locale.identifier,
                 name: Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier,
-                installed: status == .installed))
+                installed: LanguageUtil.isInstalled(locale, in: installedLocales)))
         }
         languages = rows.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
