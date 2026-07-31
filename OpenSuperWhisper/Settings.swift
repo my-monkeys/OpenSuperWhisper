@@ -372,11 +372,46 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
-    /// Cleanup backend: "ollama" (local) or "remote" (OpenAI-compatible server).
-    @Published var aiProvider: String {
+    /// True when anything needs the LLM: prose cleanup or the per-app formatting rules. Both feed
+    /// the same backend, so this is what gates the backend UI and its connection probe.
+    var llmCleanupInUse: Bool { aiPostProcessingEnabled || appContextFormattingEnabled }
+
+    /// Cleanup backend: "builtin" (embedded llama.cpp), "ollama" (local server), or
+    /// "remote" (OpenAI-compatible server).
+    @Published var aiBackend: String {
         didSet {
-            AppPreferences.shared.aiProvider = aiProvider
-            if aiPostProcessingEnabled { testLLMConnection() }
+            AppPreferences.shared.aiBackend = aiBackend
+            if llmCleanupInUse { testLLMConnection() }
+            // Warm the ~1 GB context now, while the user is here in Settings, so their first
+            // dictation doesn't wait several seconds for it. Released again after an idle spell.
+            if aiBackend == "builtin" { BuiltInLlamaBackend.shared.preload() }
+        }
+    }
+
+    /// Whether the built-in model's GGUF is present on disk.
+    @Published var builtInModelDownloaded: Bool = LLMModelManager.shared.isDefaultModelDownloaded()
+    /// Download progress in 0...1 while the built-in model is downloading; nil when idle.
+    @Published var builtInModelDownloadProgress: Double?
+    /// Set when a built-in model download fails, for inline feedback.
+    @Published var builtInModelDownloadError: String?
+
+    /// Downloads the default built-in model (~1 GB), updating progress for the UI.
+    func downloadBuiltInModel() {
+        builtInModelDownloadError = nil
+        builtInModelDownloadProgress = 0
+        Task { @MainActor in
+            do {
+                try await LLMModelManager.shared.downloadDefaultModel { progress in
+                    Task { @MainActor in self.builtInModelDownloadProgress = progress }
+                }
+                self.builtInModelDownloaded = LLMModelManager.shared.isDefaultModelDownloaded()
+                // Load it straight away: the download already made them wait, and this keeps the
+                // load out of their first dictation.
+                BuiltInLlamaBackend.shared.preload()
+            } catch {
+                self.builtInModelDownloadError = error.localizedDescription
+            }
+            self.builtInModelDownloadProgress = nil
         }
     }
 
@@ -420,10 +455,10 @@ class SettingsViewModel: ObservableObject {
     @Published var llmStatus: LLMStatus = .unknown
 
     /// Probes the local Ollama backend. The Remote backend is owned by
-    /// RemoteCleanupSettingsView (it also fills the model list), which publishes
-    /// straight to `llmStatus`, so this only runs for Ollama.
+    /// RemoteCleanupSettingsView (it also fills the model list), and the built-in backend
+    /// has no server to probe (see `builtInModelDownloaded`), so this only runs for Ollama.
     func testLLMConnection() {
-        guard aiProvider != "remote" else { return }
+        guard aiBackend == "ollama" else { return }
         llmStatus = .checking
         let endpoint = aiOllamaEndpoint, model = aiOllamaModel
         Task { @MainActor in
@@ -495,6 +530,28 @@ class SettingsViewModel: ObservableObject {
     @Published var submitOnVoiceCommand: Bool {
         didSet {
             AppPreferences.shared.submitOnVoiceCommand = submitOnVoiceCommand
+        }
+    }
+
+    /// App-aware LLM formatting: per-app instructions, keyed by the bundle identifier of the app
+    /// dictated into, that reshape the transcription via the same LLM cleanup pass (e.g. "at Rob"
+    /// -> "@Rob" in Slack). Independent of `aiPostProcessingEnabled`: either can contribute to one
+    /// pass. Edited in Settings → Rules; the shared backend is configured in Output → Cleanup.
+    @Published var appContextFormattingEnabled: Bool {
+        didSet {
+            AppPreferences.shared.appContextFormattingEnabled = appContextFormattingEnabled
+            // Same reasoning as the general-cleanup toggle: this feature also needs the backend,
+            // so probe/warm it now instead of failing silently on the next dictation.
+            if appContextFormattingEnabled {
+                testLLMConnection()
+                if aiBackend == "builtin" { BuiltInLlamaBackend.shared.preload() }
+            }
+        }
+    }
+
+    @Published var appContextProfiles: [AppContextProfile] {
+        didSet {
+            AppPreferences.shared.appContextProfiles = appContextProfiles
         }
     }
 
@@ -631,7 +688,7 @@ class SettingsViewModel: ObservableObject {
         self.unloadWhisperModelWhenIdle = prefs.unloadWhisperModelWhenIdle
         self.addSpaceAfterSentence = prefs.addSpaceAfterSentence
         self.aiPostProcessingEnabled = prefs.aiPostProcessingEnabled
-        self.aiProvider = prefs.aiProvider
+        self.aiBackend = prefs.aiBackend
         self.aiOllamaEndpoint = prefs.aiOllamaEndpoint
         self.aiOllamaModel = prefs.aiOllamaModel
         self.aiRemoteEndpoint = prefs.aiRemoteEndpoint
@@ -647,6 +704,8 @@ class SettingsViewModel: ObservableObject {
         self.pasteInsteadOfTyping = prefs.pasteInsteadOfTyping
         self.notifyWhenNoPasteTarget = prefs.notifyWhenNoPasteTarget
         self.submitOnVoiceCommand = prefs.submitOnVoiceCommand
+        self.appContextFormattingEnabled = prefs.appContextFormattingEnabled
+        self.appContextProfiles = prefs.appContextProfiles
         self.pauseMediaOnRecord = prefs.pauseMediaOnRecord
         self.reduceVolumeOnRecord = prefs.reduceVolumeOnRecord
         self.reduceVolumeLevel = prefs.reduceVolumeLevel
@@ -1667,15 +1726,10 @@ struct SettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
     }
 
-    /// Themed multiline editor (regex, prompts, instructions).
+    /// Themed multiline editor (regex, prompts, instructions). See `SEditor`, shared with
+    /// the Rules pane.
     private func sEditor(_ text: Binding<String>, height: CGFloat) -> some View {
-        TextEditor(text: text)
-            .font(.system(size: 11.5, design: .monospaced))
-            .scrollContentBackground(.hidden)
-            .padding(6)
-            .frame(height: height)
-            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+        SEditor(text: text, height: height)
     }
 
     @ViewBuilder private var ollamaCleanupFields: some View {
@@ -1691,8 +1745,41 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder private var builtInCleanupFields: some View {
+        HStack(spacing: 8) {
+            if viewModel.builtInModelDownloaded {
+                Text("✓ Model ready — runs on-device")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(STheme.ok)
+                    .padding(.horizontal, 9).padding(.vertical, 2)
+                    .background(Capsule().fill(STheme.okBg))
+                Text("Loads on first use (a few seconds), then frees its ~1 GB after 5 minutes idle.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let progress = viewModel.builtInModelDownloadProgress {
+                ProgressView(value: progress).frame(width: 160).controlSize(.small)
+                Text("\(Int(progress * 100))%").font(.system(size: 11)).foregroundColor(STheme.hint)
+            } else {
+                Button("Download model (~1 GB)") { viewModel.downloadBuiltInModel() }
+                    .controlSize(.small)
+                Text("Qwen2.5 1.5B, Apache-2.0. One-time download; no server needed.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.leading, 16)
+        if let err = viewModel.builtInModelDownloadError {
+            Text("✕ \(err)")
+                .font(.system(size: 11))
+                .foregroundColor(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 16)
+        }
+    }
+
     @ViewBuilder private var llmStatusView: some View {
-        let isRemote = viewModel.aiProvider == "remote"
+        let isRemote = viewModel.aiBackend == "remote"
         switch viewModel.llmStatus {
         case .unknown:
             EmptyView()
@@ -1784,9 +1871,13 @@ struct SettingsView: View {
                     SToggle(isOn: $viewModel.aiPostProcessingEnabled)
                 }
                 .frame(minHeight: 26)
-                if viewModel.aiPostProcessingEnabled {
+                // One backend serves BOTH this prose cleanup and the per-app formatting rules in
+                // Settings → Rules, so it stays visible while either is on — otherwise someone
+                // using formatting only would have nowhere to pick a backend or download a model.
+                if viewModel.aiPostProcessingEnabled || viewModel.appContextFormattingEnabled {
                     SRow(title: "Backend", indented: true) {
-                        Picker("", selection: $viewModel.aiProvider) {
+                        Picker("", selection: $viewModel.aiBackend) {
+                            Text("Built-in (Qwen2.5 1.5B)").tag("builtin")
                             Text("Ollama (local)").tag("ollama")
                             Text("Remote (OpenAI-compatible)").tag("remote")
                         }
@@ -1794,15 +1885,27 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                         .fixedSize()
                     }
+                    if !viewModel.aiPostProcessingEnabled {
+                        Text("Used by the per-app formatting rules in Rules.")
+                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .padding(.leading, 16)
+                    }
 
-                    if viewModel.aiProvider == "remote" {
+                    switch viewModel.aiBackend {
+                    case "builtin":
+                        builtInCleanupFields
+                    case "remote":
                         RemoteCleanupSettingsView(viewModel: viewModel)
-                    } else {
+                    default:
                         ollamaCleanupFields
                     }
 
-                    HStack { Spacer(); llmStatusView }
-                        .padding(.leading, 16)
+                    if viewModel.aiBackend != "builtin" {
+                        HStack { Spacer(); llmStatusView }
+                            .padding(.leading, 16)
+                    }
+                }
+                if viewModel.aiPostProcessingEnabled {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
                         sEditor($viewModel.aiPostProcessingPrompt, height: 64)
@@ -2235,6 +2338,11 @@ struct SettingsView: View {
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
                     }
+                }
+                SRow(title: "Paste last transcription",
+                     hint: "Inserts your most recent transcription again, wherever the cursor is. Unbound by default — ⌫ clears it") {
+                    ShortcutRecorderField(name: .pasteLastTranscription)
+                        .frame(width: 170)
                 }
                 SRow(title: "Cancel shortcut") {
                     Picker("", selection: $cancelKey) {

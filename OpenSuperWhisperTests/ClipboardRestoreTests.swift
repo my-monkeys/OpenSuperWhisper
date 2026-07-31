@@ -96,4 +96,88 @@ final class ClipboardRestoreTests: XCTestCase {
         wait(for: [restoreWindowElapsed], timeout: 2)
         XCTAssertEqual(pasteboard.string(forType: .string), "user copy in between")
     }
+
+    // MARK: - Overlapping borrows (#69 review)
+
+    func testOverlappingBorrowsRestoreTheOriginalContents() {
+        // Dictation borrows the clipboard, and before its restore fires the user re-pastes
+        // (or a second dictation lands). The second borrow must NOT snapshot the first borrow's
+        // transcription — it inherits the original snapshot, and the one surviving restore
+        // brings back the user's contents.
+        ClipboardUtil.copyToClipboard("original", to: pasteboard)
+
+        ClipboardUtil.borrowForPaste("transcription A", on: pasteboard, restoreAfter: 0.05) {}
+        ClipboardUtil.borrowForPaste("transcription B", on: pasteboard, restoreAfter: 0.05) {}
+
+        let restoreWindowElapsed = expectation(description: "restore window elapsed")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { restoreWindowElapsed.fulfill() }
+        wait(for: [restoreWindowElapsed], timeout: 2)
+        XCTAssertEqual(pasteboard.string(forType: .string), "original",
+                       "the second borrow must not end up restoring the first borrow's text")
+    }
+
+    func testManyOverlappingBorrowsStillRestoreTheOriginal() {
+        ClipboardUtil.copyToClipboard("original", to: pasteboard)
+
+        for n in 1...4 {
+            ClipboardUtil.borrowForPaste("transcription \(n)", on: pasteboard, restoreAfter: 0.05) {}
+        }
+
+        let restoreWindowElapsed = expectation(description: "restore window elapsed")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { restoreWindowElapsed.fulfill() }
+        wait(for: [restoreWindowElapsed], timeout: 2)
+        XCTAssertEqual(pasteboard.string(forType: .string), "original")
+    }
+
+    func testUserCopyAfterOverlappingBorrowsStillWins() {
+        // Newer content beats our restore even when borrows have coalesced.
+        ClipboardUtil.copyToClipboard("original", to: pasteboard)
+
+        ClipboardUtil.borrowForPaste("transcription A", on: pasteboard, restoreAfter: 0.05) {}
+        ClipboardUtil.borrowForPaste("transcription B", on: pasteboard, restoreAfter: 0.05) {}
+        ClipboardUtil.copyToClipboard("user copy in between", to: pasteboard)
+
+        let restoreWindowElapsed = expectation(description: "restore window elapsed")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { restoreWindowElapsed.fulfill() }
+        wait(for: [restoreWindowElapsed], timeout: 2)
+        XCTAssertEqual(pasteboard.string(forType: .string), "user copy in between")
+    }
+
+    func testSequentialBorrowsDoNotInheritAStaleSnapshot() {
+        // Once a borrow's restore has fired, the next borrow is a fresh cycle: it must snapshot
+        // whatever is on the pasteboard NOW, not resurrect the coalescing state of the last one.
+        ClipboardUtil.copyToClipboard("first original", to: pasteboard)
+        ClipboardUtil.borrowForPaste("transcription A", on: pasteboard, restoreAfter: 0.05) {}
+
+        let firstRestoreDone = expectation(description: "first restore done")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { firstRestoreDone.fulfill() }
+        wait(for: [firstRestoreDone], timeout: 2)
+        XCTAssertEqual(pasteboard.string(forType: .string), "first original")
+
+        ClipboardUtil.copyToClipboard("second original", to: pasteboard)
+        ClipboardUtil.borrowForPaste("transcription B", on: pasteboard, restoreAfter: 0.05) {}
+
+        let secondRestoreDone = expectation(description: "second restore done")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { secondRestoreDone.fulfill() }
+        wait(for: [secondRestoreDone], timeout: 2)
+        XCTAssertEqual(pasteboard.string(forType: .string), "second original")
+    }
+
+    func testBorrowsOnDistinctPasteboardsDoNotShareSnapshots() {
+        // Coalescing is per pasteboard: a pending borrow on one must not donate its snapshot
+        // to a borrow on another.
+        let other = NSPasteboard(name: NSPasteboard.Name("OpenSuperWhisperTests." + UUID().uuidString))
+        defer { other.releaseGlobally() }
+        ClipboardUtil.copyToClipboard("original A", to: pasteboard)
+        ClipboardUtil.copyToClipboard("original B", to: other)
+
+        ClipboardUtil.borrowForPaste("transcription", on: pasteboard, restoreAfter: 0.05) {}
+        ClipboardUtil.borrowForPaste("transcription", on: other, restoreAfter: 0.05) {}
+
+        let restoreWindowElapsed = expectation(description: "restore window elapsed")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { restoreWindowElapsed.fulfill() }
+        wait(for: [restoreWindowElapsed], timeout: 2)
+        XCTAssertEqual(pasteboard.string(forType: .string), "original A")
+        XCTAssertEqual(other.string(forType: .string), "original B")
+    }
 }
