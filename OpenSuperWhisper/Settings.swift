@@ -281,6 +281,12 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var indicatorMeterMode: String {
+        didSet {
+            AppPreferences.shared.indicatorMeterMode = indicatorMeterMode
+        }
+    }
+
     @Published var indicatorPosition: String {
         didSet {
             AppPreferences.shared.indicatorPosition = indicatorPosition
@@ -665,6 +671,7 @@ class SettingsViewModel: ObservableObject {
         self.playSoundOnRecordStart = prefs.playSoundOnRecordStart
         self.startHidden = prefs.startHidden
         self.indicatorPosition = prefs.indicatorPosition
+        self.indicatorMeterMode = prefs.indicatorMeterMode
         self.showStopButtonOnIndicator = prefs.showStopButtonOnIndicator
         self.showCancelButtonOnIndicator = prefs.showCancelButtonOnIndicator
         self.remoteFallbackEnabled = prefs.remoteFallbackEnabled
@@ -2304,7 +2311,7 @@ struct SettingsView: View {
                 case .keyCombo:
                     SRow(title: "Shortcut", hint: "Click, then press a combination with ⌘, ⌥ or ⌃ — ⌫ clears it") {
                         ShortcutRecorderField(name: .toggleRecord)
-                            .frame(width: 170)
+                            .frame(width: 132)
                     }
                 }
                 SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
@@ -2313,7 +2320,7 @@ struct SettingsView: View {
                 SRow(title: "Paste last transcription",
                      hint: "Inserts your most recent transcription again, wherever the cursor is. Unbound by default — ⌫ clears it") {
                     ShortcutRecorderField(name: .pasteLastTranscription)
-                        .frame(width: 170)
+                        .frame(width: 132)
                 }
                 SRow(title: "Cancel shortcut") {
                     Picker("", selection: $cancelKey) {
@@ -2353,6 +2360,17 @@ struct SettingsView: View {
                         .labelsHidden()
                         .fixedSize()
                     }
+                }
+                SRow(title: "Input meter",
+                     hint: "A live spectrum of what the mic is picking up, so a muted or wrong input shows before you finish talking") {
+                    Picker("", selection: $viewModel.indicatorMeterMode) {
+                        Text("Instead of the dot").tag(IndicatorMeterMode.replacesDot.rawValue)
+                        Text("Beside the label").tag(IndicatorMeterMode.besideLabel.rawValue)
+                        Text("Hidden").tag(IndicatorMeterMode.off.rawValue)
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
                 }
                 SRow(title: "Show Stop button", hint: "A stop-and-transcribe button on the recording bar") {
                     SToggle(isOn: $viewModel.showStopButtonOnIndicator)

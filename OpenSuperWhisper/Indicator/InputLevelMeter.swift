@@ -1,37 +1,67 @@
 import SwiftUI
 
-/// Five bars showing mic input while recording, so it is obvious that sound is arriving
-/// before the user has spoken a whole sentence into a muted or wrong device (#47).
+/// Seven bands of the mic spectrum, so the bubble shows the shape of what it is hearing
+/// rather than one volume repeated seven times (#47). Vowels push the low bands, sibilants
+/// the high ones, and a muted mic stays flat.
 ///
-/// The frame is deliberately fixed. The indicator window is resized by hand whenever its
-/// content changes size (`IndicatorWindowManager.resizeToContent`), so a meter that grew
-/// with the level would resize the window at 20 Hz. Only the fill inside each bar moves.
+/// The frame is deliberately fixed for a given height. The indicator window is resized by
+/// hand whenever its content changes size (`IndicatorWindowManager.resizeToContent`), so bars
+/// that changed the view's footprint would resize the window on every audio frame. Only the
+/// fill height inside each fixed slot moves.
 struct InputLevelMeter: View {
-    let level: Float
+    let bands: [Float]
+    /// Set by the caller from the layout: the notch and the pill have more vertical room
+    /// than the compact bubble, and taller bars read better there.
+    var height: CGFloat = 16
 
-    private static let barCount = 5
     private static let barWidth: CGFloat = 2.5
     private static let barSpacing: CGFloat = 2.5
-    private static let height: CGFloat = 13
+    /// Enough to stay visible while silent, so the meter reads as "quiet" and not "missing".
+    private static let restHeight: CGFloat = 2.5
 
-    private var width: CGFloat {
-        CGFloat(Self.barCount) * Self.barWidth + CGFloat(Self.barCount - 1) * Self.barSpacing
-    }
+    /// Fixed, and needed by the bubble's width calculation so adding the meter can't push
+    /// the "Recording…" label onto a second line.
+    static let width: CGFloat = {
+        let count = CGFloat(SpectrumBands.count)
+        return count * barWidth + (count - 1) * barSpacing
+    }()
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: Self.barSpacing) {
-            ForEach(0..<Self.barCount, id: \.self) { index in
-                let fill = AudioLevel.barFill(index: index, count: Self.barCount, level: level)
-                // Shortest bar stays visible at rest, so the meter reads as "no sound"
-                // rather than as a missing element.
-                let barHeight = Self.height * (0.25 + 0.75 * CGFloat(index + 1) / CGFloat(Self.barCount))
+        HStack(alignment: .center, spacing: Self.barSpacing) {
+            ForEach(0..<SpectrumBands.count, id: \.self) { index in
+                let level = CGFloat(index < bands.count ? bands[index] : 0)
                 Capsule()
-                    .fill(Color.secondary.opacity(0.22 + 0.68 * Double(fill)))
-                    .frame(width: Self.barWidth, height: barHeight)
+                    .fill(Color.secondary.opacity(0.3 + 0.6 * Double(level)))
+                    .frame(width: Self.barWidth,
+                           height: Self.restHeight + (height - Self.restHeight) * level)
             }
         }
-        .frame(width: width, height: Self.height, alignment: .bottom)
-        .animation(.linear(duration: 0.05), value: level)
+        .frame(width: Self.width, height: height)
+        .animation(.linear(duration: 0.06), value: bands)
         .accessibilityHidden(true)
+    }
+}
+
+/// Where the spectrum meter goes on the recording bubble.
+enum IndicatorMeterMode: String, CaseIterable {
+    /// No meter; the blinking dot alone marks recording.
+    case off
+    /// The meter takes the dot's place. Keeps the bubble narrow, which matters at the
+    /// compact width where a meter beside the label wraps "Recording…" onto two lines.
+    case replacesDot
+    /// Dot and meter both, the meter after the label.
+    case besideLabel
+
+    static func from(_ raw: String) -> IndicatorMeterMode {
+        IndicatorMeterMode(rawValue: raw) ?? .replacesDot
+    }
+
+    /// Width this mode adds to the bubble compared with showing the dot alone.
+    var extraBubbleWidth: CGFloat {
+        switch self {
+        case .off: return 0
+        case .replacesDot: return max(0, InputLevelMeter.width - 16)
+        case .besideLabel: return InputLevelMeter.width + 10
+        }
     }
 }

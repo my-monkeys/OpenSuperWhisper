@@ -319,6 +319,12 @@ final class AppPreferences {
     @UserDefault(key: "indicatorPosition", defaultValue: "cursor")
     var indicatorPosition: String
 
+    /// Where the live spectrum meter sits on the recording bubble: "off", "replacesDot"
+    /// or "besideLabel". Replacing the dot is the default because it costs the least width,
+    /// and the compact bubble wraps its label when the meter is added beside it.
+    @UserDefault(key: "indicatorMeterMode", defaultValue: "replacesDot")
+    var indicatorMeterMode: String
+
     /// Strip filler words (um, uh, …) from the transcription before saving/inserting. Opt-in.
     @UserDefault(key: "removeFillerWords", defaultValue: false)
     var removeFillerWords: Bool

@@ -19,12 +19,28 @@ enum RecorderCombo {
     }
 }
 
-/// Atelier-styled shortcut recorder replacing `KeyboardShortcuts.Recorder`,
-/// which renders as a bare search field and gives no feedback while keys are
-/// held. Click to arm, and the ⌃ ⌥ ⇧ ⌘ badges light up live as modifiers are
-/// pressed; a valid combo is saved through `KeyboardShortcuts.setShortcut`, so
-/// the Carbon hotkey engine underneath is unchanged. Esc cancels, ⌫ clears,
-/// clicking anywhere else disarms.
+/// One key drawn as a physical cap. Reading ⌥ ⇧ K as three objects is faster than reading
+/// "⌥⇧K" as one string, which is what the field showed before.
+private struct KeyCap: View {
+    let label: String
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(STheme.textBright)
+            .frame(minWidth: 16, minHeight: 16)
+            .padding(.horizontal, label.count > 1 ? 4 : 0)
+            .background(RoundedRectangle(cornerRadius: 3.5).fill(STheme.controlBg))
+            .overlay(RoundedRectangle(cornerRadius: 3.5).stroke(STheme.controlBorder, lineWidth: 0.5))
+    }
+}
+
+/// Atelier-styled shortcut recorder replacing `KeyboardShortcuts.Recorder`, which renders as
+/// a bare search field and gives no feedback while keys are held. Click to arm, and the
+/// ⌃ ⌥ ⇧ ⌘ badges light up live as modifiers are pressed; a valid combo is saved through
+/// `KeyboardShortcuts.setShortcut`, so the Carbon hotkey engine underneath is unchanged.
+/// Esc cancels, ⌫ clears, clicking anywhere else disarms. At rest the combination is drawn
+/// as individual key caps.
 struct ShortcutRecorderField: View {
     let name: KeyboardShortcuts.Name
 
@@ -48,7 +64,7 @@ struct ShortcutRecorderField: View {
             }
         }
         .padding(.horizontal, 9)
-        .frame(height: 26)
+        .frame(height: 22)
         .background(RoundedRectangle(cornerRadius: 7).fill(isRecording ? STheme.accentSoft : STheme.inputBg))
         .overlay(RoundedRectangle(cornerRadius: 7)
             .stroke(invalidCombo ? STheme.warn : (isRecording ? STheme.accent : STheme.controlBorder), lineWidth: 1))
@@ -61,12 +77,22 @@ struct ShortcutRecorderField: View {
         .animation(.easeOut(duration: 0.12), value: isRecording)
     }
 
+    /// The combination split into one cap per key. `description` is the modifier symbols
+    /// followed by the key, so the symbols peel off the front and whatever remains is the key.
+    private func caps(for shortcut: KeyboardShortcuts.Shortcut) -> [String] {
+        let symbols = Self.badges.filter { shortcut.modifiers.contains($0.flag) }.map(\.symbol)
+        let key = String(shortcut.description.drop { "⌃⌥⇧⌘".contains($0) })
+        return symbols + (key.isEmpty ? [] : [key])
+    }
+
     private var idleBody: some View {
         HStack(spacing: 6) {
             if let shortcut {
-                Text(shortcut.description)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundColor(STheme.textBright)
+                HStack(spacing: 3) {
+                    ForEach(Array(caps(for: shortcut).enumerated()), id: \.offset) { _, cap in
+                        KeyCap(label: cap)
+                    }
+                }
                 Spacer(minLength: 0)
                 if isHovering {
                     Button {
@@ -96,8 +122,8 @@ struct ShortcutRecorderField: View {
                 Text(badge.symbol)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(held ? .white : STheme.hint)
-                    .frame(width: 18, height: 18)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(held ? STheme.accent : STheme.controlBg))
+                    .frame(width: 16, height: 16)
+                    .background(RoundedRectangle(cornerRadius: 3.5).fill(held ? STheme.accent : STheme.controlBg))
             }
             Text(invalidCombo ? "add ⌘ ⌥ or ⌃" : "key…")
                 .font(.system(size: 11))
