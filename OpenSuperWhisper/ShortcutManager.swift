@@ -24,9 +24,6 @@ class ShortcutManager {
     /// True once the current recording has been latched, so releasing the trigger key no longer
     /// stops it.
     private var latched = false
-    /// Read on the latch monitor's tap thread to decide whether to swallow Space. Mirrors
-    /// "a recording is currently active".
-    private var recordingActive = false
     /// `systemUptime` of the previous trigger key-down, for double-tap detection.
     private var lastKeyDownTime: TimeInterval = 0
     private let doubleTapThreshold: TimeInterval = 0.35
@@ -42,7 +39,12 @@ class ShortcutManager {
 
         setupKeyboardShortcuts()
         setupRecordingTrigger()
-        setupLatchMonitor()
+
+        // The latch tap itself is started per recording (see startLatchTapIfEnabled);
+        // only the callback is wired up front.
+        LatchKeyMonitor.shared.onLatchKeyDown = { [weak self] in
+            self?.handleLatchKey()
+        }
 
         NotificationCenter.default.addObserver(
             self,
@@ -63,29 +65,28 @@ class ShortcutManager {
         activeVm = nil
         holdMode = false
         latched = false
-        recordingActive = false
+        LatchKeyMonitor.shared.stop()
     }
 
     @objc private func hotkeySettingsChanged() {
         setupRecordingTrigger()
-        setupLatchMonitor()
+        // Turning the latch preference off mid-recording tears the tap down immediately;
+        // turning it on mid-recording arms it for the recording already running.
+        Task { @MainActor in
+            if !AppPreferences.shared.latchRecordingWithSpace {
+                LatchKeyMonitor.shared.stop()
+            } else if self.activeVm != nil {
+                LatchKeyMonitor.shared.start()
+            }
+        }
     }
 
-    /// Starts or stops the Space-latch tap to match the preference. Unlike the three trigger modes
-    /// this one is mode-agnostic — it only ever acts while a recording is running — so it can stay
-    /// armed for the whole app lifetime once enabled.
-    private func setupLatchMonitor() {
-        guard AppPreferences.shared.latchRecordingWithSpace else {
-            LatchKeyMonitor.shared.stop()
-            return
-        }
-
-        LatchKeyMonitor.shared.shouldConsume = { [weak self] in
-            self?.recordingActive ?? false
-        }
-        LatchKeyMonitor.shared.onLatchKeyDown = { [weak self] in
-            self?.handleLatchKey()
-        }
+    /// Arms the Space tap for the recording that just started. The tap's lifetime is the
+    /// recording's lifetime — between recordings no tap exists, so an idle app is not in the
+    /// path of anyone's keystrokes, and the tap callback needs no cross-thread "is a recording
+    /// active?" flag: while the tap is up, the answer is yes by construction.
+    @MainActor private func startLatchTapIfEnabled() {
+        guard AppPreferences.shared.latchRecordingWithSpace else { return }
         LatchKeyMonitor.shared.start()
     }
 
@@ -96,7 +97,7 @@ class ShortcutManager {
             if self.latched {
                 IndicatorWindowManager.shared.stopRecording()
                 self.activeVm = nil
-                self.recordingActive = false
+                LatchKeyMonitor.shared.stop()
             } else {
                 self.enterLatch()
             }
@@ -245,8 +246,8 @@ class ShortcutManager {
                 }
                 Diag.measure("vm.startRecording") { vm.startRecording() }
                 self.activeVm = vm
-                self.recordingActive = true
                 self.recordingStartedUptime = ProcessInfo.processInfo.systemUptime
+                self.startLatchTapIfEnabled()
             } else if isDoubleTap && !self.latched {
                 // Second tap of a double-tap latches the recording the first tap started, rather
                 // than immediately stopping it — the same gesture as Space, without leaving the
@@ -255,7 +256,7 @@ class ShortcutManager {
             } else if !self.holdMode {
                 IndicatorWindowManager.shared.stopRecording()
                 self.activeVm = nil
-                self.recordingActive = false
+                LatchKeyMonitor.shared.stop()
             }
         }
         
@@ -280,7 +281,7 @@ class ShortcutManager {
             if holdToRecordEnabled && self.holdMode && !self.latched {
                 IndicatorWindowManager.shared.stopRecording()
                 self.activeVm = nil
-                self.recordingActive = false
+                LatchKeyMonitor.shared.stop()
                 self.holdMode = false
             }
         }

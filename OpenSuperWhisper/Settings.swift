@@ -2218,7 +2218,7 @@ struct SettingsView: View {
                     SToggle(isOn: $viewModel.holdToRecord)
                 }
                 SRow(title: "Latch with Space",
-                     hint: "While recording, Space (or a double-tap of the trigger) pins it so you can let go and keep talking. Space again stops it") {
+                     hint: "While recording, Space (or a double-tap of the trigger) pins it so you can let go and keep talking. Space again stops it — so Space won't type into other apps during a recording") {
                     SToggle(isOn: $viewModel.latchRecordingWithSpace)
                 }
                 if viewModel.latchRecordingWithSpace {
