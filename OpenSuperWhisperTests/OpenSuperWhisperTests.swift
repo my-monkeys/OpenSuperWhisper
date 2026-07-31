@@ -331,6 +331,8 @@ final class EngineCapabilitiesTests: XCTestCase {
     func testLanguages_whisperUsesFullSet() {
         XCTAssertEqual(EngineCapabilities.supportedLanguages(engine: "whisper", fluidAudioModelVersion: ""),
                        LanguageUtil.availableLanguages)
+        XCTAssertTrue(LanguageUtil.availableLanguages.contains("vi"))
+        XCTAssertEqual(LanguageUtil.languageNames["vi"], "Vietnamese")
     }
 }
 
