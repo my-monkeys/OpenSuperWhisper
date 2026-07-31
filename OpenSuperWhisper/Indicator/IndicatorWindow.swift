@@ -399,6 +399,9 @@ struct IndicatorWindow: View {
     // Surfaces how many earlier clips are still transcribing in the background, so starting a new
     // recording while others are queued shows the backlog. (parallel-recording #3)
     @ObservedObject private var pipeline = DictationPipeline.shared
+    // Observed directly rather than through the view model: `viewModel.recorder` is a nested
+    // ObservableObject, and its changes don't propagate through the outer object.
+    @ObservedObject private var recorder = AudioRecorder.shared
     @Environment(\.colorScheme) private var colorScheme
     
     private var backgroundColor: Color {
@@ -510,6 +513,7 @@ struct IndicatorWindow: View {
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.secondary)
                                 .transition(.opacity)
+                            InputLevelMeter(level: recorder.inputLevel)
                         }
                         if anyIndicatorButton {
                             Spacer(minLength: 8)

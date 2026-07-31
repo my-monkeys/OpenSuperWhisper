@@ -10,6 +10,11 @@ class AudioRecorder: NSObject, ObservableObject {
     @Published var currentlyPlayingURL: URL?
     @Published var canRecord = false
     @Published var isConnecting = false
+    /// Normalized mic input, 0 to 1, sampled while recording so the indicator can show that
+    /// sound is actually arriving. Zero whenever no recording is running.
+    @Published private(set) var inputLevel: Float = 0
+
+    private var levelTimer: DispatchSourceTimer?
     
     private var audioRecorder: AVAudioRecorder?
     private var audioPlayer: AVAudioPlayer?
@@ -197,9 +202,12 @@ class AudioRecorder: NSObject, ObservableObject {
             try Diag.measure("AVAudioRecorder init+record") {
                 audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
                 audioRecorder?.delegate = self
-                audioRecorder?.isMeteringEnabled = monitorConnection
+                // Metering also drives the indicator's level meter, so it is on for every
+                // recording, not only the ones being watched for a Bluetooth connection.
+                audioRecorder?.isMeteringEnabled = true
                 audioRecorder?.record()
             }
+            startLevelMonitoring()
             if monitorConnection {
                 startConnectionMonitoring()
             } else {
@@ -216,6 +224,7 @@ class AudioRecorder: NSObject, ObservableObject {
     func stopRecording() -> URL? {
         audioRecorder?.stop()
         updateRecordingState(isRecording: false, isConnecting: false)
+        stopLevelMonitoring()
         stopConnectionMonitoring()
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.primeAudioHardware()  // re-prime so the next recording starts instantly too
@@ -245,6 +254,7 @@ class AudioRecorder: NSObject, ObservableObject {
     func cancelRecording() {
         audioRecorder?.stop()
         updateRecordingState(isRecording: false, isConnecting: false)
+        stopLevelMonitoring()
         stopConnectionMonitoring()
 
         if AppPreferences.shared.pauseMediaOnRecord {
@@ -305,6 +315,29 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
+    /// Sample the recorder's meter into `inputLevel` at 20 Hz. Fast enough to track speech,
+    /// slow enough that the indicator is not re-rendered on every frame.
+    private func startLevelMonitoring() {
+        stopLevelMonitoring()
+
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInitiated))
+        timer.schedule(deadline: .now() + 0.05, repeating: 0.05)
+        timer.setEventHandler { [weak self] in
+            guard let self, let recorder = self.audioRecorder, recorder.isRecording else { return }
+            recorder.updateMeters()
+            let level = AudioLevel.normalize(power: recorder.averagePower(forChannel: 0))
+            DispatchQueue.main.async { self.inputLevel = level }
+        }
+        timer.resume()
+        levelTimer = timer
+    }
+
+    private func stopLevelMonitoring() {
+        levelTimer?.cancel()
+        levelTimer = nil
+        DispatchQueue.main.async { [weak self] in self?.inputLevel = 0 }
+    }
+
     private func startConnectionMonitoring() {
         stopConnectionMonitoring()
         
