@@ -34,6 +34,17 @@ final class AppPreferences {
         seedAppContextPresetsIfNeeded()
         migrateGroqToRemote()
         migrateAIProviderToBackend()
+        migrateIndicatorLayout()
+    }
+
+    /// Carry the old independent indicator switches into one ordered layout, so an existing
+    /// install keeps the bubble it had. Idempotent: only runs while the new key is unset.
+    private func migrateIndicatorLayout() {
+        guard indicatorLayout.isEmpty else { return }
+        indicatorLayout = IndicatorLayout.migrated(
+            meterMode: indicatorMeterMode,
+            showStop: showStopButtonOnIndicator,
+            showCancel: showCancelButtonOnIndicator).json
     }
 
     private func migrateOldPreferences() {
@@ -319,9 +330,13 @@ final class AppPreferences {
     @UserDefault(key: "indicatorPosition", defaultValue: "cursor")
     var indicatorPosition: String
 
-    /// Where the live spectrum meter sits on the recording bubble: "off", "replacesDot"
-    /// or "besideLabel". Replacing the dot is the default because it costs the least width,
-    /// and the compact bubble wraps its label when the meter is added beside it.
+    /// The bubble's contents as JSON (`IndicatorLayout`): which elements it shows and in
+    /// what order. Empty until `migrateIndicatorLayout()` builds one from the old
+    /// meter-mode / show-stop / show-cancel preferences.
+    @UserDefault(key: "indicatorLayout", defaultValue: "")
+    var indicatorLayout: String
+
+    /// Superseded by `indicatorLayout`; still read once by the migration.
     @UserDefault(key: "indicatorMeterMode", defaultValue: "replacesDot")
     var indicatorMeterMode: String
 

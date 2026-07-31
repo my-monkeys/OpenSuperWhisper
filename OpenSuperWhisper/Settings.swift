@@ -2344,40 +2344,7 @@ struct SettingsView: View {
                 }
             }
 
-            SSection(title: "Recording bar") {
-                SRow(title: "Indicator position") {
-                    HStack(spacing: 8) {
-                        Button("Preview") { IndicatorWindowManager.shared.preview() }
-                            .controlSize(.small)
-                        Picker("", selection: $viewModel.indicatorPosition) {
-                            Text("Near cursor").tag("cursor")
-                            Text("Notch").tag("notch")
-                            Text("Top").tag("top")
-                            Text("Center").tag("center")
-                            Text("Bottom").tag("bottom")
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                }
-                SRow(title: "Input meter",
-                     hint: "A live spectrum of what the mic is picking up, so a muted or wrong input shows before you finish talking") {
-                    Picker("", selection: $viewModel.indicatorMeterMode) {
-                        Text("Instead of the dot").tag(IndicatorMeterMode.replacesDot.rawValue)
-                        Text("Beside the label").tag(IndicatorMeterMode.besideLabel.rawValue)
-                        Text("Hidden").tag(IndicatorMeterMode.off.rawValue)
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                SRow(title: "Show Stop button", hint: "A stop-and-transcribe button on the recording bar") {
-                    SToggle(isOn: $viewModel.showStopButtonOnIndicator)
-                }
-                SRow(title: "Show Cancel button", hint: "A discard (trash) button on the recording bar") {
-                    SToggle(isOn: $viewModel.showCancelButtonOnIndicator)
-                }
+            SSection(title: "While recording") {
                 SRow(title: "Play sound when recording starts") {
                     SToggle(isOn: $viewModel.playSoundOnRecordStart)
                 }
@@ -2444,6 +2411,10 @@ struct SettingsView: View {
                     .labelsHidden()
                     .fixedSize()
                 }
+            }
+
+            SSection(title: "Indicator") {
+                IndicatorLayoutEditor(viewModel: viewModel)
             }
         }
     }

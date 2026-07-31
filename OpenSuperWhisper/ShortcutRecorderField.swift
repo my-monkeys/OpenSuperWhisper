@@ -26,10 +26,10 @@ private struct KeyCap: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 11.5, weight: .semibold))
             .foregroundColor(STheme.textBright)
-            .frame(minWidth: 16, minHeight: 16)
-            .padding(.horizontal, label.count > 1 ? 4 : 0)
+            .frame(minWidth: 18, minHeight: 18)
+            .padding(.horizontal, label.count > 1 ? 5 : 0)
             .background(RoundedRectangle(cornerRadius: 3.5).fill(STheme.controlBg))
             .overlay(RoundedRectangle(cornerRadius: 3.5).stroke(STheme.controlBorder, lineWidth: 0.5))
     }
@@ -64,7 +64,7 @@ struct ShortcutRecorderField: View {
             }
         }
         .padding(.horizontal, 9)
-        .frame(height: 22)
+        .frame(height: 26)
         .background(RoundedRectangle(cornerRadius: 7).fill(isRecording ? STheme.accentSoft : STheme.inputBg))
         .overlay(RoundedRectangle(cornerRadius: 7)
             .stroke(invalidCombo ? STheme.warn : (isRecording ? STheme.accent : STheme.controlBorder), lineWidth: 1))
@@ -122,8 +122,8 @@ struct ShortcutRecorderField: View {
                 Text(badge.symbol)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(held ? .white : STheme.hint)
-                    .frame(width: 16, height: 16)
-                    .background(RoundedRectangle(cornerRadius: 3.5).fill(held ? STheme.accent : STheme.controlBg))
+                    .frame(width: 18, height: 18)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(held ? STheme.accent : STheme.controlBg))
             }
             Text(invalidCombo ? "add ⌘ ⌥ or ⌃" : "key…")
                 .font(.system(size: 11))

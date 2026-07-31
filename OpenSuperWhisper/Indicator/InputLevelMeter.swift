@@ -56,12 +56,15 @@ enum IndicatorMeterMode: String, CaseIterable {
         IndicatorMeterMode(rawValue: raw) ?? .replacesDot
     }
 
-    /// Width this mode adds to the bubble compared with showing the dot alone.
+    /// Width this mode adds to the bubble. The compact bubble is a fixed 200pt with room to
+    /// spare for the label, so the meter mostly fits in slack that already existed. Reserving
+    /// its full width instead handed the surplus to the trailing Spacer, which parked the
+    /// stop/cancel buttons far to the right of the bars. Only the wider layout keeps a small
+    /// allowance, for the longer "Recording… · N queued" label.
     var extraBubbleWidth: CGFloat {
         switch self {
-        case .off: return 0
-        case .replacesDot: return max(0, InputLevelMeter.width - 16)
-        case .besideLabel: return InputLevelMeter.width + 10
+        case .off, .replacesDot: return 0
+        case .besideLabel: return 16
         }
     }
 }

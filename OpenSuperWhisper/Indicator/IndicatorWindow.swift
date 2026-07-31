@@ -414,43 +414,41 @@ struct IndicatorWindow: View {
     /// layout, including the notch pill (its base width has no room to spare).
     private var buttonExtraWidth: CGFloat {
         guard viewModel.state == .recording else { return 0 }
-        var extra: CGFloat = 0
-        if AppPreferences.shared.showStopButtonOnIndicator { extra += 32 }
-        if AppPreferences.shared.showCancelButtonOnIndicator { extra += 32 }
-        return extra
+        return CGFloat(layout.trailing.count) * 32
     }
 
-    /// Width the meter needs beyond the dot it replaces, so adding it never squeezes the label.
+    /// Width the chosen elements need beyond a plain dot-and-label bubble, so a composition
+    /// with the waveform (or without the label) never squeezes what is left.
     private var meterWidthAllowance: CGFloat {
-        viewModel.state == .recording ? meterMode.extraBubbleWidth : 0
+        guard viewModel.state == .recording else { return 0 }
+        return layout.contains(.waveform) && layout.contains(.label) ? 16 : 0
     }
 
-    private var bubbleWidth: CGFloat {
+    /// `nil` means "as wide as the contents". The notch keeps a fixed width because it is
+    /// imitating a piece of hardware, and the live caption keeps one because text of unknown
+    /// length would otherwise resize the window on every word. A plain recording bubble sizes
+    /// itself: a fixed 200pt left a waveform-only layout stranded at the left of an
+    /// empty pill.
+    private var bubbleWidth: CGFloat? {
+        let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
         if isNotchMode {
-            // Idle width is tunable; it only expands once there is actual caption text to show.
-            let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
             return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth + meterWidthAllowance
         }
-        // Live mode starts compact too — the pill only widens once caption text actually
-        // arrives (same rule as notch mode). Starting at 380 made the bubble appear at
-        // its "final" size the moment recording began.
         let live = viewModel.state == .recording && IndicatorViewModel.shouldUseLiveStreaming
-        let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
-        let base: CGFloat = (live && hasCaption) ? 380 : 200
-        return base + buttonExtraWidth + meterWidthAllowance
+        if live && hasCaption { return 380 + buttonExtraWidth + meterWidthAllowance }
+        if viewModel.state == .recording { return nil }
+        return 200 + buttonExtraWidth + meterWidthAllowance
     }
     
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
 
-    private var meterMode: IndicatorMeterMode {
-        IndicatorMeterMode.from(AppPreferences.shared.indicatorMeterMode)
+    private var layout: IndicatorLayout {
+        IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
     }
 
-    /// Bars are allowed to stand taller than the label next to them: the meter is the thing
-    /// being read at a glance, and a 16pt strip next to 13pt text reads as decoration. The
-    /// bubble grows to fit, which is the intended trade. The notch stays a little shorter so
-    /// the silhouette keeps passing for the hardware cutout it imitates.
-    private var meterHeight: CGFloat { isNotchMode ? 26 : 30 }
+    /// Bars are allowed to stand taller than the label beside them: the meter is the thing
+    /// being read at a glance. Set in the layout editor, where the effect is visible.
+    private var meterHeight: CGFloat { layout.waveformHeight }
 
     /// Opt-in on-bubble controls (default off). Shown on the trailing side while
     /// recording. Stop = stop & transcribe (same as the hotkey toggle); Cancel =
@@ -514,29 +512,31 @@ struct IndicatorWindow: View {
                 if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
                     HStack(alignment: .center, spacing: 10) {
-                        if meterMode == .replacesDot {
-                            InputLevelMeter(bands: spectrum.bands, height: meterHeight)
-                        } else {
-                            RecordingIndicator(isBlinking: viewModel.isBlinking)
-                                .frame(width: 16)
-                        }
                         if viewModel.isConfirmingCancel {
                             Text("Press Esc to cancel")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.orange)
                                 .transition(.opacity)
                         } else {
-                            Text(pipeline.pendingCount > 0 ? "Recording… · \(pipeline.pendingCount) queued" : "Recording…")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.secondary)
-                                .transition(.opacity)
-                            if meterMode == .besideLabel {
-                                InputLevelMeter(bands: spectrum.bands, height: meterHeight)
+                            ForEach(layout.leading) { element in
+                                IndicatorElementView(element: element,
+                                                     bands: spectrum.bands,
+                                                     meterHeight: meterHeight,
+                                                     isBlinking: viewModel.isBlinking,
+                                                     queued: pipeline.pendingCount)
                             }
                         }
-                        if anyIndicatorButton {
+                        if !layout.trailing.isEmpty {
                             Spacer(minLength: 8)
-                            indicatorControls
+                            HStack(spacing: 8) {
+                                ForEach(layout.trailing) { element in
+                                    IndicatorElementView(element: element,
+                                                         bands: spectrum.bands,
+                                                         meterHeight: meterHeight,
+                                                         isBlinking: viewModel.isBlinking,
+                                                         queued: pipeline.pendingCount)
+                                }
+                            }
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: viewModel.isConfirmingCancel)
@@ -606,13 +606,17 @@ struct IndicatorWindow: View {
                 EmptyView()
             }
         }
+        // Without a fixed width the HStack takes whatever the window offers and the trailing
+        // Spacer eats it, so a waveform plus two buttons stretched into a mostly empty bar.
+        // Fixing the horizontal size collapses the Spacer to its 8pt minimum.
+        .fixedSize(horizontal: bubbleWidth == nil, vertical: false)
         .padding(.horizontal, isNotchMode ? 22 : 16)
-        // Tighter vertically than the original 12: the meter is now the tallest element, so
-        // the old padding sat on top of a much taller row and left the label swimming in space.
         .padding(.vertical, isNotchMode ? 10 : 7)
         // Width must be set *before* the background so the bubble itself fills it (not just the
         // surrounding frame). Notch content is centred; the others stay leading.
         .frame(minHeight: isNotchMode ? notch.height : 36)
+        // A floor so a single small element still reads as a bubble rather than a chip.
+        .frame(minWidth: bubbleWidth == nil ? 76 : nil)
         .frame(width: bubbleWidth, alignment: isNotchMode ? .center : .leading)
         .background {
             if isNotchMode {
