@@ -34,6 +34,8 @@ final class DictationPipeline: ObservableObject {
         /// Model that was active when this clip was recorded. Applied for this clip's transcription
         /// even if a later recording has since switched the global model. (#model-snapshot)
         let modelOption: DictationModelOption?
+        /// This take was started by the submit mouse button, so press Return after inserting (#50).
+        let submitAfterInsert: Bool
     }
 
     /// Dictations waiting in the queue plus the one currently being processed. Drives optional
@@ -61,7 +63,8 @@ final class DictationPipeline: ObservableObject {
     /// work drains on the serial loop. Called on the main actor from the indicator's stop handler.
     /// `seq` is monotonic and assigned here, so append order == recording-start order.
     func enqueue(tempURL: URL, startedAt: Date, streamedFallback: String,
-                 context: ContextSnapshot, modelOption: DictationModelOption?) {
+                 context: ContextSnapshot, modelOption: DictationModelOption?,
+                 submitAfterInsert: Bool = false) {
         seqCounter += 1
         queue.append(PendingDictation(
             id: UUID(),
@@ -70,7 +73,8 @@ final class DictationPipeline: ObservableObject {
             tempURL: tempURL,
             streamedFallback: streamedFallback,
             context: context,
-            modelOption: modelOption))
+            modelOption: modelOption,
+            submitAfterInsert: submitAfterInsert))
         refreshPendingCount()
         startLoopIfNeeded()
     }
@@ -150,8 +154,10 @@ final class DictationPipeline: ObservableObject {
 
             // Trailing "press enter" voice command (opt-in): strip it and remember to press Return
             // after insertion, submitting the message/prompt.
-            let (strippedText, shouldSubmit) = AppPreferences.shared.stripSubmitCommand(text)
+            let (strippedText, spokenSubmit) = AppPreferences.shared.stripSubmitCommand(text)
             text = strippedText
+            // Either route asks for the same thing: send Return once the text is in.
+            let shouldSubmit = spokenSubmit || item.submitAfterInsert
             let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
             var hookAudioPath: String? = nil

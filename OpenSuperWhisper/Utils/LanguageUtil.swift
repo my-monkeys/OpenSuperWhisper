@@ -38,4 +38,18 @@ class LanguageUtil {
             return "eng"
         }
     }
+
+    /// Whether `locale` appears in `installed`, comparing language and region rather than raw
+    /// identifiers. Speech hands the same locale back as "fr_FR" or "fr-FR" depending on the
+    /// call, so a string compare reports a downloaded model as missing. A region-less locale
+    /// ("fr") matches any region of that language, which is what the language rows ask about.
+    static func isInstalled(_ locale: Locale, in installed: [Locale]) -> Bool {
+        installed.contains { matches($0, locale) }
+    }
+
+    static func matches(_ a: Locale, _ b: Locale) -> Bool {
+        guard a.language.languageCode == b.language.languageCode else { return false }
+        guard let wanted = b.region else { return true }
+        return a.region == wanted
+    }
 }

@@ -202,6 +202,7 @@ class AudioRecorder: NSObject, ObservableObject {
                 audioRecorder?.isMeteringEnabled = monitorConnection
                 audioRecorder?.record()
             }
+            Task { @MainActor in SpectrumAnalyzer.shared.start() }
             if monitorConnection {
                 startConnectionMonitoring()
             } else {
@@ -218,6 +219,7 @@ class AudioRecorder: NSObject, ObservableObject {
     func stopRecording() -> URL? {
         audioRecorder?.stop()
         updateRecordingState(isRecording: false, isConnecting: false)
+        Task { @MainActor in SpectrumAnalyzer.shared.stop() }
         stopConnectionMonitoring()
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.primeAudioHardware()  // re-prime so the next recording starts instantly too
@@ -247,6 +249,7 @@ class AudioRecorder: NSObject, ObservableObject {
     func cancelRecording() {
         audioRecorder?.stop()
         updateRecordingState(isRecording: false, isConnecting: false)
+        Task { @MainActor in SpectrumAnalyzer.shared.stop() }
         stopConnectionMonitoring()
 
         if AppPreferences.shared.pauseMediaOnRecord {

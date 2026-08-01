@@ -3,6 +3,13 @@ set -e
 
 # Configuration
 NEW_VERSION="${1:-0.0.4}"
+APP_NAME="OpenSuperWhisper"
+# Which slice notarize_app.sh built; it names the DMG after it.
+ARCH="${ARCH:-arm64}"
+# Releases go to this fork, not to the upstream project we forked from.
+REPO="${REPO:-my-monkeys/OpenSuperWhisper}"
+# Every existing tag is v-prefixed; Sparkle's appcast links to that form.
+TAG="v${NEW_VERSION}"
 CODE_SIGN_IDENTITY="${2}"
 GITHUB_TOKEN="${3}"
 
@@ -64,8 +71,8 @@ echo "✅ Updated MARKETING_VERSION to ${NEW_VERSION} and CURRENT_PROJECT_VERSIO
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
 rm -rf build
-rm -f OpenSuperWhisper.dmg
-rm -f OpenSuperWhisper.dmg.sha256
+rm -f OpenSuperWhisper-*.dmg
+rm -f OpenSuperWhisper-*.dmg.sha256
 rm -f OpenSuperWhisper.app.dSYM.zip
 
 # Use the existing notarize_app.sh script to build, sign, and notarize
@@ -85,7 +92,7 @@ fi
 
 echo "✅ Build and notarization successful!"
 
-DMG_PATH="./OpenSuperWhisper.dmg"
+DMG_PATH="./${APP_NAME}-${ARCH}.dmg"
 
 # Verify DMG exists
 if [[ ! -f "$DMG_PATH" ]]; then
@@ -122,11 +129,11 @@ git commit -m "Bump version to ${NEW_VERSION}" || echo "No changes to commit"
 
 # Create git tag
 echo "🏷️ Creating git tag..."
-git tag -a "${NEW_VERSION}" -m "Release ${NEW_VERSION}"
+git tag -a "${TAG}" -m "Release ${NEW_VERSION}"
 
 # Push tag to origin
 echo "📤 Pushing tag to origin..."
-git push origin "${NEW_VERSION}"
+git push origin "${TAG}"
 
 if [[ $? -ne 0 ]]; then
     echo "❌ Failed to push tag!"
@@ -142,12 +149,12 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer ${GITHUB_TOKEN}" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
-        https://api.github.com/repos/Starmel/OpenSuperWhisper/releases \
+        https://api.github.com/repos/${REPO}/releases \
         -d '{
-            "tag_name": "'${NEW_VERSION}'",
+            "tag_name": "'${TAG}'",
             "target_commitish": "master",
             "name": "Release '${NEW_VERSION}'",
-            "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew update\nbrew install opensuperwhisper\n```\n\n### Manual Installation\n1. Download the `OpenSuperWhisper.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon (ARM64) Mac",
+            "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew update\nbrew install opensuperwhisper\n```\n\n### Manual Installation\n1. Download the `'${APP_NAME}-${ARCH}-${NEW_VERSION}'.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon (ARM64) Mac",
             "draft": false,
             "prerelease": false,
             "generate_release_notes": false
@@ -171,7 +178,7 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
         -H "Authorization: Bearer ${GITHUB_TOKEN}" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         -H "Content-Type: application/octet-stream" \
-        "https://uploads.github.com/repos/Starmel/OpenSuperWhisper/releases/${RELEASE_ID}/assets?name=OpenSuperWhisper.dmg" \
+        "https://uploads.github.com/repos/${REPO}/releases/${RELEASE_ID}/assets?name=${APP_NAME}-${ARCH}-${NEW_VERSION}.dmg" \
         --data-binary @"${DMG_PATH}")
     
     # Check if upload was successful
@@ -198,7 +205,7 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             -H "Content-Type: application/zip" \
-            "https://uploads.github.com/repos/Starmel/OpenSuperWhisper/releases/${RELEASE_ID}/assets?name=OpenSuperWhisper.app.dSYM.zip" \
+            "https://uploads.github.com/repos/${REPO}/releases/${RELEASE_ID}/assets?name=OpenSuperWhisper.app.dSYM.zip" \
             --data-binary @"${DSYM_ZIP_PATH}")
         
         # Check dSYM upload
@@ -217,21 +224,21 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
     
     echo "✅ DMG uploaded successfully!"
     echo "🎉 GitHub release is complete!"
-    echo "🔗 Release URL: https://github.com/Starmel/OpenSuperWhisper/releases/tag/${NEW_VERSION}"
+    echo "🔗 Release URL: https://github.com/${REPO}/releases/tag/${TAG}"
 else
     echo "⚠️ Skipping GitHub release creation (no token provided)"
     echo "📋 Manual steps needed:"
     echo "1. Create GitHub release at:"
-    echo "   https://github.com/Starmel/OpenSuperWhisper/releases/new?tag=${NEW_VERSION}"
-    echo "2. Upload the DMG file: OpenSuperWhisper.dmg"
+    echo "   https://github.com/${REPO}/releases/new?tag=${TAG}"
+    echo "2. Upload the DMG file: ${DMG_PATH}"
 fi
 
 echo ""
 echo "🎉 Release ${NEW_VERSION} is ready!"
 echo ""
 echo "📁 Files created:"
-echo "   - OpenSuperWhisper.dmg"
-echo "   - OpenSuperWhisper.dmg.sha256"
+echo "   - ${DMG_PATH}"
+echo "   - ${DMG_PATH}.sha256"
 if [[ -f "$DSYM_ZIP_PATH" ]]; then
     echo "   - OpenSuperWhisper.app.dSYM.zip"
 fi
@@ -243,10 +250,10 @@ cask "opensuperwhisper" do
   version "${NEW_VERSION}"
   sha256 "${SHA256}"
 
-  url "https://github.com/starmel/OpenSuperWhisper/releases/download/#{version}/OpenSuperWhisper.dmg"
+  url "https://github.com/${REPO}/releases/download/v#{version}/${APP_NAME}-${ARCH}-#{version}.dmg"
   name "OpenSuperWhisper"
   desc "Whisper dictation/transcription app"
-  homepage "https://github.com/starmel/OpenSuperWhisper"
+  homepage "https://github.com/${REPO}"
 
   depends_on macos: ">= :sonoma"
   depends_on arch: :arm64

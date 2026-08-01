@@ -34,6 +34,17 @@ final class AppPreferences {
         seedAppContextPresetsIfNeeded()
         migrateGroqToRemote()
         migrateAIProviderToBackend()
+        migrateIndicatorLayout()
+    }
+
+    /// Carry the old independent indicator switches into one ordered layout, so an existing
+    /// install keeps the bubble it had. Idempotent: only runs while the new key is unset.
+    private func migrateIndicatorLayout() {
+        guard indicatorLayout.isEmpty else { return }
+        indicatorLayout = IndicatorLayout.migrated(
+            meterMode: indicatorMeterMode,
+            showStop: showStopButtonOnIndicator,
+            showCancel: showCancelButtonOnIndicator).json
     }
 
     private func migrateOldPreferences() {
@@ -289,6 +300,16 @@ final class AppPreferences {
     @UserDefault(key: "lastMouseButtonHotkey", defaultValue: "middle")
     var lastMouseButtonHotkey: String
 
+    /// A second mouse button that dictates and then presses Return, for apps where dictation
+    /// is followed by submitting (chat prompts, search fields). Same outcome as the spoken
+    /// "press enter" command, without saying it. "none" disables it. (#50)
+    @UserDefault(key: "submitMouseButtonHotkey", defaultValue: "none")
+    var submitMouseButtonHotkey: String
+
+    /// Single modifier for the same dictate-and-submit action. (#50)
+    @UserDefault(key: "submitModifierOnlyHotkey", defaultValue: "none")
+    var submitModifierOnlyHotkey: String
+
     // When false (default), pressing Esc to cancel a recording longer than
     // ~10s first asks for confirmation (press Esc again) instead of discarding
     // it outright — a safety net against an accidental Esc losing a long dictation.
@@ -324,6 +345,16 @@ final class AppPreferences {
     /// Where the recording indicator appears: "cursor" (default), "top", "center", "bottom".
     @UserDefault(key: "indicatorPosition", defaultValue: "cursor")
     var indicatorPosition: String
+
+    /// The bubble's contents as JSON (`IndicatorLayout`): which elements it shows and in
+    /// what order. Empty until `migrateIndicatorLayout()` builds one from the old
+    /// meter-mode / show-stop / show-cancel preferences.
+    @UserDefault(key: "indicatorLayout", defaultValue: "")
+    var indicatorLayout: String
+
+    /// Superseded by `indicatorLayout`; still read once by the migration.
+    @UserDefault(key: "indicatorMeterMode", defaultValue: "replacesDot")
+    var indicatorMeterMode: String
 
     /// Strip filler words (um, uh, …) from the transcription before saving/inserting. Opt-in.
     @UserDefault(key: "removeFillerWords", defaultValue: false)

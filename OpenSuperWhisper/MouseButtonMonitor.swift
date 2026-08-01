@@ -55,24 +55,31 @@ class MouseButtonMonitor {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var selectedMouseButton: MouseButton = .none
-    private var isButtonPressed = false
+    /// Buttons being watched, by their CGEvent number. More than one so a second button can
+    /// mean "dictate and submit" alongside the plain record button (#50).
+    private var watched: [Int64: MouseButton] = [:]
+    private var pressedButton: MouseButton?
 
-    var onButtonDown: (() -> Void)?
-    var onButtonUp: (() -> Void)?
+    var onButtonDown: ((MouseButton) -> Void)?
+    var onButtonUp: ((MouseButton) -> Void)?
 
     private init() {}
 
     func start(mouseButton: MouseButton) {
-        guard mouseButton != .none else {
+        start(mouseButtons: [mouseButton])
+    }
+
+    func start(mouseButtons: [MouseButton]) {
+        let active = mouseButtons.filter { $0 != .none }
+        guard !active.isEmpty else {
             stop()
             return
         }
 
         stop()
 
-        selectedMouseButton = mouseButton
-        isButtonPressed = false
+        watched = Dictionary(active.map { ($0.buttonNumber, $0) }, uniquingKeysWith: { first, _ in first })
+        pressedButton = nil
 
         let eventMask = CGEventMask(
             (1 << CGEventType.otherMouseDown.rawValue) |
@@ -117,7 +124,7 @@ class MouseButtonMonitor {
         if let source = runLoopSource {
             CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)
-            print("MouseButtonMonitor: Started monitoring for \(mouseButton.displayName)")
+            print("MouseButtonMonitor: Started monitoring \(active.map(\.displayName).joined(separator: ", "))")
         }
     }
 
@@ -130,7 +137,8 @@ class MouseButtonMonitor {
         }
         eventTap = nil
         runLoopSource = nil
-        isButtonPressed = false
+        watched = [:]
+        pressedButton = nil
         print("MouseButtonMonitor: Stopped")
     }
 
@@ -144,21 +152,23 @@ class MouseButtonMonitor {
     /// Returns `true` when the event belongs to the bound button and should be consumed.
     private func handleMouseEvent(type: CGEventType, event: CGEvent) -> Bool {
         let buttonNumber = event.getIntegerValueField(.mouseEventButtonNumber)
-        guard buttonNumber == selectedMouseButton.buttonNumber else { return false }
+        guard let button = watched[buttonNumber] else { return false }
 
         switch type {
         case .otherMouseDown:
-            if !isButtonPressed {
-                isButtonPressed = true
+            // Ignore a second button pressed mid-recording: the first one owns this take,
+            // and switching intent halfway would be ambiguous.
+            if pressedButton == nil {
+                pressedButton = button
                 DispatchQueue.main.async {
-                    self.onButtonDown?()
+                    self.onButtonDown?(button)
                 }
             }
         case .otherMouseUp:
-            if isButtonPressed {
-                isButtonPressed = false
+            if pressedButton == button {
+                pressedButton = nil
                 DispatchQueue.main.async {
-                    self.onButtonUp?()
+                    self.onButtonUp?(button)
                 }
             }
         default:
