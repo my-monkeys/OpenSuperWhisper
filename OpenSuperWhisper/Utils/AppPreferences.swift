@@ -1,4 +1,5 @@
 import Foundation
+import KeyboardShortcuts
 
 enum TranscriptionResult {
     /// Returned by the engines when nothing intelligible was transcribed. It is shown to the
@@ -35,6 +36,31 @@ final class AppPreferences {
         migrateGroqToRemote()
         migrateAIProviderToBackend()
         migrateIndicatorLayout()
+        migrateRecordingTriggers()
+        resolveTriggerConflicts()
+    }
+
+    /// A key bound both as a recording trigger and as stop-and-submit can only do one of them:
+    /// the router checks submit first, so the trigger silently stops starting anything. Installs
+    /// that reached that state before the editor prevented it get the submit binding cleared,
+    /// since the trigger list is the one the user sees as a list. (#48)
+    private func resolveTriggerConflicts() {
+        let set = RecordingTriggerSet.load(from: recordingTriggers)
+        let clash = set.conflicts(
+            modifier: ModifierKey(rawValue: submitModifierOnlyHotkey) ?? .none,
+            mouse: MouseButton(rawValue: submitMouseButtonHotkey) ?? .none)
+        if clash.modifier { submitModifierOnlyHotkey = ModifierKey.none.rawValue }
+        if clash.mouse { submitMouseButtonHotkey = MouseButton.none.rawValue }
+    }
+
+    /// Carries the three single-slot trigger preferences into the list. Idempotent: only runs
+    /// while the new key is unset. The old keys stay readable so a downgrade still finds them.
+    private func migrateRecordingTriggers() {
+        guard recordingTriggers.isEmpty else { return }
+        recordingTriggers = RecordingTriggerSet.migrated(
+            mouseRaw: mouseButtonHotkey,
+            modifierRaw: modifierOnlyHotkey,
+            shortcut: KeyboardShortcuts.getShortcut(for: .toggleRecord)).json
     }
 
     /// Carry the old independent indicator switches into one ordered layout, so an existing
@@ -305,6 +331,12 @@ final class AppPreferences {
     /// "press enter" command, without saying it. "none" disables it. (#50)
     @UserDefault(key: "submitMouseButtonHotkey", defaultValue: "none")
     var submitMouseButtonHotkey: String
+
+    /// Recording triggers as JSON (`RecordingTriggerSet`): any number of key combinations,
+    /// single modifiers and mouse buttons, all live at once. Empty until
+    /// `migrateRecordingTriggers()` builds it from the three single-slot preferences. (#48)
+    @UserDefault(key: "recordingTriggers", defaultValue: "")
+    var recordingTriggers: String
 
     /// Single modifier for the same dictate-and-submit action. (#50)
     @UserDefault(key: "submitModifierOnlyHotkey", defaultValue: "none")

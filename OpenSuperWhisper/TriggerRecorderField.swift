@@ -23,21 +23,134 @@ struct TriggerRecorderField: View {
     /// Cancel is normally bound to bare Esc, so that field has to be able to record it. Esc then
     /// can't also mean "abort the capture" there; clicking outside does that instead.
     var allowsBareEscape = false
+    /// The record trigger keeps a list: any number of combinations, modifiers and buttons, all
+    /// live at once (#48). The other actions hold one binding, so recording replaces it.
+    var allowsMultiple = false
 
+    /// Mirrors the stored shortcut. `KeyboardShortcuts.getShortcut` is not something SwiftUI
+    /// observes, so reading it straight from the body left a newly recorded combination
+    /// invisible until something else redrew the view — the whole list looked broken.
+    @State private var shortcut: KeyboardShortcuts.Shortcut?
     @State private var isRecording = false
     @State private var heldModifiers: NSEvent.ModifierFlags = []
     @State private var isHovering = false
     @State private var monitors: [Any] = []
     @State private var detector = SingleModifierDetector()
 
-    private var trigger: RecordingTrigger {
-        RecordingTrigger.resolve(
-            mouseRaw: mouseButton.rawValue,
-            modifierRaw: modifierKey.rawValue,
-            shortcut: KeyboardShortcuts.getShortcut(for: name))
+    /// The stored list, for the multi-trigger field. Mirrored in state so a change redraws:
+    /// preferences are not something SwiftUI observes.
+    @State private var set = RecordingTriggerSet.empty
+
+    private var triggers: [RecordingTrigger] {
+        guard allowsMultiple else {
+            let single = RecordingTrigger.resolve(mouseRaw: mouseButton.rawValue,
+                                                  modifierRaw: modifierKey.rawValue,
+                                                  shortcut: shortcut)
+            return single == .none ? [] : [single]
+        }
+        return set.triggers
     }
 
-    var body: some View {
+    private func loadShortcut() {
+        shortcut = KeyboardShortcuts.getShortcut(for: name)
+        if allowsMultiple {
+            set = RecordingTriggerSet.load(from: AppPreferences.shared.recordingTriggers)
+        }
+    }
+
+    private func persistSet() {
+        AppPreferences.shared.recordingTriggers = set.json
+        NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+    }
+
+    @ViewBuilder var body: some View {
+        if allowsMultiple {
+            listBody
+        } else {
+            singleField
+        }
+    }
+
+    /// One row per configured trigger, plus an explicit row to add another. The compact field
+    /// couldn't show two bindings side by side without cramming, and its "+" was decoration
+    /// rather than a control — clicking it armed the recorder by accident rather than by design.
+    private var listBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(triggers.enumerated()), id: \.offset) { _, configured in
+                triggerRow(configured)
+            }
+            addRow
+        }
+    }
+
+    private func triggerRow(_ trigger: RecordingTrigger) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 3) {
+                ForEach(Array(trigger.caps.enumerated()), id: \.offset) { _, cap in
+                    TriggerCap(label: cap)
+                }
+            }
+            Spacer(minLength: 8)
+            Button { remove(trigger) } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(STheme.hint)
+            }
+            .buttonStyle(.plain)
+            .pointerCursorOnHover()
+            .help("Remove this trigger")
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 30)
+        .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+    }
+
+    /// Doubles as the capture surface: idle it invites a new trigger, armed it shows the
+    /// modifiers being held, so the thing you click is the thing that records.
+    private var addRow: some View {
+        HStack(spacing: 8) {
+            if isRecording {
+                ForEach(RecordingTrigger.modifierBadges, id: \.symbol) { badge in
+                    let held = heldModifiers.contains(badge.flag)
+                    Text(badge.symbol)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(held ? .white : STheme.hint)
+                        .frame(width: 18, height: 18)
+                        .background(RoundedRectangle(cornerRadius: 4)
+                            .fill(held ? STheme.accent : STheme.controlBg))
+                }
+                Text(placeholder)
+                    .font(.system(size: 11))
+                    .foregroundColor(STheme.hint)
+            } else {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(STheme.hint)
+                Text(triggers.isEmpty ? "Add a trigger" : "Add another")
+                    .font(.system(size: 11))
+                    .foregroundColor(STheme.hint)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 30)
+        .background(RoundedRectangle(cornerRadius: 7)
+            .fill(isRecording ? STheme.accentSoft : Color.clear))
+        .overlay(RoundedRectangle(cornerRadius: 7)
+            .strokeBorder(isRecording ? STheme.accent : STheme.controlBorder,
+                          style: StrokeStyle(lineWidth: 1, dash: isRecording ? [] : [4, 3])))
+        .contentShape(RoundedRectangle(cornerRadius: 7))
+        .onTapGesture { if isRecording { disarm() } else { arm() } }
+        .onHover { isHovering = $0 }
+        .pointerCursorOnHover()
+        .onAppear { loadShortcut() }
+        .onDisappear { disarm() }
+        .animation(.easeOut(duration: 0.12), value: heldModifiers.rawValue)
+        .animation(.easeOut(duration: 0.12), value: isRecording)
+    }
+
+    private var singleField: some View {
         HStack(spacing: 8) {
             if isRecording { recordingBody } else { idleBody }
         }
@@ -50,22 +163,18 @@ struct TriggerRecorderField: View {
         .contentShape(RoundedRectangle(cornerRadius: 7))
         .onTapGesture { if isRecording { disarm() } else { arm() } }
         .onHover { isHovering = $0 }
+        .onAppear { loadShortcut() }
         .onDisappear { disarm() }
         .animation(.easeOut(duration: 0.12), value: heldModifiers.rawValue)
         .animation(.easeOut(duration: 0.12), value: isRecording)
     }
 
+    /// The single-binding presentation: one trigger, replaced on each recording.
     private var idleBody: some View {
         HStack(spacing: 6) {
-            let caps = trigger.caps
-            if caps.isEmpty {
-                Text("Click to record")
-                    .font(.system(size: 11))
-                    .foregroundColor(STheme.hint)
-                Spacer(minLength: 0)
-            } else {
+            if let configured = triggers.first {
                 HStack(spacing: 3) {
-                    ForEach(Array(caps.enumerated()), id: \.offset) { _, cap in
+                    ForEach(Array(configured.caps.enumerated()), id: \.offset) { _, cap in
                         TriggerCap(label: cap)
                     }
                 }
@@ -79,8 +188,23 @@ struct TriggerRecorderField: View {
                     .buttonStyle(.plain)
                     .help("Clear trigger")
                 }
+            } else {
+                Text("Click to record")
+                    .font(.system(size: 11))
+                    .foregroundColor(STheme.hint)
+                Spacer(minLength: 0)
             }
         }
+    }
+
+    /// Clears one trigger without touching the others.
+    private func remove(_ trigger: RecordingTrigger) {
+        guard allowsMultiple else {
+            clear()
+            return
+        }
+        set.remove(trigger)
+        persistSet()
     }
 
     private var recordingBody: some View {
@@ -193,29 +317,73 @@ struct TriggerRecorderField: View {
     /// Stores the trigger, clearing the other two kinds: exactly one is active at a time, which
     /// is what makes the mode implicit.
     private func save(_ trigger: RecordingTrigger) {
+        if allowsMultiple {
+            set.add(trigger)
+            releaseFromOtherActions(trigger)
+            persistSet()
+            disarm()
+            return
+        }
+        // The reverse direction: binding a key to this action takes it off the trigger list, or
+        // the router would route it here and the trigger would silently stop starting anything.
+        takeOverFromRecordingTriggers(trigger)
         switch trigger {
         case .none:
             clear()
         case .keyCombo(let shortcut):
-            mouseButton = .none
-            modifierKey = .none
+            if !allowsMultiple { mouseButton = .none; modifierKey = .none }
             KeyboardShortcuts.setShortcut(shortcut, for: name)
+            self.shortcut = shortcut
         case .modifier(let key):
-            mouseButton = .none
+            if !allowsMultiple {
+                mouseButton = .none
+                KeyboardShortcuts.setShortcut(nil, for: name)
+                self.shortcut = nil
+            }
             modifierKey = key
-            KeyboardShortcuts.setShortcut(nil, for: name)
         case .mouse(let button):
-            modifierKey = .none
+            if !allowsMultiple {
+                modifierKey = .none
+                KeyboardShortcuts.setShortcut(nil, for: name)
+                self.shortcut = nil
+            }
             mouseButton = button
-            KeyboardShortcuts.setShortcut(nil, for: name)
         }
         disarm()
+    }
+
+    /// Frees a key that another action already claims. The newest assignment wins, which is what
+    /// every shortcut editor does — the alternative is a key bound twice where the loser fails
+    /// silently, which is exactly how a working modifier looked broken.
+    private func releaseFromOtherActions(_ trigger: RecordingTrigger) {
+        let prefs = AppPreferences.shared
+        switch trigger {
+        case .modifier(let key):
+            if prefs.submitModifierOnlyHotkey == key.rawValue {
+                prefs.submitModifierOnlyHotkey = ModifierKey.none.rawValue
+            }
+        case .mouse(let button):
+            if prefs.submitMouseButtonHotkey == button.rawValue {
+                prefs.submitMouseButtonHotkey = MouseButton.none.rawValue
+            }
+        case .keyCombo, .none:
+            break
+        }
+    }
+
+    /// Same rule, applied when a single-binding field claims something the trigger list holds.
+    private func takeOverFromRecordingTriggers(_ trigger: RecordingTrigger) {
+        var triggerSet = RecordingTriggerSet.load(from: AppPreferences.shared.recordingTriggers)
+        guard triggerSet.triggers.contains(trigger) else { return }
+        triggerSet.remove(trigger)
+        AppPreferences.shared.recordingTriggers = triggerSet.json
     }
 
     private func clear() {
         mouseButton = .none
         modifierKey = .none
         KeyboardShortcuts.setShortcut(nil, for: name)
+        shortcut = nil
     }
 
     private func disarm() {

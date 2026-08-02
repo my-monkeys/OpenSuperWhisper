@@ -25,7 +25,7 @@ enum RecorderCombo {
 /// the mode could disagree with what was stored, leaving a configured key stranded behind a
 /// picker (the reason `lastModifierOnlyHotkey` had to exist). Here the mode is simply whatever
 /// was recorded, so the two can't drift.
-enum RecordingTrigger: Equatable {
+enum RecordingTrigger: Equatable, Codable {
     case none
     case keyCombo(KeyboardShortcuts.Shortcut)
     case modifier(ModifierKey)
@@ -53,9 +53,20 @@ enum RecordingTrigger: Equatable {
         (.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘"),
     ]
 
-    /// Which trigger a set of stored preferences describes. Mouse wins over a single modifier,
-    /// which wins over the key combination, matching how `ShortcutManager` has always resolved
-    /// them, so an install upgrading into this type keeps the trigger it had.
+    /// Every trigger the stored preferences describe. More than one can be live at a time — a
+    /// thumb button at the desk and a shortcut on the move — so this returns all of them rather
+    /// than picking a winner (#48).
+    static func resolveAll(mouseRaw: String, modifierRaw: String,
+                           shortcut: KeyboardShortcuts.Shortcut?) -> [RecordingTrigger] {
+        var triggers: [RecordingTrigger] = []
+        if let shortcut { triggers.append(.keyCombo(shortcut)) }
+        if let key = ModifierKey(rawValue: modifierRaw), key != .none { triggers.append(.modifier(key)) }
+        if let button = MouseButton(rawValue: mouseRaw), button != .none { triggers.append(.mouse(button)) }
+        return triggers
+    }
+
+    /// The single trigger these preferences describe, for the fields that only ever hold one
+    /// (cancel, submit, paste-last). Mouse wins over a modifier, which wins over the shortcut.
     static func resolve(mouseRaw: String, modifierRaw: String,
                         shortcut: KeyboardShortcuts.Shortcut?) -> RecordingTrigger {
         if let button = MouseButton(rawValue: mouseRaw), button != .none {
@@ -68,6 +79,87 @@ enum RecordingTrigger: Equatable {
             return .keyCombo(shortcut)
         }
         return .none
+    }
+
+    /// Two triggers of the same kind can't coexist: there is one shortcut slot, one modifier
+    /// preference and one mouse-button preference, so recording a new one of a kind replaces it.
+    var kind: Kind {
+        switch self {
+        case .none: return .keyCombo
+        case .keyCombo: return .keyCombo
+        case .modifier: return .modifier
+        case .mouse: return .mouse
+        }
+    }
+
+    enum Kind { case keyCombo, modifier, mouse }
+}
+
+/// The recording triggers, in the order they were added. Any number of each kind: the old shape
+/// held one slot per kind (one shortcut, one modifier preference, one mouse-button preference),
+/// which capped it at three however the UI was drawn (#48).
+struct RecordingTriggerSet: Equatable, Codable {
+    var triggers: [RecordingTrigger]
+
+    static let empty = RecordingTriggerSet(triggers: [])
+
+    var modifiers: [ModifierKey] {
+        triggers.compactMap { if case .modifier(let key) = $0 { return key } else { return nil } }
+    }
+
+    var mouseButtons: [MouseButton] {
+        triggers.compactMap { if case .mouse(let button) = $0 { return button } else { return nil } }
+    }
+
+    var keyCombos: [KeyboardShortcuts.Shortcut] {
+        triggers.compactMap { if case .keyCombo(let combo) = $0 { return combo } else { return nil } }
+    }
+
+    /// Appends unless an identical trigger is already there — recording the same key twice
+    /// should be a no-op, not a duplicate row that fires once.
+    mutating func add(_ trigger: RecordingTrigger) {
+        guard trigger != .none, !triggers.contains(trigger) else { return }
+        triggers.append(trigger)
+    }
+
+    mutating func remove(_ trigger: RecordingTrigger) {
+        triggers.removeAll { $0 == trigger }
+    }
+
+    /// The modifier and mouse button bound to a different action, if either collides with this
+    /// list. One key can only mean one thing: bound twice, whicheverthe router checks first
+    /// wins and the other binding looks broken with nothing on screen to explain it.
+    func conflicts(modifier: ModifierKey, mouse: MouseButton) -> (modifier: Bool, mouse: Bool) {
+        (modifier != .none && modifiers.contains(modifier),
+         mouse != .none && mouseButtons.contains(mouse))
+    }
+
+    // MARK: - Persistence
+
+    static func load(from json: String) -> RecordingTriggerSet {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode(RecordingTriggerSet.self, from: data)
+        else { return .empty }
+        return decoded
+    }
+
+    var json: String {
+        guard let data = try? JSONEncoder().encode(self),
+              let string = String(data: data, encoding: .utf8)
+        else { return "" }
+        return string
+    }
+
+    /// Carries the three single-slot preferences into the list, so an existing install keeps
+    /// the trigger it had.
+    static func migrated(mouseRaw: String, modifierRaw: String,
+                         shortcut: KeyboardShortcuts.Shortcut?) -> RecordingTriggerSet {
+        var set = RecordingTriggerSet.empty
+        for trigger in RecordingTrigger.resolveAll(mouseRaw: mouseRaw, modifierRaw: modifierRaw,
+                                                   shortcut: shortcut) {
+            set.add(trigger)
+        }
+        return set
     }
 }
 

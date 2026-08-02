@@ -17,6 +17,14 @@ extension KeyboardShortcuts.Name {
     /// mouse button. Unbound by default: claiming a global combination for everyone isn't
     /// ours to do. (#50)
     static let toggleRecordAndSubmit = Self("toggleRecordAndSubmit")
+
+    /// One registration handle per recorded key combination. Names are dynamic because the
+    /// number of triggers is: the combinations themselves live in `recordingTriggers`, and
+    /// these slots are only how the library is told about them. (#48)
+    static func recordTriggerSlot(_ index: Int) -> Self { Self("recordTriggerSlot\(index)") }
+    /// Slots are cleared up to this index when the list shrinks, so a removed combination
+    /// can't stay bound. Well above any realistic number of triggers.
+    static let recordTriggerSlotLimit = 16
 }
 
 class ShortcutManager {
@@ -157,12 +165,11 @@ class ShortcutManager {
             KeyboardShortcuts.setShortcut(.init(.escape), for: .escape)
         }
 
-        KeyboardShortcuts.onKeyDown(for: .toggleRecord) { [weak self] in
-            self?.handleKeyDown()
-        }
-
-        KeyboardShortcuts.onKeyUp(for: .toggleRecord) { [weak self] in
-            self?.handleKeyUp()
+        // One pair of handlers per slot, registered once for the process lifetime.
+        for index in 0..<KeyboardShortcuts.Name.recordTriggerSlotLimit {
+            let slot = KeyboardShortcuts.Name.recordTriggerSlot(index)
+            KeyboardShortcuts.onKeyDown(for: slot) { [weak self] in self?.handleKeyDown() }
+            KeyboardShortcuts.onKeyUp(for: slot) { [weak self] in self?.handleKeyUp() }
         }
 
         // Ends the running take and submits it. Works alongside every trigger mode, since it is
@@ -194,28 +201,17 @@ class ShortcutManager {
     }
     
     private func setupRecordingTrigger() {
-        let modifierKey = ModifierKey(rawValue: AppPreferences.shared.modifierOnlyHotkey) ?? .none
-        let mouseButton = MouseButton(rawValue: AppPreferences.shared.mouseButtonHotkey) ?? .none
-        // Optional second button that dictates and then submits. It works alongside whichever
-        // trigger is active, including the keyboard ones, so it is set up separately. (#50)
+        let set = RecordingTriggerSet.load(from: AppPreferences.shared.recordingTriggers)
+        // Optional second bindings that dictate and then submit. Separate from the trigger list:
+        // they end a take rather than starting one. (#50)
         let submitButton = MouseButton(rawValue: AppPreferences.shared.submitMouseButtonHotkey) ?? .none
         let submitModifier = ModifierKey(rawValue: AppPreferences.shared.submitModifierOnlyHotkey) ?? .none
 
-        // The three trigger modes are mutually exclusive. Tear all of them down
-        // first, then enable exactly one. A configured mouse button takes priority
-        // over a modifier key, which takes priority over the regular shortcut.
         ModifierKeyMonitor.shared.stop()
         MouseButtonMonitor.shared.stop()
 
-        if mouseButton != .none || submitButton != .none {
-            useMouseButtonHotkey = mouseButton != .none
-            if mouseButton != .none {
-                useModifierOnlyHotkey = false
-                // Only the plain record shortcut is exclusive with the other trigger modes;
-                // toggleRecordAndSubmit is a separate action and stays live.
-                KeyboardShortcuts.disable(.toggleRecord)
-            }
-
+        let mouseButtons = set.mouseButtons + (submitButton == .none ? [] : [submitButton])
+        if !mouseButtons.isEmpty {
             MouseButtonMonitor.shared.onButtonDown = { [weak self] button in
                 guard let self else { return }
                 if submitButton != .none, button == submitButton {
@@ -224,26 +220,15 @@ class ShortcutManager {
                     self.handleKeyDown()
                 }
             }
-
             MouseButtonMonitor.shared.onButtonUp = { [weak self] button in
                 guard submitButton == .none || button != submitButton else { return }
                 self?.handleKeyUp()
             }
-
-            MouseButtonMonitor.shared.start(mouseButtons: [mouseButton, submitButton])
+            MouseButtonMonitor.shared.start(mouseButtons: mouseButtons)
         }
 
-        if mouseButton != .none {
-            print("ShortcutManager: Using mouse-button hotkey: \(mouseButton.displayName)")
-        }
-
-        if modifierKey != .none || submitModifier != .none {
-            useModifierOnlyHotkey = modifierKey != .none
-            if modifierKey != .none && mouseButton == .none {
-                useMouseButtonHotkey = false
-                KeyboardShortcuts.disable(.toggleRecord)
-            }
-
+        let modifiers = set.modifiers + (submitModifier == .none ? [] : [submitModifier])
+        if !modifiers.isEmpty {
             ModifierKeyMonitor.shared.onKeyDown = { [weak self] key in
                 guard let self else { return }
                 if submitModifier != .none, key == submitModifier {
@@ -252,29 +237,41 @@ class ShortcutManager {
                     self.handleKeyDown()
                 }
             }
-
             ModifierKeyMonitor.shared.onKeyUp = { [weak self] key in
-                // The submit key already stopped the take on key-down; a release must not
-                // stop a fresh recording started right after.
                 guard submitModifier == .none || key != submitModifier else { return }
                 self?.handleKeyUp()
             }
-
-            ModifierKeyMonitor.shared.start(modifierKeys: [modifierKey, submitModifier])
+            ModifierKeyMonitor.shared.start(modifierKeys: modifiers)
         }
 
-        if mouseButton != .none {
-            print("ShortcutManager: Using mouse-button hotkey: \(mouseButton.displayName)")
-        } else if modifierKey != .none {
-            print("ShortcutManager: Using modifier-only hotkey: \(modifierKey.displayName)")
-        } else {
-            useMouseButtonHotkey = false
-            useModifierOnlyHotkey = false
-            KeyboardShortcuts.enable(.toggleRecord)
-            print("ShortcutManager: Using regular keyboard shortcut")
+        bindKeyComboSlots(set.keyCombos)
+
+        useMouseButtonHotkey = !set.mouseButtons.isEmpty
+        useModifierOnlyHotkey = !set.modifiers.isEmpty
+        print("ShortcutManager: \(set.triggers.count) recording trigger(s) armed")
+    }
+
+    /// Points one library slot at each recorded combination and clears the rest, so removing a
+    /// trigger actually unbinds it rather than leaving a stale slot listening.
+    ///
+    /// Only the bindings move here. The handlers are registered once at launch, because
+    /// `KeyboardShortcuts.onKeyDown` appends to a list rather than replacing: re-registering on
+    /// every settings change stacked duplicates, and one key press then ran the toggle twice —
+    /// starting a recording and immediately ending it, which looked like the mic firing with no
+    /// indicator.
+    private func bindKeyComboSlots(_ combos: [KeyboardShortcuts.Shortcut]) {
+        for index in 0..<KeyboardShortcuts.Name.recordTriggerSlotLimit {
+            let slot = KeyboardShortcuts.Name.recordTriggerSlot(index)
+            if index < combos.count {
+                KeyboardShortcuts.setShortcut(combos[index], for: slot)
+                KeyboardShortcuts.enable(slot)
+            } else {
+                KeyboardShortcuts.setShortcut(nil, for: slot)
+                KeyboardShortcuts.disable(slot)
+            }
         }
     }
-    
+
     /// Stops the running take and asks for Return once its text lands. Deliberately cannot
     /// START a recording: one key begins a dictation, the others only end it. Both keys being
     /// able to do both made the outcome depend on which one you happened to press first, which

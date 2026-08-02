@@ -2227,13 +2227,21 @@ struct SettingsView: View {
     private var dictationSettings: some View {
         SPane(title: "Dictation") {
             SSection(title: "Trigger") {
-                SRow(title: "Recording trigger",
-                     hint: "Click, then do it: press a combination with ⌘ ⌥ ⌃, tap a single modifier on its own, or click a spare mouse button. ⌫ clears it") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recording trigger")
+                        .font(.system(size: 13))
+                        .foregroundColor(STheme.text)
+                    Text("Click Add, then do the thing: press a combination with ⌘ ⌥ ⌃, tap a single modifier on its own, or click a spare mouse button. Keep several and use whichever suits the moment.")
+                        .font(.system(size: 11))
+                        .foregroundColor(STheme.hint)
+                        .fixedSize(horizontal: false, vertical: true)
                     TriggerRecorderField(name: .toggleRecord,
                                          mouseButton: $viewModel.mouseButtonHotkey,
-                                         modifierKey: $viewModel.modifierOnlyHotkey)
-                        .frame(width: 168)
+                                         modifierKey: $viewModel.modifierOnlyHotkey,
+                                         allowsMultiple: true)
+                        .padding(.top, 2)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 SRow(title: "Latch with Space",
                      hint: "While recording, Space (or a double-tap of the trigger) pins it so you can let go and keep talking. Space again stops it — so Space won't type into other apps during a recording") {
                     SToggle(isOn: $viewModel.latchRecordingWithSpace)
