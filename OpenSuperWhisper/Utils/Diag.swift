@@ -22,7 +22,7 @@ enum Diag {
         #if DEBUG
         return true
         #else
-        return UserDefaults.standard.bool(forKey: "diagnosticLogging")
+        return DefaultsStore.current.bool(forKey: "diagnosticLogging")
         #endif
     }
 

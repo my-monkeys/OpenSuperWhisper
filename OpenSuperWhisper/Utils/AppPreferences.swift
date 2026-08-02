@@ -12,8 +12,8 @@ struct UserDefault<T> {
     let defaultValue: T
     
     var wrappedValue: T {
-        get { UserDefaults.standard.object(forKey: key) as? T ?? defaultValue }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
+        get { DefaultsStore.current.object(forKey: key) as? T ?? defaultValue }
+        set { DefaultsStore.current.set(newValue, forKey: key) }
     }
 }
 
@@ -22,8 +22,8 @@ struct OptionalUserDefault<T> {
     let key: String
     
     var wrappedValue: T? {
-        get { UserDefaults.standard.object(forKey: key) as? T }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
+        get { DefaultsStore.current.object(forKey: key) as? T }
+        set { DefaultsStore.current.set(newValue, forKey: key) }
     }
 }
 
@@ -48,9 +48,9 @@ final class AppPreferences {
     }
 
     private func migrateOldPreferences() {
-        if let oldPath = UserDefaults.standard.string(forKey: "selectedModelPath"),
-           UserDefaults.standard.string(forKey: "selectedWhisperModelPath") == nil {
-            UserDefaults.standard.set(oldPath, forKey: "selectedWhisperModelPath")
+        if let oldPath = DefaultsStore.current.string(forKey: "selectedModelPath"),
+           DefaultsStore.current.string(forKey: "selectedWhisperModelPath") == nil {
+            DefaultsStore.current.set(oldPath, forKey: "selectedWhisperModelPath")
         }
     }
 
@@ -78,7 +78,7 @@ final class AppPreferences {
     /// had picked "remote" isn't silently dropped back onto the "ollama" default. Idempotent: it
     /// only runs while the new key is unset, and the old key is never read again afterwards.
     private func migrateAIProviderToBackend() {
-        let defaults = UserDefaults.standard
+        let defaults = DefaultsStore.current
         guard defaults.object(forKey: "aiBackend") == nil,
               let old = defaults.string(forKey: "aiProvider"),
               !old.isEmpty
