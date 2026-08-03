@@ -157,6 +157,23 @@ struct SPane<Content: View>: View {
     }
 }
 
+/// Themed multiline editor (regex, prompts, per-app instructions). Shared by the
+/// panes that let the user type free-form text; `SettingsView.sEditor` wraps it.
+struct SEditor: View {
+    @Binding var text: String
+    let height: CGFloat
+
+    var body: some View {
+        TextEditor(text: $text)
+            .font(.system(size: 11.5, design: .monospaced))
+            .scrollContentBackground(.hidden)
+            .padding(6)
+            .frame(height: height)
+            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+    }
+}
+
 /// A titled group of rows with the hairline header.
 struct SSection<Content: View>: View {
     let title: LocalizedStringKey

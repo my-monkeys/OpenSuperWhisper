@@ -1,4 +1,5 @@
 import SwiftUI
+import WhisperCore
 
 /// Live-tunable notch geometry, shared between the settings sliders and the indicator view so the
 /// notch updates in real time while you drag. Values persist in UserDefaults.
@@ -11,7 +12,7 @@ final class NotchTuning: ObservableObject {
     @Published var bottomRadius: Double { didSet { save(bottomRadius, "notchBottomRadius") } }
 
     private init() {
-        let d = UserDefaults.standard
+        let d = DefaultsStore.current
         width = d.object(forKey: "notchWidth") as? Double ?? 220
         height = d.object(forKey: "notchHeight") as? Double ?? 42
         topRadius = d.object(forKey: "notchTopRadius") as? Double ?? 10
@@ -19,6 +20,6 @@ final class NotchTuning: ObservableObject {
     }
 
     private func save(_ value: Double, _ key: String) {
-        UserDefaults.standard.set(value, forKey: key)
+        DefaultsStore.current.set(value, forKey: key)
     }
 }

@@ -20,6 +20,7 @@ final class DictationPipeline: ObservableObject {
     /// shows where THIS clip was dictated — not wherever focus moved to by the time it's processed.
     struct ContextSnapshot {
         var appName: String? = nil
+        var bundleID: String? = nil
         var windowTitle: String? = nil
         var fullURL: String? = nil
     }
@@ -34,6 +35,8 @@ final class DictationPipeline: ObservableObject {
         /// Model that was active when this clip was recorded. Applied for this clip's transcription
         /// even if a later recording has since switched the global model. (#model-snapshot)
         let modelOption: DictationModelOption?
+        /// This take was started by the submit mouse button, so press Return after inserting (#50).
+        let submitAfterInsert: Bool
     }
 
     /// Dictations waiting in the queue plus the one currently being processed. Drives optional
@@ -61,7 +64,8 @@ final class DictationPipeline: ObservableObject {
     /// work drains on the serial loop. Called on the main actor from the indicator's stop handler.
     /// `seq` is monotonic and assigned here, so append order == recording-start order.
     func enqueue(tempURL: URL, startedAt: Date, streamedFallback: String,
-                 context: ContextSnapshot, modelOption: DictationModelOption?) {
+                 context: ContextSnapshot, modelOption: DictationModelOption?,
+                 submitAfterInsert: Bool = false) {
         seqCounter += 1
         queue.append(PendingDictation(
             id: UUID(),
@@ -70,7 +74,8 @@ final class DictationPipeline: ObservableObject {
             tempURL: tempURL,
             streamedFallback: streamedFallback,
             context: context,
-            modelOption: modelOption))
+            modelOption: modelOption,
+            submitAfterInsert: submitAfterInsert))
         refreshPendingCount()
         startLoopIfNeeded()
     }
@@ -142,13 +147,18 @@ final class DictationPipeline: ObservableObject {
                 text = fallback
             }
 
-            // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
-            text = await LLMPostProcessor.process(text)
+            // Optional LLM cleanup (no-op when disabled; returns the raw text on failure). The
+            // app-aware formatting rules are keyed off the app that was frontmost when the clip was
+            // RECORDED — the app the user was dictating into — not whatever is frontmost now that
+            // the background queue got to it. (parallel-recording)
+            text = await LLMPostProcessor.process(text, bundleID: item.context.bundleID)
 
             // Trailing "press enter" voice command (opt-in): strip it and remember to press Return
             // after insertion, submitting the message/prompt.
-            let (strippedText, shouldSubmit) = AppPreferences.shared.stripSubmitCommand(text)
+            let (strippedText, spokenSubmit) = AppPreferences.shared.stripSubmitCommand(text)
             text = strippedText
+            // Either route asks for the same thing: send Return once the text is in.
+            let shouldSubmit = spokenSubmit || item.submitAfterInsert
             let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
             var hookAudioPath: String? = nil
@@ -270,47 +280,11 @@ final class DictationPipeline: ObservableObject {
     }
 
     /// Returns `true` when auto-paste ran but no editable field was focused, so the caller can leave
-    /// the text on the clipboard and notify ⌘V. When no target is found, typing is skipped. Moved
-    /// here from the indicator view model; behaviour matches master incl. the #45 clipboard restore.
+    /// the text on the clipboard and notify ⌘V. When no target is found, typing is skipped. The
+    /// insertion policy itself lives in `TranscriptInserter`, shared with the re-paste shortcut.
     @discardableResult
     private func insertText(_ text: String) -> Bool {
-        let finalText = IndicatorViewModel.applyPostProcessing(text)
-        let prefs = AppPreferences.shared
-
-        // Optional, independent clipboard stash (never the insertion mechanism).
-        if prefs.autoCopyToClipboard {
-            ClipboardUtil.copyToClipboard(finalText)
-        }
-
-        guard prefs.autoPasteTranscription else { return false }
-
-        if prefs.pasteInsteadOfTyping {
-            // Paste is universal: ⌘V lands in any text field, including apps the accessibility check
-            // can't read (Messages, Electron), and is a harmless no-op otherwise. So no editable-
-            // target gate — it only ever produces false negatives (#paste-messages).
-            if prefs.autoCopyToClipboard {
-                Diag.measure("TextInserter.paste") { TextInserter.paste() }
-            } else {
-                // The clipboard is only the paste vehicle here — the user opted out of keeping the
-                // text on it (#44) — so put the previous contents back after the ⌘V lands.
-                ClipboardUtil.borrowForPaste(finalText) {
-                    Diag.measure("TextInserter.paste") { TextInserter.paste() }
-                }
-            }
-            return false
-        }
-
-        // Typing mode: synthetic keystrokes go wherever focus is, so only type when we're confident
-        // there's an editable target; otherwise stash on the clipboard and notify ⌘V.
-        let targetMissing = prefs.notifyWhenNoPasteTarget
-            && Diag.measure("focusedElementIsEditable") { FocusUtils.focusedElementIsEditable() } == false
-        if targetMissing {
-            if !prefs.autoCopyToClipboard {
-                ClipboardUtil.copyToClipboard(finalText)
-            }
-            return true
-        }
-        Diag.measure("TextInserter.type") { TextInserter.type(finalText) }
-        return false
+        TranscriptInserter.insert(IndicatorViewModel.applyPostProcessing(text),
+                                  honorAutoPastePreference: true)
     }
 }

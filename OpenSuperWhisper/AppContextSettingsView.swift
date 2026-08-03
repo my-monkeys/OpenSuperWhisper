@@ -3,10 +3,10 @@ import AppKit
 import UniformTypeIdentifiers
 import WhisperCore
 
-/// Settings → App Context. One place to manage context-aware model selection:
-/// the switching mode plus a list of every app/site → model rule, with inline
-/// model pickers and add/remove controls. Rules are also created from the
-/// menu-bar "Model" submenu; this tab shows and edits the same store.
+/// Settings → Rules. Everything that varies per app (or per site) lives here:
+/// which transcription model to use, and how the LLM cleanup pass should reformat
+/// the text. Model rules are also created from the menu-bar "Model" submenu; this
+/// tab shows and edits the same store.
 struct AppContextSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var rules: [AppContextRuleRow] = []
@@ -14,13 +14,17 @@ struct AppContextSettingsView: View {
     /// All usable models right now, across engines — recomputed on appear and
     /// after edits. Context-aware selection only makes sense with 2+.
     @State private var availableModels: [DictationModelOption] = []
+    /// Formatting rules: app picker sheet. `appPickerTargetID` is the profile being
+    /// (re)assigned an app, or nil when the picker is adding a brand-new profile.
+    @State private var showingAppPicker = false
+    @State private var appPickerTargetID: UUID?
 
     private var hasChoice: Bool { availableModels.count > 1 }
 
     var body: some View {
-        SPane(title: "Rules", subtitle: "Pick a model per app or site") {
+        SPane(title: "Rules", subtitle: "Model and formatting, per app or site") {
             if hasChoice {
-                SSection(title: "Behavior") {
+                SSection(title: "Model switching") {
                     HStack(spacing: 5) {
                         Text("When the front app changes")
                             .font(.system(size: 13)).foregroundColor(STheme.text)
@@ -38,7 +42,7 @@ struct AppContextSettingsView: View {
                     .frame(minHeight: 26)
                 }
 
-                SSection(title: "App & site rules") {
+                SSection(title: "Model by app or site") {
                     VStack(spacing: 0) {
                         if rules.isEmpty {
                             (Text("No rules yet.\n").foregroundColor(STheme.hint)
@@ -85,16 +89,112 @@ struct AppContextSettingsView: View {
                 }
             } else {
                 SWarnBox {
-                    Text("**Rules need at least two models to switch between.**")
-                    Text("Context-aware selection switches the transcription model based on the app (or website) you're dictating in — download another model in Models to get started.")
+                    Text("**Model rules need at least two models to switch between.**")
+                    Text("Context-aware selection switches the transcription model based on the app (or website) you're dictating in — download another model in Models to get started. Formatting rules below work with a single model.")
                         .foregroundColor(STheme.text)
                 }
             }
+
+            formattingSection
         }
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: AppContextModelRules.didChangeNotification)) { _ in
             reload()
         }
+        .sheet(isPresented: $showingAppPicker) {
+            AppPickerSheet { app in applyPickedApp(app) }
+        }
+    }
+
+    // MARK: - Formatting by app (LLM cleanup rules)
+
+    /// Per-app instructions folded into the LLM cleanup pass — e.g. "at Rob" → "@Rob"
+    /// in Slack. Independent of the model rules above (and of general AI cleanup): it
+    /// only needs a cleanup backend, configured in Output → Cleanup.
+    @ViewBuilder private var formattingSection: some View {
+        SSection(title: "Formatting by app") {
+            SRow(title: "Reformat per app",
+                 hint: "Reshape the transcription through the LLM cleanup pass, based on the app you dictated into — e.g. \"at Rob\" → \"@Rob\" in Slack. Needs a cleanup backend (Output → Cleanup).") {
+                SToggle(isOn: $viewModel.appContextFormattingEnabled)
+            }
+            if viewModel.appContextFormattingEnabled {
+                VStack(alignment: .leading, spacing: 10) {
+                    if viewModel.appContextProfiles.isEmpty {
+                        Text("No apps yet. Add one below.")
+                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .padding(.vertical, 4)
+                    }
+                    ForEach($viewModel.appContextProfiles) { $profile in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 10) {
+                                Button {
+                                    appPickerTargetID = profile.id
+                                    showingAppPicker = true
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(nsImage: InstalledApps.icon(forBundleIdentifier: profile.bundleIdentifier))
+                                            .resizable()
+                                            .frame(width: 20, height: 20)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(profile.appName.isEmpty ? "Choose an app…" : profile.appName)
+                                                .font(.system(size: 12))
+                                                .foregroundColor(profile.appName.isEmpty ? STheme.hint : STheme.text)
+                                            if !profile.bundleIdentifier.isEmpty {
+                                                Text(profile.bundleIdentifier)
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(STheme.hint)
+                                            }
+                                        }
+                                        Image(systemName: "chevron.up.chevron.down")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(STheme.hint)
+                                        Spacer()
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Change the app")
+
+                                Button {
+                                    viewModel.appContextProfiles.removeAll { $0.id == profile.id }
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(STheme.hint)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Remove this app")
+                                .frame(width: 24)
+                            }
+                            SEditor(text: $profile.instructions, height: 56)
+                        }
+                        .padding(.bottom, 2)
+                    }
+                    Button {
+                        appPickerTargetID = nil
+                        showingAppPicker = true
+                    } label: {
+                        Label("Add App", systemImage: "plus")
+                            .font(.system(size: 11.5, weight: .medium))
+                    }
+                    .controlSize(.small)
+                }
+                .padding(.leading, 16)
+            }
+        }
+    }
+
+    /// Applies the app chosen in the picker: reassigns the targeted profile, or appends a new one.
+    private func applyPickedApp(_ app: InstalledApp) {
+        if let targetID = appPickerTargetID,
+           let idx = viewModel.appContextProfiles.firstIndex(where: { $0.id == targetID }) {
+            viewModel.appContextProfiles[idx].appName = app.name
+            viewModel.appContextProfiles[idx].bundleIdentifier = app.bundleIdentifier
+        } else {
+            viewModel.appContextProfiles.append(
+                AppContextProfile(bundleIdentifier: app.bundleIdentifier, appName: app.name, instructions: ""))
+        }
+        appPickerTargetID = nil
     }
 
     private func ruleRow(_ rule: AppContextRuleRow) -> some View {

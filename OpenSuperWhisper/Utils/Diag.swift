@@ -1,5 +1,6 @@
 import Foundation
 import os
+import WhisperCore
 
 /// Lightweight diagnostic tracing for the record-start / hotkey hot path.
 ///
@@ -22,7 +23,7 @@ enum Diag {
         #if DEBUG
         return true
         #else
-        return UserDefaults.standard.bool(forKey: "diagnosticLogging")
+        return DefaultsStore.current.bool(forKey: "diagnosticLogging")
         #endif
     }
 

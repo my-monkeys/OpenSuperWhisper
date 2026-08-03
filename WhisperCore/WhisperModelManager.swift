@@ -59,7 +59,6 @@ public class WhisperModelManager {
             self.modelsDirectory = StorageLocations.whisperModelsDirectory
         }
         createModelsDirectoryIfNeeded()
-        copyDefaultModelIfNeeded()
     }
     
     private func createModelsDirectoryIfNeeded() {
@@ -70,34 +69,6 @@ public class WhisperModelManager {
         }
     }
     
-    private func copyDefaultModelIfNeeded() {
-        let defaultModelName = "ggml-tiny.en.bin"
-        let destinationURL = modelsDirectory.appendingPathComponent(defaultModelName)
-        
-        // Check if model already exists
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            return
-        }
-        
-        // Look for the model in the bundle
-        if let bundleURL = Bundle.main.url(forResource: "ggml-tiny.en", withExtension: "bin") {
-            do {
-                try FileManager.default.copyItem(at: bundleURL, to: destinationURL)
-                print("Copied default model to: \(destinationURL.path)")
-            } catch {
-                print("Failed to copy default model: \(error)")
-            }
-        }
-    }
-
-    // Call this on every startup to ensure at least one model is present
-    public func ensureDefaultModelPresent() {
-        let defaultModelName = "ggml-tiny.en.bin"
-        let destinationURL = modelsDirectory.appendingPathComponent(defaultModelName)
-        if !FileManager.default.fileExists(atPath: destinationURL.path) {
-            copyDefaultModelIfNeeded()
-        }
-    }
     
     public func getAvailableModels() -> [URL] {
         do {

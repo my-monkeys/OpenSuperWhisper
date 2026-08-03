@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import WhisperCore
 
 /// In-app override of the interface language. Writes the standard `AppleLanguages` default so the
 /// override persists in the app's own domain (independent of the system language); takes effect on
@@ -7,13 +8,13 @@ import Foundation
 enum LanguageManager {
     /// "system" (follow the Mac), "en", or "fr".
     static var selected: String {
-        get { UserDefaults.standard.string(forKey: "appLanguageOverride") ?? "system" }
+        get { DefaultsStore.current.string(forKey: "appLanguageOverride") ?? "system" }
         set {
-            UserDefaults.standard.set(newValue, forKey: "appLanguageOverride")
+            DefaultsStore.current.set(newValue, forKey: "appLanguageOverride")
             if newValue == "system" {
-                UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+                DefaultsStore.current.removeObject(forKey: "AppleLanguages")
             } else {
-                UserDefaults.standard.set([newValue], forKey: "AppleLanguages")
+                DefaultsStore.current.set([newValue], forKey: "AppleLanguages")
             }
         }
     }

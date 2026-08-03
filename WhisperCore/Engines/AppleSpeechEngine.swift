@@ -28,12 +28,12 @@ public enum AppleSpeechSupport {
 
     /// Whisper-style language codes ("en", "fr", …) the system model can transcribe.
     public static var cachedSupportedLanguages: [String] {
-        UserDefaults.standard.stringArray(forKey: supportedKey) ?? []
+        DefaultsStore.current.stringArray(forKey: supportedKey) ?? []
     }
 
     /// Languages whose assets are installed on this Mac right now.
     public static var cachedInstalledLanguages: [String] {
-        UserDefaults.standard.stringArray(forKey: installedKey) ?? []
+        DefaultsStore.current.stringArray(forKey: installedKey) ?? []
     }
 
     /// The engine is usable without triggering a download (the catalog's rule:
@@ -44,8 +44,8 @@ public enum AppleSpeechSupport {
     public static func refreshCaches() async {
         let supported = languageCodes(from: await SpeechTranscriber.supportedLocales)
         let installed = languageCodes(from: await SpeechTranscriber.installedLocales)
-        UserDefaults.standard.set(supported, forKey: supportedKey)
-        UserDefaults.standard.set(installed, forKey: installedKey)
+        DefaultsStore.current.set(supported, forKey: supportedKey)
+        DefaultsStore.current.set(installed, forKey: installedKey)
     }
 
     /// Locale list → deduplicated language codes, keeping the framework's order.
@@ -91,8 +91,8 @@ public enum AppleSpeechSupport {
     /// Models pane. Absent = the canonical CLDR resolution below.
     private static let overridesKey = "appleSpeechLocaleOverrides"
     public static var localeOverrides: [String: String] {
-        get { UserDefaults.standard.dictionary(forKey: overridesKey) as? [String: String] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: overridesKey) }
+        get { DefaultsStore.current.dictionary(forKey: overridesKey) as? [String: String] ?? [:] }
+        set { DefaultsStore.current.set(newValue, forKey: overridesKey) }
     }
 
     /// The effective language code for the app's language setting ("auto" = system).

@@ -103,7 +103,9 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
-    private func playNotificationSound() {
+    /// The short chime used to confirm a recording state change. Internal rather than private so
+    /// the Space latch can reuse it — same class of feedback, same preference.
+    func playNotificationSound() {
         // Try to play using NSSound first
         guard let soundURL = Bundle.main.url(forResource: "notification", withExtension: "mp3") else {
             print("Failed to find notification sound file")
@@ -201,6 +203,7 @@ class AudioRecorder: NSObject, ObservableObject {
                 audioRecorder?.isMeteringEnabled = monitorConnection
                 audioRecorder?.record()
             }
+            Task { @MainActor in SpectrumAnalyzer.shared.start() }
             if monitorConnection {
                 startConnectionMonitoring()
             } else {
@@ -217,6 +220,7 @@ class AudioRecorder: NSObject, ObservableObject {
     func stopRecording() -> URL? {
         audioRecorder?.stop()
         updateRecordingState(isRecording: false, isConnecting: false)
+        Task { @MainActor in SpectrumAnalyzer.shared.stop() }
         stopConnectionMonitoring()
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.primeAudioHardware()  // re-prime so the next recording starts instantly too
@@ -246,6 +250,7 @@ class AudioRecorder: NSObject, ObservableObject {
     func cancelRecording() {
         audioRecorder?.stop()
         updateRecordingState(isRecording: false, isConnecting: false)
+        Task { @MainActor in SpectrumAnalyzer.shared.stop() }
         stopConnectionMonitoring()
 
         if AppPreferences.shared.pauseMediaOnRecord {

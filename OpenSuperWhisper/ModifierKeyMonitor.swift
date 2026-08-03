@@ -98,14 +98,26 @@ class ModifierKeyMonitor {
     
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var selectedModifierKey: ModifierKey = .none
-    private var isModifierPressed = false
-    
-    var onKeyDown: (() -> Void)?
-    var onKeyUp: (() -> Void)?
+    /// Modifiers being watched, by key code. More than one so a second modifier can mean
+    /// "dictate and submit" alongside the plain record trigger (#50).
+    private var watched: [UInt16: ModifierKey] = [:]
+    private var pressedKey: ModifierKey?
+
+    var onKeyDown: ((ModifierKey) -> Void)?
+    var onKeyUp: ((ModifierKey) -> Void)?
     
     private init() {}
     
+    func start(modifierKeys: [ModifierKey]) {
+        let active = modifierKeys.filter { $0 != .none }
+        guard !active.isEmpty else {
+            stop()
+            return
+        }
+        start(modifierKey: active[0])
+        watched = Dictionary(active.map { ($0.keyCode, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
     func start(modifierKey: ModifierKey) {
         guard modifierKey != .none else {
             stop()
@@ -114,8 +126,8 @@ class ModifierKeyMonitor {
         
         stop()
         
-        selectedModifierKey = modifierKey
-        isModifierPressed = false
+        watched = [modifierKey.keyCode: modifierKey]
+        pressedKey = nil
         
         let eventMask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
         
@@ -164,7 +176,8 @@ class ModifierKeyMonitor {
         }
         eventTap = nil
         runLoopSource = nil
-        isModifierPressed = false
+        watched = [:]
+        pressedKey = nil
         print("ModifierKeyMonitor: Stopped")
     }
     
@@ -179,20 +192,20 @@ class ModifierKeyMonitor {
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         
-        guard keyCode == selectedModifierKey.keyCode else { return }
-        
-        let cgFlag = selectedModifierKey.cgEventFlag
-        let isPressed = flags.contains(cgFlag)
-        
-        if isPressed && !isModifierPressed {
-            isModifierPressed = true
+        guard let key = watched[keyCode] else { return }
+
+        let isPressed = flags.contains(key.cgEventFlag)
+
+        if isPressed, pressedKey == nil {
+            // A second modifier pressed mid-recording is ignored: the first owns this take.
+            pressedKey = key
             DispatchQueue.main.async {
-                self.onKeyDown?()
+                self.onKeyDown?(key)
             }
-        } else if !isPressed && isModifierPressed {
-            isModifierPressed = false
+        } else if !isPressed, pressedKey == key {
+            pressedKey = nil
             DispatchQueue.main.async {
-                self.onKeyUp?()
+                self.onKeyUp?(key)
             }
         }
     }

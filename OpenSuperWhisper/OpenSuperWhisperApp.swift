@@ -70,7 +70,6 @@ struct OpenSuperWhisperApp: App {
         MainThreadWatchdog.shared.start()
         _ = ShortcutManager.shared
         _ = MicrophoneService.shared
-        WhisperModelManager.shared.ensureDefaultModelPresent()
     }
 }
 
@@ -130,6 +129,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
             alert.addButton(withTitle: "Cancel")
             return alert.runModal() == .alertFirstButtonReturn
         }
+
+        // Inject the built-in llama.cpp cleanup backend into WhisperCore (protocol-inversion
+        // ruling, PR #57): BuiltInLlamaBackend/LlamaContext/libllama.a and the GGUF model stay
+        // app-side, so the framework's LLMPostProcessor reaches them only through this provider
+        // closure. Same willFinish-not-didFinish race as above: an openFiles-at-launch
+        // transcription can reach LLMPostProcessor.process before didFinishLaunching.
+        LLMPostProcessor.builtInBackendProvider = { BuiltInLlamaBackend.shared }
+
+        // Run the trigger/indicator preference migrations + conflict resolution (master's
+        // #48/#72, relocated app-side with the extraction — they interpret AppKit-bound types
+        // the framework can't see). Must complete before ShortcutManager/IndicatorWindowManager
+        // start reading those prefs in didFinishLaunching; forces AppPreferences.shared init
+        // here so the framework-resident migrations also run at a deterministic point.
+        AppPreferences.shared.migrateTriggerAndIndicatorPrefs()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

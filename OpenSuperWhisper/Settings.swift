@@ -282,6 +282,33 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var submitMouseButtonHotkey: MouseButton {
+        didSet {
+            AppPreferences.shared.submitMouseButtonHotkey = submitMouseButtonHotkey.rawValue
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+        }
+    }
+
+    @Published var submitModifierOnlyHotkey: ModifierKey {
+        didSet {
+            AppPreferences.shared.submitModifierOnlyHotkey = submitModifierOnlyHotkey.rawValue
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+        }
+    }
+
+    /// Cancel and paste-last are key-combination only, but the recorder field needs bindings,
+    /// so these stay parked at `.none`.
+    @Published var cancelMouseButtonUnused: MouseButton = .none
+    @Published var cancelModifierUnused: ModifierKey = .none
+    @Published var pasteMouseButtonUnused: MouseButton = .none
+    @Published var pasteModifierUnused: ModifierKey = .none
+
+    @Published var indicatorMeterMode: String {
+        didSet {
+            AppPreferences.shared.indicatorMeterMode = indicatorMeterMode
+        }
+    }
+
     @Published var indicatorPosition: String {
         didSet {
             AppPreferences.shared.indicatorPosition = indicatorPosition
@@ -336,6 +363,15 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var latchRecordingWithSpace: Bool {
+        didSet {
+            AppPreferences.shared.latchRecordingWithSpace = latchRecordingWithSpace
+            // Same notification the trigger modes use: it makes ShortcutManager install or tear
+            // down the latch tap immediately, instead of at the next launch.
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+        }
+    }
+
     @Published var escCancelWithoutConfirmation: Bool {
         didSet {
             AppPreferences.shared.escCancelWithoutConfirmation = escCancelWithoutConfirmation
@@ -364,11 +400,46 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
-    /// Cleanup backend: "ollama" (local) or "remote" (OpenAI-compatible server).
-    @Published var aiProvider: String {
+    /// True when anything needs the LLM: prose cleanup or the per-app formatting rules. Both feed
+    /// the same backend, so this is what gates the backend UI and its connection probe.
+    var llmCleanupInUse: Bool { aiPostProcessingEnabled || appContextFormattingEnabled }
+
+    /// Cleanup backend: "builtin" (embedded llama.cpp), "ollama" (local server), or
+    /// "remote" (OpenAI-compatible server).
+    @Published var aiBackend: String {
         didSet {
-            AppPreferences.shared.aiProvider = aiProvider
-            if aiPostProcessingEnabled { testLLMConnection() }
+            AppPreferences.shared.aiBackend = aiBackend
+            if llmCleanupInUse { testLLMConnection() }
+            // Warm the ~1 GB context now, while the user is here in Settings, so their first
+            // dictation doesn't wait several seconds for it. Released again after an idle spell.
+            if aiBackend == "builtin" { BuiltInLlamaBackend.shared.preload() }
+        }
+    }
+
+    /// Whether the built-in model's GGUF is present on disk.
+    @Published var builtInModelDownloaded: Bool = LLMModelManager.shared.isDefaultModelDownloaded()
+    /// Download progress in 0...1 while the built-in model is downloading; nil when idle.
+    @Published var builtInModelDownloadProgress: Double?
+    /// Set when a built-in model download fails, for inline feedback.
+    @Published var builtInModelDownloadError: String?
+
+    /// Downloads the default built-in model (~1 GB), updating progress for the UI.
+    func downloadBuiltInModel() {
+        builtInModelDownloadError = nil
+        builtInModelDownloadProgress = 0
+        Task { @MainActor in
+            do {
+                try await LLMModelManager.shared.downloadDefaultModel { progress in
+                    Task { @MainActor in self.builtInModelDownloadProgress = progress }
+                }
+                self.builtInModelDownloaded = LLMModelManager.shared.isDefaultModelDownloaded()
+                // Load it straight away: the download already made them wait, and this keeps the
+                // load out of their first dictation.
+                BuiltInLlamaBackend.shared.preload()
+            } catch {
+                self.builtInModelDownloadError = error.localizedDescription
+            }
+            self.builtInModelDownloadProgress = nil
         }
     }
 
@@ -412,10 +483,10 @@ class SettingsViewModel: ObservableObject {
     @Published var llmStatus: LLMStatus = .unknown
 
     /// Probes the local Ollama backend. The Remote backend is owned by
-    /// RemoteCleanupSettingsView (it also fills the model list), which publishes
-    /// straight to `llmStatus`, so this only runs for Ollama.
+    /// RemoteCleanupSettingsView (it also fills the model list), and the built-in backend
+    /// has no server to probe (see `builtInModelDownloaded`), so this only runs for Ollama.
     func testLLMConnection() {
-        guard aiProvider != "remote" else { return }
+        guard aiBackend == "ollama" else { return }
         llmStatus = .checking
         let endpoint = aiOllamaEndpoint, model = aiOllamaModel
         Task { @MainActor in
@@ -487,6 +558,28 @@ class SettingsViewModel: ObservableObject {
     @Published var submitOnVoiceCommand: Bool {
         didSet {
             AppPreferences.shared.submitOnVoiceCommand = submitOnVoiceCommand
+        }
+    }
+
+    /// App-aware LLM formatting: per-app instructions, keyed by the bundle identifier of the app
+    /// dictated into, that reshape the transcription via the same LLM cleanup pass (e.g. "at Rob"
+    /// -> "@Rob" in Slack). Independent of `aiPostProcessingEnabled`: either can contribute to one
+    /// pass. Edited in Settings → Rules; the shared backend is configured in Output → Cleanup.
+    @Published var appContextFormattingEnabled: Bool {
+        didSet {
+            AppPreferences.shared.appContextFormattingEnabled = appContextFormattingEnabled
+            // Same reasoning as the general-cleanup toggle: this feature also needs the backend,
+            // so probe/warm it now instead of failing silently on the next dictation.
+            if appContextFormattingEnabled {
+                testLLMConnection()
+                if aiBackend == "builtin" { BuiltInLlamaBackend.shared.preload() }
+            }
+        }
+    }
+
+    @Published var appContextProfiles: [AppContextProfile] {
+        didSet {
+            AppPreferences.shared.appContextProfiles = appContextProfiles
         }
     }
 
@@ -609,6 +702,9 @@ class SettingsViewModel: ObservableObject {
         self.playSoundOnRecordStart = prefs.playSoundOnRecordStart
         self.startHidden = prefs.startHidden
         self.indicatorPosition = prefs.indicatorPosition
+        self.indicatorMeterMode = prefs.indicatorMeterMode
+        self.submitMouseButtonHotkey = MouseButton(rawValue: prefs.submitMouseButtonHotkey) ?? .none
+        self.submitModifierOnlyHotkey = ModifierKey(rawValue: prefs.submitModifierOnlyHotkey) ?? .none
         self.showStopButtonOnIndicator = prefs.showStopButtonOnIndicator
         self.showCancelButtonOnIndicator = prefs.showCancelButtonOnIndicator
         self.remoteFallbackEnabled = prefs.remoteFallbackEnabled
@@ -618,11 +714,12 @@ class SettingsViewModel: ObservableObject {
         self.modifierOnlyHotkey = ModifierKey(rawValue: prefs.modifierOnlyHotkey) ?? .none
         self.mouseButtonHotkey = MouseButton(rawValue: prefs.mouseButtonHotkey) ?? .none
         self.holdToRecord = prefs.holdToRecord
+        self.latchRecordingWithSpace = prefs.latchRecordingWithSpace
         self.escCancelWithoutConfirmation = prefs.escCancelWithoutConfirmation
         self.unloadWhisperModelWhenIdle = prefs.unloadWhisperModelWhenIdle
         self.addSpaceAfterSentence = prefs.addSpaceAfterSentence
         self.aiPostProcessingEnabled = prefs.aiPostProcessingEnabled
-        self.aiProvider = prefs.aiProvider
+        self.aiBackend = prefs.aiBackend
         self.aiOllamaEndpoint = prefs.aiOllamaEndpoint
         self.aiOllamaModel = prefs.aiOllamaModel
         self.aiRemoteEndpoint = prefs.aiRemoteEndpoint
@@ -638,6 +735,8 @@ class SettingsViewModel: ObservableObject {
         self.pasteInsteadOfTyping = prefs.pasteInsteadOfTyping
         self.notifyWhenNoPasteTarget = prefs.notifyWhenNoPasteTarget
         self.submitOnVoiceCommand = prefs.submitOnVoiceCommand
+        self.appContextFormattingEnabled = prefs.appContextFormattingEnabled
+        self.appContextProfiles = prefs.appContextProfiles
         self.pauseMediaOnRecord = prefs.pauseMediaOnRecord
         self.reduceVolumeOnRecord = prefs.reduceVolumeOnRecord
         self.reduceVolumeLevel = prefs.reduceVolumeLevel
@@ -1126,25 +1225,8 @@ struct SettingsView: View {
     @State private var previousModelURL: URL?
     @State private var appLanguage = LanguageManager.selected
     @State private var langNeedsRelaunch = false
-    @State private var cancelKey = "esc"
 
     /// Curated cancel-recording keys (the recorder can't capture Esc / single special keys).
-    struct CancelKeyChoice: Identifiable {
-        let id: String
-        let label: String
-        let shortcut: KeyboardShortcuts.Shortcut
-    }
-    static let cancelKeyChoices: [CancelKeyChoice] = [
-        .init(id: "esc", label: "Esc", shortcut: .init(.escape)),
-        .init(id: "cmd-esc", label: "⌘ Esc", shortcut: .init(.escape, modifiers: .command)),
-        .init(id: "opt-esc", label: "⌥ Esc", shortcut: .init(.escape, modifiers: .option)),
-        .init(id: "ctrl-esc", label: "⌃ Esc", shortcut: .init(.escape, modifiers: .control)),
-        .init(id: "cmd-period", label: "⌘ .", shortcut: .init(.period, modifiers: .command)),
-    ]
-    static func currentCancelKeyID() -> String {
-        let current = KeyboardShortcuts.getShortcut(for: .escape)
-        return cancelKeyChoices.first { $0.shortcut == current }?.id ?? "esc"
-    }
 
     /// One-line description of the selected engine, to help users choose.
     /// Engine → display name for the "active engine" indicator.
@@ -1605,15 +1687,10 @@ struct SettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
     }
 
-    /// Themed multiline editor (regex, prompts, instructions).
+    /// Themed multiline editor (regex, prompts, instructions). See `SEditor`, shared with
+    /// the Rules pane.
     private func sEditor(_ text: Binding<String>, height: CGFloat) -> some View {
-        TextEditor(text: text)
-            .font(.system(size: 11.5, design: .monospaced))
-            .scrollContentBackground(.hidden)
-            .padding(6)
-            .frame(height: height)
-            .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-            .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+        SEditor(text: text, height: height)
     }
 
     @ViewBuilder private var ollamaCleanupFields: some View {
@@ -1629,8 +1706,41 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder private var builtInCleanupFields: some View {
+        HStack(spacing: 8) {
+            if viewModel.builtInModelDownloaded {
+                Text("✓ Model ready — runs on-device")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(STheme.ok)
+                    .padding(.horizontal, 9).padding(.vertical, 2)
+                    .background(Capsule().fill(STheme.okBg))
+                Text("Loads on first use (a few seconds), then frees its ~1 GB after 5 minutes idle.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let progress = viewModel.builtInModelDownloadProgress {
+                ProgressView(value: progress).frame(width: 160).controlSize(.small)
+                Text("\(Int(progress * 100))%").font(.system(size: 11)).foregroundColor(STheme.hint)
+            } else {
+                Button("Download model (~1 GB)") { viewModel.downloadBuiltInModel() }
+                    .controlSize(.small)
+                Text("Qwen2.5 1.5B, Apache-2.0. One-time download; no server needed.")
+                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.leading, 16)
+        if let err = viewModel.builtInModelDownloadError {
+            Text("✕ \(err)")
+                .font(.system(size: 11))
+                .foregroundColor(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 16)
+        }
+    }
+
     @ViewBuilder private var llmStatusView: some View {
-        let isRemote = viewModel.aiProvider == "remote"
+        let isRemote = viewModel.aiBackend == "remote"
         switch viewModel.llmStatus {
         case .unknown:
             EmptyView()
@@ -1722,9 +1832,13 @@ struct SettingsView: View {
                     SToggle(isOn: $viewModel.aiPostProcessingEnabled)
                 }
                 .frame(minHeight: 26)
-                if viewModel.aiPostProcessingEnabled {
+                // One backend serves BOTH this prose cleanup and the per-app formatting rules in
+                // Settings → Rules, so it stays visible while either is on — otherwise someone
+                // using formatting only would have nowhere to pick a backend or download a model.
+                if viewModel.aiPostProcessingEnabled || viewModel.appContextFormattingEnabled {
                     SRow(title: "Backend", indented: true) {
-                        Picker("", selection: $viewModel.aiProvider) {
+                        Picker("", selection: $viewModel.aiBackend) {
+                            Text("Built-in (Qwen2.5 1.5B)").tag("builtin")
                             Text("Ollama (local)").tag("ollama")
                             Text("Remote (OpenAI-compatible)").tag("remote")
                         }
@@ -1732,15 +1846,27 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                         .fixedSize()
                     }
+                    if !viewModel.aiPostProcessingEnabled {
+                        Text("Used by the per-app formatting rules in Rules.")
+                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .padding(.leading, 16)
+                    }
 
-                    if viewModel.aiProvider == "remote" {
+                    switch viewModel.aiBackend {
+                    case "builtin":
+                        builtInCleanupFields
+                    case "remote":
                         RemoteCleanupSettingsView(viewModel: viewModel)
-                    } else {
+                    default:
                         ollamaCleanupFields
                     }
 
-                    HStack { Spacer(); llmStatusView }
-                        .padding(.leading, 16)
+                    if viewModel.aiBackend != "builtin" {
+                        HStack { Spacer(); llmStatusView }
+                            .padding(.leading, 16)
+                    }
+                }
+                if viewModel.aiPostProcessingEnabled {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
                         sEditor($viewModel.aiPostProcessingPrompt, height: 64)
@@ -2042,99 +2168,35 @@ struct SettingsView: View {
         }
     }
 
-    private enum TriggerMode: Hashable {
-        case keyCombo
-        case modifier
-        case mouse
-    }
-
     /// The three recording-trigger modes are mutually exclusive; a bound mouse button
     /// wins over a modifier key, which wins over the regular key-combination shortcut.
-    private var triggerMode: TriggerMode {
-        if viewModel.mouseButtonHotkey != .none { return .mouse }
-        if viewModel.modifierOnlyHotkey != .none { return .modifier }
-        return .keyCombo
-    }
-
     /// "Dictation" — the redesigned first screen (Settings Explorations 2a):
     /// Trigger / Recording bar / Input, in the Atelier style.
     private var dictationSettings: some View {
         SPane(title: "Dictation") {
             SSection(title: "Trigger") {
-                SRow(title: "Recording trigger") {
-                    Picker("", selection: Binding(
-                        get: { triggerMode },
-                        set: { newMode in
-                            // Remember the outgoing mode's choice so switching modes
-                            // round-trips (leaving Single Modifier used to reset it
-                            // to Left Command).
-                            if viewModel.modifierOnlyHotkey != .none {
-                                AppPreferences.shared.lastModifierOnlyHotkey = viewModel.modifierOnlyHotkey.rawValue
-                            }
-                            if viewModel.mouseButtonHotkey != .none {
-                                AppPreferences.shared.lastMouseButtonHotkey = viewModel.mouseButtonHotkey.rawValue
-                            }
-                            switch newMode {
-                            case .keyCombo:
-                                viewModel.mouseButtonHotkey = .none
-                                viewModel.modifierOnlyHotkey = .none
-                            case .modifier:
-                                viewModel.mouseButtonHotkey = .none
-                                viewModel.modifierOnlyHotkey =
-                                    ModifierKey(rawValue: AppPreferences.shared.lastModifierOnlyHotkey) ?? .leftCommand
-                            case .mouse:
-                                viewModel.modifierOnlyHotkey = .none
-                                viewModel.mouseButtonHotkey =
-                                    MouseButton(rawValue: AppPreferences.shared.lastMouseButtonHotkey) ?? .middle
-                            }
-                        }
-                    )) {
-                        Text("Key Combination").tag(TriggerMode.keyCombo)
-                        Text("Single Modifier Key").tag(TriggerMode.modifier)
-                        Text("Mouse Button").tag(TriggerMode.mouse)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recording trigger")
+                        .font(.system(size: 13))
+                        .foregroundColor(STheme.text)
+                    Text("Click Add, then do the thing: press a combination with ⌘ ⌥ ⌃, tap a single modifier on its own, or click a spare mouse button. Keep several and use whichever suits the moment.")
+                        .font(.system(size: 11))
+                        .foregroundColor(STheme.hint)
+                        .fixedSize(horizontal: false, vertical: true)
+                    TriggerRecorderField(name: .toggleRecord,
+                                         mouseButton: $viewModel.mouseButtonHotkey,
+                                         modifierKey: $viewModel.modifierOnlyHotkey,
+                                         allowsMultiple: true)
+                        .padding(.top, 2)
                 }
-                switch triggerMode {
-                case .modifier:
-                    SRow(title: "Modifier key", hint: "One-tap to toggle recording") {
-                        Picker("", selection: $viewModel.modifierOnlyHotkey) {
-                            ForEach(ModifierKey.allCases.filter { $0 != .none }) { key in
-                                Text(key.displayName).tag(key)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                SRow(title: "Latch with Space",
+                     hint: "While recording, Space (or a double-tap of the trigger) pins it so you can let go and keep talking. Space again stops it — so Space won't type into other apps during a recording") {
+                    SToggle(isOn: $viewModel.latchRecordingWithSpace)
+                }
+                if viewModel.latchRecordingWithSpace {
                     SWarnBox {
-                        Text("**⚠︎ Input Monitoring permission required.** macOS needs it to detect single modifier key presses globally. Only modifier key events (⌘ ⌥ ⇧ ⌃ Fn) are monitored — no regular keystrokes are captured.")
-                        Button("Open Input Monitoring Settings…") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundColor(STheme.warn)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
-                    }
-                case .mouse:
-                    SRow(title: "Mouse button", hint: "Middle or an extra (thumb) button — click to toggle, hold when Hold to Record is on") {
-                        Picker("", selection: $viewModel.mouseButtonHotkey) {
-                            ForEach(MouseButton.allCases.filter { $0 != .none }) { button in
-                                Text(button.displayName).tag(button)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                    SWarnBox {
-                        Text("**⚠︎ Accessibility permission required.** macOS needs it to detect the mouse button globally and use it only as a recording trigger. The left and right buttons are reserved; only the selected button is intercepted — no other clicks or keystrokes are captured.")
+                        Text("**⚠︎ Accessibility permission required.** macOS needs it to see the Space key globally. Space is only intercepted while a recording is running — at any other time it types normally, and no other keystrokes are captured.")
                         Button("Open Accessibility Settings…") {
                             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
                                 NSWorkspace.shared.open(url)
@@ -2146,61 +2208,45 @@ struct SettingsView: View {
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
                     }
-                case .keyCombo:
-                    SRow(title: "Shortcut", hint: "Click, then press a combination with ⌘, ⌥ or ⌃ — ⌫ clears it") {
-                        ShortcutRecorderField(name: .toggleRecord)
-                            .frame(width: 170)
-                    }
                 }
-                SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
-                    SToggle(isOn: $viewModel.holdToRecord)
+                SRow(title: "Paste last transcription",
+                     hint: "Inserts your most recent transcription again, wherever the cursor is. Unbound by default — ⌫ clears it") {
+                    TriggerRecorderField(name: .pasteLastTranscription,
+                                         mouseButton: $viewModel.pasteMouseButtonUnused,
+                                         modifierKey: $viewModel.pasteModifierUnused,
+                                         allowsMouse: false,
+                                         allowsModifier: false)
+                        .frame(width: 168)
                 }
-                SRow(title: "Cancel shortcut") {
-                    Picker("", selection: $cancelKey) {
-                        ForEach(SettingsView.cancelKeyChoices) { choice in
-                            Text(choice.label).tag(choice.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .fixedSize()
-                    .onChange(of: cancelKey) { _, newValue in
-                        if let choice = SettingsView.cancelKeyChoices.first(where: { $0.id == newValue }) {
-                            KeyboardShortcuts.setShortcut(choice.shortcut, for: .escape)
-                        }
-                    }
-                    .onAppear { cancelKey = SettingsView.currentCancelKeyID() }
+                SRow(title: "Cancel shortcut",
+                     hint: "Discards the recording. Esc on its own is fine here; ⌫ clears it") {
+                    TriggerRecorderField(name: .escape,
+                                         mouseButton: $viewModel.cancelMouseButtonUnused,
+                                         modifierKey: $viewModel.cancelModifierUnused,
+                                         allowsMouse: false,
+                                         allowsModifier: false,
+                                         allowsBareEscape: true)
+                        .frame(width: 168)
+                }
+                SRow(title: "Stop and submit",
+                     hint: "Ends the recording and presses Return, so the message sends itself. Only works while recording — it never starts one. Unbound by default; ⌫ clears it") {
+                    TriggerRecorderField(name: .toggleRecordAndSubmit,
+                                         mouseButton: $viewModel.submitMouseButtonHotkey,
+                                         modifierKey: $viewModel.submitModifierOnlyHotkey)
+                        .frame(width: 168)
                 }
                 SRow(title: "Cancel without confirmation",
                      hint: "Skip the double-Esc confirmation for recordings longer than 10 seconds") {
                     SToggle(isOn: $viewModel.escCancelWithoutConfirmation)
                 }
+                SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
+                    SToggle(isOn: $viewModel.holdToRecord)
+                }
             }
 
-            SSection(title: "Recording bar") {
-                SRow(title: "Indicator position") {
-                    HStack(spacing: 8) {
-                        Button("Preview") { IndicatorWindowManager.shared.preview() }
-                            .controlSize(.small)
-                        Picker("", selection: $viewModel.indicatorPosition) {
-                            Text("Near cursor").tag("cursor")
-                            Text("Notch").tag("notch")
-                            Text("Top").tag("top")
-                            Text("Center").tag("center")
-                            Text("Bottom").tag("bottom")
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                }
-                SRow(title: "Show Stop button", hint: "A stop-and-transcribe button on the recording bar") {
-                    SToggle(isOn: $viewModel.showStopButtonOnIndicator)
-                }
-                SRow(title: "Show Cancel button", hint: "A discard (trash) button on the recording bar") {
-                    SToggle(isOn: $viewModel.showCancelButtonOnIndicator)
-                }
-                SRow(title: "Play sound when recording starts") {
+            SSection(title: "While recording") {
+                SRow(title: "Play sound when recording starts",
+                     hint: "Also plays when a recording is latched hands-free") {
                     SToggle(isOn: $viewModel.playSoundOnRecordStart)
                 }
                 HStack(spacing: 8) {
@@ -2238,15 +2284,26 @@ struct SettingsView: View {
             }
 
             SSection(title: "Input") {
-                SRow(title: "Microphone", hint: "Also switchable from the menu bar") {
+                SRow(title: "Microphone",
+                     hint: micService.followsSystemDefault
+                        ? "Following the system input\(micService.currentMicrophone.map { " (\($0.name))" } ?? "") — switch headsets and it follows"
+                        : "Also switchable from the menu bar") {
                     Picker("", selection: Binding(
-                        get: { micService.selectedMicrophone?.id ?? micService.currentMicrophone?.id ?? "" },
+                        get: {
+                            micService.followsSystemDefault
+                                ? MicrophoneService.systemDefaultID
+                                : (micService.selectedMicrophone?.id ?? MicrophoneService.systemDefaultID)
+                        },
                         set: { newID in
-                            if let device = micService.availableMicrophones.first(where: { $0.id == newID }) {
+                            if newID == MicrophoneService.systemDefaultID {
+                                micService.resetToDefault()
+                            } else if let device = micService.availableMicrophones.first(where: { $0.id == newID }) {
                                 micService.selectMicrophone(device)
                             }
                         }
                     )) {
+                        Text("System Default").tag(MicrophoneService.systemDefaultID)
+                        Divider()
                         ForEach(micService.availableMicrophones, id: \.id) { device in
                             Text(device.name).tag(device.id)
                         }
@@ -2255,6 +2312,10 @@ struct SettingsView: View {
                     .labelsHidden()
                     .fixedSize()
                 }
+            }
+
+            SSection(title: "Indicator") {
+                IndicatorLayoutEditor(viewModel: viewModel)
             }
         }
     }

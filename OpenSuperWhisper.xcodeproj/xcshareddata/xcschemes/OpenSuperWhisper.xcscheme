@@ -46,17 +46,6 @@
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "CE57B0422D52C7BC00929AF3"
-               BuildableName = "OpenSuperWhisperUITests.xctest"
-               BlueprintName = "OpenSuperWhisperUITests"
-               ReferencedContainer = "container:OpenSuperWhisper.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "CE37B5F22D54F09A009D6564"
                BuildableName = "WhisperCppBindingTests.xctest"
                BlueprintName = "WhisperCppBindingTests"

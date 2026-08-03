@@ -28,6 +28,7 @@
 		840156D52D79EDBA00FB5FFE /* libggml-metal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CD2D79ED9900FB5FFE /* libggml-metal.a */; };
 		CE0EAD6E2D56ACA80067FDEE /* GRDB-dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB-dynamic */; };
 	CEAC00102D90000000000001 /* GRDB-dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB-dynamic */; };
+		840156E02D79EE0000FB5FFE /* libllama.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156DF2D79EE0000FB5FFE /* libllama.a */; };
 		5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5BA9E0DA0000000000000A02 /* Sparkle */; };
 		CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6D2D55777800C54EA6 /* libc++.tbd */; };
 		CE84DF712D55778000C54EA6 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6F2D55778000C54EA6 /* Metal.framework */; };
@@ -116,6 +117,13 @@
 			proxyType = 2;
 			remoteGlobalIDString = 30B2BC75387D4C73A3820913;
 			remoteInfo = whisper;
+		};
+		840156DE2D79EE0000FB5FFE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 840156402D79E87600FB5FFE /* libwhisper.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 602D06718EE64704BBF92480;
+			remoteInfo = llama;
 		};
 		CE57B03A2D52C7BC00929AF3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -297,6 +305,12 @@
 				CE84DF712D55778000C54EA6 /* Metal.framework in Frameworks */,
 				CE0EAD6E2D56ACA80067FDEE /* GRDB-dynamic in Frameworks */,
 				CE84DF722D55778000C54EA6 /* MetalKit.framework in Frameworks */,
+				5BDCC01500000000000000A1 /* libggml-metal.a in Frameworks */,
+				5BDCC01400000000000000A1 /* libggml-cpu.a in Frameworks */,
+				5BDCC01300000000000000A1 /* libggml-blas.a in Frameworks */,
+				5BDCC01200000000000000A1 /* libggml-base.a in Frameworks */,
+				840156E02D79EE0000FB5FFE /* libllama.a in Frameworks */,
+				5BDCC01100000000000000A1 /* libggml.a in Frameworks */,
 				CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */,
 				CE84E17D2D56550B00C54EA6 /* KeyboardShortcuts in Frameworks */,
 				5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */,
@@ -367,6 +381,7 @@
 				840156CB2D79ED9900FB5FFE /* libggml-cpu.a */,
 				840156CD2D79ED9900FB5FFE /* libggml-metal.a */,
 				840156CF2D79ED9900FB5FFE /* libwhisper.a */,
+				840156DF2D79EE0000FB5FFE /* libllama.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -796,6 +811,13 @@
 			remoteRef = 840156CE2D79ED9900FB5FFE /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
+		840156DF2D79EE0000FB5FFE /* libllama.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libllama.a;
+			remoteRef = 840156DE2D79EE0000FB5FFE /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
 /* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
@@ -1084,7 +1106,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 43;
+				CURRENT_PROJECT_VERSION = 44;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"OpenSuperWhisper/Preview Content\"";
@@ -1100,7 +1122,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
+					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				INFOPLIST_FILE = "OpenSuperWhisper/OpenSuperWhisper-Info.plist";
@@ -1120,13 +1144,14 @@
 					/opt/homebrew/opt/libomp/lib,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.10.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/OpenSuperWhisper/LlamaBridge.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -1141,7 +1166,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 43;
+				CURRENT_PROJECT_VERSION = 44;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"OpenSuperWhisper/Preview Content\"";
@@ -1158,7 +1183,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
+					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				INFOPLIST_FILE = "OpenSuperWhisper/OpenSuperWhisper-Info.plist";
@@ -1179,13 +1206,14 @@
 				);
 				LLVM_LTO = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.10.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/OpenSuperWhisper/LlamaBridge.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 			};
@@ -1196,20 +1224,23 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 43;
+				CURRENT_PROJECT_VERSION = 44;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5C67TFSJ2B;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
+					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/OpenSuperWhisper/LlamaBridge.h";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenSuperWhisper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OpenSuperWhisper";
 			};
@@ -1220,20 +1251,23 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 43;
+				CURRENT_PROJECT_VERSION = 44;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5C67TFSJ2B;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/libwhisper/**",
+					"$(PROJECT_DIR)/libwhisper/whisper.cpp/**",
+					"$(PROJECT_DIR)/libwhisper/llama.cpp/include",
+					"$(PROJECT_DIR)/libwhisper/whisper-modulemap",
 					"$(PROJECT_DIR)/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/Headers",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/OpenSuperWhisper/LlamaBridge.h";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenSuperWhisper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OpenSuperWhisper";
 			};
@@ -1243,11 +1277,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 43;
+				CURRENT_PROJECT_VERSION = 44;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5C67TFSJ2B;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -1260,11 +1294,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 43;
+				CURRENT_PROJECT_VERSION = 44;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 5C67TFSJ2B;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.9.9;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

@@ -4,8 +4,9 @@ import XCTest
 
 /// Commit 0, scenario 7: pin AppPreferences' once-per-process init migrations by
 /// re-running them through the `AppPreferences(forTesting: true)` seam against seeded
-/// UserDefaults/Keychain state. Every touched key (defaults AND keychain) is snapshotted
-/// in setUp and restored in tearDown — hosted tests share the app's real stores.
+/// defaults/Keychain state. Every touched key (defaults AND keychain) is snapshotted
+/// in setUp and restored in tearDown. Under #59 the seeded store is DefaultsStore.current
+/// (a per-process suite under XCTest), not DefaultsStore.current.
 final class AppPreferencesMigrationTests: XCTestCase {
 
     private enum Keys {
@@ -28,7 +29,7 @@ final class AppPreferencesMigrationTests: XCTestCase {
         // Array-of-tuples, NOT a dictionary: dict[key] = nil deletes the entry, which
         // would lose the "originally absent → must be removed in tearDown" state.
         for key in defaults {
-            savedDefaults.append((key, UserDefaults.standard.string(forKey: key)))
+            savedDefaults.append((key, DefaultsStore.current.string(forKey: key)))
         }
         savedGroqKey = .some(Keychain.read("groqAPIKey"))
         savedRemoteKey = .some(Keychain.read("remoteServerAPIKey"))
@@ -36,8 +37,8 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
     override func tearDown() {
         for (key, value) in savedDefaults {
-            if let value { UserDefaults.standard.set(value, forKey: key) }
-            else { UserDefaults.standard.removeObject(forKey: key) }
+            if let value { DefaultsStore.current.set(value, forKey: key) }
+            else { DefaultsStore.current.removeObject(forKey: key) }
         }
         Keychain.set(savedGroqKey ?? nil, for: "groqAPIKey")
         Keychain.set(savedRemoteKey ?? nil, for: "remoteServerAPIKey")
@@ -45,8 +46,8 @@ final class AppPreferencesMigrationTests: XCTestCase {
     }
 
     private func seed(_ key: String, _ value: Any?) {
-        if let value { UserDefaults.standard.set(value, forKey: key) }
-        else { UserDefaults.standard.removeObject(forKey: key) }
+        if let value { DefaultsStore.current.set(value, forKey: key) }
+        else { DefaultsStore.current.removeObject(forKey: key) }
     }
 
     // MARK: - migrateOldPreferences (selectedModelPath → selectedWhisperModelPath)
@@ -57,7 +58,7 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         _ = AppPreferences(forTesting: true)
 
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.selectedWhisperModelPath),
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.selectedWhisperModelPath),
                        "/old/models/ggml-base.bin", "legacy path must be copied to the new key")
     }
 
@@ -67,7 +68,7 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         _ = AppPreferences(forTesting: true)
 
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.selectedWhisperModelPath),
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.selectedWhisperModelPath),
                        "/new/models/ggml-tiny.bin", "an existing new-key value must win")
     }
 
@@ -87,11 +88,11 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         _ = AppPreferences(forTesting: true)
 
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.selectedEngine), "remote",
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.selectedEngine), "remote",
                        "groq users are folded into the remote engine")
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.remoteServerURL),
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.remoteServerURL),
                        "https://api.groq.com/openai/v1")
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.remoteServerModel),
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.remoteServerModel),
                        "whisper-large-v3-turbo", "remote model seeded from the legacy groqModel")
         XCTAssertEqual(Keychain.read("remoteServerAPIKey"), "test-groq-key",
                        "remote API key seeded from the legacy groqAPIKey keychain item")
@@ -106,11 +107,11 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         _ = AppPreferences(forTesting: true)
 
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.remoteServerURL),
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.remoteServerURL),
                        "https://my-server.example/v1", "existing remote URL must not be clobbered")
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.remoteServerModel), "my-model")
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.remoteServerModel), "my-model")
         XCTAssertEqual(Keychain.read("remoteServerAPIKey"), "my-existing-key")
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.selectedEngine), "remote",
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.selectedEngine), "remote",
                        "the engine flip still happens for a groq user with remote config present")
     }
 
@@ -119,15 +120,15 @@ final class AppPreferencesMigrationTests: XCTestCase {
         Keychain.set("test-groq-key", for: "groqAPIKey")
 
         _ = AppPreferences(forTesting: true)
-        let urlAfterFirst = UserDefaults.standard.string(forKey: Keys.remoteServerURL)
-        let engineAfterFirst = UserDefaults.standard.string(forKey: Keys.selectedEngine)
+        let urlAfterFirst = DefaultsStore.current.string(forKey: Keys.remoteServerURL)
+        let engineAfterFirst = DefaultsStore.current.string(forKey: Keys.selectedEngine)
 
         // Second construction: the migration's own guard (selectedEngine == "groq") is
         // now false, so nothing may change.
         seed(Keys.remoteServerURL, "https://touched-by-user.example/v1")
         _ = AppPreferences(forTesting: true)
 
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.remoteServerURL),
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.remoteServerURL),
                        "https://touched-by-user.example/v1", "second run must be a no-op")
         XCTAssertEqual(urlAfterFirst, "https://api.groq.com/openai/v1")
         XCTAssertEqual(engineAfterFirst, "remote")
@@ -140,8 +141,8 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         _ = AppPreferences(forTesting: true)
 
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.selectedEngine), "whisper")
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.remoteServerURL), "")
-        XCTAssertEqual(UserDefaults.standard.string(forKey: Keys.remoteServerModel), "")
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.selectedEngine), "whisper")
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.remoteServerURL), "")
+        XCTAssertEqual(DefaultsStore.current.string(forKey: Keys.remoteServerModel), "")
     }
 }

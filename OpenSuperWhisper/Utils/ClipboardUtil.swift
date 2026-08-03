@@ -44,23 +44,43 @@ enum ClipboardUtil {
     /// adds margin, and being generous costs nothing now that the wait no longer blocks a thread).
     static let borrowRestoreDelay: TimeInterval = 1.0
 
+    /// Borrows whose restore hasn't fired yet, keyed by pasteboard name. A borrow that lands while
+    /// another is still pending must NOT snapshot — the pasteboard currently holds the previous
+    /// borrow's transcription, and restoring that later would overwrite the user's contents with
+    /// dictated text, the very thing "Copy to clipboard" off exists to prevent. Instead it inherits
+    /// the pending borrow's snapshot and cancels its timer, so any number of overlapping borrows
+    /// collapse into a single restore of the original contents. Main-thread only, like every
+    /// caller (the restore timers are on the main queue too, so there is no interleaving).
+    private static var pendingBorrows: [NSPasteboard.Name: (saved: Snapshot, restore: DispatchWorkItem)] = [:]
+
     /// Puts `text` on the pasteboard just long enough for `paste` (a synthetic ⌘V) to be serviced,
     /// then restores the previous contents — for when the user opted out of keeping transcriptions
     /// on the clipboard and it's only borrowed as the paste vehicle (#44). The restore is skipped
     /// if anything else writes to the pasteboard within the delay (a user copy, a clipboard
-    /// manager): newer content wins over our restore.
+    /// manager): newer content wins over our restore. Overlapping borrows — a dictation insert
+    /// followed within the delay by the paste-last shortcut — coalesce onto the first borrow's
+    /// snapshot, so the user's clipboard comes back no matter how many borrows stacked up.
     static func borrowForPaste(_ text: String,
                                on pasteboard: NSPasteboard = .general,
                                restoreAfter delay: TimeInterval = borrowRestoreDelay,
                                paste: () -> Void) {
-        let saved = snapshot(of: pasteboard)
+        let saved: Snapshot
+        if let pending = pendingBorrows[pasteboard.name] {
+            pending.restore.cancel()
+            saved = pending.saved
+        } else {
+            saved = snapshot(of: pasteboard)
+        }
         copyToClipboard(text, to: pasteboard)
         let borrowChangeCount = pasteboard.changeCount
         paste()
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+        let restoreItem = DispatchWorkItem {
+            pendingBorrows[pasteboard.name] = nil
             guard pasteboard.changeCount == borrowChangeCount else { return }
             restore(saved, to: pasteboard)
         }
+        pendingBorrows[pasteboard.name] = (saved, restoreItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: restoreItem)
     }
 
     // MARK: - Input source helpers (used by keyboard-layout tests)

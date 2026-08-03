@@ -29,11 +29,17 @@ class IndicatorViewModel: ObservableObject {
 
     @Published var state: RecordingState = .idle
     @Published var isBlinking = false
+    /// The recording has been pinned hands-free and no longer depends on the trigger key.
+    @Published var isLatched = false
     @Published var isConfirmingCancel = false
     @Published var recorder: AudioRecorder = .shared
     @Published var isVisible = false
 
     var recordingStartedAt: Date?
+    /// Set by the trigger when this take should be submitted after insertion (#50). Carried
+    /// on the queued clip rather than read at paste time: transcription runs in the
+    /// background now, so the next recording may already have started by then.
+    var submitAfterInsert = false
 
     var delegate: IndicatorViewDelegate?
     private var blinkTimer: Timer?
@@ -212,6 +218,7 @@ class IndicatorViewModel: ObservableObject {
     func startDecoding() {
         resetCancelConfirmation()
         stopBlinking()
+        isLatched = false
 
         // Grab the live-streaming preview text (if any) BEFORE cancelling the stream, then hand
         // off. A very short clip can come back empty from the offline file pass even when the
@@ -235,7 +242,8 @@ class IndicatorViewModel: ObservableObject {
         // later, in the background. (parallel-recording, #model-snapshot)
         let ctx = RecordingContext.shared
         let snapshot = DictationPipeline.ContextSnapshot(
-            appName: ctx.appName, windowTitle: ctx.windowTitle, fullURL: ctx.fullURL)
+            appName: ctx.appName, bundleID: ctx.bundleID,
+            windowTitle: ctx.windowTitle, fullURL: ctx.fullURL)
         let modelOption = ModelCatalog.activeOption()
 
         // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
@@ -246,7 +254,8 @@ class IndicatorViewModel: ObservableObject {
             startedAt: recordingStartedAt ?? Date(),
             streamedFallback: streamedFallback,
             context: snapshot,
-            modelOption: modelOption)
+            modelOption: modelOption,
+            submitAfterInsert: submitAfterInsert)
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.
         delegate?.didFinishDecoding()
@@ -288,6 +297,7 @@ class IndicatorViewModel: ObservableObject {
     func cleanup() {
         stopBlinking()
         resetCancelConfirmation()
+        isLatched = false
         recordingStartedAt = nil
         hideTimer?.invalidate()
         hideTimer = nil
@@ -318,7 +328,11 @@ class IndicatorViewModel: ObservableObject {
 
 struct RecordingIndicator: View {
     let isBlinking: Bool
-    
+    /// Hands-free: the dot swells, stops blinking and gains a slow outward pulse. The change has to
+    /// be legible at a glance and from the corner of the eye — it is the only signal that it is now
+    /// safe to let go of the trigger key.
+    var isLatched: Bool = false
+
     var body: some View {
         Circle()
             .fill(
@@ -331,10 +345,29 @@ struct RecordingIndicator: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .frame(width: 8, height: 8)
-            .shadow(color: .red.opacity(0.5), radius: 4)
-            .opacity(isBlinking ? 0.3 : 1.0)
+            .frame(width: isLatched ? 11 : 8, height: isLatched ? 11 : 8)
+            .shadow(color: .red.opacity(0.5), radius: isLatched ? 6 : 4)
+            // Latched reads as steady-and-pulsing rather than blinking: a solid dot says the
+            // recording no longer depends on anything being held down.
+            .opacity(isLatched ? 1.0 : (isBlinking ? 0.3 : 1.0))
+            .overlay { if isLatched { LatchPulse() } }
             .animation(.easeInOut(duration: 0.4), value: isBlinking)
+            .animation(.spring(response: 0.32, dampingFraction: 0.55), value: isLatched)
+    }
+}
+
+/// The ring that expands out of the latched dot and fades, once per beat. Deliberately slow: it is
+/// an ambient "still going" cue, not something to keep looking at.
+private struct LatchPulse: View {
+    @State private var expanded = false
+
+    var body: some View {
+        Circle()
+            .stroke(Color.red.opacity(0.55), lineWidth: 1.5)
+            .scaleEffect(expanded ? 2.1 : 1)
+            .opacity(expanded ? 0 : 0.7)
+            .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false), value: expanded)
+            .onAppear { expanded = true }
     }
 }
 
@@ -399,6 +432,7 @@ struct IndicatorWindow: View {
     // Surfaces how many earlier clips are still transcribing in the background, so starting a new
     // recording while others are queued shows the backlog. (parallel-recording #3)
     @ObservedObject private var pipeline = DictationPipeline.shared
+    @ObservedObject private var spectrum = SpectrumAnalyzer.shared
     @Environment(\.colorScheme) private var colorScheme
     
     private var backgroundColor: Color {
@@ -413,28 +447,41 @@ struct IndicatorWindow: View {
     /// layout, including the notch pill (its base width has no room to spare).
     private var buttonExtraWidth: CGFloat {
         guard viewModel.state == .recording else { return 0 }
-        var extra: CGFloat = 0
-        if AppPreferences.shared.showStopButtonOnIndicator { extra += 32 }
-        if AppPreferences.shared.showCancelButtonOnIndicator { extra += 32 }
-        return extra
+        return CGFloat(layout.trailing.count) * 32
     }
 
-    private var bubbleWidth: CGFloat {
-        if isNotchMode {
-            // Idle width is tunable; it only expands once there is actual caption text to show.
-            let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
-            return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth
-        }
-        // Live mode starts compact too — the pill only widens once caption text actually
-        // arrives (same rule as notch mode). Starting at 380 made the bubble appear at
-        // its "final" size the moment recording began.
-        let live = viewModel.state == .recording && IndicatorViewModel.shouldUseLiveStreaming
+    /// Width the chosen elements need beyond a plain dot-and-label bubble, so a composition
+    /// with the waveform (or without the label) never squeezes what is left.
+    private var meterWidthAllowance: CGFloat {
+        guard viewModel.state == .recording else { return 0 }
+        return layout.contains(.waveform) && layout.contains(.label) ? 16 : 0
+    }
+
+    /// `nil` means "as wide as the contents". The notch keeps a fixed width because it is
+    /// imitating a piece of hardware, and the live caption keeps one because text of unknown
+    /// length would otherwise resize the window on every word. A plain recording bubble sizes
+    /// itself: a fixed 200pt left a waveform-only layout stranded at the left of an
+    /// empty pill.
+    private var bubbleWidth: CGFloat? {
         let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
-        let base: CGFloat = (live && hasCaption) ? 380 : 200
-        return base + buttonExtraWidth
+        if isNotchMode {
+            return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth + meterWidthAllowance
+        }
+        let live = viewModel.state == .recording && IndicatorViewModel.shouldUseLiveStreaming
+        if live && hasCaption { return 380 + buttonExtraWidth + meterWidthAllowance }
+        if viewModel.state == .recording { return nil }
+        return 200 + buttonExtraWidth + meterWidthAllowance
     }
     
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
+
+    private var layout: IndicatorLayout {
+        IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
+    }
+
+    /// Bars are allowed to stand taller than the label beside them: the meter is the thing
+    /// being read at a glance. Set in the layout editor, where the effect is visible.
+    private var meterHeight: CGFloat { layout.waveformHeight }
 
     /// Opt-in on-bubble controls (default off). Shown on the trailing side while
     /// recording. Stop = stop & transcribe (same as the hotkey toggle); Cancel =
@@ -498,22 +545,33 @@ struct IndicatorWindow: View {
                 if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
                     HStack(alignment: .center, spacing: 10) {
-                        RecordingIndicator(isBlinking: viewModel.isBlinking)
-                            .frame(width: 16)
                         if viewModel.isConfirmingCancel {
                             Text("Press Esc to cancel")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.orange)
                                 .transition(.opacity)
                         } else {
-                            Text(pipeline.pendingCount > 0 ? "Recording… · \(pipeline.pendingCount) queued" : "Recording…")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.secondary)
-                                .transition(.opacity)
+                            ForEach(layout.leading) { element in
+                                IndicatorElementView(element: element,
+                                                     bands: spectrum.bands,
+                                                     meterHeight: meterHeight,
+                                                     isBlinking: viewModel.isBlinking,
+                                                     isLatched: viewModel.isLatched,
+                                                     queued: pipeline.pendingCount)
+                            }
                         }
-                        if anyIndicatorButton {
+                        if !layout.trailing.isEmpty {
                             Spacer(minLength: 8)
-                            indicatorControls
+                            HStack(spacing: 8) {
+                                ForEach(layout.trailing) { element in
+                                    IndicatorElementView(element: element,
+                                                         bands: spectrum.bands,
+                                                         meterHeight: meterHeight,
+                                                         isBlinking: viewModel.isBlinking,
+                                                         isLatched: viewModel.isLatched,
+                                                         queued: pipeline.pendingCount)
+                                }
+                            }
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: viewModel.isConfirmingCancel)
@@ -523,7 +581,7 @@ struct IndicatorWindow: View {
                     // Center-aligned: with the (taller) on-bubble buttons enabled, .top
                     // alignment pinned a single caption line above the vertical middle.
                     HStack(alignment: .center, spacing: 10) {
-                        RecordingIndicator(isBlinking: viewModel.isBlinking)
+                        RecordingIndicator(isBlinking: viewModel.isBlinking, isLatched: viewModel.isLatched)
                             .frame(width: 16)
                         (Text(streaming.confirmedText).foregroundColor(.primary)
                             + Text(streaming.confirmedText.isEmpty ? "" : " ")
@@ -583,11 +641,17 @@ struct IndicatorWindow: View {
                 EmptyView()
             }
         }
-        .padding(.horizontal, isNotchMode ? 22 : 24)
-        .padding(.vertical, isNotchMode ? 10 : 12)
+        // Without a fixed width the HStack takes whatever the window offers and the trailing
+        // Spacer eats it, so a waveform plus two buttons stretched into a mostly empty bar.
+        // Fixing the horizontal size collapses the Spacer to its 8pt minimum.
+        .fixedSize(horizontal: bubbleWidth == nil, vertical: false)
+        .padding(.horizontal, isNotchMode ? 22 : 16)
+        .padding(.vertical, isNotchMode ? 10 : 7)
         // Width must be set *before* the background so the bubble itself fills it (not just the
         // surrounding frame). Notch content is centred; the others stay leading.
         .frame(minHeight: isNotchMode ? notch.height : 36)
+        // A floor so a single small element still reads as a bubble rather than a chip.
+        .frame(minWidth: bubbleWidth == nil ? 76 : nil)
         .frame(width: bubbleWidth, alignment: isNotchMode ? .center : .leading)
         .background {
             if isNotchMode {

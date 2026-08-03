@@ -71,13 +71,17 @@ Models load lazily: browsing engine tabs never triggers a surprise download.
 
 - 🪟 **Rules** — bind a model to an app (or a website in supported browsers) and the model
   switches automatically when you dictate there: a fast one for chat, an accurate one for email.
+  The same tab holds **per-app formatting** rules, so the cleanup pass knows that "at Rob" means
+  "@Rob" in Slack and "src slash main dot swift" means `src/main.swift` in a terminal.
   Managed from Settings → Rules or the menu-bar **Model** picker.
 - 📖 **Custom dictionary** — your proper nouns and jargon come out spelled right; boosts
   recognition and applies replacements.
 - 🧹 **Cleaner output** — optional filler-word removal (um, uh…), automatic sentence spacing, and
   "No speech detected" is never pasted.
-- 🤖 **AI cleanup** — optionally tidy punctuation/casing through a local [Ollama](https://ollama.com)
-  model. Fully on-device, opt-in.
+- 🤖 **AI cleanup** — optionally tidy punctuation/casing with an LLM: the **built-in** model
+  (Qwen2.5 1.5B, one-time ~1 GB download, no server to run), a local
+  [Ollama](https://ollama.com) server, or any OpenAI-compatible endpoint. Opt-in; the first two
+  stay fully on-device, and the transcription is returned verbatim if the model misbehaves.
 - ⏯️ **Media handling** — pause other apps' playback (and resume only what was actually playing) or
   duck the system volume while you record.
 - 🎤 **Any microphone** — built-in, external, Bluetooth or iPhone (Continuity), switchable from the
@@ -153,6 +157,15 @@ Contributions are welcome — issues, focused PRs, or big ideas
 ([the last community batch](https://github.com/my-monkeys/OpenSuperWhisper/pull/21) shipped a whole
 menu of features). Open items live in the
 [issue tracker](https://github.com/my-monkeys/OpenSuperWhisper/issues).
+
+## Also from My-Monkey
+
+Two other free, open-source apps from the same collective:
+
+| | |
+|---|---|
+| 🐒 **[Desktop Monkey](https://desktop-monkey.my-monkey.fr)** | A pixel-art monkey that lives on your desktop — he follows your cursor, hunts it, throws bananas at it and naps when you're away. Windows & macOS, one 6 MB file. ([source](https://github.com/my-monkeys/desktop-monkey)) |
+| 📊 **[Claude Monitor](https://github.com/my-monkeys/claude-monitor)** | A macOS menu-bar app that counts your Claude Code instances and MCP servers, watches the per-user process limit and RAM, and kills a runaway swarm before it takes the Mac down. |
 
 ## License
 
