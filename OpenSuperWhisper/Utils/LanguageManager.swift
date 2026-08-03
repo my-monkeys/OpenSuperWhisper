@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import WhisperCore
 
 /// In-app override of the interface language. Writes the standard `AppleLanguages` default so the
 /// override persists in the app's own domain (independent of the system language); takes effect on

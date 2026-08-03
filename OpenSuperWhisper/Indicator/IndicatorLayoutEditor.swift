@@ -1,4 +1,5 @@
 import SwiftUI
+import WhisperCore
 import UniformTypeIdentifiers
 
 /// Composes the recording bubble: where it appears, what it contains, in what order, and how

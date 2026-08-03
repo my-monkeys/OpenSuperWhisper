@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// The Remote engine retries only *transient* failures — a self-hosted endpoint

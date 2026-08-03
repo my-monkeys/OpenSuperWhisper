@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import WhisperCore
 
 /// Configuration UI for a custom remote (OpenAI-compatible) transcription server.
 /// Shown under the "Custom" preset of the Remote engine section: free-text URL,

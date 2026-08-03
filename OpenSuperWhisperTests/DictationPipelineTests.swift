@@ -8,6 +8,7 @@
 //
 
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 final class AsyncSemaphoreTests: XCTestCase {

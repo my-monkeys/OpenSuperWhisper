@@ -1,4 +1,5 @@
 import SwiftUI
+import WhisperCore
 
 /// Live-tunable notch geometry, shared between the settings sliders and the indicator view so the
 /// notch updates in real time while you drag. Values persist in UserDefaults.

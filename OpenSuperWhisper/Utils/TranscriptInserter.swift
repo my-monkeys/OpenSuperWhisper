@@ -1,4 +1,5 @@
 import Foundation
+import WhisperCore
 
 /// The single place that decides *how* a finished transcription reaches the focused app:
 /// clipboard stash, paste-vs-type, and the no-editable-target fallback.

@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import WhisperCore
 
 /// Runs hotkey dictations (transcribe → save → paste) on a background, serial queue so the user is
 /// never blocked from starting the next recording while a previous one is still being transcribed.

@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import WhisperCore
 
 /// Settings → Rules. Everything that varies per app (or per site) lives here:
 /// which transcription model to use, and how the LLM cleanup pass should reformat

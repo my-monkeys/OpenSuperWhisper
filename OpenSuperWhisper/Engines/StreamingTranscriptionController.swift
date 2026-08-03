@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import FluidAudio
+import WhisperCore
 
 /// Drives live (streaming) transcription on the Parakeet/FluidAudio engine.
 ///

@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import KeyboardShortcuts
 import SwiftUI
+import WhisperCore
 
 /// Records the recording trigger: a key combination, a single modifier, or a mouse button,
 /// whichever the user performs. One field instead of a mode picker plus three per-mode controls.

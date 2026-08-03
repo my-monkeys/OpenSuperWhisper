@@ -1,4 +1,5 @@
 import Foundation
+import WhisperCore
 
 /// Built-in LLM cleanup backend: a small GGUF model run locally via llama.cpp (`LlamaContext`),
 /// with no external server. The model downloads on first use (`LLMModelManager`); the inference

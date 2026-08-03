@@ -10,6 +10,7 @@ import SwiftUI
 import AppKit
 import Combine
 import UniformTypeIdentifiers
+import WhisperCore
 
 @main
 enum AppMain {
@@ -111,7 +112,39 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private var modelSubmenu: NSMenu?
     private var microphoneService = MicrophoneService.shared
     private var microphoneObserver: AnyCancellable?
-    
+
+    // Wire the consent seam for the history-disabled prompt (Option A ruling) in
+    // willFinishLaunching, not didFinishLaunching: a file-open-at-launch delivers
+    // application(_:openFiles:) BETWEEN willFinish and didFinish, and the unwired
+    // fail-safe (nil = cancel) silently dropped the file instead of prompting
+    // (PR #57 maintainer review). Alert body byte-identical to the pre-extraction
+    // inline NSAlert in addFileToQueue.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        TranscriptionQueue.shared.confirmEnableHistory = {
+            let alert = NSAlert()
+            alert.messageText = "Transcription History Disabled"
+            alert.informativeText = "Transcription saving is currently disabled. Would you like to enable it so this recording can be saved?"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Enable & Save")
+            alert.addButton(withTitle: "Cancel")
+            return alert.runModal() == .alertFirstButtonReturn
+        }
+
+        // Inject the built-in llama.cpp cleanup backend into WhisperCore (protocol-inversion
+        // ruling, PR #57): BuiltInLlamaBackend/LlamaContext/libllama.a and the GGUF model stay
+        // app-side, so the framework's LLMPostProcessor reaches them only through this provider
+        // closure. Same willFinish-not-didFinish race as above: an openFiles-at-launch
+        // transcription can reach LLMPostProcessor.process before didFinishLaunching.
+        LLMPostProcessor.builtInBackendProvider = { BuiltInLlamaBackend.shared }
+
+        // Run the trigger/indicator preference migrations + conflict resolution (master's
+        // #48/#72, relocated app-side with the extraction — they interpret AppKit-bound types
+        // the framework can't see). Must complete before ShortcutManager/IndicatorWindowManager
+        // start reading those prefs in didFinishLaunching; forces AppPreferences.shared init
+        // here so the framework-resident migrations also run at a deterministic point.
+        AppPreferences.shared.migrateTriggerAndIndicatorPrefs()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         setupStatusBarItem()

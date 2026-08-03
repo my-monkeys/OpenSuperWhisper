@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import WhisperCore
 
 /// Onboarding is the only thing standing between a fresh install and a dictation that can't
 /// work, so its exit condition is pinned here.

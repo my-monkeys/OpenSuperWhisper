@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// `parseSubmitCommand` is the pure regex behind the opt-in "press enter" voice command

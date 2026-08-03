@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import WhisperCore
 
 /// Preferences must not leak between parallel test processes. The scheme runs three testables
 /// in parallel under one bundle identifier, so `UserDefaults.standard` is a single on-disk

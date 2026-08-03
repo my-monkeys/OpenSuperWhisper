@@ -1,4 +1,5 @@
 import Foundation
+import WhisperCore
 
 /// Runs a user-configured shell command after a successful transcription, so people can wire
 /// their own automations (save JSON, sync to git, trigger a script…). Opt-in.

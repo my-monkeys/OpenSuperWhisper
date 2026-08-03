@@ -1,4 +1,5 @@
 import SwiftUI
+import WhisperCore
 
 /// Configuration for the Remote (OpenAI-compatible) LLM-cleanup backend: server URL,
 /// optional API key, Test Connection, and a chat-model picker fetched from

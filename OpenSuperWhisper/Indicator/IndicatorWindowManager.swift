@@ -1,6 +1,7 @@
 import AppKit
 import KeyboardShortcuts
 import SwiftUI
+import WhisperCore
 
 @MainActor
 class IndicatorWindowManager: IndicatorViewDelegate {

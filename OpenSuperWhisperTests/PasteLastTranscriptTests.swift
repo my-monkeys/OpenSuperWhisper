@@ -2,6 +2,7 @@ import KeyboardShortcuts
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import WhisperCore
 
 /// Covers which stored recording the "paste last transcription" shortcut re-pastes: the newest
 /// one that actually produced text. Failed clips (whose `transcription` holds the retry

@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// Per-app / per-site model rules resolve with **site-beats-app** precedence: a

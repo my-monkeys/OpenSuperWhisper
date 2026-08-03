@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import WhisperCore
 
 /// The Apple Speech model rows ask "are this language's assets on this Mac", and the answer
 /// is matched against the locale list Speech returns. Identifier formatting differs between

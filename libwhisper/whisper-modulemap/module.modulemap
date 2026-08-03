@@ -1,0 +1,28 @@
+// Checked-in clang modulemap exposing the whisper.cpp C API as module `whisper`
+// on macOS. WhisperCore is a framework target and therefore CANNOT use an
+// Objective-C bridging header (Xcode: "using bridging headers with framework
+// targets is unsupported") — it consumes whisper as a clang module instead.
+// Module name is IDENTICAL to the iOS xcframework's modulemap
+// (build/whisper-ios.xcframework, produced by Scripts/build-xcframework-ios.sh)
+// so WhisperCore sources compile identically per platform.
+//
+// Header paths are relative to this file's directory (libwhisper/whisper-modulemap/)
+// so they stay checkout-location independent. Wired into the WhisperCore target via
+// SWIFT_INCLUDE_PATHS[sdk=macosx*] = $(PROJECT_DIR)/libwhisper/whisper-modulemap.
+module whisper {
+    header "../whisper.cpp/include/whisper.h"
+    header "../whisper.cpp/ggml/include/ggml.h"
+    header "../whisper.cpp/ggml/include/ggml-alloc.h"
+    header "../whisper.cpp/ggml/include/ggml-backend.h"
+    header "../whisper.cpp/ggml/include/ggml-metal.h"
+    header "../whisper.cpp/ggml/include/ggml-cpu.h"
+    header "../whisper.cpp/ggml/include/ggml-blas.h"
+    header "../whisper.cpp/ggml/include/gguf.h"
+
+    link "c++"
+    link framework "Accelerate"
+    link framework "Metal"
+    link framework "Foundation"
+
+    export *
+}

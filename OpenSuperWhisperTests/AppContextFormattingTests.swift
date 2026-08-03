@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import WhisperCore
 
 /// Covers the pure logic behind app-aware LLM formatting: profile lookup by bundle id, system
 /// prompt assembly from the two independent contributors (general cleanup + per-app rules), and

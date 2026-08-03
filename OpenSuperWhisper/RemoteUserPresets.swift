@@ -1,4 +1,5 @@
 import Foundation
+import WhisperCore
 
 /// A user-saved Remote-engine configuration: everything needed to switch servers
 /// in one click. The API key is deliberately NOT part of the Codable payload —

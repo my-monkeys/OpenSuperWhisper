@@ -1,4 +1,5 @@
 import XCTest
+@testable import WhisperCore
 @testable import OpenSuperWhisper
 
 /// `GroqPreset.isGroqURL` decides whether the Remote settings open on the Groq

@@ -125,6 +125,11 @@ if [ -d "${SPARKLE_FW}" ]; then
   done
   codesign -f -o runtime --timestamp -s "${CODE_SIGN_IDENTITY}" "${SPARKLE_FW}"
 fi
+# GRDB-dynamic.framework is embedded into the bundle by the "Embed GRDB-dynamic" script
+# phase (Xcode 26 copy phases silently ignore package products — see TRIAGE.md "Liens
+# GRDB / FluidAudio"). Sign it before re-sealing the app, same inside-out order as Sparkle.
+codesign -f -o runtime --timestamp -s "${CODE_SIGN_IDENTITY}" \
+  "${APP_PATH}/Contents/Frameworks/GRDB-dynamic.framework"
 # Always re-seal the app (covers the Sparkle re-sign and the x86_64 post-build edits).
 codesign -f -o runtime --timestamp \
   --entitlements "OpenSuperWhisper/OpenSuperWhisper.entitlements" \
