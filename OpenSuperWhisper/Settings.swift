@@ -1566,6 +1566,10 @@ struct SettingsView: View {
                 }
             }
         }
+        // Injected from the view model rather than read from preferences at window
+        // construction: preferences aren't observed, so the slider wrote a value nothing
+        // ever re-read and the setting appeared to do nothing until the app restarted.
+        .environment(\.appTextScale, viewModel.textScale)
     }
     
     /// Compact engine card (design 1b): name + one-line subtitle, copper when browsed.
