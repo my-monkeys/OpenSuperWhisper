@@ -49,7 +49,7 @@ struct SSectionHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 11, weight: .bold))
+                .scaledFont(size: 11, weight: .bold)
                 .tracking(0.8)
                 .textCase(.uppercase)
                 .foregroundColor(STheme.sectionTitle)
@@ -70,11 +70,11 @@ struct SRow<Trailing: View>: View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13))
+                    .scaledFont(size: 13)
                     .foregroundColor(STheme.text)
                 if let hint {
                     Text(hint)
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundColor(hintColor)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -93,7 +93,7 @@ struct STag: View {
     init(_ label: LocalizedStringKey) { self.label = label }
     var body: some View {
         Text(label)
-            .font(.system(size: 9.5, weight: .bold))
+            .scaledFont(size: 9.5, weight: .bold)
             .tracking(0.5)
             .textCase(.uppercase)
             .foregroundColor(STheme.hint)
@@ -107,7 +107,7 @@ struct SWarnBox<Content: View>: View {
     @ViewBuilder let content: () -> Content
     var body: some View {
         VStack(alignment: .leading, spacing: 8) { content() }
-            .font(.system(size: 11.5))
+            .scaledFont(size: 11.5)
             .foregroundColor(STheme.warn)
             .padding(.horizontal, 12).padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -140,11 +140,11 @@ struct SPane<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(title)
-                    .font(.system(size: 16, weight: .bold))
+                    .scaledFont(size: 16, weight: .bold)
                     .foregroundColor(STheme.textBright)
                 Spacer()
                 if let subtitle {
-                    Text(subtitle).font(.system(size: 11)).foregroundColor(STheme.hint)
+                    Text(subtitle).scaledFont(size: 11).foregroundColor(STheme.hint)
                 }
             }
             .padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 4)
@@ -165,7 +165,7 @@ struct SEditor: View {
 
     var body: some View {
         TextEditor(text: $text)
-            .font(.system(size: 11.5, design: .monospaced))
+            .scaledFont(size: 11.5, design: .monospaced)
             .scrollContentBackground(.hidden)
             .padding(6)
             .frame(height: height)

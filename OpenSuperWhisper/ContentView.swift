@@ -484,7 +484,7 @@ struct ContentView: View {
                                 if !debouncedSearchText.isEmpty {
                                     // Show "no results" for search
                                     Image(systemName: "magnifyingglass")
-                                        .font(.system(size: 40))
+                                        .scaledFont(size: 40)
                                         .foregroundColor(.secondary)
                                         .padding(.top, 40)
 
@@ -500,7 +500,7 @@ struct ContentView: View {
                                 } else {
                                     // Show "start recording" tip
                                     Image(systemName: "arrow.down.circle")
-                                        .font(.system(size: 40))
+                                        .scaledFont(size: 40)
                                         .foregroundColor(.secondary)
                                         .padding(.top, 40)
 
@@ -525,7 +525,7 @@ struct ContentView: View {
                                                     .font(.subheadline)
                                                     .foregroundColor(.secondary)
                                                 Text(shortcut.description)
-                                                    .font(.system(size: 16, weight: .medium))
+                                                    .scaledFont(size: 16, weight: .medium)
                                                     .padding(.horizontal, 6)
                                                     .padding(.vertical, 3)
                                                     .background(Color.secondary.opacity(0.2))
@@ -1143,7 +1143,7 @@ struct RecordingRow: View {
                             }
                         }) {
                             Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle.fill")
-                                .font(.system(size: 20))
+                                .scaledFont(size: 20)
                                 .foregroundColor(isPlaying ? .red : ThemePalette.iconAccent(colorScheme))
                                 .contentTransition(.symbolEffect(.replace))
                         }
@@ -1157,7 +1157,7 @@ struct RecordingRow: View {
                             )
                         }) {
                             Image(systemName: "doc.on.doc.fill")
-                                .font(.system(size: 18))
+                                .scaledFont(size: 18)
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
@@ -1172,7 +1172,7 @@ struct RecordingRow: View {
                         HStack(spacing: 1) {
                             Button(action: { onRegenerate(nil) }) {
                                 Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 18))
+                                    .scaledFont(size: 18)
                                     .foregroundColor(.secondary)
                             }
                             .buttonStyle(.plain)
@@ -1188,7 +1188,7 @@ struct RecordingRow: View {
                                 }
                             } label: {
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 9, weight: .semibold))
+                                    .scaledFont(size: 9, weight: .semibold)
                                     .foregroundColor(.secondary)
                             }
                             .menuStyle(.button)
@@ -1208,7 +1208,7 @@ struct RecordingRow: View {
                             onDelete()
                         }) {
                             Image(systemName: "trash.fill")
-                                .font(.system(size: 18))
+                                .scaledFont(size: 18)
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)

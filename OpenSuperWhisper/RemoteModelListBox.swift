@@ -91,16 +91,16 @@ struct RemoteModelListBox: View {
             if models.count > 5 {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                         .foregroundColor(STheme.hint)
                     TextField("", text: $modelSearchText, prompt: Text("Filter models…"))
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .autocorrectionDisabled(true)
                     if !modelSearchText.isEmpty {
                         Button { modelSearchText = "" } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 10))
+                                .scaledFont(size: 10)
                                 .foregroundColor(STheme.hint)
                         }
                         .buttonStyle(.plain)
@@ -117,7 +117,7 @@ struct RemoteModelListBox: View {
                 VStack(spacing: 0) {
                     if visibleModels.isEmpty && !modelSearchText.isEmpty {
                         Text("No models match \"\(modelSearchText)\"")
-                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .scaledFont(size: 11).foregroundColor(STheme.hint)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 14)
                     }
@@ -156,7 +156,7 @@ struct RemoteModelListBox: View {
                                 .foregroundColor(STheme.hint)
                         }
                     }
-                    .font(.system(size: 11.5))
+                    .scaledFont(size: 11.5)
                 }
                 .buttonStyle(.plain)
             }
@@ -166,14 +166,14 @@ struct RemoteModelListBox: View {
                 // GET /v1/models without credentials, so the list stays empty until
                 // a key is set and Test Connection runs.
                 Text("The server's models are listed here after a successful Test Connection — most providers (e.g. Groq) need the API key set first.")
-                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .scaledFont(size: 11).foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if isCustom {
                 TextField("", text: $customText, prompt: Text(customPrompt))
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12, design: .monospaced))
+                    .scaledFont(size: 12, design: .monospaced)
                     .autocorrectionDisabled(true)
                     .padding(.horizontal, 9).padding(.vertical, 5)
                     .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
@@ -191,12 +191,12 @@ struct RemoteModelListBox: View {
                     .overlay(Circle().stroke(selected ? STheme.accent : STheme.controlBorder, lineWidth: 1.5))
                     .frame(width: 8, height: 8)
                 Text(name)
-                    .font(.system(size: 12.5, design: .monospaced))
+                    .scaledFont(size: 12.5, design: .monospaced)
                     .foregroundColor(selected ? STheme.textBright : STheme.text)
                 Spacer()
                 if selected {
                     Text("ACTIVE")
-                        .font(.system(size: 10, weight: .bold))
+                        .scaledFont(size: 10, weight: .bold)
                         .tracking(0.5)
                         .foregroundColor(STheme.accent)
                 }

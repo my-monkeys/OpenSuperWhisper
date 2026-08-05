@@ -94,7 +94,7 @@ struct TriggerRecorderField: View {
             Spacer(minLength: 8)
             Button { remove(trigger) } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundColor(STheme.hint)
             }
             .buttonStyle(.plain)
@@ -115,21 +115,21 @@ struct TriggerRecorderField: View {
                 ForEach(RecordingTrigger.modifierBadges, id: \.symbol) { badge in
                     let held = heldModifiers.contains(badge.flag)
                     Text(badge.symbol)
-                        .font(.system(size: 11, weight: .semibold))
+                        .scaledFont(size: 11, weight: .semibold)
                         .foregroundColor(held ? .white : STheme.hint)
                         .frame(width: 18, height: 18)
                         .background(RoundedRectangle(cornerRadius: 4)
                             .fill(held ? STheme.accent : STheme.controlBg))
                 }
                 Text(placeholder)
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundColor(STheme.hint)
             } else {
                 Image(systemName: "plus")
-                    .font(.system(size: 10, weight: .semibold))
+                    .scaledFont(size: 10, weight: .semibold)
                     .foregroundColor(STheme.hint)
                 Text(triggers.isEmpty ? "Add a trigger" : "Add another")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundColor(STheme.hint)
             }
             Spacer(minLength: 0)
@@ -183,7 +183,7 @@ struct TriggerRecorderField: View {
                 if isHovering {
                     Button { clear() } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                             .foregroundColor(STheme.hint)
                     }
                     .buttonStyle(.plain)
@@ -191,7 +191,7 @@ struct TriggerRecorderField: View {
                 }
             } else {
                 Text("Click to record")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundColor(STheme.hint)
                 Spacer(minLength: 0)
             }
@@ -213,14 +213,14 @@ struct TriggerRecorderField: View {
             ForEach(RecordingTrigger.modifierBadges, id: \.symbol) { badge in
                 let held = heldModifiers.contains(badge.flag)
                 Text(badge.symbol)
-                    .font(.system(size: 11, weight: .semibold))
+                    .scaledFont(size: 11, weight: .semibold)
                     .foregroundColor(held ? .white : STheme.hint)
                     .frame(width: 18, height: 18)
                     .background(RoundedRectangle(cornerRadius: 4)
                         .fill(held ? STheme.accent : STheme.controlBg))
             }
             Text(placeholder)
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundColor(STheme.hint)
                 .padding(.leading, 2)
             Spacer(minLength: 0)
@@ -406,7 +406,7 @@ private struct TriggerCap: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 11.5, weight: .semibold))
+            .scaledFont(size: 11.5, weight: .semibold)
             .foregroundColor(STheme.textBright)
             .lineLimit(1)
             .frame(minWidth: 18, minHeight: 18)

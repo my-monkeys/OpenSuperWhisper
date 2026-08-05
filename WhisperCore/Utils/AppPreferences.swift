@@ -385,7 +385,16 @@ public final class AppPreferences {
     @UserDefault(key: "postRecordHookCommand", defaultValue: "")
     public var postRecordHookCommand: String
 
-    /// Where the recording indicator appears: "cursor" (default), "top", "center", "bottom".
+    /// Multiplier applied on top of the system text size. 1.0 means "exactly what macOS asks
+    /// for"; the control exists because following the system alone leaves no room for wanting
+    /// this one app bigger than the rest. (#80)
+    ///
+    /// Spelled as a literal rather than `TextScale.default`: `TextScale` is app-side (it is a
+    /// SwiftUI view concern) and this file now lives in WhisperCore, which must not depend on
+    /// the app. The app clamps reads through `TextScale.clamped`.
+    @UserDefault(key: "textScale", defaultValue: 1.0)
+    public var textScale: Double
+
     @UserDefault(key: "indicatorPosition", defaultValue: "cursor")
     public var indicatorPosition: String
 

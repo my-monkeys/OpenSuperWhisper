@@ -71,6 +71,9 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             rootView: IndicatorWindow(viewModel: newViewModel) { [weak self] size in
                 self?.resizeToContent(size)
             }
+            // Read once per presentation rather than observed: the bubble is short-lived, and a
+            // size change mid-recording would resize the window under the user (#80).
+            .environment(\.appTextScale, AppPreferences.shared.textScale)
         )
         hostingController.sizingOptions = Self.hostingSizingOptions
         window?.contentViewController = hostingController

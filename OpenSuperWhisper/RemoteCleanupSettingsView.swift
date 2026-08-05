@@ -22,7 +22,7 @@ struct RemoteCleanupSettingsView: View {
                 TextField("", text: $viewModel.aiRemoteEndpoint,
                           prompt: Text("https://api.groq.com/openai/v1"))
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12, design: .monospaced))
+                    .scaledFont(size: 12, design: .monospaced)
                     .autocorrectionDisabled(true)
                     .padding(.horizontal, 9).padding(.vertical, 5)
                     .frame(width: 260)
@@ -40,7 +40,7 @@ struct RemoteCleanupSettingsView: View {
                         }
                     }
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12, design: .monospaced))
+                    .scaledFont(size: 12, design: .monospaced)
                     .autocorrectionDisabled(true)
                     .padding(.horizontal, 9).padding(.vertical, 5)
                     .frame(width: 220)
@@ -48,7 +48,7 @@ struct RemoteCleanupSettingsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                     Button { revealKey.toggle() } label: {
                         Image(systemName: revealKey ? "eye.slash" : "eye")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                             .foregroundColor(STheme.hint)
                     }
                     .buttonStyle(.plain)
@@ -71,7 +71,7 @@ struct RemoteCleanupSettingsView: View {
             .padding(.leading, 16)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Model").font(.system(size: 11)).foregroundColor(STheme.hint)
+                Text("Model").scaledFont(size: 11).foregroundColor(STheme.hint)
                 RemoteModelListBox(
                     models: availableModels,
                     isCustom: $isCustomModel,

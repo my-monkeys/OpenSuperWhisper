@@ -43,7 +43,7 @@ struct AppleSpeechModelSection: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Checking the system speech model…")
-                        .font(.system(size: 11.5))
+                        .scaledFont(size: 11.5)
                         .foregroundColor(STheme.hint)
                 }
             } else {
@@ -55,7 +55,7 @@ struct AppleSpeechModelSection: View {
             }
 
             if let errorMessage {
-                Text(errorMessage).font(.system(size: 11)).foregroundColor(.red)
+                Text(errorMessage).scaledFont(size: 11).foregroundColor(.red)
             }
 
             if variants.count > 1 {
@@ -80,7 +80,7 @@ struct AppleSpeechModelSection: View {
             }
 
             Text("The model is built into macOS: downloaded per language by the system, shared across apps, and updated with the OS — nothing is stored in the app. Selecting a language here also sets the transcription language. macOS keeps up to 5 languages reserved per app; beyond that the app rotates automatically.")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundColor(STheme.hint)
                 .fixedSize(horizontal: false, vertical: true)
         }

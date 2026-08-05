@@ -303,6 +303,10 @@ class SettingsViewModel: ObservableObject {
     @Published var pasteMouseButtonUnused: MouseButton = .none
     @Published var pasteModifierUnused: ModifierKey = .none
 
+    @Published var textScale: Double {
+        didSet { AppPreferences.shared.textScale = TextScale.clamped(textScale) }
+    }
+
     @Published var indicatorMeterMode: String {
         didSet {
             AppPreferences.shared.indicatorMeterMode = indicatorMeterMode
@@ -703,6 +707,7 @@ class SettingsViewModel: ObservableObject {
         self.startHidden = prefs.startHidden
         self.indicatorPosition = prefs.indicatorPosition
         self.indicatorMeterMode = prefs.indicatorMeterMode
+        self.textScale = prefs.textScale
         self.submitMouseButtonHotkey = MouseButton(rawValue: prefs.submitMouseButtonHotkey) ?? .none
         self.submitModifierOnlyHotkey = ModifierKey(rawValue: prefs.submitModifierOnlyHotkey) ?? .none
         self.showStopButtonOnIndicator = prefs.showStopButtonOnIndicator
@@ -1149,7 +1154,7 @@ struct InfoButton: View {
             isShown.toggle()
         } label: {
             Image(systemName: "info.circle")
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundColor(.secondary)
         }
         .buttonStyle(.plain)
@@ -1286,7 +1291,7 @@ struct SettingsView: View {
     private var feedbackSettings: some View {
         SPane(title: "Feedback", subtitle: "Help us improve") {
             Text("OpenSuperWhisper gets better with your feedback. Hit a bug, or have an idea? Tell us — every report helps make it more stable.")
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundColor(STheme.hint)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -1316,21 +1321,21 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 15))
+                    .scaledFont(size: 15)
                     .foregroundColor(STheme.accent)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                         .foregroundColor(STheme.textBright)
                     Text(subtitle)
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10))
+                    .scaledFont(size: 10)
                     .foregroundColor(STheme.hint)
             }
             .padding(12)
@@ -1349,11 +1354,11 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: compact ? 11 : 12, weight: .medium))
+                    .scaledFont(size: compact ? 11 : 12, weight: .medium)
                     .frame(width: 18, alignment: .center)
                     .foregroundColor(selectedTab == tab ? STheme.accent : STheme.hint)
                 Text(tab.title)
-                    .font(.system(size: compact ? 12 : 13, weight: .medium))
+                    .scaledFont(size: compact ? 12 : 13, weight: .medium)
                 Spacer(minLength: 0)
                 if tab == .updates && availableUpdateTag != nil {
                     Circle().fill(STheme.accent).frame(width: 6, height: 6)
@@ -1384,15 +1389,15 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 10))
+                        .scaledFont(size: 10)
                         .foregroundColor(STheme.hint)
                     TextField("Search…", text: $sidebarSearch)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .foregroundColor(STheme.text)
                         .focused($sidebarSearchFocused)
                     Text("⌘F")
-                        .font(.system(size: 10, design: .monospaced))
+                        .scaledFont(size: 10, design: .monospaced)
                         .foregroundColor(STheme.hint)
                         .padding(.horizontal, 5).padding(.vertical, 1)
                         .background(RoundedRectangle(cornerRadius: 4).fill(STheme.controlBg))
@@ -1421,10 +1426,10 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "heart")
-                            .font(.system(size: 11, weight: .medium))
+                            .scaledFont(size: 11, weight: .medium)
                             .frame(width: 18, alignment: .center)
                             .foregroundColor(STheme.hint)
-                        Text("Support us").font(.system(size: 12, weight: .medium))
+                        Text("Support us").scaledFont(size: 12, weight: .medium)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 10).padding(.vertical, 5)
@@ -1440,7 +1445,7 @@ struct SettingsView: View {
                                 .renderingMode(.template)
                                 .frame(width: 13, height: 13)
                             Text("v\(UpdateChecker.currentVersion)")
-                                .font(.system(size: 10.5, design: .monospaced))
+                                .scaledFont(size: 10.5, design: .monospaced)
                         }
                         .foregroundColor(STheme.hint.opacity(0.8))
                         .contentShape(Rectangle())
@@ -1449,7 +1454,7 @@ struct SettingsView: View {
                     Spacer()
                     Link(destination: URL(string: "https://github.com/my-monkeys/OpenSuperWhisper")!) {
                         Image(systemName: "star")
-                            .font(.system(size: 10))
+                            .scaledFont(size: 10)
                             .foregroundColor(STheme.hint.opacity(0.8))
                     }
                     .help("Star us on GitHub")
@@ -1516,11 +1521,11 @@ struct SettingsView: View {
         Button { browseEngine = tag } label: {
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledFont(size: 13, weight: .semibold)
                     .foregroundColor(browseEngine == tag ? STheme.accent : STheme.text)
                     .lineLimit(1)
                 Text(sub)
-                    .font(.system(size: 10.5))
+                    .scaledFont(size: 10.5)
                     .foregroundColor(STheme.hint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -1540,7 +1545,7 @@ struct SettingsView: View {
     private var activeModelPill: some View {
         let model = ModelCatalog.activeOption()?.displayName
         return Text("● Active · \(engineDisplayName(viewModel.selectedEngine))\(model.map { " / \($0)" } ?? "")")
-            .font(.system(size: 11, weight: .semibold))
+            .scaledFont(size: 11, weight: .semibold)
             .foregroundColor(STheme.ok)
             .lineLimit(1)
             .truncationMode(.middle)
@@ -1562,7 +1567,7 @@ struct SettingsView: View {
                 }
                 if let downloadingName = viewModel.downloadingModelName {
                     Text(downloadingName)
-                        .font(.system(size: 11, design: .monospaced))
+                        .scaledFont(size: 11, design: .monospaced)
                         .foregroundColor(STheme.hint)
                         .lineLimit(1)
                 }
@@ -1589,7 +1594,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Models")
-                    .font(.system(size: 16, weight: .bold))
+                    .scaledFont(size: 16, weight: .bold)
                     .foregroundColor(STheme.textBright)
                 Spacer()
                 activeModelPill
@@ -1614,7 +1619,7 @@ struct SettingsView: View {
                     Text("⚠︎")
                     Text("Audio is uploaded to the remote server — not necessarily on-device.")
                 }
-                .font(.system(size: 11.5))
+                .scaledFont(size: 11.5)
                 .foregroundColor(STheme.warn)
                 .padding(.horizontal, 11).padding(.vertical, 7)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1679,7 +1684,7 @@ struct SettingsView: View {
     private func sInput(_ text: Binding<String>, prompt: String, width: CGFloat, mono: Bool = false) -> some View {
         TextField("", text: text, prompt: Text(prompt))
             .textFieldStyle(.plain)
-            .font(.system(size: 12, design: mono ? .monospaced : .default))
+            .scaledFont(size: 12, design: mono ? .monospaced : .default)
             .autocorrectionDisabled(true)
             .padding(.horizontal, 9).padding(.vertical, 5)
             .frame(width: width)
@@ -1710,21 +1715,21 @@ struct SettingsView: View {
         HStack(spacing: 8) {
             if viewModel.builtInModelDownloaded {
                 Text("✓ Model ready — runs on-device")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scaledFont(size: 11, weight: .semibold)
                     .foregroundColor(STheme.ok)
                     .padding(.horizontal, 9).padding(.vertical, 2)
                     .background(Capsule().fill(STheme.okBg))
                 Text("Loads on first use (a few seconds), then frees its ~1 GB after 5 minutes idle.")
-                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .scaledFont(size: 11).foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let progress = viewModel.builtInModelDownloadProgress {
                 ProgressView(value: progress).frame(width: 160).controlSize(.small)
-                Text("\(Int(progress * 100))%").font(.system(size: 11)).foregroundColor(STheme.hint)
+                Text("\(Int(progress * 100))%").scaledFont(size: 11).foregroundColor(STheme.hint)
             } else {
                 Button("Download model (~1 GB)") { viewModel.downloadBuiltInModel() }
                     .controlSize(.small)
                 Text("Qwen2.5 1.5B, Apache-2.0. One-time download; no server needed.")
-                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .scaledFont(size: 11).foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
@@ -1732,7 +1737,7 @@ struct SettingsView: View {
         .padding(.leading, 16)
         if let err = viewModel.builtInModelDownloadError {
             Text("✕ \(err)")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundColor(.red)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 16)
@@ -1748,7 +1753,7 @@ struct SettingsView: View {
             ProgressView().controlSize(.small)
         case .ok:
             Text("✓ Connected — model ready")
-                .font(.system(size: 11, weight: .semibold))
+                .scaledFont(size: 11, weight: .semibold)
                 .foregroundColor(STheme.ok)
                 .padding(.horizontal, 9).padding(.vertical, 2)
                 .background(Capsule().fill(STheme.okBg))
@@ -1756,19 +1761,19 @@ struct SettingsView: View {
             Text(isRemote
                 ? "Reachable, but “\(model)” isn't in the server's model list"
                 : "Reachable, but “\(model)” isn't pulled — run: ollama pull \(model)")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundColor(STheme.warn)
                 .fixedSize(horizontal: false, vertical: true)
         case .authFailed:
             Text("✕ The server rejected the API key")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundColor(.red)
                 .fixedSize(horizontal: false, vertical: true)
         case .unreachable:
             Text(isRemote
                 ? "✕ Can't reach the server — check the URL"
                 : "✕ Can't reach Ollama — is it running? (ollama serve)")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundColor(.red)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1821,13 +1826,13 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         sEditor($viewModel.fillerWordsPattern, height: 48)
                         Text("Case-insensitive regex, applied before pasting.")
-                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .scaledFont(size: 11).foregroundColor(STheme.hint)
                     }
                     .padding(.leading, 16)
                 }
                 HStack(spacing: 8) {
                     Text("Clean up with an LLM")
-                        .font(.system(size: 13)).foregroundColor(STheme.text)
+                        .scaledFont(size: 13).foregroundColor(STheme.text)
                     Spacer()
                     SToggle(isOn: $viewModel.aiPostProcessingEnabled)
                 }
@@ -1848,7 +1853,7 @@ struct SettingsView: View {
                     }
                     if !viewModel.aiPostProcessingEnabled {
                         Text("Used by the per-app formatting rules in Rules.")
-                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .scaledFont(size: 11).foregroundColor(STheme.hint)
                             .padding(.leading, 16)
                     }
 
@@ -1868,7 +1873,7 @@ struct SettingsView: View {
                 }
                 if viewModel.aiPostProcessingEnabled {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Instruction").font(.system(size: 11)).foregroundColor(STheme.hint)
+                        Text("Instruction").scaledFont(size: 11).foregroundColor(STheme.hint)
                         sEditor($viewModel.aiPostProcessingPrompt, height: 64)
                     }
                     .padding(.leading, 16)
@@ -1882,7 +1887,7 @@ struct SettingsView: View {
                 if viewModel.customDictionaryEnabled {
                     HStack(spacing: 8) {
                         Text("Boost recognition")
-                            .font(.system(size: 12)).foregroundColor(STheme.text)
+                            .scaledFont(size: 12).foregroundColor(STheme.text)
                         STag("Advanced")
                         InfoButton(text: "Also bias the model toward these terms while listening, not just fix them afterward. Helps rare, distinctive words (e.g. “Kubernetes”) — but can over-correct short, common ones. Leave off if it replaces too much.")
                         Spacer()
@@ -1897,7 +1902,7 @@ struct SettingsView: View {
                             Text("Replace with").frame(maxWidth: .infinity, alignment: .leading)
                             Color.clear.frame(width: 24, height: 1)
                         }
-                        .font(.system(size: 10, weight: .bold))
+                        .scaledFont(size: 10, weight: .bold)
                         .tracking(0.6)
                         .textCase(.uppercase)
                         .foregroundColor(STheme.sectionTitle)
@@ -1906,7 +1911,7 @@ struct SettingsView: View {
 
                         if viewModel.customDictionaryEntries.isEmpty {
                             Text("No words yet. Add one below.")
-                                .font(.system(size: 11)).foregroundColor(STheme.hint)
+                                .scaledFont(size: 11).foregroundColor(STheme.hint)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 14)
                         }
@@ -1914,18 +1919,18 @@ struct SettingsView: View {
                             HStack(spacing: 10) {
                                 TextField("", text: $entry.original, prompt: Text("git hub"))
                                     .textFieldStyle(.plain)
-                                    .font(.system(size: 12))
+                                    .scaledFont(size: 12)
                                     .frame(maxWidth: .infinity)
-                                Text("→").font(.system(size: 11)).foregroundColor(STheme.hint)
+                                Text("→").scaledFont(size: 11).foregroundColor(STheme.hint)
                                 TextField("", text: $entry.replacement, prompt: Text("GitHub"))
                                     .textFieldStyle(.plain)
-                                    .font(.system(size: 12))
+                                    .scaledFont(size: 12)
                                     .frame(maxWidth: .infinity)
                                 Button {
                                     viewModel.customDictionaryEntries.removeAll { $0.id == entry.id }
                                 } label: {
                                     Image(systemName: "trash")
-                                        .font(.system(size: 11))
+                                        .scaledFont(size: 11)
                                         .foregroundColor(STheme.hint)
                                 }
                                 .buttonStyle(.plain)
@@ -1945,7 +1950,7 @@ struct SettingsView: View {
                         viewModel.customDictionaryEntries.append(CustomDictionaryEntry())
                     } label: {
                         Label("Add word", systemImage: "plus")
-                            .font(.system(size: 11.5, weight: .medium))
+                            .scaledFont(size: 11.5, weight: .medium)
                     }
                     .controlSize(.small)
                     .padding(.leading, 16)
@@ -2008,7 +2013,7 @@ struct SettingsView: View {
                         HStack(spacing: 6) {
                             TextField("", value: $viewModel.retentionMaxCount, format: .number)
                                 .textFieldStyle(.plain)
-                                .font(.system(size: 12, design: .monospaced))
+                                .scaledFont(size: 12, design: .monospaced)
                                 .multilineTextAlignment(.trailing)
                                 .padding(.horizontal, 9).padding(.vertical, 4)
                                 .frame(width: 64)
@@ -2016,7 +2021,7 @@ struct SettingsView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                             Stepper("", value: $viewModel.retentionMaxCount, in: 1...100000)
                                 .labelsHidden()
-                            Text("recordings").font(.system(size: 11)).foregroundColor(STheme.hint)
+                            Text("recordings").scaledFont(size: 11).foregroundColor(STheme.hint)
                         }
                     }
                 }
@@ -2029,7 +2034,7 @@ struct SettingsView: View {
                         HStack(spacing: 6) {
                             TextField("", value: $viewModel.retentionMaxAgeValue, format: .number)
                                 .textFieldStyle(.plain)
-                                .font(.system(size: 12, design: .monospaced))
+                                .scaledFont(size: 12, design: .monospaced)
                                 .multilineTextAlignment(.trailing)
                                 .padding(.horizontal, 9).padding(.vertical, 4)
                                 .frame(width: 56)
@@ -2049,7 +2054,7 @@ struct SettingsView: View {
                     }
                 }
                 Text("Both limits combine — whichever is hit first wins. Cleanup runs automatically, never while a transcription is being processed.")
-                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .scaledFont(size: 11).foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -2060,6 +2065,20 @@ struct SettingsView: View {
     private var advancedSettings: some View {
         SPane(title: "Advanced") {
             SSection(title: "App") {
+                SRow(title: "Text size",
+                     hint: "Applied on top of the system text size (System Settings → Accessibility → Display). Leave at 100% to follow macOS exactly.") {
+                    HStack(spacing: 10) {
+                        Slider(value: $viewModel.textScale,
+                               in: TextScale.minimum...TextScale.maximum, step: 0.05)
+                            .controlSize(.small)
+                            .frame(width: 150)
+                            .tint(STheme.accent)
+                        Text("\(Int(viewModel.textScale * 100))%")
+                            .scaledFont(size: 11, design: .monospaced)
+                            .foregroundColor(STheme.hint)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                }
                 SRow(title: "App language", hint: "Relaunch to apply.") {
                     Picker("", selection: $appLanguage) {
                         Text("System").tag("system")
@@ -2103,7 +2122,7 @@ struct SettingsView: View {
                 if viewModel.useBeamSearch {
                     SRow(title: "Beam size", indented: true) {
                         Stepper("\(viewModel.beamSize)", value: $viewModel.beamSize, in: 1...10)
-                            .font(.system(size: 12, design: .monospaced))
+                            .scaledFont(size: 12, design: .monospaced)
                             .foregroundColor(STheme.text)
                             .frame(width: 90)
                     }
@@ -2114,7 +2133,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     SRow(title: "Temperature", hint: "Higher values make decoding more random.") {
                         Text(String(format: "%.2f", viewModel.temperature))
-                            .font(.system(size: 11.5, design: .monospaced))
+                            .scaledFont(size: 11.5, design: .monospaced)
                             .foregroundColor(STheme.hint)
                     }
                     Slider(value: $viewModel.temperature, in: 0.0...1.0, step: 0.1)
@@ -2123,7 +2142,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     SRow(title: "No speech threshold", hint: "How confident the model must be to call a segment silence.") {
                         Text(String(format: "%.2f", viewModel.noSpeechThreshold))
-                            .font(.system(size: 11.5, design: .monospaced))
+                            .scaledFont(size: 11.5, design: .monospaced)
                             .foregroundColor(STheme.hint)
                     }
                     Slider(value: $viewModel.noSpeechThreshold, in: 0.0...1.0, step: 0.1)
@@ -2142,16 +2161,16 @@ struct SettingsView: View {
                     sEditor($viewModel.postRecordHookCommand, height: 56)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Available in your command (also piped as JSON on stdin):")
-                            .font(.system(size: 11))
+                            .scaledFont(size: 11)
                             .foregroundColor(STheme.hint)
                             .fixedSize(horizontal: false, vertical: true)
                         ForEach(Self.postRecordHookVariables, id: \.name) { variable in
                             HStack(alignment: .firstTextBaseline, spacing: 6) {
                                 Text(variable.name)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .scaledFont(size: 11, design: .monospaced)
                                     .foregroundColor(STheme.text)
                                 Text("— \(variable.description)")
-                                    .font(.system(size: 11))
+                                    .scaledFont(size: 11)
                                     .foregroundColor(STheme.hint)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -2177,10 +2196,10 @@ struct SettingsView: View {
             SSection(title: "Trigger") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Recording trigger")
-                        .font(.system(size: 13))
+                        .scaledFont(size: 13)
                         .foregroundColor(STheme.text)
                     Text("Click Add, then do the thing: press a combination with ⌘ ⌥ ⌃, tap a single modifier on its own, or click a spare mouse button. Keep several and use whichever suits the moment.")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
                     TriggerRecorderField(name: .toggleRecord,
@@ -2203,7 +2222,7 @@ struct SettingsView: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .scaledFont(size: 11.5, weight: .semibold)
                         .foregroundColor(STheme.warn)
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.warnBorder, lineWidth: 1))
@@ -2251,7 +2270,7 @@ struct SettingsView: View {
                 }
                 HStack(spacing: 8) {
                     Text("Live transcription")
-                        .font(.system(size: 13))
+                        .scaledFont(size: 13)
                         .foregroundColor(STheme.text)
                         .opacity(viewModel.selectedEngine == "fluidaudio" ? 1 : 0.45)
                     STag("Parakeet only")
@@ -2275,7 +2294,7 @@ struct SettingsView: View {
                                 .frame(width: 150)
                                 .tint(STheme.accent)
                             Text("\(Int(viewModel.reduceVolumeLevel * 100))%")
-                                .font(.system(size: 11, design: .monospaced))
+                                .scaledFont(size: 11, design: .monospaced)
                                 .foregroundColor(STheme.hint)
                                 .frame(width: 34, alignment: .trailing)
                         }

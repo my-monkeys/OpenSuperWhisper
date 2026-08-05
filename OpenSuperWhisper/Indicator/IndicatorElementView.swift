@@ -23,7 +23,7 @@ struct IndicatorElementView: View {
             InputLevelMeter(bands: bands, height: meterHeight)
         case .label:
             Text(queued > 0 ? "Recording… · \(queued) queued" : "Recording…")
-                .font(.system(size: 13, weight: .semibold))
+                .scaledFont(size: 13, weight: .semibold)
                 .foregroundColor(.secondary)
                 // The bubble is a fixed width, so the label would wrap rather than widen it.
                 // One line always: a two-line "Recording…" is worse than a truncated one.
@@ -45,7 +45,7 @@ struct IndicatorElementView: View {
                         action: @escaping () -> Void) -> some View {
         Button { if isInteractive { action() } } label: {
             Image(systemName: symbol)
-                .font(.system(size: size, weight: .regular))
+                .scaledFont(size: size, weight: .regular)
                 .foregroundColor(.red)
                 .frame(width: 24, height: 24)
                 .contentShape(Rectangle())

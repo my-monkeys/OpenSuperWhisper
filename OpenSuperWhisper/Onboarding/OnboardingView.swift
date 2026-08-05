@@ -342,7 +342,7 @@ struct OnboardingView: View {
                         .foregroundColor(.secondary)
                     
                     Text("OpenSuperWhisper")
-                        .font(.system(size: 32, weight: .bold))
+                        .scaledFont(size: 32, weight: .bold)
                         .foregroundStyle(
                             .white
                         )
@@ -452,11 +452,11 @@ struct OnboardingView: View {
                         Button(action: { viewModel.selectRemote() }) {
                             HStack(spacing: 10) {
                                 Image(systemName: "cloud")
-                                    .font(.system(size: 18))
+                                    .scaledFont(size: 18)
                                     .foregroundColor(.accentColor)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Use a remote server")
-                                        .font(.system(size: 13, weight: .semibold))
+                                        .scaledFont(size: 13, weight: .semibold)
                                     Text("OpenAI-compatible API (Groq, or your own server). Set the endpoint and key in Settings after setup.")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
@@ -494,7 +494,7 @@ struct OnboardingView: View {
                     HStack(spacing: 6) {
                         Text("Continue")
                         Image(systemName: "arrow.right")
-                            .font(.system(size: 12, weight: .semibold))
+                            .scaledFont(size: 12, weight: .semibold)
                     }
                     .frame(minWidth: 100)
                 }
@@ -654,7 +654,7 @@ private struct KeyCap: View {
     
     var body: some View {
         Text(label)
-            .font(.system(size: w > 20 ? 9 : 7, weight: .medium))
+            .scaledFont(size: w > 20 ? 9 : 7, weight: .medium)
             .lineLimit(2)
             .multilineTextAlignment(.center)
             .frame(width: w, height: h)

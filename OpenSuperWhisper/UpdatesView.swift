@@ -36,12 +36,12 @@ struct UpdatesView: View {
             }
             if let statusMessage {
                 Label(statusMessage, systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundColor(STheme.ok)
             }
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundColor(.red)
             }
         }
@@ -53,12 +53,12 @@ struct UpdatesView: View {
                 .foregroundColor(STheme.accent)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Update available: \(update.tagName)")
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .scaledFont(size: 12.5, weight: .semibold)
                     .foregroundColor(STheme.textBright)
                 // The release page on GitHub, for those who want to read it first.
                 Button("View on GitHub") { NSWorkspace.shared.open(update.htmlURL) }
                     .buttonStyle(.link)
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
             }
             Spacer()
             // Install in place via Sparkle (download + verify + relaunch), not a web page.
@@ -75,7 +75,7 @@ struct UpdatesView: View {
         SSection(title: "What's new") {
             if releases.isEmpty {
                 Text("Loading release notes…")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundColor(STheme.hint)
             } else {
                 ForEach(releases) { release in
@@ -89,18 +89,18 @@ struct UpdatesView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline) {
                 Text(release.displayName)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .scaledFont(size: 12.5, weight: .semibold)
                     .foregroundColor(STheme.textBright)
                 Spacer()
                 if let date = release.publishedAt {
                     Text(date, style: .date)
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundColor(STheme.hint)
                 }
             }
             if let body = release.body, !body.isEmpty {
                 Text(renderedNotes(body))
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundColor(STheme.text.opacity(0.85))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
