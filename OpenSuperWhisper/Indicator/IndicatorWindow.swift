@@ -497,7 +497,7 @@ struct IndicatorWindow: View {
                 Button { IndicatorWindowManager.shared.stopRecording() } label: {
                     // A red ring with a red stop square inside (transparent interior).
                     Image(systemName: "stop.circle")
-                        .font(.system(size: 19, weight: .regular))
+                        .scaledFont(size: 19, weight: .regular)
                         .foregroundColor(.red)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
@@ -510,7 +510,7 @@ struct IndicatorWindow: View {
                 Button { IndicatorWindowManager.shared.stopForce() } label: {
                     // A plain red trash can — discard without transcribing.
                     Image(systemName: "trash")
-                        .font(.system(size: 16, weight: .regular))
+                        .scaledFont(size: 16, weight: .regular)
                         .foregroundColor(.red)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
@@ -538,7 +538,7 @@ struct IndicatorWindow: View {
                         .frame(width: 24)
                     
                     Text("Connecting...")
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                 }                
             case .recording:
                 if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
@@ -546,7 +546,7 @@ struct IndicatorWindow: View {
                     HStack(alignment: .center, spacing: 10) {
                         if viewModel.isConfirmingCancel {
                             Text("Press Esc to cancel")
-                                .font(.system(size: 12, weight: .semibold))
+                                .scaledFont(size: 12, weight: .semibold)
                                 .foregroundColor(.orange)
                                 .transition(.opacity)
                         } else {
@@ -585,7 +585,7 @@ struct IndicatorWindow: View {
                         (Text(streaming.confirmedText).foregroundColor(.primary)
                             + Text(streaming.confirmedText.isEmpty ? "" : " ")
                             + Text(streaming.volatileText).foregroundColor(.secondary))
-                            .font(.system(size: 14))
+                            .scaledFont(size: 14)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(width: 300, alignment: .leading)
                         if anyIndicatorButton {
@@ -604,7 +604,7 @@ struct IndicatorWindow: View {
                         .frame(width: 24, height: 16)
 
                     Text("Transcribing...")
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                 }                
             case .busy:
                 HStack(spacing: 8) {
@@ -613,7 +613,7 @@ struct IndicatorWindow: View {
                         .frame(width: 24)
                     
                     Text("Processing...")
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                         .foregroundColor(.orange)
                 }                
             case .error(let message):
@@ -623,7 +623,7 @@ struct IndicatorWindow: View {
                         .frame(width: 24)
 
                     Text(message)
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                         .foregroundColor(.red)
                 }
             case .info(let message):
@@ -633,7 +633,7 @@ struct IndicatorWindow: View {
                         .frame(width: 24)
 
                     Text(message)
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                         .foregroundColor(.primary)
                 }
             case .idle:

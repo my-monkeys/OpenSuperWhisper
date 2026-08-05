@@ -26,7 +26,7 @@ struct AppContextSettingsView: View {
                 SSection(title: "Model switching") {
                     HStack(spacing: 5) {
                         Text("When the front app changes")
-                            .font(.system(size: 13)).foregroundColor(STheme.text)
+                            .scaledFont(size: 13).foregroundColor(STheme.text)
                         InfoButton(text: "Bind a transcription model to an app (or a website, in supported browsers) so it switches automatically when you dictate there. Add a rule below (＋), or from the menu-bar “Model” submenu while that app is focused.\n\n• Ask on change — auto-switch by app, and ask the scope (System Default / this app / just once / forget) whenever you pick a model in the menu.\n• Auto · no prompt — auto-switch by app, but picking a model just sets the system default (no prompt). Set rules up in “Ask”, then switch here.\n• Off — no auto-switch and no prompts.")
                         Spacer()
                         Picker("", selection: $viewModel.contextAwareModelMode) {
@@ -47,7 +47,7 @@ struct AppContextSettingsView: View {
                             (Text("No rules yet.\n").foregroundColor(STheme.hint)
                                 + Text("Click ＋ to add an app, or bind a model from the menu-bar “Model” submenu while an app is focused.")
                                     .foregroundColor(STheme.hint.opacity(0.75)))
-                                .font(.system(size: 11.5))
+                                .scaledFont(size: 11.5)
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(3)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -120,7 +120,7 @@ struct AppContextSettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if viewModel.appContextProfiles.isEmpty {
                         Text("No apps yet. Add one below.")
-                            .font(.system(size: 11)).foregroundColor(STheme.hint)
+                            .scaledFont(size: 11).foregroundColor(STheme.hint)
                             .padding(.vertical, 4)
                     }
                     ForEach($viewModel.appContextProfiles) { $profile in
@@ -136,16 +136,16 @@ struct AppContextSettingsView: View {
                                             .frame(width: 20, height: 20)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(profile.appName.isEmpty ? "Choose an app…" : profile.appName)
-                                                .font(.system(size: 12))
+                                                .scaledFont(size: 12)
                                                 .foregroundColor(profile.appName.isEmpty ? STheme.hint : STheme.text)
                                             if !profile.bundleIdentifier.isEmpty {
                                                 Text(profile.bundleIdentifier)
-                                                    .font(.system(size: 10))
+                                                    .scaledFont(size: 10)
                                                     .foregroundColor(STheme.hint)
                                             }
                                         }
                                         Image(systemName: "chevron.up.chevron.down")
-                                            .font(.system(size: 9))
+                                            .scaledFont(size: 9)
                                             .foregroundColor(STheme.hint)
                                         Spacer()
                                     }
@@ -158,7 +158,7 @@ struct AppContextSettingsView: View {
                                     viewModel.appContextProfiles.removeAll { $0.id == profile.id }
                                 } label: {
                                     Image(systemName: "trash")
-                                        .font(.system(size: 11))
+                                        .scaledFont(size: 11)
                                         .foregroundColor(STheme.hint)
                                 }
                                 .buttonStyle(.plain)
@@ -174,7 +174,7 @@ struct AppContextSettingsView: View {
                         showingAppPicker = true
                     } label: {
                         Label("Add App", systemImage: "plus")
-                            .font(.system(size: 11.5, weight: .medium))
+                            .scaledFont(size: 11.5, weight: .medium)
                     }
                     .controlSize(.small)
                 }

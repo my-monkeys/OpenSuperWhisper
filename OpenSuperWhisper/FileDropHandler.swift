@@ -61,7 +61,7 @@ struct FileDropOverlay: ViewModifier {
                             .opacity(0.95)
                         VStack(spacing: 16) {
                             Image(systemName: "arrow.down.circle")
-                                .font(.system(size: 48))
+                                .scaledFont(size: 48)
                                 .foregroundColor(.accentColor)
                                 .symbolEffect(.bounce, value: handler.isDragging)
                             Text("Drop audio files to transcribe")

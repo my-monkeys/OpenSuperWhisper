@@ -37,7 +37,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                     TextField("", text: $viewModel.remoteServerURL,
                               prompt: Text("http://localhost:11434"))
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, design: .monospaced))
+                        .scaledFont(size: 12, design: .monospaced)
                         .autocorrectionDisabled(true)
                         .padding(.horizontal, 9).padding(.vertical, 5)
                         .frame(width: 280)
@@ -56,7 +56,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                             }
                         }
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, design: .monospaced))
+                        .scaledFont(size: 12, design: .monospaced)
                         .autocorrectionDisabled(true)
                         .padding(.horizontal, 9).padding(.vertical, 5)
                         .frame(width: 240)
@@ -64,7 +64,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                         Button { revealKey.toggle() } label: {
                             Image(systemName: revealKey ? "eye.slash" : "eye")
-                                .font(.system(size: 11))
+                                .scaledFont(size: 11)
                                 .foregroundColor(STheme.hint)
                         }
                         .buttonStyle(.plain)
@@ -91,13 +91,13 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                         if viewModel.remoteServerTimeoutEnabled {
                             TextField("", value: $viewModel.remoteServerTimeoutSeconds, format: .number)
                                 .textFieldStyle(.plain)
-                                .font(.system(size: 12, design: .monospaced))
+                                .scaledFont(size: 12, design: .monospaced)
                                 .multilineTextAlignment(.trailing)
                                 .padding(.horizontal, 9).padding(.vertical, 4)
                                 .frame(width: 56)
                                 .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
                                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
-                            Text("s").font(.system(size: 11)).foregroundColor(STheme.hint)
+                            Text("s").scaledFont(size: 11).foregroundColor(STheme.hint)
                         }
                         SToggle(isOn: $viewModel.remoteServerTimeoutEnabled)
                     }
@@ -155,7 +155,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
         Group {
             if !hasAnyLocalModel {
                 Text("To enable local fallback, download an on-device model first (Models → Whisper or Parakeet).")
-                    .font(.system(size: 11)).foregroundColor(STheme.hint)
+                    .scaledFont(size: 11).foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 SRow(title: "Local fallback", hint: "Transcribe locally if the server is unreachable") {
@@ -165,7 +165,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                     let models = localFallbackModels
                     if models.isEmpty {
                         Text("Translate to English is on, but no Whisper model is downloaded — only Whisper supports translation. Download one under Models.")
-                            .font(.system(size: 11)).foregroundColor(STheme.warn)
+                            .scaledFont(size: 11).foregroundColor(STheme.warn)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.leading, 16)
                     } else {
@@ -180,7 +180,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                         }
                         if viewModel.translateToEnglish {
                             Text("Translate to English is on, so only Whisper models are offered — Parakeet and SenseVoice can't translate.")
-                                .font(.system(size: 11)).foregroundColor(STheme.warn)
+                                .scaledFont(size: 11).foregroundColor(STheme.warn)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.leading, 16)
                         }
@@ -234,13 +234,13 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
             ProgressView().controlSize(.small)
         case .success(let message):
             Text("✓ \(message)")
-                .font(.system(size: 11, weight: .semibold))
+                .scaledFont(size: 11, weight: .semibold)
                 .foregroundColor(STheme.ok)
                 .padding(.horizontal, 9).padding(.vertical, 2)
                 .background(Capsule().fill(STheme.okBg))
         case .failure(let message):
             Text("✕ \(message)")
-                .font(.system(size: 11, weight: .semibold))
+                .scaledFont(size: 11, weight: .semibold)
                 .foregroundColor(.red)
                 .padding(.horizontal, 9).padding(.vertical, 2)
                 .background(Capsule().fill(Color.red.opacity(0.12)))

@@ -65,7 +65,7 @@ struct IndicatorLayoutEditor: View {
     private var preview: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Preview")
-                .font(.system(size: 11, weight: .medium))
+                .scaledFont(size: 11, weight: .medium)
                 .foregroundColor(STheme.hint)
             ZStack {
                 RoundedRectangle(cornerRadius: 10).fill(STheme.inputBg)
@@ -121,10 +121,10 @@ struct IndicatorLayoutEditor: View {
     private var elementList: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Elements")
-                .font(.system(size: 11, weight: .medium))
+                .scaledFont(size: 11, weight: .medium)
                 .foregroundColor(STheme.hint)
             Text("Drag the handle to reorder, including elements that are switched off. Buttons always sit at the trailing edge, so they have no handle.")
-                .font(.system(size: 10.5))
+                .scaledFont(size: 10.5)
                 .foregroundColor(STheme.hint)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -155,7 +155,7 @@ struct IndicatorLayoutEditor: View {
                 Color.clear.frame(width: 16, height: 20)
             } else {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundColor(STheme.hint)
                     .frame(width: 16, height: 20)
                     .contentShape(Rectangle())
@@ -166,15 +166,15 @@ struct IndicatorLayoutEditor: View {
                     .pointerCursorOnHover()
             }
             Image(systemName: element.symbol)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundColor(visible ? STheme.accent : STheme.hint)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(element.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .scaledFont(size: 12, weight: .medium)
                     .foregroundColor(visible ? STheme.textBright : STheme.hint)
                 Text(element.subtitle)
-                    .font(.system(size: 10.5))
+                    .scaledFont(size: 10.5)
                     .foregroundColor(STheme.hint)
             }
             Spacer(minLength: 8)
@@ -204,7 +204,7 @@ struct IndicatorLayoutEditor: View {
                         .frame(width: 150)
                         .tint(STheme.accent)
                     Text("\(Int(layout.waveformHeight))pt")
-                        .font(.system(size: 11, design: .monospaced))
+                        .scaledFont(size: 11, design: .monospaced)
                         .foregroundColor(STheme.hint)
                         .frame(width: 34, alignment: .trailing)
                 }

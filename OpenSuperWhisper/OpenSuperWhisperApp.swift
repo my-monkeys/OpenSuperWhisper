@@ -60,6 +60,7 @@ struct OpenSuperWhisperApp: App {
         // Dedicated, movable & closable settings window (sidebar layout).
         Window("Settings", id: "settings") {
             SettingsView()
+                .environment(\.appTextScale, AppPreferences.shared.textScale)
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 780, height: 600)
