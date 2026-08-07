@@ -14,6 +14,11 @@ final class OnboardingModelGateTests: XCTestCase {
 
     private func makeViewModel() -> OnboardingViewModel {
         let viewModel = OnboardingViewModel()
+        // Init may auto-select Apple when SpeechTranscriber is available; clear that
+        // so these tests exercise the download gate in isolation.
+        viewModel.appleSelected = false
+        viewModel.remoteSelected = false
+        viewModel.selectedModelId = nil
         viewModel.unifiedModels = [
             OnboardingUnifiedModel(name: "Whisper", isDownloaded: false, description: "",
                                    type: .whisper(url: URL(string: "https://example.invalid/m.bin")!,
@@ -58,5 +63,24 @@ final class OnboardingModelGateTests: XCTestCase {
         viewModel.selectRemote()
         XCTAssertTrue(viewModel.canContinue)
         XCTAssertEqual(AppPreferences.shared.selectedEngine, "remote")
+    }
+
+    /// Apple Speech needs no app-managed model download either.
+    func testAppleSpeechNeedsNoLocalModel() {
+        let viewModel = makeViewModel()
+        viewModel.selectApple()
+        XCTAssertTrue(viewModel.canContinue)
+        XCTAssertTrue(viewModel.appleSelected)
+        XCTAssertEqual(AppPreferences.shared.selectedEngine, "apple")
+    }
+
+    /// Choosing a local model after Apple clears the Apple selection.
+    func testSelectingLocalModelClearsApple() {
+        let viewModel = makeViewModel()
+        viewModel.selectApple()
+        viewModel.unifiedModels[0].isDownloaded = true
+        viewModel.selectModel(viewModel.unifiedModels[0])
+        XCTAssertFalse(viewModel.appleSelected)
+        XCTAssertTrue(viewModel.canContinue)
     }
 }
