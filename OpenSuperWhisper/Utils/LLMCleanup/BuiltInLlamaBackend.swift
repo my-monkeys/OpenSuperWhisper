@@ -26,14 +26,22 @@ final class BuiltInLlamaBackend: LLMCleanupBackend {
     /// Owned by `inferenceQueue` — never read or written from anywhere else.
     private var context: LlamaContext?
     private var idleUnloadWork: DispatchWorkItem?
+    /// Which GGUF `context` was loaded from, so a model switch can be noticed. Also
+    /// `inferenceQueue`-confined.
+    private var loadedFileName: String?
 
     private init() {}
 
-    /// Ready once the default model is on disk. The context itself loads on first `generate`.
-    var isReady: Bool { manager.isDefaultModelDownloaded() }
+    /// The model the user picked in Settings.
+    private var selectedModel: LLMModelDescriptor {
+        LLMModelManager.model(fileName: AppPreferences.shared.builtInModelFileName)
+    }
 
-    /// A 1.5B model is the one that can wander off the transform-only contract, so this is the
-    /// backend whose output gets the length-ratio sanity check.
+    /// Ready once the selected model is on disk. The context itself loads on first `generate`.
+    var isReady: Bool { manager.isModelDownloaded(name: selectedModel.fileName) }
+
+    /// Even the larger built-in model is small next to a hosted one, so this backend keeps the
+    /// length-ratio sanity check on its output.
     var enforcesLengthRatio: Bool { true }
 
     /// Loads the model ahead of first use, so the first cleanup doesn't pay the multi-second load.
@@ -64,14 +72,19 @@ final class BuiltInLlamaBackend: LLMCleanupBackend {
 
     // MARK: - inferenceQueue-confined state
 
-    /// Returns the cached context, loading it (~1 GB) if needed. Must run on `inferenceQueue`.
+    /// Returns the cached context, loading it if needed. Must run on `inferenceQueue`.
+    ///
+    /// A context is only reused while it belongs to the selected model: switching models in
+    /// Settings otherwise keeps answering from the previously loaded GGUF until the idle release
+    /// happens to fire, which looks exactly like the switch having no effect.
     private func loadContextOnQueue() -> LlamaContext? {
         idleUnloadWork?.cancel()
         idleUnloadWork = nil
-        if let context { return context }
-        guard manager.isDefaultModelDownloaded() else { return nil }
-        let path = manager.localURL(for: LLMModelManager.defaultModel.fileName).path
-        context = LlamaContext(modelPath: path)
+        let model = selectedModel
+        if let context, loadedFileName == model.fileName { return context }
+        guard manager.isModelDownloaded(name: model.fileName) else { return nil }
+        context = LlamaContext(modelPath: manager.localURL(for: model.fileName).path)
+        loadedFileName = context == nil ? nil : model.fileName
         return context
     }
 
@@ -82,6 +95,7 @@ final class BuiltInLlamaBackend: LLMCleanupBackend {
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.context = nil          // deinit frees the llama model + KV cache
+            self.loadedFileName = nil
             self.idleUnloadWork = nil
         }
         idleUnloadWork = work
