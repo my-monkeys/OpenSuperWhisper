@@ -259,6 +259,17 @@ final class AppPreferences {
     @UserDefault(key: "customDictionaryBoostEnabled", defaultValue: false)
     var customDictionaryBoostEnabled: Bool
 
+    /// Read what is already written in the field being dictated into, and let the transcriber
+    /// expect those words.
+    ///
+    /// Off by default and deliberately so. Everything else the app reads about the target is a
+    /// label: the app name, a window title, a URL host. This reads the writing itself, which is
+    /// a different kind of access and has to be asked for rather than assumed. It never leaves
+    /// the Mac: only the on-device engines receive it, and it is held in memory for the length
+    /// of one dictation.
+    @UserDefault(key: "useSurroundingTextAsContext", defaultValue: false)
+    var useSurroundingTextAsContext: Bool
+
     @OptionalUserDefault(key: "customDictionaryData")
     private var customDictionaryData: Data?
 

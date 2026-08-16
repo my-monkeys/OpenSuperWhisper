@@ -22,6 +22,10 @@ final class DictationPipeline: ObservableObject {
         var bundleID: String? = nil
         var windowTitle: String? = nil
         var fullURL: String? = nil
+        /// What was written in the field when recording started, when the setting asks for it.
+        /// Snapshotted like the rest: by the time the queue reaches this clip the caret has
+        /// usually moved, and a later recording would otherwise lend it its own field.
+        var focusedText: String? = nil
     }
 
     private struct PendingDictation {
@@ -137,7 +141,8 @@ final class DictationPipeline: ObservableObject {
     }
 
     private func process(_ item: PendingDictation) async {
-        let settings = Settings()
+        var settings = Settings()
+        settings.focusedText = item.context.focusedText
         do {
             let rawText: String
             if let transcribeOverride {
