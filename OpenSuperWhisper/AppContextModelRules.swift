@@ -41,15 +41,23 @@ final class RecordingContext {
     private(set) var fullURL: String?
     /// Focused window title at capture time (for transcript metadata).
     private(set) var windowTitle: String?
+    /// What was already written in the field, up to the caret, when recording started.
+    ///
+    /// Read at record-start because by the time transcription runs the caret has usually moved
+    /// and the focus may have left the field entirely. Kept in memory only: it is the contents
+    /// of someone's document and it has no business being written to disk.
+    private(set) var focusedText: String?
     private init() {}
 
     func update(appName: String?, bundleID: String?, host: String? = nil,
-                fullURL: String? = nil, windowTitle: String? = nil) {
+                fullURL: String? = nil, windowTitle: String? = nil,
+                focusedText: String? = nil) {
         self.appName = appName
         self.bundleID = bundleID
         self.host = host
         self.fullURL = fullURL
         self.windowTitle = windowTitle
+        self.focusedText = focusedText
     }
 
     /// A label for the most specific bindable scope: the site host if we have
@@ -68,8 +76,12 @@ final class RecordingContext {
         let url = SourceCapture.browserURL(bundleID: bundle)
         let host = SourceCapture.host(of: url)
         let title = SourceCapture.focusedWindowTitle()
+        // Only read the field when the setting asks for it. Reading what someone is writing is
+        // not something to do speculatively and then discard.
+        let written = AppPreferences.shared.useSurroundingTextAsContext
+            ? SourceCapture.focusedText() : nil
         update(appName: front.localizedName, bundleID: bundle, host: host,
-               fullURL: url, windowTitle: title)
+               fullURL: url, windowTitle: title, focusedText: written)
     }
 
     // One-time model override. "Just This Time" makes the *next* recording in an

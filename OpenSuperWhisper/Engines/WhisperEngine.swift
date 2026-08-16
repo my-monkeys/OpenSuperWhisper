@@ -177,9 +177,13 @@ class WhisperEngine: TranscriptionEngine {
         let promptBoost = settings.shouldBoostCustomDictionary
             ? CustomDictionary.promptBoost(entries: settings.customDictionaryEntries)
             : ""
-        let combinedPrompt = [settings.initialPrompt, promptBoost]
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        // Read at record-start, when the caret was still in the field the user was writing in.
+        let surrounding = TranscriptionPrompt.surroundingText(
+            enabled: settings.useSurroundingTextAsContext,
+            captured: RecordingContext.shared.focusedText)
+        let combinedPrompt = TranscriptionPrompt.combined(userPrompt: settings.initialPrompt,
+                                                          dictionaryBoost: promptBoost,
+                                                          surroundingText: surrounding) ?? ""
         params.initialPrompt = combinedPrompt.isEmpty ? nil : combinedPrompt
         // Otherwise the prompt only conditions the first 30s window, so a custom dictionary
         // stops being applied partway through a long dictation.

@@ -241,6 +241,12 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var useSurroundingTextAsContext: Bool {
+        didSet {
+            AppPreferences.shared.useSurroundingTextAsContext = useSurroundingTextAsContext
+        }
+    }
+
     @Published var customDictionaryBoostEnabled: Bool {
         didSet {
             AppPreferences.shared.customDictionaryBoostEnabled = customDictionaryBoostEnabled
@@ -698,6 +704,7 @@ class SettingsViewModel: ObservableObject {
         self.temperature = prefs.temperature
         self.noSpeechThreshold = prefs.noSpeechThreshold
         self.initialPrompt = prefs.initialPrompt
+        self.useSurroundingTextAsContext = prefs.useSurroundingTextAsContext
         self.customDictionaryEnabled = prefs.customDictionaryEnabled
         self.customDictionaryBoostEnabled = prefs.customDictionaryBoostEnabled
         // Folded when the window opens rather than as the user types: merging live would yank a
@@ -1213,6 +1220,7 @@ struct Settings {
     var customDictionaryEnabled: Bool
     var customDictionaryBoostEnabled: Bool
     var customDictionaryEntries: [CustomDictionaryEntry]
+    var useSurroundingTextAsContext: Bool
 
     var isAsianLanguage: Bool {
         Settings.asianLanguages.contains(selectedLanguage)
@@ -1247,6 +1255,7 @@ struct Settings {
         self.customDictionaryEnabled = prefs.customDictionaryEnabled
         self.customDictionaryBoostEnabled = prefs.customDictionaryBoostEnabled
         self.customDictionaryEntries = prefs.customDictionaryEntries
+        self.useSurroundingTextAsContext = prefs.useSurroundingTextAsContext
     }
 }
 
@@ -1917,6 +1926,11 @@ struct SettingsView: View {
                 SRow(title: "Initial prompt",
                      hint: "Optional text to guide the model's transcription. Whisper copies its style, so a few lines of your own writing teach it your punctuation. A file at ~/.config/opensuperwhisper/prompt.md is used instead of this box when it exists.") { EmptyView() }
                 sEditor($viewModel.initialPrompt, height: 48)
+
+                SRow(title: "Read what you're writing into",
+                     hint: "Takes the sentence before your cursor and lets the model expect those words. Helps with names and terms already on the page. Stays on your Mac: on-device engines only, never a remote one, and never saved.") {
+                    SToggle(isOn: $viewModel.useSurroundingTextAsContext)
+                }
             }
 
             SSection(title: "Cleanup") {
