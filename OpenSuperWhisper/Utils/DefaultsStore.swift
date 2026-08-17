@@ -14,7 +14,7 @@ import Foundation
 /// forgotten by the next test that starts background work.
 enum DefaultsStore {
     static let current: UserDefaults = {
-        guard isRunningTests else { return .standard }
+        guard isRunningTests else { return normalRunStore }
         let name = testSuiteName(for: ProcessInfo.processInfo.processIdentifier)
         guard let suite = UserDefaults(suiteName: name) else { return .standard }
         // Start from nothing: a suite left behind by a crashed run would otherwise seed this one.
@@ -23,6 +23,18 @@ enum DefaultsStore {
         return suite
     }()
 
+    /// `UserDefaults.standard` chooses its domain from the main bundle's identifier, and that
+    /// identifier is nil when the process was launched through a symlink sitting outside the
+    /// bundle — which is exactly how the Homebrew CLI is meant to be run. The app's own settings
+    /// were then invisible, so the CLI reported loading an engine nobody had selected. Naming the
+    /// domain gets the same preferences the app writes, whichever path started the process (#88).
+    private static var normalRunStore: UserDefaults {
+        guard Bundle.main.bundleIdentifier == nil,
+              let suite = UserDefaults(suiteName: AppIdentity.bundleID)
+        else { return .standard }
+        return suite
+    }
+
     /// True while the process is hosting XCTest. `XCTestConfigurationFilePath` is set by the
     /// test runner and absent in a normal launch, including a Debug build the user runs.
     static var isRunningTests: Bool {
@@ -30,7 +42,7 @@ enum DefaultsStore {
     }
 
     static var testSuitePrefix: String {
-        "\(Bundle.main.bundleIdentifier ?? "fr.my-monkey.opensuperwhisper").tests."
+        "\(AppIdentity.bundleID).tests."
     }
 
     static func testSuiteName(for pid: Int32) -> String { "\(testSuitePrefix)\(pid)" }

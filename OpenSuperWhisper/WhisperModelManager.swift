@@ -49,7 +49,7 @@ class WhisperModelManager {
     
     var modelsDirectory: URL {
         let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let modelsDirectory = applicationSupport.appendingPathComponent(Bundle.main.bundleIdentifier!).appendingPathComponent(modelsDirectoryName)
+        let modelsDirectory = applicationSupport.appendingPathComponent(AppIdentity.bundleID).appendingPathComponent(modelsDirectoryName)
         return modelsDirectory
     }
     
