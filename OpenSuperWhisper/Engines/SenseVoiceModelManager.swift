@@ -14,7 +14,7 @@ final class SenseVoiceModelManager {
     var modelDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport
-            .appendingPathComponent(Bundle.main.bundleIdentifier!)
+            .appendingPathComponent(AppIdentity.bundleID)
             .appendingPathComponent(dirName)
     }
     var modelPath: URL { modelDirectory.appendingPathComponent("model.int8.onnx") }

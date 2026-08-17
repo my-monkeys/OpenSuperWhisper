@@ -85,7 +85,7 @@ class LLMModelManager {
     var modelsDirectory: URL {
         let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return applicationSupport
-            .appendingPathComponent(Bundle.main.bundleIdentifier!)
+            .appendingPathComponent(AppIdentity.bundleID)
             .appendingPathComponent(modelsDirectoryName)
     }
 

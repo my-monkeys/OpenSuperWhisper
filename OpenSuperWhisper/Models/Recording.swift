@@ -49,7 +49,7 @@ struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equ
         let applicationSupport = FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask
         ).first!
-        let appDirectory = applicationSupport.appendingPathComponent(Bundle.main.bundleIdentifier!)
+        let appDirectory = applicationSupport.appendingPathComponent(AppIdentity.bundleID)
         return appDirectory.appendingPathComponent("recordings")
     }
 
@@ -97,7 +97,7 @@ class RecordingStore: ObservableObject {
         let applicationSupport = FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask
         ).first!
-        let appDirectory = applicationSupport.appendingPathComponent(Bundle.main.bundleIdentifier!)
+        let appDirectory = applicationSupport.appendingPathComponent(AppIdentity.bundleID)
         let dbPath = appDirectory.appendingPathComponent("recordings.sqlite")
 
         do {
