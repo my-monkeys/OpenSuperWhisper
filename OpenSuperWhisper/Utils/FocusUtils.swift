@@ -236,6 +236,45 @@ class FocusUtils {
                                    role: role)
     }
 
+
+    /// How much text is already in the focused field, and where the caret sits in it.
+    ///
+    /// Sizes and offsets only, never the text itself: this exists to be written to a diagnostic
+    /// log, and the numbers are what the diagnosis needs. Read from the frontmost application's
+    /// own element rather than the system-wide one, which answers `cannotComplete` in cases where
+    /// asking the application directly works. nil when accessibility cannot say, which is a real
+    /// answer here rather than a failure: an app that reports nothing is itself a finding.
+    static func focusedTextMetrics() -> (length: Int, caret: Int?)? {
+        guard AXIsProcessTrusted(),
+              let front = NSWorkspace.shared.frontmostApplication else { return nil }
+
+        let app = AXUIElementCreateApplication(front.processIdentifier)
+        AXUIElementSetMessagingTimeout(app, axMessagingTimeout)
+
+        var focused: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            app, kAXFocusedUIElementAttribute as CFString, &focused
+        ) == .success, let focused else { return nil }
+
+        let element = focused as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, axMessagingTimeout)
+
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element, kAXValueAttribute as CFString, &value
+        ) == .success, let text = value as? String else { return nil }
+
+        var caret: Int?
+        var rangeRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(
+            element, kAXSelectedTextRangeAttribute as CFString, &rangeRef
+        ) == .success, let rangeRef {
+            var range = CFRange()
+            if AXValueGetValue(rangeRef as! AXValue, .cfRange, &range) { caret = range.location }
+        }
+
+        return (text.count, caret)
+    }
 }
 
 private extension AXValue {
