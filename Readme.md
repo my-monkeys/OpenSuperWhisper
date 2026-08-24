@@ -82,6 +82,12 @@ Models load lazily: browsing engine tabs never triggers a surprise download.
   (Qwen2.5 1.5B, one-time ~1 GB download, no server to run), a local
   [Ollama](https://ollama.com) server, or any OpenAI-compatible endpoint. Opt-in; the first two
   stay fully on-device, and the transcription is returned verbatim if the model misbehaves.
+  Pick the on-device model to match the job: **Qwen2.5 1.5B** is quick, **7B** follows instructions
+  far more reliably. The prompt is yours too — an opening and a closing instruction, together the
+  entire system prompt with nothing wrapped around them and per-app rules sandwiched in between.
+  Each half resets to its shipped text, and **Translate to …** has the model rewrite both in the
+  language you dictate, which is what stops it from answering in the prompt's language instead of
+  yours.
 - ⏯️ **Media handling** — pause other apps' playback (and resume only what was actually playing) or
   duck the system volume while you record.
 - 🎤 **Any microphone** — built-in, external, Bluetooth or iPhone (Continuity), switchable from the

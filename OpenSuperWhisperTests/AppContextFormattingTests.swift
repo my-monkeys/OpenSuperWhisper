@@ -151,4 +151,96 @@ final class AppContextFormattingTests: XCTestCase {
             input: input, output: String(repeating: "x", count: input.count * 4),
             condensingAllowed: true))
     }
+
+    // MARK: - the shipped instruction
+
+    func testShippedClosingStatesTheOutputLanguage() {
+        // Without a sentence about the output language, nothing in the prompt fixes it — which is
+        // the bug this replaced. The wording travels with "Translate to …".
+        XCTAssertTrue(LLMPostProcessor.defaultClosingInstruction
+            .contains("Write your output in the same language as the transcription."))
+    }
+
+    func testShippedClosingEndsWithTheGuardrail() {
+        // Closest to the text is where a weak model needs the reminder not to answer it.
+        XCTAssertTrue(LLMPostProcessor.defaultClosingInstruction
+            .contains("Output only the corrected text"))
+    }
+
+    // MARK: - passesTranslationGuard
+
+    func testTranslationGuardAcceptsASimilarlyLongTranslation() {
+        XCTAssertTrue(LLMPostProcessor.passesTranslationGuard(
+            source: "Fix punctuation and capitalization. Output only the corrected text.",
+            translated: "Korrigiere Zeichensetzung und Großschreibung. Gib nur den korrigierten Text aus."))
+    }
+
+    func testTranslationGuardRejectsAFragment() {
+        // Observed with the built-in 1.5B model: it returned the placeholder alone and the app
+        // swallowed a carefully written prompt.
+        XCTAssertFalse(LLMPostProcessor.passesTranslationGuard(
+            source: "Fix punctuation and capitalization. Output only the corrected text.",
+            translated: "{{language}}"))
+    }
+
+    func testTranslationGuardRejectsEmptyOutput() {
+        XCTAssertFalse(LLMPostProcessor.passesTranslationGuard(
+            source: "Fix punctuation and capitalization.", translated: "   "))
+    }
+
+    func testTranslationGuardRejectsAnAnsweringModel() {
+        let source = "Fix punctuation and capitalization. Output only the corrected text."
+        XCTAssertFalse(LLMPostProcessor.passesTranslationGuard(
+            source: source, translated: String(repeating: "x", count: source.count * 3)))
+    }
+
+    // MARK: - nothing wrapped around the instruction
+
+    func testAssembleIsTheInstructionVerbatim() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "FIX-PUNCTUATION", profile: nil)
+        XCTAssertEqual(system, "FIX-PUNCTUATION")
+    }
+
+    func testAssembleSandwichesAppRulesBetweenTheHalves() {
+        // The whole point of splitting the instruction: an app rule appended behind the guardrail
+        // would be the model's last word.
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "OPENING", profile: slack, closingPrompt: "CLOSING")
+        XCTAssertEqual(system, """
+            OPENING
+
+            App-specific formatting rules:
+            \(slack.instructions)
+
+            CLOSING
+            """)
+    }
+
+    func testAssembleWithoutProfileStillClosesLast() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "OPENING", profile: nil, closingPrompt: "CLOSING")
+        XCTAssertEqual(system, "OPENING\n\nCLOSING")
+    }
+
+    func testAssembleDropsAnEmptyClosing() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "OPENING", profile: nil, closingPrompt: "  ")
+        XCTAssertEqual(system, "OPENING")
+    }
+
+    func testAssembleOmitsClosingWhenGeneralCleanupIsOff() {
+        // Closing belongs to the general instruction; with only app formatting on, the profile
+        // rules are the whole prompt.
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: false, generalPrompt: "OPENING", profile: slack, closingPrompt: "CLOSING")
+        XCTAssertEqual(system, "App-specific formatting rules:\n\(slack.instructions)")
+    }
+
+    func testAssembleDropsAnEmptyInstruction() {
+        // Clearing the field is a supported choice, not an error to paper over.
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "   ", profile: slack)
+        XCTAssertEqual(system, "App-specific formatting rules:\n\(slack.instructions)")
+    }
 }
