@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -53,11 +54,47 @@ enum TextInserter {
     /// Types `text` into the focused app as Unicode keyboard events. Each chunk
     /// is sent as one key-down/key-up pair carrying the Unicode string; modifier
     /// flags are cleared so a still-held hotkey can't combine with the input.
+
+    /// One line describing an insertion, for diagnosing corruption that only happens in the wild.
+    ///
+    /// Asked for on #85 by the person reporting it, and it is the right ask: the fault fires about
+    /// twice in twelve hours, so turning a pacing dial by feel costs days per setting and invites
+    /// reading noise as signal. The numbers at the moment it breaks answer directly what the pause
+    /// should scale with. Written as one flat line so it can be pasted into an issue.
+    ///
+    /// `targetLength` nil is itself a finding rather than a gap: an app that will not say how much
+    /// it is holding is an app where pacing derived from that number cannot work, and the report
+    /// came from an Electron terminal.
+    static func insertionLogLine(app: String, targetLength: Int?, caret: Int?,
+                                 payload: Int, chunks: Int, pause: useconds_t) -> String {
+        let gaps = max(chunks - 1, 0)
+        let target = targetLength.map(String.init) ?? "unavailable"
+        let caretText = caret.map(String.init) ?? "unavailable"
+        return "insert app=\(app) target=\(target) caret=\(caretText) payload=\(payload) "
+            + "chunks=\(chunks) pause=\(pause)us/gap total=\(UInt(pause) * UInt(gaps))us"
+    }
+
+    /// Reads the target's state and logs the line. Skipped entirely when diagnostics are off: the
+    /// accessibility read costs up to 32ms, and the insertion path should not pay that to log
+    /// nothing.
+    private static func logInsertion(payload: String, chunks: Int, pause: useconds_t) {
+        guard Diag.isEnabled else { return }
+        let metrics = FocusUtils.focusedTextMetrics()
+        Diag.mark(insertionLogLine(
+            app: NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown",
+            targetLength: metrics?.length,
+            caret: metrics?.caret,
+            payload: payload.count,
+            chunks: chunks,
+            pause: pause))
+    }
+
     static func type(_ text: String) {
         guard let source = CGEventSource(stateID: .combinedSessionState) else { return }
 
         let allChunks = chunks(of: text)
         let pause = chunkPause(forChunkCount: allChunks.count)
+        logInsertion(payload: text, chunks: allChunks.count, pause: pause)
 
         for (index, chunk) in allChunks.enumerated() {
             guard
