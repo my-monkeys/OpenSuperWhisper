@@ -44,14 +44,7 @@ final class SenseVoiceEngine: TranscriptionEngine {
         let result = recognizer.decode(samples: samples, sampleRate: 16000)
         guard !isCancelled else { throw CancellationError() }
 
-        var text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if settings.shouldApplyAsianAutocorrect && !text.isEmpty {
-            text = AutocorrectWrapper.format(text)
-        }
-        if settings.shouldApplyCustomDictionary {
-            text = CustomDictionary.apply(text, entries: settings.customDictionaryEntries)
-        }
-        return text.isEmpty ? TranscriptionResult.noSpeech : text
+        return TranscriptionPostProcessing.finish(result.text, settings: settings)
     }
 
     func cancelTranscription() { isCancelled = true }

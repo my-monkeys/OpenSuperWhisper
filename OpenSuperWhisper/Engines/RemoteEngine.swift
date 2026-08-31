@@ -137,7 +137,9 @@ final class RemoteEngine: TranscriptionEngine {
         defer { currentTask = nil }
 
         do {
-            return try await task.value
+            // The server hands back raw text; everything the local engines do afterwards has to
+            // happen here too, or dictionary rules quietly stop existing on Remote (#101).
+            return TranscriptionPostProcessing.finish(try await task.value, settings: settings)
         } catch let error as RemoteError {
             throw error
         } catch is CancellationError {
