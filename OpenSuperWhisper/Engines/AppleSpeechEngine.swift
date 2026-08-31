@@ -177,14 +177,7 @@ final class AppleSpeechEngine: TranscriptionEngine {
         try await analyzer.analyzeSequence(from: file)
         try await analyzer.finalizeAndFinishThroughEndOfInput()
 
-        var text = try await collected.trimmingCharacters(in: .whitespacesAndNewlines)
-        if settings.shouldApplyAsianAutocorrect && !text.isEmpty {
-            text = AutocorrectWrapper.format(text)
-        }
-        if settings.shouldApplyCustomDictionary {
-            text = CustomDictionary.apply(text, entries: settings.customDictionaryEntries)
-        }
-        return text.isEmpty ? TranscriptionResult.noSpeech : text
+        return TranscriptionPostProcessing.finish(try await collected, settings: settings)
     }
 
     private static func collectFinalText(from transcriber: SpeechTranscriber) async throws -> String {

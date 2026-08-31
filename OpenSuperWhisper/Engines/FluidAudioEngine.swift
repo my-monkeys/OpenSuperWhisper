@@ -104,19 +104,11 @@ class FluidAudioEngine: TranscriptionEngine {
         // Finalize
         onProgressUpdate?(0.95)
 
-        var processedText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        if settings.shouldApplyAsianAutocorrect && !processedText.isEmpty {
-            processedText = AutocorrectWrapper.format(processedText)
-        }
-
-        if settings.shouldApplyCustomDictionary {
-            processedText = CustomDictionary.apply(processedText, entries: settings.customDictionaryEntries)
-        }
+        let processedText = TranscriptionPostProcessing.finish(rawText, settings: settings)
 
         onProgressUpdate?(1.0)
-        
-        return processedText.isEmpty ? TranscriptionResult.noSpeech : processedText
+
+        return processedText
     }
     
     func cancelTranscription() {
