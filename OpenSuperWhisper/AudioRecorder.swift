@@ -310,28 +310,56 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
+    /// How long to wait for a microphone that needs to connect before showing the recording as
+    /// live anyway.
+    ///
+    /// Bluetooth headsets take a moment to actually start delivering audio, which is what the
+    /// wait is for. Three seconds is far longer than that and short enough that nobody sits
+    /// through it wondering whether the app heard them.
+    static let connectionGracePeriod: TimeInterval = 3.0
+
+    /// Whether to stop waiting and treat the recording as live.
+    ///
+    /// The growth check alone had no way out. If the file never grew — a device that went away
+    /// while the Mac was locked, an input that delivers nothing — the app waited forever: the
+    /// bubble was up, `isRecording` stayed false, and only force-quitting recovered it (#98).
+    ///
+    /// Timing out into "live" rather than into a failure is deliberate. The recorder is running
+    /// either way and the person is already talking, so giving up would throw their words away
+    /// to fix a state problem. The worst case here is a silent recording they can stop, look at,
+    /// and try again — which is what every microphone that does not need connecting already does.
+    static func shouldGoLive(growthObservations: Int, elapsed: TimeInterval) -> Bool {
+        growthObservations >= 2 || elapsed >= connectionGracePeriod
+    }
+
     private func startConnectionMonitoring() {
         stopConnectionMonitoring()
-        
+
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInitiated))
         timer.schedule(deadline: .now() + 0.05, repeating: 0.05)
         let initialFileSize: Int64 = 4096
+        let startedAt = Date()
         var growthCount = 0
-        
+
         timer.setEventHandler { [weak self] in
             guard let self = self, let _ = self.audioRecorder, let url = self.currentRecordingURL else { return }
-            
+
             let currentFileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
             let totalGrowth = currentFileSize - initialFileSize
-            
+
             if totalGrowth > 8000 {
                 growthCount += 1
             }
-            
-            if growthCount >= 2 {
-                self.stopConnectionMonitoring()
-                self.updateRecordingState(isRecording: true, isConnecting: false)
+
+            let elapsed = Date().timeIntervalSince(startedAt)
+            guard Self.shouldGoLive(growthObservations: growthCount, elapsed: elapsed) else { return }
+
+            if growthCount < 2 {
+                Diag.mark("recorder.connectionWait timed out after \(Int(elapsed * 1000))ms "
+                    + "with \(totalGrowth) bytes written; going live anyway")
             }
+            self.stopConnectionMonitoring()
+            self.updateRecordingState(isRecording: true, isConnecting: false)
         }
         connectionCheckTimer = timer
         timer.resume()
