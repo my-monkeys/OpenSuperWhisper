@@ -2039,7 +2039,8 @@ struct SettingsView: View {
                 SRow(title: "Suppress blank audio") {
                     SToggle(isOn: $viewModel.suppressBlankAudio)
                 }
-                SRow(title: "Add space after sentence", hint: "Useful when dictating in bursts") {
+                SRow(title: "Space between dictations",
+                     hint: "Leaves a space at the end, so the next dictation into the same field doesn't run into the last one. Also separates two sentences a model ran together, as in \"regularly.Using\". Both are invisible in a single dictation, which is the point.") {
                     SToggle(isOn: $viewModel.addSpaceAfterSentence)
                 }
             }
