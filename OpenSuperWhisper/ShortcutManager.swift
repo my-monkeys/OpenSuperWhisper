@@ -325,6 +325,10 @@ class ShortcutManager {
                 // trigger key.
                 self.enterLatch()
             } else if !self.holdMode {
+                // Paired with "keyDown → start recording": a stop that is missing from the log
+                // never reached the app, which is a different bug from one that reached it and
+                // did nothing.
+                Diag.mark("keyDown → stop recording")
                 IndicatorWindowManager.shared.stopRecording()
                 self.activeVm = nil
                 LatchKeyMonitor.shared.stop()
@@ -350,6 +354,7 @@ class ShortcutManager {
             // A latched recording ignores the trigger key coming back up — that is the whole point
             // — and waits for Space (or the trigger) to stop it.
             if holdToRecordEnabled && self.holdMode && !self.latched {
+                Diag.mark("keyUp → stop recording (hold)")
                 IndicatorWindowManager.shared.stopRecording()
                 self.activeVm = nil
                 LatchKeyMonitor.shared.stop()
