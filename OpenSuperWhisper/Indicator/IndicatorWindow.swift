@@ -231,6 +231,7 @@ class IndicatorViewModel: ObservableObject {
 
         guard let tempURL = recorder.stopRecording() else {
             print("!!! Not found record url !!!")
+            Diag.mark("vm.startDecoding — no clip returned, nothing to transcribe")
             delegate?.didFinishDecoding()
             return
         }
