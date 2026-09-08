@@ -473,6 +473,11 @@ struct IndicatorWindow: View {
     /// empty pill.
     private var bubbleWidth: CGFloat? {
         let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
+        if straddlesNotch {
+            // Exactly the two flanks plus the hardware between them. No allowance on top: the
+            // sides already reserve theirs, and anything extra here would push the hole off centre.
+            return notchSideWidth * 2 + notchGapWidth
+        }
         if isNotchMode {
             // The tuned width is a preference; a real cutout is not. Narrower than the hardware
             // would leave the pill floating inside it.
@@ -493,6 +498,24 @@ struct IndicatorWindow: View {
         return 200 + buttonExtraWidth + meterWidthAllowance
     }
     
+    /// Whether the bubble sits astride the cutout rather than below it.
+    ///
+    /// The menu bar either side of a notch is usable screen, so the elements go there and the
+    /// bubble never grows downward: the waveform to the left of the hardware, the buttons to the
+    /// right. Text is the exception — a caption cannot be split around a hole, so anything with
+    /// one falls back to hanging below.
+    private var straddlesNotch: Bool {
+        guard isNotchMode, viewModel.physicalNotch != nil else { return false }
+        return streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty
+            && !viewModel.isConfirmingCancel
+    }
+
+    /// The hardware's width, reserved as a hole in the middle of the row.
+    private var notchGapWidth: CGFloat { viewModel.physicalNotch?.width ?? 0 }
+
+    /// Equal on both sides, so the hole stays centred on the hardware.
+    private var notchSideWidth: CGFloat { layout.notchSideWidth() }
+
     /// How far down the content must start to clear the hardware.
     ///
     /// The window hangs from the very top of the screen so the pill and the cutout read as one
@@ -500,7 +523,8 @@ struct IndicatorWindow: View {
     /// waveform and the buttons were being drawn into a hole. Zero on every other screen, where
     /// the pill is a drawing rather than a fitting.
     private var notchTopInset: CGFloat {
-        isNotchMode ? (viewModel.physicalNotch?.height ?? 0) : 0
+        guard isNotchMode, !straddlesNotch else { return 0 }
+        return viewModel.physicalNotch?.height ?? 0
     }
 
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
@@ -588,26 +612,40 @@ struct IndicatorWindow: View {
                 } else if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
                     HStack(alignment: .center, spacing: 10) {
-                        ForEach(layout.leading) { element in
-                            IndicatorElementView(element: element,
-                                                 bands: spectrum.bands,
-                                                 meterHeight: meterHeight,
-                                                 isBlinking: viewModel.isBlinking,
-                                                 isLatched: viewModel.isLatched,
-                                                 queued: pipeline.pendingCount)
+HStack(spacing: 10) {
+                            ForEach(layout.leading) { element in
+                                IndicatorElementView(element: element,
+                                                     bands: spectrum.bands,
+                                                     meterHeight: meterHeight,
+                                                     isBlinking: viewModel.isBlinking,
+                                                     isLatched: viewModel.isLatched,
+                                                     queued: pipeline.pendingCount)
+                            }
                         }
-                        if !layout.trailing.isEmpty {
+                        .frame(width: straddlesNotch ? notchSideWidth : nil,
+                               alignment: straddlesNotch ? .trailing : .leading)
+
+                        // The hardware goes here. Reserved even with no buttons to its right, or
+                        // the hole would slide off the notch by half the missing side.
+                        if straddlesNotch {
+                            Color.clear.frame(width: notchGapWidth)
+                        } else if !layout.trailing.isEmpty {
                             Spacer(minLength: 8)
+                        }
+
+                        if straddlesNotch || !layout.trailing.isEmpty {
                             HStack(spacing: 8) {
                                 ForEach(layout.trailing) { element in
                                     IndicatorElementView(element: element,
-                                                         bands: spectrum.bands,
-                                                         meterHeight: meterHeight,
-                                                         isBlinking: viewModel.isBlinking,
-                                                         isLatched: viewModel.isLatched,
-                                                         queued: pipeline.pendingCount)
+                                                     bands: spectrum.bands,
+                                                     meterHeight: meterHeight,
+                                                     isBlinking: viewModel.isBlinking,
+                                                     isLatched: viewModel.isLatched,
+                                                     queued: pipeline.pendingCount)
                                 }
                             }
+                            .frame(width: straddlesNotch ? notchSideWidth : nil,
+                                   alignment: .leading)
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: viewModel.isConfirmingCancel)
@@ -638,22 +676,36 @@ struct IndicatorWindow: View {
                 // different words, whoever chose both gets both. The stop and cancel buttons
                 // drop out, since there is no longer anything to stop.
                 HStack(alignment: .center, spacing: 10) {
-                    ForEach(decodingElements) { element in
-                        IndicatorElementView(element: element,
-                                             meterHeight: meterHeight,
-                                             queued: pipeline.pendingCount,
-                                             isDecoding: true)
+    HStack(spacing: 10) {
+                        ForEach(decodingElements) { element in
+                            IndicatorElementView(element: element,
+                                                 meterHeight: meterHeight,
+                                                 queued: pipeline.pendingCount,
+                                                 isDecoding: true)
+                        }
                     }
-                    if !layout.trailing.isEmpty {
+                    .frame(width: straddlesNotch ? notchSideWidth : nil,
+                           alignment: straddlesNotch ? .trailing : .leading)
+
+                    // The hardware goes here. Reserved even with no buttons to its right, or
+                    // the hole would slide off the notch by half the missing side.
+                    if straddlesNotch {
+                        Color.clear.frame(width: notchGapWidth)
+                    } else if !layout.trailing.isEmpty {
                         Spacer(minLength: 8)
+                    }
+
+                    if straddlesNotch || !layout.trailing.isEmpty {
                         HStack(spacing: 8) {
                             ForEach(layout.trailing) { element in
                                 IndicatorElementView(element: element,
-                                                     meterHeight: meterHeight,
-                                                     queued: pipeline.pendingCount,
-                                                     isDecoding: true)
+                                                 meterHeight: meterHeight,
+                                                 queued: pipeline.pendingCount,
+                                                 isDecoding: true)
                             }
                         }
+                        .frame(width: straddlesNotch ? notchSideWidth : nil,
+                               alignment: .leading)
                     }
                 }
             case .busy:
@@ -694,14 +746,18 @@ struct IndicatorWindow: View {
         // Spacer eats it, so a waveform plus two buttons stretched into a mostly empty bar.
         // Fixing the horizontal size collapses the Spacer to its 8pt minimum.
         .fixedSize(horizontal: bubbleWidth == nil, vertical: false)
-        .padding(.horizontal, isNotchMode ? 22 : 16 * scale)
-        .padding(.vertical, isNotchMode ? 10 : 7 * scale)
+        // Astride the notch the flanks already carry their own widths, and vertical padding
+        // would push the row out of the menu bar band it is meant to sit in.
+        .padding(.horizontal, straddlesNotch ? 0 : (isNotchMode ? 22 : 16 * scale))
+        .padding(.vertical, straddlesNotch ? 0 : (isNotchMode ? 10 : 7 * scale))
         // The background still runs up under the cutout, so the pill looks like it grows out of
         // the notch rather than sitting below it.
         .padding(.top, notchTopInset)
         // Width must be set *before* the background so the bubble itself fills it (not just the
         // surrounding frame). Notch content is centred; the others stay leading.
-        .frame(minHeight: isNotchMode ? notch.height + notchTopInset : 36 * scale)
+        .frame(minHeight: straddlesNotch
+               ? (viewModel.physicalNotch?.height ?? 0)
+               : (isNotchMode ? notch.height + notchTopInset : 36 * scale))
         // A floor so a single small element still reads as a bubble rather than a chip.
         .frame(minWidth: bubbleWidth == nil ? 76 * scale : nil)
         .frame(width: bubbleWidth, alignment: isNotchMode ? .center : .leading)
