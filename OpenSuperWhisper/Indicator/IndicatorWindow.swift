@@ -35,7 +35,7 @@ class IndicatorViewModel: ObservableObject {
     @Published var isVisible = false
     /// The physical notch of the screen this bubble is showing on, nil when that screen has
     /// none. Set at record-start by the window manager, which is the only place that knows
-    /// which screen was chosen — a laptop plugged into an external display has one of each.
+    /// which screen was chosen: a laptop plugged into an external display has one of each.
     @Published var physicalNotch: CGSize?
 
     var recordingStartedAt: Date?
@@ -473,16 +473,8 @@ struct IndicatorWindow: View {
     /// empty pill.
     private var bubbleWidth: CGFloat? {
         let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
-        if straddlesNotch {
-            // Exactly the two flanks plus the hardware between them. No allowance on top: the
-            // sides already reserve theirs, and anything extra here would push the hole off centre.
-            return notchSideWidth * 2 + notchGapWidth
-        }
         if isNotchMode {
-            // The tuned width is a preference; a real cutout is not. Narrower than the hardware
-            // would leave the pill floating inside it.
-            let base = max(notch.width, viewModel.physicalNotch?.width ?? 0)
-            return (hasCaption ? max(base, 440) : base) + buttonExtraWidth + meterWidthAllowance
+            return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth + meterWidthAllowance
         }
         // The cancel confirmation replaces everything with one short line, and it must be
         // readable whatever was there before: a width chosen for a caption or a meter has no
@@ -498,81 +490,6 @@ struct IndicatorWindow: View {
         return 200 + buttonExtraWidth + meterWidthAllowance
     }
     
-    /// Whether the bubble sits astride the cutout rather than below it.
-    ///
-    /// The menu bar either side of a notch is usable screen, so the elements go there and the
-    /// bubble never grows downward: the waveform to the left of the hardware, the buttons to the
-    /// right. Text is the exception — a caption cannot be split around a hole, so anything with
-    /// one falls back to hanging below.
-    private var straddlesNotch: Bool {
-        guard isNotchMode, viewModel.physicalNotch != nil else { return false }
-        // Only the two states made of small fixed elements. Everything else the bubble shows is
-        // prose — the cancel warning, an error, "Copied", a live caption — and prose cannot be
-        // split around a hole: laid out astride, its middle went behind the hardware. Those hang
-        // below the notch and take the height they need.
-        switch viewModel.state {
-        case .recording, .decoding:
-            return streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty
-                && !viewModel.isConfirmingCancel
-        case .idle, .connecting, .busy, .error, .info:
-            return false
-        }
-    }
-
-    /// The hardware's width, reserved as a hole in the middle of the row.
-    private var notchGapWidth: CGFloat { viewModel.physicalNotch?.width ?? 0 }
-
-    /// Where the bubble comes from on the way in.
-    ///
-    /// Astride the notch it starts exactly the width of the cutout and no shorter, so the first
-    /// frame is indistinguishable from the hardware and it appears to widen out of it. That is
-    /// the Dynamic Island move, and it only reads as one if the starting shape *is* the notch:
-    /// scaling down uniformly, as the other positions do, looks like a block fading in from
-    /// nowhere in front of the notch.
-    ///
-    /// Render-only, like the transforms it replaces — the size is measured above this, so none
-    /// of it can drive a window resize.
-    private var entranceScale: CGSize {
-        if straddlesNotch {
-            let full = notchSideWidth * 2 + notchGapWidth
-            return CGSize(width: full > 0 ? notchGapWidth / full : 1, height: 1)
-        }
-        let uniform = isNotchMode ? 0.85 : 0.5
-        return CGSize(width: uniform, height: uniform)
-    }
-
-    private var entranceAnchor: UnitPoint {
-        if straddlesNotch { return .center }
-        return isNotchMode ? .top : .center
-    }
-
-    /// No vertical travel astride the notch: it comes out of the hardware sideways, and sliding
-    /// it down as well would break the illusion that it was there all along.
-    private var entranceOffsetY: CGFloat {
-        if straddlesNotch { return 0 }
-        return isNotchMode ? -20 : 20
-    }
-
-    /// The hardware's height too, so the reserved hole is a box rather than a column.
-    ///
-    /// A `Color` constrained on one axis takes every point offered on the other. Leaving the
-    /// height open stretched the row until the bubble read as a block.
-    private var notchGapHeight: CGFloat { viewModel.physicalNotch?.height ?? 0 }
-
-    /// Equal on both sides, so the hole stays centred on the hardware.
-    private var notchSideWidth: CGFloat { layout.notchSideWidth() }
-
-    /// How far down the content must start to clear the hardware.
-    ///
-    /// The window hangs from the very top of the screen so the pill and the cutout read as one
-    /// piece. On a Mac that actually has a cutout, everything in that band is behind it: the
-    /// waveform and the buttons were being drawn into a hole. Zero on every other screen, where
-    /// the pill is a drawing rather than a fitting.
-    private var notchTopInset: CGFloat {
-        guard isNotchMode, !straddlesNotch else { return 0 }
-        return viewModel.physicalNotch?.height ?? 0
-    }
-
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
 
     private var layout: IndicatorLayout {
@@ -625,7 +542,29 @@ struct IndicatorWindow: View {
         }
     }
 
+    /// The measurements of the screen's cutout, or nil when it has none.
+    ///
+    /// Everything hardware-shaped hangs off this one optional. A screen without a notch never
+    /// gets a value, so it never takes the branch below and keeps the drawn-on pill it has
+    /// always had: measurements from one Mac have no business shaping the look on another.
+    private var notchGeometry: NotchGeometry? {
+        guard isNotchMode else { return nil }
+        return NotchGeometry.measure(cutout: viewModel.physicalNotch,
+                                     layout: layout,
+                                     textScale: CGFloat(scale),
+                                     topRadius: CGFloat(notch.topRadius),
+                                     bottomRadius: CGFloat(notch.bottomRadius))
+    }
+
     var body: some View {
+        if let geometry = notchGeometry {
+            notchBubble(geometry)
+        } else {
+            classicBubble
+        }
+    }
+
+    @ViewBuilder private var classicBubble: some View {
 
         // Notch mode uses the real notch silhouette (concave top wings + rounded bottom).
         let rect: AnyShape = isNotchMode
@@ -658,40 +597,26 @@ struct IndicatorWindow: View {
                 } else if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
                     // Before any text arrives, just the dot + label, vertically centered.
                     HStack(alignment: .center, spacing: 10) {
-HStack(spacing: 10) {
-                            ForEach(layout.leading) { element in
-                                IndicatorElementView(element: element,
-                                                     bands: spectrum.bands,
-                                                     meterHeight: meterHeight,
-                                                     isBlinking: viewModel.isBlinking,
-                                                     isLatched: viewModel.isLatched,
-                                                     queued: pipeline.pendingCount)
-                            }
+                        ForEach(layout.leading) { element in
+                            IndicatorElementView(element: element,
+                                                 bands: spectrum.bands,
+                                                 meterHeight: meterHeight,
+                                                 isBlinking: viewModel.isBlinking,
+                                                 isLatched: viewModel.isLatched,
+                                                 queued: pipeline.pendingCount)
                         }
-                        .frame(width: straddlesNotch ? notchSideWidth : nil,
-                               alignment: straddlesNotch ? .trailing : .leading)
-
-                        // The hardware goes here. Reserved even with no buttons to its right, or
-                        // the hole would slide off the notch by half the missing side.
-                        if straddlesNotch {
-                            Color.clear.frame(width: notchGapWidth, height: notchGapHeight)
-                        } else if !layout.trailing.isEmpty {
+                        if !layout.trailing.isEmpty {
                             Spacer(minLength: 8)
-                        }
-
-                        if straddlesNotch || !layout.trailing.isEmpty {
                             HStack(spacing: 8) {
                                 ForEach(layout.trailing) { element in
                                     IndicatorElementView(element: element,
-                                                     bands: spectrum.bands,
-                                                     meterHeight: meterHeight,
-                                                     isBlinking: viewModel.isBlinking,
-                                                     isLatched: viewModel.isLatched,
-                                                     queued: pipeline.pendingCount)
+                                                         bands: spectrum.bands,
+                                                         meterHeight: meterHeight,
+                                                         isBlinking: viewModel.isBlinking,
+                                                         isLatched: viewModel.isLatched,
+                                                         queued: pipeline.pendingCount)
                                 }
                             }
-                            .frame(width: straddlesNotch ? notchSideWidth : nil,
-                                   alignment: .leading)
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: viewModel.isConfirmingCancel)
@@ -722,36 +647,22 @@ HStack(spacing: 10) {
                 // different words, whoever chose both gets both. The stop and cancel buttons
                 // drop out, since there is no longer anything to stop.
                 HStack(alignment: .center, spacing: 10) {
-    HStack(spacing: 10) {
-                        ForEach(decodingElements) { element in
-                            IndicatorElementView(element: element,
-                                                 meterHeight: meterHeight,
-                                                 queued: pipeline.pendingCount,
-                                                 isDecoding: true)
-                        }
+                    ForEach(decodingElements) { element in
+                        IndicatorElementView(element: element,
+                                             meterHeight: meterHeight,
+                                             queued: pipeline.pendingCount,
+                                             isDecoding: true)
                     }
-                    .frame(width: straddlesNotch ? notchSideWidth : nil,
-                           alignment: straddlesNotch ? .trailing : .leading)
-
-                    // The hardware goes here. Reserved even with no buttons to its right, or
-                    // the hole would slide off the notch by half the missing side.
-                    if straddlesNotch {
-                        Color.clear.frame(width: notchGapWidth, height: notchGapHeight)
-                    } else if !layout.trailing.isEmpty {
+                    if !layout.trailing.isEmpty {
                         Spacer(minLength: 8)
-                    }
-
-                    if straddlesNotch || !layout.trailing.isEmpty {
                         HStack(spacing: 8) {
                             ForEach(layout.trailing) { element in
                                 IndicatorElementView(element: element,
-                                                 meterHeight: meterHeight,
-                                                 queued: pipeline.pendingCount,
-                                                 isDecoding: true)
+                                                     meterHeight: meterHeight,
+                                                     queued: pipeline.pendingCount,
+                                                     isDecoding: true)
                             }
                         }
-                        .frame(width: straddlesNotch ? notchSideWidth : nil,
-                               alignment: .leading)
                     }
                 }
             case .busy:
@@ -792,18 +703,11 @@ HStack(spacing: 10) {
         // Spacer eats it, so a waveform plus two buttons stretched into a mostly empty bar.
         // Fixing the horizontal size collapses the Spacer to its 8pt minimum.
         .fixedSize(horizontal: bubbleWidth == nil, vertical: false)
-        // Astride the notch the flanks already carry their own widths, and vertical padding
-        // would push the row out of the menu bar band it is meant to sit in.
-        .padding(.horizontal, straddlesNotch ? 0 : (isNotchMode ? 22 : 16 * scale))
-        .padding(.vertical, straddlesNotch ? 0 : (isNotchMode ? 10 : 7 * scale))
-        // The background still runs up under the cutout, so the pill looks like it grows out of
-        // the notch rather than sitting below it.
-        .padding(.top, notchTopInset)
+        .padding(.horizontal, isNotchMode ? 22 : 16 * scale)
+        .padding(.vertical, isNotchMode ? 10 : 7 * scale)
         // Width must be set *before* the background so the bubble itself fills it (not just the
         // surrounding frame). Notch content is centred; the others stay leading.
-        .frame(minHeight: straddlesNotch
-               ? (viewModel.physicalNotch?.height ?? 0)
-               : (isNotchMode ? notch.height + notchTopInset : 36 * scale))
+        .frame(minHeight: isNotchMode ? notch.height : 36 * scale)
         // A floor so a single small element still reads as a bubble rather than a chip.
         .frame(minWidth: bubbleWidth == nil ? 76 * scale : nil)
         .frame(width: bubbleWidth, alignment: isNotchMode ? .center : .leading)
@@ -836,12 +740,9 @@ HStack(spacing: 10) {
             }
         )
         .environment(\.colorScheme, isNotchMode ? .dark : colorScheme)
-        // Astride the notch it grows sideways out of the hardware; a notch pill hanging below
-        // drops from the top edge; everything else rises from beneath.
-        .scaleEffect(x: viewModel.isVisible ? 1 : entranceScale.width,
-                     y: viewModel.isVisible ? 1 : entranceScale.height,
-                     anchor: entranceAnchor)
-        .offset(y: viewModel.isVisible ? 0 : entranceOffsetY)
+        // Notch drops in from the top edge; the others rise from below.
+        .scaleEffect(viewModel.isVisible ? 1 : (isNotchMode ? 0.85 : 0.5), anchor: isNotchMode ? .top : .center)
+        .offset(y: viewModel.isVisible ? 0 : (isNotchMode ? -20 : 20))
         .opacity(viewModel.isVisible ? 1 : 0)
         .animation(.spring(response: 0.35, dampingFraction: 0.72), value: viewModel.isVisible)
         // The hosting window is sized by the manager from this preference (NOT by SwiftUI's
@@ -856,6 +757,178 @@ HStack(spacing: 10) {
         }
         .onAppear {
             viewModel.isVisible = true
+        }
+    }
+
+    // MARK: - Around a real notch
+
+    /// The bubble on a Mac that has a cutout: one width, whatever it is showing, and a height
+    /// that grows only when there is something the notch cannot hold.
+    ///
+    /// The small fixed elements go either side of the hardware, which is where the menu bar has
+    /// room to spare. Prose goes underneath, because a sentence laid out astride a hole loses its
+    /// middle. Nothing here is narrower than the notch: the width has a floor that accounts for
+    /// the silhouette's inward-curving wings, so the black always reaches past the glass.
+    private func notchBubble(_ geometry: NotchGeometry) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                notchFlank(notchLeadingElements, geometry: geometry, alignment: .trailing)
+                // The hardware itself. Reserved on both sides even when only one of them has
+                // anything in it, or the hole slides off the notch by half the missing width.
+                Color.clear
+                    .frame(width: geometry.cutout.width, height: geometry.bandHeight)
+                notchFlank(notchTrailingElements, geometry: geometry, alignment: .leading)
+            }
+            .frame(height: geometry.bandHeight)
+
+            if hasNotchApron {
+                notchApron
+                    .padding(.horizontal, 18)
+                    .padding(.top, 5)
+                    .padding(.bottom, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(width: geometry.width)
+        .background { notchSilhouette(geometry).fill(.black) }
+        .environment(\.colorScheme, .dark)
+        // Measured here, before the mask, which is render-only. Nothing about the entrance may
+        // reach this: the manager resizes the window from it, and a size that animates would
+        // feed a stream of window resizes back into layout (the macOS 26 recursion, #19).
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: IndicatorContentSizeKey.self, value: proxy.size)
+            }
+        )
+        // The entrance. A mask rather than a transform, so the bubble is uncovered at its final
+        // size instead of being squashed into the notch and stretched back out.
+        .mask {
+            NotchReveal(progress: viewModel.isVisible ? 1 : 0,
+                        cutout: geometry.cutout,
+                        topRadius: geometry.topRadius,
+                        bottomRadius: geometry.bottomRadius)
+        }
+        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: viewModel.isVisible)
+        .onPreferenceChange(IndicatorContentSizeKey.self) { size in
+            onContentResize(size)
+        }
+        .onAppear {
+            viewModel.isVisible = true
+        }
+    }
+
+    private func notchSilhouette(_ geometry: NotchGeometry) -> NotchShape {
+        NotchShape(topRadius: geometry.topRadius, bottomRadius: geometry.bottomRadius)
+    }
+
+    /// One side of the cutout, at the fixed width both sides share.
+    ///
+    /// Content hugs the hardware, so the bubble reads as one object wrapped around the notch
+    /// rather than two islands adrift at the far edges. The slack goes to the outer edges, in
+    /// equal parts, which is what keeps the hole over the glass.
+    private func notchFlank(_ elements: [IndicatorElement], geometry: NotchGeometry,
+                            alignment: Alignment) -> some View {
+        HStack(spacing: NotchGeometry.elementSpacing) {
+            ForEach(elements) { element in
+                IndicatorElementView(element: element,
+                                     bands: spectrum.bands,
+                                     meterHeight: notchMeterHeight(geometry),
+                                     isBlinking: viewModel.isBlinking,
+                                     isLatched: viewModel.isLatched,
+                                     queued: pipeline.pendingCount,
+                                     isDecoding: viewModel.state == .decoding)
+            }
+        }
+        .padding(alignment == .trailing ? .trailing : .leading, NotchGeometry.innerGutter)
+        .frame(width: geometry.sideWidth, height: geometry.bandHeight, alignment: alignment)
+    }
+
+    /// The meter is the tallest thing on the row and the row is the height of the cutout, so a
+    /// taller setting would stand the bars out from under the hardware instead of inside it.
+    private func notchMeterHeight(_ geometry: NotchGeometry) -> CGFloat {
+        min(meterHeight, geometry.bandHeight - 10)
+    }
+
+    private var notchLeadingElements: [IndicatorElement] {
+        switch viewModel.state {
+        case .recording: return layout.leading
+        case .decoding: return layout.decodingLeading
+        case .idle, .connecting, .busy, .error, .info: return []
+        }
+    }
+
+    private var notchTrailingElements: [IndicatorElement] {
+        switch viewModel.state {
+        case .recording, .decoding: return layout.trailing
+        case .idle, .connecting, .busy, .error, .info: return []
+        }
+    }
+
+    /// Whether anything hangs below the hardware. When nothing does, the bubble is exactly the
+    /// cutout's height and the only thing on screen is what flanks it.
+    private var hasNotchApron: Bool {
+        switch viewModel.state {
+        case .recording:
+            return viewModel.isConfirmingCancel
+                || !streaming.confirmedText.isEmpty
+                || !streaming.volatileText.isEmpty
+        case .connecting, .busy, .error, .info:
+            return true
+        case .idle, .decoding:
+            return false
+        }
+    }
+
+    /// Everything made of words. It keeps the width the bubble already had and takes the height
+    /// it needs, which is the one direction there is room to grow in.
+    @ViewBuilder private var notchApron: some View {
+        switch viewModel.state {
+        case .recording:
+            if viewModel.isConfirmingCancel {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Press Esc to cancel")
+                        .scaledFont(size: 12, weight: .semibold)
+                        .foregroundColor(.orange)
+                        .lineLimit(1)
+                    CancelConfirmationBar()
+                }
+            } else {
+                (Text(streaming.confirmedText).foregroundColor(.primary)
+                    + Text(streaming.confirmedText.isEmpty ? "" : " ")
+                    + Text(streaming.volatileText).foregroundColor(.secondary))
+                    .scaledFont(size: 13)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .connecting:
+            HStack(spacing: 8) {
+                ProgressView().scaleEffect(0.6).frame(width: 18)
+                Text("Connecting...").scaledFont(size: 13, weight: .semibold)
+            }
+        case .busy:
+            HStack(spacing: 8) {
+                Image(systemName: "hourglass").foregroundColor(.orange)
+                Text("Processing...")
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundColor(.orange)
+            }
+        case .error(let message):
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.red)
+                Text(message)
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundColor(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .info(let message):
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "doc.on.clipboard").foregroundColor(.accentColor)
+                Text(message)
+                    .scaledFont(size: 13, weight: .semibold)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .idle, .decoding:
+            EmptyView()
         }
     }
 }

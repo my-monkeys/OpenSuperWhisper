@@ -41,7 +41,15 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         let newViewModel = IndicatorViewModel()
         newViewModel.delegate = self
         viewModel = newViewModel
-        
+
+        // Measured per show, and measured *first*. The bubble follows the caret, so which screen
+        // it lands on changes and only one of them may have hardware in the way. It has to be on
+        // the view model before the view is built: the first layout pass decides the shape the
+        // entrance animates out of, and a pass that ran before the measurement arrived armed the
+        // wrong one, which is what made the bubble visibly rise before settling.
+        let targetScreen = point.flatMap { FocusUtils.screenContaining(point: $0) } ?? NSScreen.main
+        newViewModel.physicalNotch = targetScreen.flatMap { NotchMetrics.physicalNotch(for: $0) }
+
         if window == nil {
             // Create window if it doesn't exist - using NSPanel for full-screen compatibility
             let panel = NSPanel(
@@ -94,7 +102,13 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         // never appears in ANY position mode (#indicator-invisible). Seed a non-zero canvas
         // (non-animated, so no NSHostingView recursion-crash risk) so SwiftUI can lay out and
         // size the window.
-        window?.setContentSize(NSSize(width: 380, height: 120))
+        //
+        // Around a real notch that canvas is the finished size rather than a placeholder. The
+        // placeholder was 380×120 against a bubble 38pt tall, and NSHostingView centres a smaller
+        // content in its window: the pill was drawn a good 40pt below a window pinned to the top
+        // of the screen, then jumped up when the measured size came back. That is the climb the
+        // entrance was blamed for.
+        window?.setContentSize(seedSize(for: newViewModel.physicalNotch))
 
         // Accept clicks only when an on-bubble button is enabled (so it's tappable);
         // otherwise stay fully click-through (baseline). Re-evaluated each show() so
@@ -104,13 +118,8 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             showsStop: AppPreferences.shared.showStopButtonOnIndicator,
             showsCancel: AppPreferences.shared.showCancelButtonOnIndicator)
 
-        // Position window - use the screen containing the point, or main screen as fallback
-        let targetScreen = point.flatMap { FocusUtils.screenContaining(point: $0) } ?? NSScreen.main
         if let window = window, let screen = targetScreen {
             let screenFrame = screen.frame
-            // Measured per show: the bubble follows the caret, so which screen it lands on
-            // changes, and only one of them may have hardware in the way.
-            newViewModel.physicalNotch = NotchMetrics.physicalNotch(for: screen)
 
             anchorFromTop = false
             switch AppPreferences.shared.indicatorPosition {
@@ -170,6 +179,25 @@ class IndicatorWindowManager: IndicatorViewDelegate {
 
         window?.orderFront(nil)
         return newViewModel
+    }
+
+    /// The canvas the window starts on, before SwiftUI has measured anything.
+    ///
+    /// Around a real notch this is the answer, not a guess: `NotchGeometry` is the single place
+    /// the width is worked out, and the view builds its bubble from the very same call. Anywhere
+    /// else it stays a roomy placeholder, since the size there depends on text nobody has laid
+    /// out yet and `resizeToContent` settles it a frame later.
+    private func seedSize(for cutout: CGSize?) -> NSSize {
+        guard AppPreferences.shared.indicatorPosition == "notch",
+              let geometry = NotchGeometry.measure(
+                cutout: cutout,
+                layout: IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout),
+                textScale: CGFloat(TextScale.clamped(AppPreferences.shared.textScale)),
+                topRadius: CGFloat(NotchTuning.shared.topRadius),
+                bottomRadius: CGFloat(NotchTuning.shared.bottomRadius))
+        else { return NSSize(width: 380, height: 120) }
+
+        return NSSize(width: geometry.width, height: geometry.bandHeight)
     }
 
     /// Sizes the indicator window to its SwiftUI content, *non-animated*. This replaces

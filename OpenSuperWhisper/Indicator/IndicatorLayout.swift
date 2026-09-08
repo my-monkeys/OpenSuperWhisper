@@ -98,27 +98,6 @@ struct IndicatorLayout: Codable, Equatable {
         return leading
     }
 
-    // MARK: - Straddling a notch
-
-    /// Width reserved on each side of the cutout when the bubble sits astride it.
-    ///
-    /// Both sides get the **same** width, and that is the whole point: the window is centred on
-    /// the screen and the cutout is centred too, so the gap only lands on the hardware if what
-    /// flanks it is symmetric. Sizing each side to its own contents would slide the hole off the
-    /// notch by half the difference.
-    ///
-    /// These are allowances rather than measurements. SwiftUI knows the real widths and the
-    /// window manager does not, and reserving a little too much only shows as a bit more black
-    /// beside the notch, which reads as the notch being wider.
-    func notchSideWidth() -> Double {
-        let buttons = Double(trailing.count) * 32 + 8
-        let waveform = contains(.waveform) ? 76.0 : 0
-        let label = contains(.label) ? 120.0 : 0
-        let dot = contains(.dot) ? 24.0 : 0
-        let leadingNeed = waveform + label + dot
-        return max(72, buttons, leadingNeed)
-    }
-
     mutating func setVisible(_ visible: Bool, for element: IndicatorElement) {
         if visible { hidden.remove(element) } else { hidden.insert(element) }
     }

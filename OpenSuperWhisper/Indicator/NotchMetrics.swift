@@ -32,10 +32,4 @@ enum NotchMetrics {
         let width = screen.frame.width - left - right + edgeAllowance
         return CGSize(width: width, height: screen.safeAreaInsets.top)
     }
-
-    /// The physical cutout of the screen the pointer is on, for UI that has no window yet.
-    static var mainScreenPhysicalNotch: CGSize? {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return nil }
-        return physicalNotch(for: screen)
-    }
 }
