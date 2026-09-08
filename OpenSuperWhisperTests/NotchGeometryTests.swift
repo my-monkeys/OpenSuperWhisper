@@ -127,13 +127,14 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertEqual(geometry([.waveform, .label]).bandHeight, cutout.height)
     }
 
-    // MARK: - The entrance
+    // MARK: - The opening
 
-    /// At rest the mask is the cutout and nothing else, so the first frame is hidden behind the
+    /// Closed, the mask is the cutout and nothing else, so the first frame is hidden behind the
     /// hardware and the bubble looks like it grew out of it.
-    func testTheRevealStartsInsideTheNotch() {
+    func testTheRevealClosesOntoTheNotch() {
         let full = CGRect(x: 0, y: 0, width: 520, height: 90)
-        let closed = NotchReveal(progress: 0, cutout: cutout, topRadius: 10, bottomRadius: 14)
+        let closed = NotchReveal(width: cutout.width, height: cutout.height,
+                                 topRadius: 10, bottomRadius: 14)
             .path(in: full).boundingRect
 
         XCTAssertEqual(closed.width, cutout.width, accuracy: 0.001)
@@ -144,43 +145,82 @@ final class NotchGeometryTests: XCTestCase {
 
     /// Fully open it is the bubble itself, so the mask doubles as the silhouette and nothing is
     /// left clipped.
-    func testTheRevealEndsAsTheWholeBubble() {
+    func testTheRevealOpensToTheWholeBubble() {
         let full = CGRect(x: 0, y: 0, width: 520, height: 90)
-        let open = NotchReveal(progress: 1, cutout: cutout, topRadius: 10, bottomRadius: 14)
+        let open = NotchReveal(width: full.width, height: full.height,
+                               topRadius: 10, bottomRadius: 14)
             .path(in: full).boundingRect
         let silhouette = NotchShape(topRadius: 10, bottomRadius: 14).path(in: full).boundingRect
 
         XCTAssertEqual(open, silhouette)
     }
 
-    /// It only ever widens, and it stays centred the whole way. The version this replaces scaled
-    /// the view tree, which moved the content as well as revealing it.
-    func testTheRevealOnlyGrowsAndStaysCentred() {
-        let full = CGRect(x: 0, y: 0, width: 520, height: 90)
+    /// The reported problem. The mask used to interpolate a fraction of the rect it was handed,
+    /// and `path(in:)` gets a new rect the instant the content grows: at full progress there was
+    /// nothing left to interpolate, so the pill snapped to its new height. Points are a value
+    /// SwiftUI can animate between whatever the rect does, so every height in between draws.
+    func testHeightIsAValueOfItsOwnRatherThanAFractionOfTheRect() {
+        let grown = CGRect(x: 0, y: 0, width: 520, height: 120)
         var previous: CGFloat = 0
 
-        for step in stride(from: CGFloat(0), through: 1, by: 0.1) {
-            let box = NotchReveal(progress: step, cutout: cutout, topRadius: 10, bottomRadius: 14)
-                .path(in: full).boundingRect
+        for height in stride(from: cutout.height, through: grown.height, by: 8) {
+            let box = NotchReveal(width: 520, height: height, topRadius: 10, bottomRadius: 14)
+                .path(in: grown).boundingRect
 
-            XCTAssertGreaterThanOrEqual(box.width, previous)
-            XCTAssertEqual(box.midX, full.midX, accuracy: 0.001)
-            XCTAssertEqual(box.minY, full.minY, accuracy: 0.001)
-            previous = box.width
+            XCTAssertEqual(box.height, height, accuracy: 0.001,
+                           "a partly-open mask must be exactly as tall as it was asked to be")
+            XCTAssertGreaterThan(box.height, previous)
+            previous = box.height
         }
     }
 
-    /// Out of range values cannot make the mask larger than the bubble or narrower than the
-    /// notch: a spring overshoots past 1, and an overshoot that widened the mask past the pill
-    /// would show a black rectangle for a frame.
-    func testAnOvershootingSpringCannotBreakTheMask() {
+    /// It stays centred on the hardware and pinned to the top the whole way, in both dimensions.
+    func testTheOpeningStaysOnTheHardware() {
         let full = CGRect(x: 0, y: 0, width: 520, height: 90)
-        let over = NotchReveal(progress: 1.3, cutout: cutout, topRadius: 10, bottomRadius: 14)
-            .path(in: full).boundingRect
-        let under = NotchReveal(progress: -0.4, cutout: cutout, topRadius: 10, bottomRadius: 14)
+
+        for step in stride(from: CGFloat(0), through: 1, by: 0.1) {
+            let box = NotchReveal(width: cutout.width + (full.width - cutout.width) * step,
+                                  height: cutout.height + (full.height - cutout.height) * step,
+                                  topRadius: 10, bottomRadius: 14)
+                .path(in: full).boundingRect
+
+            XCTAssertEqual(box.midX, full.midX, accuracy: 0.001)
+            XCTAssertEqual(box.minY, full.minY, accuracy: 0.001)
+        }
+    }
+
+    /// A spring overshoots at both ends. Past the bubble it would show a bare rectangle of black
+    /// for a frame or two.
+    func testAnOvershootPastTheBubbleIsClampedToIt() {
+        let full = CGRect(x: 0, y: 0, width: 520, height: 90)
+        let over = NotchReveal(width: 700, height: 140, topRadius: 10, bottomRadius: 14)
             .path(in: full).boundingRect
 
         XCTAssertEqual(over.width, full.width, accuracy: 0.001)
-        XCTAssertEqual(under.width, cutout.width, accuracy: 0.001)
+        XCTAssertEqual(over.height, full.height, accuracy: 0.001)
+    }
+
+    /// The other end. `NotchShape` carves its corners out of the rect it is given, so an opening
+    /// too small to hold them draws a path that crosses itself and encloses *more* than it was
+    /// asked for: a mask that shrank to nothing would flash a shape bigger than the one before it.
+    func testAnOpeningTooSmallForItsOwnCornersShowsNothing() {
+        let full = CGRect(x: 0, y: 0, width: 520, height: 90)
+
+        for (width, height) in [(CGFloat(-40), CGFloat(-12)), (0, 0), (30, 20), (520, 8)] {
+            let box = NotchReveal(width: width, height: height, topRadius: 10, bottomRadius: 14)
+                .path(in: full)
+
+            XCTAssertTrue(box.isEmpty, "\(width)x\(height) cannot draw a notch")
+        }
+    }
+
+    /// And the cutout itself is comfortably above that floor, so the closed mask is a real shape
+    /// rather than an empty one.
+    func testTheClosedMaskIsStillDrawn() {
+        let full = CGRect(x: 0, y: 0, width: 520, height: 90)
+        let closed = NotchReveal(width: cutout.width, height: cutout.height,
+                                 topRadius: 10, bottomRadius: 14).path(in: full)
+
+        XCTAssertFalse(closed.isEmpty)
     }
 }

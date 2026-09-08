@@ -443,7 +443,10 @@ struct IndicatorWindow: View {
     /// Padding and minimum sizes follow the text setting, or the bubble keeps its shipped size
     /// however large the text is set. Notch mode is excluded: its geometry is the hardware's.
     @Environment(\.textScaleFactor) private var scale
-    
+    /// The bubble's own height, as last measured. Drives the mask, never the layout: reading it
+    /// back into a frame would make the measurement depend on itself.
+    @State private var measuredHeight: CGFloat = 0
+
     private var backgroundColor: Color {
         colorScheme == .dark
             ? Color.black.opacity(0.24)
@@ -800,21 +803,38 @@ struct IndicatorWindow: View {
                 Color.clear.preference(key: IndicatorContentSizeKey.self, value: proxy.size)
             }
         )
-        // The entrance. A mask rather than a transform, so the bubble is uncovered at its final
-        // size instead of being squashed into the notch and stretched back out.
+        // The opening the bubble is seen through. A mask rather than a transform, so the bubble
+        // is uncovered at its final size instead of being squashed into the notch and stretched
+        // back out. It carries the entrance *and* every later change of height: the window itself
+        // snaps, deliberately, and the mask is what makes that look like the pill growing.
         .mask {
-            NotchReveal(progress: viewModel.isVisible ? 1 : 0,
-                        cutout: geometry.cutout,
+            NotchReveal(width: viewModel.isVisible ? geometry.width : geometry.cutout.width,
+                        height: viewModel.isVisible ? openHeight(geometry) : geometry.cutout.height,
                         topRadius: geometry.topRadius,
                         bottomRadius: geometry.bottomRadius)
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: viewModel.isVisible)
         .onPreferenceChange(IndicatorContentSizeKey.self) { size in
             onContentResize(size)
+            // The window snaps to the new height in the same breath — `setContentSize` is
+            // non-animated on purpose, since NSHostingView's animated resize re-enters layout
+            // and overflows the stack on macOS 26 (#19). So the extra height is already there,
+            // transparent, and this is what walks the black down into it.
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+                measuredHeight = size.height
+            }
         }
         .onAppear {
             viewModel.isVisible = true
         }
+    }
+
+    /// How far down the mask is open once the bubble is up.
+    ///
+    /// Floored at the band, so the very first frame — before anything has been measured — opens
+    /// to the hardware's own height rather than to nothing.
+    private func openHeight(_ geometry: NotchGeometry) -> CGFloat {
+        max(measuredHeight, geometry.bandHeight)
     }
 
     private func notchSilhouette(_ geometry: NotchGeometry) -> NotchShape {

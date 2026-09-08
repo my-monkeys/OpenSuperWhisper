@@ -1,35 +1,48 @@
 import SwiftUI
 
-/// The bubble's entrance, as a mask that starts out exactly the size of the cutout and opens to
-/// the whole bubble.
+/// The opening through which the bubble is seen: a notch silhouette, centred on the hardware and
+/// pinned to the top of the screen, whose width and height are animated.
 ///
-/// Used as a mask rather than applied to the view, and that is the entire point. The three
-/// entrances before this one scaled the view tree instead, which does not reveal content, it
-/// squashes it: the spectrum bars went in at a third of their width and stretched back out,
-/// the label started as illegible compressed glyphs, and the shape's rounded corners came in
-/// oval. Masking leaves every point of the bubble at its final size and simply uncovers it.
+/// A mask rather than a transform, and that is the whole point. The three entrances before this
+/// one scaled the view tree instead, which does not reveal content, it squashes it: the spectrum
+/// bars went in at a third of their width and stretched back out, the label started as illegible
+/// compressed glyphs, and the rounded corners came in oval. A mask leaves every point of the
+/// bubble at its final size and simply uncovers it.
 ///
-/// At zero it is the notch and nothing else, so the first frame is hidden behind the hardware
-/// and the bubble looks like it grew out of it. Anchored to the top edge and centred, because
-/// that is where the hardware is.
+/// Both dimensions are **points**, not a fraction of the bubble. A fraction was enough for the
+/// entrance and useless for everything after it: `path(in:)` is handed a new rect the instant the
+/// content grows, and a fraction of a rect that changed under it has nothing left to interpolate.
+/// So the pill snapped to its new height with no animation at all — most visibly when a clip came
+/// back with nothing in it and the bubble had to drop down to say so. Points are a value SwiftUI
+/// can animate between, whatever the rect does.
 struct NotchReveal: Shape {
-    /// 0 = exactly the cutout, 1 = the full bubble.
-    var progress: CGFloat
-    var cutout: CGSize
+    /// Closed, this is the cutout: the first frame is indistinguishable from the hardware, so the
+    /// bubble looks like it grew out of it.
+    var width: CGFloat
+    var height: CGFloat
     var topRadius: CGFloat
     var bottomRadius: CGFloat
 
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(width, height) }
+        set { width = newValue.first; height = newValue.second }
     }
 
     func path(in rect: CGRect) -> Path {
-        let eased = min(max(progress, 0), 1)
-        let width = cutout.width + (rect.width - cutout.width) * eased
-        let height = cutout.height + (rect.height - cutout.height) * eased
-        let opening = CGRect(x: rect.midX - width / 2, y: rect.minY,
-                             width: width, height: max(height, 0))
+        // Clamped because a spring overshoots at both ends, and an opening wider than the bubble
+        // would show a bare rectangle of black for a frame or two.
+        let openWidth = min(max(width, 0), rect.width)
+        let openHeight = min(max(height, 0), rect.height)
+
+        // `NotchShape` carves its corners out of the rect it is handed, so below the size those
+        // corners need, the path crosses itself and encloses more than the opening asked for.
+        // An opening that small has nothing worth showing, so it shows nothing.
+        guard openWidth >= 2 * (topRadius + bottomRadius),
+              openHeight >= topRadius + bottomRadius
+        else { return Path() }
+
+        let opening = CGRect(x: rect.midX - openWidth / 2, y: rect.minY,
+                             width: openWidth, height: openHeight)
         return NotchShape(topRadius: topRadius, bottomRadius: bottomRadius).path(in: opening)
     }
 }
