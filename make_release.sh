@@ -151,7 +151,7 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
             "tag_name": "'${TAG}'",
             "target_commitish": "master",
             "name": "Release '${NEW_VERSION}'",
-            "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew update\nbrew install opensuperwhisper\n```\n\n### Manual Installation\n1. Download the `'${APP_NAME}-${ARCH}-${NEW_VERSION}'.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon (ARM64) Mac",
+            "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew install --cask my-monkeys/tap/opensuperwhisper\n```\nUse the full `my-monkeys/tap/` path: the bare name resolves to the original unmaintained cask, not this fork.\n\n### Manual Installation\n1. Download the `'${APP_NAME}-${ARCH}-${NEW_VERSION}'.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon or Intel",
             "draft": false,
             "prerelease": false,
             "generate_release_notes": false
@@ -240,27 +240,22 @@ if [[ -f "$DSYM_ZIP_PATH" ]]; then
     echo "   - OpenSuperWhisper.app.dSYM.zip"
 fi
 echo ""
-echo "🍺 Homebrew cask update:"
-echo "-----"
-cat << EOF
-cask "opensuperwhisper" do
-  version "${NEW_VERSION}"
-  sha256 "${SHA256}"
-
-  url "https://github.com/${REPO}/releases/download/v#{version}/${APP_NAME}-${ARCH}-#{version}.dmg"
-  name "OpenSuperWhisper"
-  desc "Whisper dictation/transcription app"
-  homepage "https://github.com/${REPO}"
-
-  depends_on macos: ">= :sonoma"
-  depends_on arch: :arm64
-
-  app "OpenSuperWhisper.app"
-
-  zap trash: [
-    "~/Library/Application Scripts/ru.starmel.OpenSuperWhisper",
-    "~/Library/Application Support/ru.starmel.OpenSuperWhisper",
-  ]
-end
-EOF
-echo "-----" 
+echo "🍺 Homebrew tap:"
+# Not printed for someone to copy by hand any more. What used to be printed here was a
+# single-arch cask that declared `depends_on arch: :arm64` and zapped `ru.starmel.*`, the bundle
+# ID of the project this was forked from — following it produced a cask that was wrong for Intel
+# and cleaned up nothing. So nobody followed it, and the tap sat on 0.9.9 for three releases
+# while Homebrew was the first install route in our own README (#106).
+#
+# The bump reads the checksums off the published release rather than off this build, so it can
+# only run once BOTH architectures are uploaded. Releasing the second one is what completes it;
+# on the first it says so and stops, which is a state to expect rather than a failure.
+if [[ -x "./update_homebrew_tap.sh" ]]; then
+    ./update_homebrew_tap.sh "${NEW_VERSION}" || {
+        echo ""
+        echo "⚠️  The tap was not updated. Run this once the other architecture is published:"
+        echo "    ./update_homebrew_tap.sh ${NEW_VERSION}"
+    }
+else
+    echo "⚠️  update_homebrew_tap.sh not found; the tap still points at whatever it did before."
+fi
