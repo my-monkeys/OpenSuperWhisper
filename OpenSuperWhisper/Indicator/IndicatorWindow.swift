@@ -861,6 +861,22 @@ struct IndicatorWindow: View {
         return geometry.openHeight(progress: apronProgress, full: full)
     }
 
+    /// A symbol and its message on one line, the symbol centred on the first line of text so a
+    /// message that wraps still reads as one block rather than as a symbol with a paragraph
+    /// hanging off it.
+    private func messageLine(_ symbol: (name: String, color: Color)?, _ text: Text) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            if let symbol {
+                Image(systemName: symbol.name)
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundColor(symbol.color)
+            }
+            text
+                .scaledFont(size: 13, weight: .semibold)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private func notchSilhouette(_ geometry: NotchGeometry) -> NotchShape {
         NotchShape(topRadius: geometry.topRadius, bottomRadius: geometry.bottomRadius)
     }
@@ -901,29 +917,29 @@ struct IndicatorWindow: View {
     /// reopened underneath. The words go below; what is happening stays up here.
     @ViewBuilder private func notchLeadingContent(_ geometry: NotchGeometry) -> some View {
         switch viewModel.state {
-        case .recording:
-            notchElements(layout.leading, geometry: geometry)
-        case .decoding:
-            notchElements(layout.decodingLeading, geometry: geometry)
         case .connecting:
             ProgressView()
                 .progressViewStyle(.circular)
                 .controlSize(.small)
-        case .busy:
-            notchStatusIcon("hourglass", .orange)
-        case .error:
-            notchStatusIcon("exclamationmark.triangle.fill", .red)
-        case .info:
-            notchStatusIcon("info.circle", .white)
         case .idle:
             EmptyView()
+        default:
+            // `decodingLeading` rather than `leading` because it is the one that is never empty:
+            // a layout with neither meter nor label borrows the meter, and an empty flank means
+            // an invisible bubble. While a message is up the meter is simply at rest, which is
+            // both true and continuous with what was there a moment earlier.
+            notchElements(layout.decodingLeading, geometry: geometry)
         }
     }
 
-    private func notchStatusIcon(_ symbol: String, _ color: Color) -> some View {
-        Image(systemName: symbol)
-            .scaledFont(size: 15, weight: .semibold)
-            .foregroundColor(color)
+    /// The symbol that goes beside a message, or nil for a state that has no words.
+    private var notchMessageSymbol: (name: String, color: Color)? {
+        switch viewModel.state {
+        case .busy: return ("hourglass", .orange)
+        case .error: return ("exclamationmark.triangle.fill", .red)
+        case .info: return ("info.circle", .white)
+        case .connecting, .recording, .decoding, .idle: return nil
+        }
     }
 
     /// The meter is the tallest thing on the row and the row is the height of the cutout, so a
@@ -975,24 +991,16 @@ struct IndicatorWindow: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        // No icons down here: the band above already says what is happening, and repeating it
-        // beside the words made the message look like a separate notification rather than the
-        // same object continuing.
+        // The symbol sits on the same line as the words it belongs to, not up in the band. Up
+        // there it read as an orphan on a line of its own, with the message stranded below it.
         case .connecting:
-            Text("Connecting...").scaledFont(size: 13, weight: .semibold)
+            messageLine(nil, Text("Connecting...").foregroundColor(.primary))
         case .busy:
-            Text("Processing...")
-                .scaledFont(size: 13, weight: .semibold)
-                .foregroundColor(.orange)
+            messageLine(notchMessageSymbol, Text("Processing...").foregroundColor(.orange))
         case .error(let message):
-            Text(message)
-                .scaledFont(size: 13, weight: .semibold)
-                .foregroundColor(.red)
-                .fixedSize(horizontal: false, vertical: true)
+            messageLine(notchMessageSymbol, Text(message).foregroundColor(.red))
         case .info(let message):
-            Text(message)
-                .scaledFont(size: 13, weight: .semibold)
-                .fixedSize(horizontal: false, vertical: true)
+            messageLine(notchMessageSymbol, Text(message).foregroundColor(.primary))
         case .idle, .decoding:
             EmptyView()
         }
