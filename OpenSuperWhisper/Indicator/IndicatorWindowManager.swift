@@ -291,14 +291,41 @@ class IndicatorWindowManager: IndicatorViewDelegate {
     /// progress so it never interrupts the live recording bubble. The message auto-hides via the
     /// view model's own timer (showError/showInfo). (parallel-recording #3)
     func flash(_ state: RecordingState) {
-        if let current = viewModel, current.state == .recording || current.state == .connecting {
+        if let current = viewModel {
+            guard Self.messageMayTakeOver(from: current.state) else { return }
+
+            // Reuse the bubble that is already on screen. Going through `show()` built a fresh
+            // view and swapped it into the window, so between "transcribing" and whatever the
+            // clip turned out to be the pill visibly closed back into the notch and reopened.
+            // Nothing about the window has to change here: the message is one more thing to
+            // show in the bubble that is still up.
+            drainObserver?.cancel()
+            drainObserver = nil
+            present(state, on: current)
             return
         }
-        let vm = show(nearPoint: FocusUtils.getCurrentCursorPosition())
+        present(state, on: show(nearPoint: FocusUtils.getCurrentCursorPosition()))
+    }
+
+    /// Whether a message from the background pipeline may take over the bubble currently
+    /// showing `state`.
+    ///
+    /// Everything except a take in progress. The bubble is one object on screen, and building a
+    /// second one to say "no speech" made the pill close back into the notch and reopen between
+    /// transcribing and the answer. A live recording is the exception: the message belongs to an
+    /// earlier clip, and what is in front of the user is the take they are in the middle of.
+    nonisolated static func messageMayTakeOver(from state: RecordingState) -> Bool {
         switch state {
-        case .error(let message): vm.showError(message)
-        case .info(let message): vm.showInfo(message)
-        default: vm.showBusyMessage()
+        case .recording, .connecting: return false
+        case .idle, .decoding, .busy, .error, .info: return true
+        }
+    }
+
+    private func present(_ state: RecordingState, on viewModel: IndicatorViewModel) {
+        switch state {
+        case .error(let message): viewModel.showError(message)
+        case .info(let message): viewModel.showInfo(message)
+        default: viewModel.showBusyMessage()
         }
     }
 
