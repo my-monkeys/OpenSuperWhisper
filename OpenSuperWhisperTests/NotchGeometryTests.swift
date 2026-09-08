@@ -127,6 +127,45 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertEqual(geometry([.waveform, .label]).bandHeight, cutout.height)
     }
 
+    // MARK: - Walking the opening down
+
+    /// Closed, the opening is the band and nothing more, so the bubble is exactly the hardware and
+    /// whatever hangs below it is still covered.
+    func testAtZeroTheOpeningIsJustTheBand() {
+        XCTAssertEqual(geometry([.waveform]).openHeight(progress: 0, full: 73), cutout.height)
+    }
+
+    func testAtOneTheOpeningIsTheWholeBubble() {
+        XCTAssertEqual(geometry([.waveform]).openHeight(progress: 1, full: 73), 73)
+    }
+
+    func testItTravelsEvenlyInBetween() {
+        let g = geometry([.waveform])
+
+        XCTAssertEqual(g.openHeight(progress: 0.5, full: 73), (cutout.height + 73) / 2, accuracy: 0.001)
+    }
+
+    /// A spring undershoots below zero on its way out. An opening pulled up inside the hardware
+    /// would show the menu bar through the notch for a frame.
+    func testAnUndershootCannotOpenLessThanTheBand() {
+        XCTAssertEqual(geometry([.waveform]).openHeight(progress: -0.3, full: 73), cutout.height)
+    }
+
+    /// And it overshoots past one on the way in, which would show a band of black below the bubble.
+    func testAnOvershootCannotOpenPastTheBubble() {
+        XCTAssertEqual(geometry([.waveform]).openHeight(progress: 1.4, full: 73), 73)
+    }
+
+    /// Nothing hanging below means nothing to travel, at any progress. The bubble that only
+    /// flanks the notch must never grow even mid-animation.
+    func testWithNothingBelowTheOpeningNeverLeavesTheBand() {
+        let g = geometry([.waveform])
+
+        for progress in stride(from: CGFloat(0), through: 1, by: 0.25) {
+            XCTAssertEqual(g.openHeight(progress: progress, full: cutout.height), cutout.height)
+        }
+    }
+
     // MARK: - The opening
 
     /// Closed, the mask is the cutout and nothing else, so the first frame is hidden behind the

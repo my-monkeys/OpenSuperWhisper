@@ -443,7 +443,11 @@ struct IndicatorWindow: View {
     /// Padding and minimum sizes follow the text setting, or the bubble keeps its shipped size
     /// however large the text is set. Notch mode is excluded: its geometry is the hardware's.
     @Environment(\.textScaleFactor) private var scale
-    
+    /// How far the opening has travelled past the notch band, 0 to 1. Drives the mask only, never
+    /// layout, which is why it is a plain value animated from outside the mask rather than an
+    /// animation attached inside it.
+    @State private var apronProgress: CGFloat = 0
+
     private var backgroundColor: Color {
         colorScheme == .dark
             ? Color.black.opacity(0.24)
@@ -795,41 +799,62 @@ struct IndicatorWindow: View {
         // Measured here, before the mask, which is render-only. Nothing about the entrance may
         // reach this: the manager resizes the window from it, and a size that animates would
         // feed a stream of window resizes back into layout (the macOS 26 recursion, #19).
-        .background(
+        .overlay(
             GeometryReader { proxy in
                 Color.clear.preference(key: IndicatorContentSizeKey.self, value: proxy.size)
             }
+            .allowsHitTesting(false)
         )
         // The opening the bubble is seen through. A mask rather than a transform, so the bubble
         // is uncovered at its final size instead of being squashed into the notch and stretched
-        // back out. It carries the entrance *and* every later change of height: the window itself
-        // snaps, deliberately, and the mask is what makes that look like the pill growing.
+        // back out. It carries the entrance and every later change of height: the window snaps,
+        // deliberately, and the mask is what makes that read as the pill growing.
         .mask {
-            // The height comes from the mask's own reader rather than from anything measured a
-            // frame earlier. That is deliberate, and it is about the failure mode: an opening
-            // driven by a value that arrives late clips whatever the bubble is saying until it
-            // catches up, and the message vanished. Read here it is simply the bubble's height,
-            // always, and the animation is the only thing that can go missing.
+            // The height is read here rather than measured a frame earlier, so the opening is
+            // always the bubble's real height and can never clip what the bubble is saying. An
+            // earlier version drove it from the size reported for the window, which arrives late,
+            // and the message was invisible until it caught up.
+            //
+            // There is deliberately no `.animation` inside here. Any animation modifier in this
+            // GeometryReader leaks into layout, whatever value drives it, and then the bubble
+            // itself grows over 40 frames inside a window that snapped to full height in one.
+            // SwiftUI centres content smaller than its frame, so the pill appeared to swell out
+            // of the middle of the notch in both directions at once, with a gap showing the
+            // desktop through the middle. The animation lives in `apronProgress` instead, set
+            // from `.onChange` below, which runs after layout has already settled.
             GeometryReader { proxy in
                 NotchReveal(width: viewModel.isVisible ? geometry.width : geometry.cutout.width,
-                            height: viewModel.isVisible ? proxy.size.height : geometry.cutout.height,
+                            height: openHeight(geometry, full: proxy.size.height),
                             topRadius: geometry.topRadius,
                             bottomRadius: geometry.bottomRadius)
-                    // The window snaps to the new height in the same breath, on purpose:
-                    // NSHostingView's animated resize re-enters layout and overflows the stack on
-                    // macOS 26 (#19). The extra height is therefore already there and transparent,
-                    // and this is what walks the black down into it.
-                    .animation(.spring(response: 0.34, dampingFraction: 0.9),
-                               value: proxy.size.height)
             }
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: viewModel.isVisible)
         .onPreferenceChange(IndicatorContentSizeKey.self) { size in
             onContentResize(size)
         }
+        // Set here rather than inside the mask so the bubble's own layout has already settled,
+        // unanimated, by the time this runs. That ordering is the whole trick: the height snaps,
+        // and only the opening over it travels.
+        .onChange(of: hasNotchApron) { _, showing in
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+                apronProgress = showing ? 1 : 0
+            }
+        }
         .onAppear {
             viewModel.isVisible = true
+            if hasNotchApron { apronProgress = 1 }
         }
+    }
+
+    /// How far down the opening reaches.
+    ///
+    /// Closed it is the cutout, so the first frame is indistinguishable from the hardware. Open it
+    /// is the band alone when nothing hangs below, and the bubble's whole measured height when
+    /// something does.
+    private func openHeight(_ geometry: NotchGeometry, full: CGFloat) -> CGFloat {
+        guard viewModel.isVisible else { return geometry.cutout.height }
+        return geometry.openHeight(progress: apronProgress, full: full)
     }
 
     private func notchSilhouette(_ geometry: NotchGeometry) -> NotchShape {

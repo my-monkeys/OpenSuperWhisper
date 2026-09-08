@@ -30,6 +30,22 @@ struct NotchGeometry: Equatable {
     let topRadius: CGFloat
     let bottomRadius: CGFloat
 
+    /// How far down the opening reaches, part way through the reveal.
+    ///
+    /// `progress` is 0 while nothing hangs below the hardware and 1 once it fully does, and it is
+    /// animated from outside the mask rather than by an animation attached inside it. That is not
+    /// a style preference: any animation modifier inside the mask's own `GeometryReader` leaks
+    /// into layout, and the bubble then grows over many frames inside a window that snapped to
+    /// full height in one. SwiftUI centres content smaller than its frame, so the pill swelled out
+    /// of the middle of the notch in both directions with the desktop showing through the gap.
+    ///
+    /// Floored at the band, so a spring undershooting past zero cannot pull the opening up inside
+    /// the hardware and reveal the menu bar behind it.
+    func openHeight(progress: CGFloat, full: CGFloat) -> CGFloat {
+        let apron = max(0, full - bandHeight)
+        return bandHeight + apron * min(max(progress, 0), 1)
+    }
+
     /// The band level with the hardware. A floor *and* a ceiling: content that grew past it would
     /// spill out from under the notch, and content that stopped short would leave a black lip.
     var bandHeight: CGFloat { cutout.height }
