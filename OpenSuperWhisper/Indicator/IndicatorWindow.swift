@@ -776,12 +776,16 @@ struct IndicatorWindow: View {
     private func notchBubble(_ geometry: NotchGeometry) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                notchFlank(notchLeadingElements, geometry: geometry, alignment: .trailing)
+                notchFlank(geometry: geometry, alignment: .trailing) {
+                    notchLeadingContent(geometry)
+                }
                 // The hardware itself. Reserved on both sides even when only one of them has
                 // anything in it, or the hole slides off the notch by half the missing width.
                 Color.clear
                     .frame(width: geometry.cutout.width, height: geometry.bandHeight)
-                notchFlank(notchTrailingElements, geometry: geometry, alignment: .leading)
+                notchFlank(geometry: geometry, alignment: .leading) {
+                    notchElements(notchTrailingElements, geometry: geometry)
+                }
             }
             .frame(height: geometry.bandHeight)
 
@@ -866,8 +870,15 @@ struct IndicatorWindow: View {
     /// Content hugs the hardware, so the bubble reads as one object wrapped around the notch
     /// rather than two islands adrift at the far edges. The slack goes to the outer edges, in
     /// equal parts, which is what keeps the hole over the glass.
-    private func notchFlank(_ elements: [IndicatorElement], geometry: NotchGeometry,
-                            alignment: Alignment) -> some View {
+    private func notchFlank<Content: View>(geometry: NotchGeometry, alignment: Alignment,
+                                          @ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(alignment == .trailing ? .trailing : .leading, NotchGeometry.innerGutter)
+            .frame(width: geometry.sideWidth, height: geometry.bandHeight, alignment: alignment)
+    }
+
+    private func notchElements(_ elements: [IndicatorElement],
+                               geometry: NotchGeometry) -> some View {
         HStack(spacing: NotchGeometry.elementSpacing) {
             ForEach(elements) { element in
                 IndicatorElementView(element: element,
@@ -879,22 +890,46 @@ struct IndicatorWindow: View {
                                      isDecoding: viewModel.state == .decoding)
             }
         }
-        .padding(alignment == .trailing ? .trailing : .leading, NotchGeometry.innerGutter)
-        .frame(width: geometry.sideWidth, height: geometry.bandHeight, alignment: alignment)
+    }
+
+    /// What sits beside the notch, whatever the bubble is doing.
+    ///
+    /// Every state puts something here, and that is the point. The bubble is one object that
+    /// stays up from the moment you start speaking until the moment it goes away, so the band
+    /// beside the hardware must never go empty: a message used to clear both flanks, and since
+    /// the band itself is hidden behind the notch, the bubble read as having closed and then
+    /// reopened underneath. The words go below; what is happening stays up here.
+    @ViewBuilder private func notchLeadingContent(_ geometry: NotchGeometry) -> some View {
+        switch viewModel.state {
+        case .recording:
+            notchElements(layout.leading, geometry: geometry)
+        case .decoding:
+            notchElements(layout.decodingLeading, geometry: geometry)
+        case .connecting:
+            ProgressView()
+                .progressViewStyle(.circular)
+                .controlSize(.small)
+        case .busy:
+            notchStatusIcon("hourglass", .orange)
+        case .error:
+            notchStatusIcon("exclamationmark.triangle.fill", .red)
+        case .info:
+            notchStatusIcon("info.circle", .white)
+        case .idle:
+            EmptyView()
+        }
+    }
+
+    private func notchStatusIcon(_ symbol: String, _ color: Color) -> some View {
+        Image(systemName: symbol)
+            .scaledFont(size: 15, weight: .semibold)
+            .foregroundColor(color)
     }
 
     /// The meter is the tallest thing on the row and the row is the height of the cutout, so a
     /// taller setting would stand the bars out from under the hardware instead of inside it.
     private func notchMeterHeight(_ geometry: NotchGeometry) -> CGFloat {
         min(meterHeight, geometry.bandHeight - 10)
-    }
-
-    private var notchLeadingElements: [IndicatorElement] {
-        switch viewModel.state {
-        case .recording: return layout.leading
-        case .decoding: return layout.decodingLeading
-        case .idle, .connecting, .busy, .error, .info: return []
-        }
     }
 
     private var notchTrailingElements: [IndicatorElement] {
@@ -940,33 +975,24 @@ struct IndicatorWindow: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        // No icons down here: the band above already says what is happening, and repeating it
+        // beside the words made the message look like a separate notification rather than the
+        // same object continuing.
         case .connecting:
-            HStack(spacing: 8) {
-                ProgressView().scaleEffect(0.6).frame(width: 18)
-                Text("Connecting...").scaledFont(size: 13, weight: .semibold)
-            }
+            Text("Connecting...").scaledFont(size: 13, weight: .semibold)
         case .busy:
-            HStack(spacing: 8) {
-                Image(systemName: "hourglass").foregroundColor(.orange)
-                Text("Processing...")
-                    .scaledFont(size: 13, weight: .semibold)
-                    .foregroundColor(.orange)
-            }
+            Text("Processing...")
+                .scaledFont(size: 13, weight: .semibold)
+                .foregroundColor(.orange)
         case .error(let message):
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.red)
-                Text(message)
-                    .scaledFont(size: 13, weight: .semibold)
-                    .foregroundColor(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(message)
+                .scaledFont(size: 13, weight: .semibold)
+                .foregroundColor(.red)
+                .fixedSize(horizontal: false, vertical: true)
         case .info(let message):
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "doc.on.clipboard").foregroundColor(.accentColor)
-                Text(message)
-                    .scaledFont(size: 13, weight: .semibold)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(message)
+                .scaledFont(size: 13, weight: .semibold)
+                .fixedSize(horizontal: false, vertical: true)
         case .idle, .decoding:
             EmptyView()
         }
