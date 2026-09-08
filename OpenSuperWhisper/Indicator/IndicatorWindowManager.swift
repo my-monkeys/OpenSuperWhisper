@@ -108,6 +108,9 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         let targetScreen = point.flatMap { FocusUtils.screenContaining(point: $0) } ?? NSScreen.main
         if let window = window, let screen = targetScreen {
             let screenFrame = screen.frame
+            // Measured per show: the bubble follows the caret, so which screen it lands on
+            // changes, and only one of them may have hardware in the way.
+            newViewModel.physicalNotch = NotchMetrics.physicalNotch(for: screen)
 
             anchorFromTop = false
             switch AppPreferences.shared.indicatorPosition {

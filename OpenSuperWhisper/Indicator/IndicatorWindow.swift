@@ -33,6 +33,10 @@ class IndicatorViewModel: ObservableObject {
     @Published var isConfirmingCancel = false
     @Published var recorder: AudioRecorder = .shared
     @Published var isVisible = false
+    /// The physical notch of the screen this bubble is showing on, nil when that screen has
+    /// none. Set at record-start by the window manager, which is the only place that knows
+    /// which screen was chosen — a laptop plugged into an external display has one of each.
+    @Published var physicalNotch: CGSize?
 
     var recordingStartedAt: Date?
     /// Set by the trigger when this take should be submitted after insertion (#50). Carried
@@ -470,7 +474,10 @@ struct IndicatorWindow: View {
     private var bubbleWidth: CGFloat? {
         let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
         if isNotchMode {
-            return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth + meterWidthAllowance
+            // The tuned width is a preference; a real cutout is not. Narrower than the hardware
+            // would leave the pill floating inside it.
+            let base = max(notch.width, viewModel.physicalNotch?.width ?? 0)
+            return (hasCaption ? max(base, 440) : base) + buttonExtraWidth + meterWidthAllowance
         }
         // The cancel confirmation replaces everything with one short line, and it must be
         // readable whatever was there before: a width chosen for a caption or a meter has no
@@ -486,6 +493,16 @@ struct IndicatorWindow: View {
         return 200 + buttonExtraWidth + meterWidthAllowance
     }
     
+    /// How far down the content must start to clear the hardware.
+    ///
+    /// The window hangs from the very top of the screen so the pill and the cutout read as one
+    /// piece. On a Mac that actually has a cutout, everything in that band is behind it: the
+    /// waveform and the buttons were being drawn into a hole. Zero on every other screen, where
+    /// the pill is a drawing rather than a fitting.
+    private var notchTopInset: CGFloat {
+        isNotchMode ? (viewModel.physicalNotch?.height ?? 0) : 0
+    }
+
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
 
     private var layout: IndicatorLayout {
@@ -679,9 +696,12 @@ struct IndicatorWindow: View {
         .fixedSize(horizontal: bubbleWidth == nil, vertical: false)
         .padding(.horizontal, isNotchMode ? 22 : 16 * scale)
         .padding(.vertical, isNotchMode ? 10 : 7 * scale)
+        // The background still runs up under the cutout, so the pill looks like it grows out of
+        // the notch rather than sitting below it.
+        .padding(.top, notchTopInset)
         // Width must be set *before* the background so the bubble itself fills it (not just the
         // surrounding frame). Notch content is centred; the others stay leading.
-        .frame(minHeight: isNotchMode ? notch.height : 36 * scale)
+        .frame(minHeight: isNotchMode ? notch.height + notchTopInset : 36 * scale)
         // A floor so a single small element still reads as a bubble rather than a chip.
         .frame(minWidth: bubbleWidth == nil ? 76 * scale : nil)
         .frame(width: bubbleWidth, alignment: isNotchMode ? .center : .leading)
