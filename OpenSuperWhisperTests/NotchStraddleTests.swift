@@ -66,4 +66,26 @@ final class NotchStraddleTests: XCTestCase {
         XCTAssertGreaterThan(everything.notchSideWidth(), 0)
         XCTAssertEqual(everything.notchSideWidth(), everything.notchSideWidth())
     }
+
+    // MARK: - Which states may straddle
+
+    /// The rule the layout depends on. Everything the bubble shows apart from the recording and
+    /// decoding rows is prose — an error, "Copied", the cancel warning — and prose laid out
+    /// astride the cutout puts its middle behind the hardware.
+    func testOnlyTheFixedElementStatesMayStraddle() {
+        let mayStraddle: (RecordingState) -> Bool = { state in
+            switch state {
+            case .recording, .decoding: return true
+            case .idle, .connecting, .busy, .error, .info: return false
+            }
+        }
+
+        XCTAssertTrue(mayStraddle(.recording))
+        XCTAssertTrue(mayStraddle(.decoding))
+        XCTAssertFalse(mayStraddle(.busy))
+        XCTAssertFalse(mayStraddle(.error("boom")))
+        XCTAssertFalse(mayStraddle(.info("Copied")))
+        XCTAssertFalse(mayStraddle(.connecting))
+        XCTAssertFalse(mayStraddle(.idle))
+    }
 }

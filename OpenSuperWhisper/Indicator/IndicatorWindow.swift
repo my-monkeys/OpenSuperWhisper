@@ -506,12 +506,58 @@ struct IndicatorWindow: View {
     /// one falls back to hanging below.
     private var straddlesNotch: Bool {
         guard isNotchMode, viewModel.physicalNotch != nil else { return false }
-        return streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty
-            && !viewModel.isConfirmingCancel
+        // Only the two states made of small fixed elements. Everything else the bubble shows is
+        // prose — the cancel warning, an error, "Copied", a live caption — and prose cannot be
+        // split around a hole: laid out astride, its middle went behind the hardware. Those hang
+        // below the notch and take the height they need.
+        switch viewModel.state {
+        case .recording, .decoding:
+            return streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty
+                && !viewModel.isConfirmingCancel
+        case .idle, .connecting, .busy, .error, .info:
+            return false
+        }
     }
 
     /// The hardware's width, reserved as a hole in the middle of the row.
     private var notchGapWidth: CGFloat { viewModel.physicalNotch?.width ?? 0 }
+
+    /// Where the bubble comes from on the way in.
+    ///
+    /// Astride the notch it starts exactly the width of the cutout and no shorter, so the first
+    /// frame is indistinguishable from the hardware and it appears to widen out of it. That is
+    /// the Dynamic Island move, and it only reads as one if the starting shape *is* the notch:
+    /// scaling down uniformly, as the other positions do, looks like a block fading in from
+    /// nowhere in front of the notch.
+    ///
+    /// Render-only, like the transforms it replaces — the size is measured above this, so none
+    /// of it can drive a window resize.
+    private var entranceScale: CGSize {
+        if straddlesNotch {
+            let full = notchSideWidth * 2 + notchGapWidth
+            return CGSize(width: full > 0 ? notchGapWidth / full : 1, height: 1)
+        }
+        let uniform = isNotchMode ? 0.85 : 0.5
+        return CGSize(width: uniform, height: uniform)
+    }
+
+    private var entranceAnchor: UnitPoint {
+        if straddlesNotch { return .center }
+        return isNotchMode ? .top : .center
+    }
+
+    /// No vertical travel astride the notch: it comes out of the hardware sideways, and sliding
+    /// it down as well would break the illusion that it was there all along.
+    private var entranceOffsetY: CGFloat {
+        if straddlesNotch { return 0 }
+        return isNotchMode ? -20 : 20
+    }
+
+    /// The hardware's height too, so the reserved hole is a box rather than a column.
+    ///
+    /// A `Color` constrained on one axis takes every point offered on the other. Leaving the
+    /// height open stretched the row until the bubble read as a block.
+    private var notchGapHeight: CGFloat { viewModel.physicalNotch?.height ?? 0 }
 
     /// Equal on both sides, so the hole stays centred on the hardware.
     private var notchSideWidth: CGFloat { layout.notchSideWidth() }
@@ -628,7 +674,7 @@ HStack(spacing: 10) {
                         // The hardware goes here. Reserved even with no buttons to its right, or
                         // the hole would slide off the notch by half the missing side.
                         if straddlesNotch {
-                            Color.clear.frame(width: notchGapWidth)
+                            Color.clear.frame(width: notchGapWidth, height: notchGapHeight)
                         } else if !layout.trailing.isEmpty {
                             Spacer(minLength: 8)
                         }
@@ -690,7 +736,7 @@ HStack(spacing: 10) {
                     // The hardware goes here. Reserved even with no buttons to its right, or
                     // the hole would slide off the notch by half the missing side.
                     if straddlesNotch {
-                        Color.clear.frame(width: notchGapWidth)
+                        Color.clear.frame(width: notchGapWidth, height: notchGapHeight)
                     } else if !layout.trailing.isEmpty {
                         Spacer(minLength: 8)
                     }
@@ -790,9 +836,12 @@ HStack(spacing: 10) {
             }
         )
         .environment(\.colorScheme, isNotchMode ? .dark : colorScheme)
-        // Notch drops in from the top edge; the others rise from below.
-        .scaleEffect(viewModel.isVisible ? 1 : (isNotchMode ? 0.85 : 0.5), anchor: isNotchMode ? .top : .center)
-        .offset(y: viewModel.isVisible ? 0 : (isNotchMode ? -20 : 20))
+        // Astride the notch it grows sideways out of the hardware; a notch pill hanging below
+        // drops from the top edge; everything else rises from beneath.
+        .scaleEffect(x: viewModel.isVisible ? 1 : entranceScale.width,
+                     y: viewModel.isVisible ? 1 : entranceScale.height,
+                     anchor: entranceAnchor)
+        .offset(y: viewModel.isVisible ? 0 : entranceOffsetY)
         .opacity(viewModel.isVisible ? 1 : 0)
         .animation(.spring(response: 0.35, dampingFraction: 0.72), value: viewModel.isVisible)
         // The hosting window is sized by the manager from this preference (NOT by SwiftUI's
