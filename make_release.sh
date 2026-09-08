@@ -58,22 +58,35 @@ echo ""
 # # Update version in Xcode project
 echo "📝 Updating version to ${NEW_VERSION} in Xcode project..."
 
-# Update MARKETING_VERSION in project.pbxproj
-sed -i '' "s/MARKETING_VERSION = [^;]*/MARKETING_VERSION = ${NEW_VERSION}/g" OpenSuperWhisper.xcodeproj/project.pbxproj
+# A release is two runs of this script, one per architecture, and the second must not look
+# like a different version of the app. Sparkle compares build numbers, not marketing versions,
+# so two slices of one release carrying different builds is an app that offers to update itself
+# to itself, with the Intel machine and the Apple Silicon one disagreeing about which is newer.
+# Bumping unconditionally, which is what this did, guaranteed exactly that; it was worked around
+# by hand on 0.12.0, 0.12.1 and 0.12.2.
+PROJECT_FILE="OpenSuperWhisper.xcodeproj/project.pbxproj"
+PREVIOUS_VERSION=$(grep -o 'MARKETING_VERSION = [^;]*' "${PROJECT_FILE}" | head -1 | sed 's/.*= *//')
+CURRENT_PROJECT_VERSION=$(grep -o 'CURRENT_PROJECT_VERSION = [0-9]*' "${PROJECT_FILE}" | head -1 | grep -o '[0-9]*')
 
-# Get current PROJECT_VERSION and increment by 1
-CURRENT_PROJECT_VERSION=$(grep -o 'CURRENT_PROJECT_VERSION = [0-9]*' OpenSuperWhisper.xcodeproj/project.pbxproj | head -1 | grep -o '[0-9]*')
-NEW_PROJECT_VERSION=$((CURRENT_PROJECT_VERSION + 1))
-sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*/CURRENT_PROJECT_VERSION = ${NEW_PROJECT_VERSION}/g" OpenSuperWhisper.xcodeproj/project.pbxproj
-
-echo "✅ Updated MARKETING_VERSION to ${NEW_VERSION} and CURRENT_PROJECT_VERSION to ${NEW_PROJECT_VERSION} (was ${CURRENT_PROJECT_VERSION})"
+if [[ "${PREVIOUS_VERSION}" == "${NEW_VERSION}" ]]; then
+    NEW_PROJECT_VERSION="${CURRENT_PROJECT_VERSION}"
+    SECOND_ARCH=true
+    echo "📝 ${NEW_VERSION} is already prepared at build ${NEW_PROJECT_VERSION}."
+    echo "   Treating this as the ${ARCH} slice of a release already under way."
+else
+    NEW_PROJECT_VERSION=$((CURRENT_PROJECT_VERSION + 1))
+    SECOND_ARCH=false
+    sed -i '' "s/MARKETING_VERSION = [^;]*/MARKETING_VERSION = ${NEW_VERSION}/g" "${PROJECT_FILE}"
+    sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*/CURRENT_PROJECT_VERSION = ${NEW_PROJECT_VERSION}/g" "${PROJECT_FILE}"
+    echo "✅ ${PREVIOUS_VERSION} -> ${NEW_VERSION}, build ${CURRENT_PROJECT_VERSION} -> ${NEW_PROJECT_VERSION}"
+fi
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
 rm -rf build
 rm -f OpenSuperWhisper-*.dmg
 rm -f OpenSuperWhisper-*.dmg.sha256
-rm -f OpenSuperWhisper.app.dSYM.zip
+rm -f OpenSuperWhisper*.app.dSYM.zip
 
 # Use the existing notarize_app.sh script to build, sign, and notarize
 echo "🔨 Building, signing and notarizing with notarize_app.sh..."
@@ -99,7 +112,9 @@ fi
 
 # Find and prepare dSYM
 DSYM_PATH="./build/Build/Products/Release/OpenSuperWhisper.app.dSYM"
-DSYM_ZIP_PATH="./OpenSuperWhisper.app.dSYM.zip"
+# Named per architecture: the two slices have different symbols, and uploading both under one
+# name left whichever lost the race with none to read a crash report against.
+DSYM_ZIP_PATH="./OpenSuperWhisper-${ARCH}-${NEW_VERSION}.app.dSYM.zip"
 
 if [[ -d "$DSYM_PATH" ]]; then
     echo "📦 Creating dSYM zip..."
@@ -119,54 +134,65 @@ shasum -a 256 "$DMG_PATH" > "${DMG_PATH}.sha256"
 SHA256=$(cat "${DMG_PATH}.sha256" | cut -d' ' -f1)
 echo "SHA256: $SHA256"
 
-# # Commit version changes
-echo "📝 Committing version changes..."
-git add OpenSuperWhisper.xcodeproj/project.pbxproj
-git commit -m "Bump version to ${NEW_VERSION}" || echo "No changes to commit"
+# Commit, tag and push, unless the second architecture is retracing steps the first already
+# took. Re-tagging fails, and `set -e` would abort the run after a forty-minute notarisation.
+if [[ "${SECOND_ARCH}" == "true" ]]; then
+    echo "🏷️ Tag ${TAG} exists; this run only adds the ${ARCH} build to it."
+else
+    echo "📝 Committing version changes..."
+    git add "${PROJECT_FILE}"
+    git commit -m "Bump version to ${NEW_VERSION}" || echo "No changes to commit"
 
-# Create git tag
-echo "🏷️ Creating git tag..."
-git tag -a "${TAG}" -m "Release ${NEW_VERSION}"
+    echo "🏷️ Creating git tag..."
+    git tag -a "${TAG}" -m "Release ${NEW_VERSION}"
 
-# Push tag to origin
-echo "📤 Pushing tag to origin..."
-git push origin "${TAG}"
-
-if [[ $? -ne 0 ]]; then
-    echo "❌ Failed to push tag!"
-    exit 1
+    echo "📤 Pushing tag to origin..."
+    git push origin "${TAG}"
 fi
 
 # Create GitHub release and upload DMG if token is provided
 if [[ -n "$GITHUB_TOKEN" ]]; then
-    echo "🚀 Creating GitHub release..."
-    
-    # Create release
-    RELEASE_RESPONSE=$(curl -s -L -X POST \
+    # The second architecture joins the release the first one made. A tag carries one release,
+    # so creating it again just fails.
+    RELEASE_ID=$(curl -s -L \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        https://api.github.com/repos/${REPO}/releases \
-        -d '{
-            "tag_name": "'${TAG}'",
-            "target_commitish": "master",
-            "name": "Release '${NEW_VERSION}'",
-            "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew install --cask my-monkeys/tap/opensuperwhisper\n```\nUse the full `my-monkeys/tap/` path: the bare name resolves to the original unmaintained cask, not this fork.\n\n### Manual Installation\n1. Download the `'${APP_NAME}-${ARCH}-${NEW_VERSION}'.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon or Intel",
-            "draft": false,
-            "prerelease": false,
-            "generate_release_notes": false
-        }')
+        "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" \
+        | grep -o '"id": [0-9]*' | head -1 | grep -o '[0-9]*')
+
+    if [[ -n "$RELEASE_ID" ]]; then
+        echo "🚀 Release ${TAG} exists (ID: $RELEASE_ID), adding the ${ARCH} build."
+    else
+        echo "🚀 Creating GitHub release..."
     
-    # Extract release ID from response
-    RELEASE_ID=$(echo "$RELEASE_RESPONSE" | grep -o '"id": [0-9]*' | head -1 | grep -o '[0-9]*')
+        # Create release
+        RELEASE_RESPONSE=$(curl -s -L -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${REPO}/releases \
+            -d '{
+                "tag_name": "'${TAG}'",
+                "target_commitish": "master",
+                "name": "Release '${NEW_VERSION}'",
+                "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew install --cask my-monkeys/tap/opensuperwhisper\n```\nUse the full `my-monkeys/tap/` path: the bare name resolves to the original unmaintained cask, not this fork.\n\n### Manual Installation\n1. Download the `'${APP_NAME}-${ARCH}-${NEW_VERSION}'.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon or Intel",
+                "draft": false,
+                "prerelease": false,
+                "generate_release_notes": false
+            }')
     
-    if [[ -z "$RELEASE_ID" ]]; then
-        echo "❌ Failed to create GitHub release or extract release ID"
-        echo "Response: $RELEASE_RESPONSE"
-        exit 1
+        # Extract release ID from response
+        RELEASE_ID=$(echo "$RELEASE_RESPONSE" | grep -o '"id": [0-9]*' | head -1 | grep -o '[0-9]*')
+    
+        if [[ -z "$RELEASE_ID" ]]; then
+            echo "❌ Failed to create GitHub release or extract release ID"
+            echo "Response: $RELEASE_RESPONSE"
+            exit 1
+        fi
+    
+        echo "✅ GitHub release created (ID: $RELEASE_ID)!"
     fi
-    
-    echo "✅ GitHub release created (ID: $RELEASE_ID)!"
+
     echo "📤 Uploading DMG..."
     
     # Upload DMG using the correct API format
@@ -202,7 +228,7 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             -H "Content-Type: application/zip" \
-            "https://uploads.github.com/repos/${REPO}/releases/${RELEASE_ID}/assets?name=OpenSuperWhisper.app.dSYM.zip" \
+            "https://uploads.github.com/repos/${REPO}/releases/${RELEASE_ID}/assets?name=$(basename "${DSYM_ZIP_PATH}")" \
             --data-binary @"${DSYM_ZIP_PATH}")
         
         # Check dSYM upload
@@ -237,7 +263,7 @@ echo "📁 Files created:"
 echo "   - ${DMG_PATH}"
 echo "   - ${DMG_PATH}.sha256"
 if [[ -f "$DSYM_ZIP_PATH" ]]; then
-    echo "   - OpenSuperWhisper.app.dSYM.zip"
+    echo "   - $(basename "${DSYM_ZIP_PATH}")"
 fi
 echo ""
 echo "🍺 Homebrew tap:"
