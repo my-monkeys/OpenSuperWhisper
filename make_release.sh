@@ -114,15 +114,24 @@ fi
 DSYM_PATH="./build/Build/Products/Release/OpenSuperWhisper.app.dSYM"
 # Named per architecture: the two slices have different symbols, and uploading both under one
 # name left whichever lost the race with none to read a crash report against.
-DSYM_ZIP_PATH="./OpenSuperWhisper-${ARCH}-${NEW_VERSION}.app.dSYM.zip"
+#
+# Absolute, because the zip is made from inside the build directory. Relative, the `mv` that
+# was meant to bring it back to the repo root renamed it onto itself and left it in the build
+# directory, so the `-f` test below found nothing and the upload was skipped without a word.
+# No release has ever carried a dSYM: not 0.12.2, not 0.12.1, not 0.12.0. Which means every
+# crash report we have been sent had no symbols to read it against.
+DSYM_ZIP_PATH="$(pwd)/OpenSuperWhisper-${ARCH}-${NEW_VERSION}.app.dSYM.zip"
 
 if [[ -d "$DSYM_PATH" ]]; then
     echo "📦 Creating dSYM zip..."
-    cd $(dirname "$DSYM_PATH")
-    zip -r "$(basename "$DSYM_ZIP_PATH")" "$(basename "$DSYM_PATH")" > /dev/null
-    mv "$(basename "$DSYM_ZIP_PATH")" "$DSYM_ZIP_PATH"
-    cd - > /dev/null
-    echo "✅ dSYM zip created: $DSYM_ZIP_PATH"
+    rm -f "$DSYM_ZIP_PATH"
+    # A subshell, so a failure here cannot leave the rest of the script in the build directory.
+    (cd "$(dirname "$DSYM_PATH")" && zip -r -q "$DSYM_ZIP_PATH" "$(basename "$DSYM_PATH")")
+    if [[ ! -f "$DSYM_ZIP_PATH" ]]; then
+        echo "❌ dSYM zip was not written to $DSYM_ZIP_PATH"
+        exit 1
+    fi
+    echo "✅ dSYM zip created: $DSYM_ZIP_PATH ($(du -h "$DSYM_ZIP_PATH" | cut -f1))"
 else
     echo "⚠️ dSYM not found at $DSYM_PATH - skipping dSYM upload"
     DSYM_ZIP_PATH=""
