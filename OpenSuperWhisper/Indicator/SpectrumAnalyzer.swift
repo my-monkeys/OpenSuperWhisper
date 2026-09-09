@@ -36,19 +36,38 @@ final class SpectrumAnalyzer: ObservableObject {
         if let fftSetup { vDSP_destroy_fftsetup(fftSetup) }
     }
 
+    /// Whether a second microphone tap is worth opening at all.
+    ///
+    /// It only feeds the visualiser, so with no visualiser on the bubble it is a second claim on
+    /// the input device for nothing. That claim is not free: it lands immediately after
+    /// `AVAudioRecorder.record()` has taken the device, which is exactly when a route or format
+    /// reconfiguration is in flight (#107 follow-up).
+    nonisolated static func shouldRun(layout: IndicatorLayout) -> Bool {
+        layout.contains(.waveform)
+    }
+
     func start() {
         guard !isRunning, fftSetup != nil else { return }
+        guard Self.shouldRun(layout: IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout))
+        else { return }
 
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0 else { return }
-        let sampleRate = Float(format.sampleRate)
-        let ranges = SpectrumBands.binRanges(sampleRate: sampleRate, fftSize: fftSize)
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+        // `format: nil` rather than a format read a moment ago, and this is the fix rather than a
+        // tidy-up. This runs right after `AVAudioRecorder.record()` grabs the device, so the
+        // device is often mid-reconfiguration: a format snapshotted here is stale by the time the
+        // engine starts, and AVAudioEngine then refuses the tap with a format mismatch. Reported
+        // on 0.12.3 as "Failed to create tap due to format mismatch" for 1ch/48kHz/Float32,
+        // followed by CoreAudio failing to start the input at all, over and over. Passing nil
+        // makes the engine use the bus's own format at the moment the tap is created, so there is
+        // no snapshot left to go stale.
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             guard let self, let channel = buffer.floatChannelData?[0] else { return }
             let incoming = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
-            Task { @MainActor in self.consume(incoming, ranges: ranges) }
+            // The buffer knows its own sample rate; nothing read up front can be trusted to still
+            // describe it. Sent along so the band edges are derived from the audio that arrived.
+            let sampleRate = Float(buffer.format.sampleRate)
+            Task { @MainActor in self.consume(incoming, sampleRate: sampleRate) }
         }
 
         engine.prepare()
@@ -67,10 +86,25 @@ final class SpectrumAnalyzer: ObservableObject {
         engine.stop()
         isRunning = false
         sampleBuffer.removeAll(keepingCapacity: true)
+        cachedRanges = nil
         bands = Array(repeating: 0, count: SpectrumBands.count)
     }
 
-    private func consume(_ samples: [Float], ranges: [Range<Int>]) {
+    /// Band edges for one sample rate, kept so they are not recomputed for every buffer. Keyed by
+    /// the rate rather than computed once at start, because the device can change rate underneath
+    /// a running tap.
+    private var cachedRanges: (sampleRate: Float, ranges: [Range<Int>])?
+
+    private func binRanges(for sampleRate: Float) -> [Range<Int>] {
+        if let cachedRanges, cachedRanges.sampleRate == sampleRate { return cachedRanges.ranges }
+        let ranges = SpectrumBands.binRanges(sampleRate: sampleRate, fftSize: fftSize)
+        cachedRanges = (sampleRate, ranges)
+        return ranges
+    }
+
+    private func consume(_ samples: [Float], sampleRate: Float) {
+        guard sampleRate > 0 else { return }
+        let ranges = binRanges(for: sampleRate)
         sampleBuffer.append(contentsOf: samples)
         guard sampleBuffer.count >= fftSize else { return }
         // Keep only the newest window; older audio has already been drawn.
