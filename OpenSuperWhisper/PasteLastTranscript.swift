@@ -53,8 +53,14 @@ enum PasteLastTranscript {
 
         // `honorAutoPastePreference: false` — asking for this insertion *is* the request, so a
         // user who dictates to the clipboard only still gets text where the cursor is.
-        let targetMissing = TranscriptInserter.insert(IndicatorViewModel.applyPostProcessing(text),
-                                                      honorAutoPastePreference: false)
+        //
+        // The target here is whatever is frontmost right now, unlike the pipeline, which uses the
+        // app that was frontmost when the clip was recorded. This insertion has no earlier moment
+        // to refer back to: the request is being made now, at this window.
+        let targetMissing = TranscriptInserter.insert(
+            IndicatorViewModel.applyPostProcessing(text),
+            honorAutoPastePreference: false,
+            targetBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
         if targetMissing {
             IndicatorWindowManager.shared.flash(.info("Copied — press ⌘V"))
         }

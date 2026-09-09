@@ -582,6 +582,14 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var typingPaceMilliseconds: Int {
+        didSet { AppPreferences.shared.typingPaceMilliseconds = typingPaceMilliseconds }
+    }
+
+    @Published var appInsertionRules: [AppInsertionRule] {
+        didSet { AppPreferences.shared.appInsertionRules = appInsertionRules }
+    }
+
     @Published var appContextProfiles: [AppContextProfile] {
         didSet {
             AppPreferences.shared.appContextProfiles = appContextProfiles
@@ -744,6 +752,8 @@ class SettingsViewModel: ObservableObject {
         self.notifyWhenNoPasteTarget = prefs.notifyWhenNoPasteTarget
         self.submitOnVoiceCommand = prefs.submitOnVoiceCommand
         self.appContextFormattingEnabled = prefs.appContextFormattingEnabled
+        self.typingPaceMilliseconds = prefs.typingPaceMilliseconds
+        self.appInsertionRules = prefs.appInsertionRules
         self.appContextProfiles = prefs.appContextProfiles
         self.pauseMediaOnRecord = prefs.pauseMediaOnRecord
         self.reduceVolumeOnRecord = prefs.reduceVolumeOnRecord
@@ -2022,7 +2032,7 @@ struct SettingsView: View {
                     SToggle(isOn: $viewModel.autoPasteTranscription)
                 }
                 SRow(title: "Paste instead of typing",
-                     hint: "⌘V instead of synthetic keystrokes — helps in Electron apps and Messages") {
+                     hint: "⌘V instead of synthetic keystrokes — helps in Electron apps and Messages. Apps listed under Insertion by app override this.") {
                     SToggle(isOn: $viewModel.pasteInsteadOfTyping)
                 }
                 SRow(title: "Notify when no paste target",
@@ -2043,6 +2053,8 @@ struct SettingsView: View {
                     SToggle(isOn: $viewModel.addSpaceAfterSentence)
                 }
             }
+
+            InsertionByAppSection(viewModel: viewModel)
         }
     }
 

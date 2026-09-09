@@ -478,6 +478,33 @@ final class AppPreferences {
     @UserDefault(key: "appContextFormattingEnabled", defaultValue: false)
     var appContextFormattingEnabled: Bool
 
+    /// Milliseconds between keystroke chunks while typing. See `TextInserter`.
+    ///
+    /// A dial rather than a constant because the quantity it has to cover, the target's redraw
+    /// cost, is not something we can read in every app: the accessibility read comes back empty
+    /// in several, including the Electron terminal that produced #85. Handing the number to the
+    /// person who hits the bug beats another constant chosen by reasoning, which is how the
+    /// first attempt came to scale on the wrong thing.
+    @UserDefault(key: "typingPaceMilliseconds", defaultValue: 2)
+    var typingPaceMilliseconds: Int
+
+    @OptionalUserDefault(key: "appInsertionRulesData")
+    private var appInsertionRulesData: Data?
+
+    /// Per-app overrides of how text is inserted. Empty by default: no rule means the global
+    /// paste-or-type setting decides, exactly as before.
+    var appInsertionRules: [AppInsertionRule] {
+        get {
+            guard let data = appInsertionRulesData,
+                  let rules = try? JSONDecoder().decode([AppInsertionRule].self, from: data)
+            else { return [] }
+            return rules
+        }
+        set {
+            appInsertionRulesData = try? JSONEncoder().encode(newValue)
+        }
+    }
+
     @OptionalUserDefault(key: "appContextProfilesData")
     private var appContextProfilesData: Data?
 

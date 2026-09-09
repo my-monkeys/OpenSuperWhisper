@@ -224,7 +224,7 @@ final class DictationPipeline: ObservableObject {
                 try? FileManager.default.removeItem(at: item.tempURL)
             }
 
-            let pasteTargetMissing = hasText ? insertText(text) : false
+            let pasteTargetMissing = hasText ? insertText(text, targetBundleID: item.context.bundleID) : false
             if hasText {
                 PostRecordHook.runIfEnabled(text: text, audioPath: hookAudioPath, timestamp: item.startedAt, duration: 0)
             }
@@ -315,8 +315,9 @@ final class DictationPipeline: ObservableObject {
     /// the text on the clipboard and notify ⌘V. When no target is found, typing is skipped. The
     /// insertion policy itself lives in `TranscriptInserter`, shared with the re-paste shortcut.
     @discardableResult
-    private func insertText(_ text: String) -> Bool {
+    private func insertText(_ text: String, targetBundleID: String?) -> Bool {
         TranscriptInserter.insert(IndicatorViewModel.applyPostProcessing(text),
-                                  honorAutoPastePreference: true)
+                                  honorAutoPastePreference: true,
+                                  targetBundleID: targetBundleID)
     }
 }
