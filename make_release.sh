@@ -154,11 +154,16 @@ fi
 if [[ -n "$GITHUB_TOKEN" ]]; then
     # The second architecture joins the release the first one made. A tag carries one release,
     # so creating it again just fails.
+    # `|| true` is load-bearing. On the FIRST architecture there is no release yet, the lookup
+    # 404s, `grep` matches nothing and exits 1, and under `set -e` an assignment from a failing
+    # command substitution aborts the script — right after the tag has been pushed and forty
+    # minutes of notarisation have completed. Finding nothing here is the normal case, not an
+    # error.
     RELEASE_ID=$(curl -s -L \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer ${GITHUB_TOKEN}" \
         "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" \
-        | grep -o '"id": [0-9]*' | head -1 | grep -o '[0-9]*')
+        | grep -o '"id": [0-9]*' | head -1 | grep -o '[0-9]*' || true)
 
     if [[ -n "$RELEASE_ID" ]]; then
         echo "🚀 Release ${TAG} exists (ID: $RELEASE_ID), adding the ${ARCH} build."
@@ -182,7 +187,10 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
             }')
     
         # Extract release ID from response
-        RELEASE_ID=$(echo "$RELEASE_RESPONSE" | grep -o '"id": [0-9]*' | head -1 | grep -o '[0-9]*')
+        # Same reason: a creation that failed has no id to find, and the explicit check just
+        # below is what should report that, with the response body, rather than `set -e`
+        # killing the run one line earlier and saying nothing.
+        RELEASE_ID=$(echo "$RELEASE_RESPONSE" | grep -o '"id": [0-9]*' | head -1 | grep -o '[0-9]*' || true)
     
         if [[ -z "$RELEASE_ID" ]]; then
             echo "❌ Failed to create GitHub release or extract release ID"
