@@ -98,7 +98,14 @@ fi
 chmod +x ./notarize_app.sh
 # No exit-code check here: `set -e` already aborts on a non-zero return, so a test on $? would
 # only ever see the 0 of a script that succeeded.
-./notarize_app.sh "${CODE_SIGN_IDENTITY}"
+# ARCH has to be passed positionally. `notarize_app.sh` reads it as `${2:-arm64}`, so leaving it
+# off does not inherit it from the environment, it silently builds arm64 — and then also skips
+# the two things that run only for x86_64 in there: stripping the arm64-only onnxruntime, and
+# pointing Sparkle at the x86_64 appcast. An Intel release built this way is an ARM binary under
+# an Intel name, subscribed to the wrong update feed. The DMG filename carries the architecture,
+# so the run dies looking for a file that was never made, which is the only reason this was a
+# failed release rather than a wrong one.
+./notarize_app.sh "${CODE_SIGN_IDENTITY}" "${ARCH}"
 
 echo "✅ Build and notarization successful!"
 
