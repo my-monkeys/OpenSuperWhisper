@@ -37,10 +37,25 @@ enum TranscriptInserter {
 
         // A rule for this app wins over the global switch, which is the whole point of having one.
         let pasting = rule.map { $0.mode == .paste } ?? prefs.pasteInsteadOfTyping
+
+        // Logged from here rather than from inside `TextInserter`, because this is where the
+        // decision is made: which rule matched, which app it was resolved from, and which of the
+        // two mechanisms ran. Logging it one layer down could only report the app in front right
+        // now, which is not the one the rule came from once transcription has run in between.
+        func log(mechanism: String, chunks: Int, pause: useconds_t) {
+            TextInserter.logInsertion(payload: text, mechanism: mechanism,
+                                      dictatedInto: targetBundleID, rule: rule,
+                                      chunks: chunks, pause: pause)
+        }
+
         if pasting {
             // Paste is universal: ⌘V lands in any text field, including apps the accessibility check
             // can't read (Messages, Electron), and is a harmless no-op otherwise. So no editable-
             // target gate — it only ever produces false negatives (#paste-messages).
+            // One event, so there is nothing to pace and nothing to chunk. Logged all the same:
+            // a report has to be able to say which mechanism ran, and a paste that logged
+            // nothing looked exactly like an insertion that never happened.
+            log(mechanism: "paste", chunks: 1, pause: 0)
             if prefs.autoCopyToClipboard {
                 Diag.measure("TextInserter.paste") { TextInserter.paste() }
             } else {
@@ -63,8 +78,15 @@ enum TranscriptInserter {
             }
             return true
         }
+        let pace = rule?.typingPaceMilliseconds
+        let chunkCount = TextInserter.chunks(of: text).count
+        let requested = pace.map(TextInserter.microseconds(fromMilliseconds:))
+            ?? TextInserter.chunkPauseMicroseconds
+        log(mechanism: "type", chunks: chunkCount,
+            pause: TextInserter.chunkPause(forChunkCount: chunkCount, requested: requested))
+
         Diag.measure("TextInserter.type") {
-            TextInserter.type(text, paceMilliseconds: rule?.typingPaceMilliseconds)
+            TextInserter.type(text, paceMilliseconds: pace)
         }
         return false
     }

@@ -34,9 +34,17 @@ struct InsertionByAppSection: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Apps listed here ignore the global “Paste instead of typing” switch.")
-                    .scaledFont(size: 11)
-                    .foregroundColor(STheme.hint)
+                // Both sides of the choice, together. The trade is the whole reason this section
+                // exists, and putting it only in a tooltip on the segmented control showed one
+                // option at a time: you could not learn what the mode you were not on would do
+                // without switching to it first.
+                HStack(alignment: .top, spacing: 6) {
+                    Text("Apps listed here ignore the global “Paste instead of typing” switch.")
+                        .scaledFont(size: 11)
+                        .foregroundColor(STheme.hint)
+                    InfoButton(text: "**Type** sends synthetic keystrokes and leaves the clipboard alone. An app that redraws its whole input area on every keystroke can fall behind, and the text arrives cut short or lands where the cursor used to be. Raising the pace for that app gives it time to keep up.\n\n**Paste** sends a single ⌘V, so there is nothing to fall behind. It needs the clipboard: when transcriptions are not kept there, your previous contents are borrowed and put back around each dictation.")
+                    Spacer()
+                }
 
                 if viewModel.appInsertionRules.isEmpty {
                     Text("No apps yet. Add one below.")

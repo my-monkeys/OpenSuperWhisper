@@ -85,23 +85,51 @@ enum TextInserter {
     /// `targetLength` nil is itself a finding rather than a gap: an app that will not say how much
     /// it is holding is an app where pacing derived from that number cannot work, and the report
     /// came from an Electron terminal.
-    static func insertionLogLine(app: String, targetLength: Int?, caret: Int?,
+    /// - Parameters:
+    ///   - app: the app actually receiving the events, read now.
+    ///   - dictatedInto: the app the clip was recorded in, which is what the per-app rule was
+    ///     resolved from. The two differ whenever the user switches apps while transcription
+    ///     runs, and their disagreement is itself worth seeing: the pace on this line came from
+    ///     the second, so a line that named only the first would attribute one app's rule to
+    ///     another and send triage into the settings code.
+    ///   - rule: what the rule lookup decided, so a rule that matched can be told apart from one
+    ///     that silently did not. A typo in a bundle identifier and no rule at all otherwise
+    ///     produce the same line, and that is the first question anyone reading #85 now asks.
+    static func insertionLogLine(app: String, dictatedInto: String?, rule: String,
+                                 mechanism: String, targetLength: Int?, caret: Int?,
                                  payload: Int, chunks: Int, pause: useconds_t) -> String {
         let gaps = max(chunks - 1, 0)
         let target = targetLength.map(String.init) ?? "unavailable"
         let caretText = caret.map(String.init) ?? "unavailable"
-        return "insert app=\(app) target=\(target) caret=\(caretText) payload=\(payload) "
+        return "insert via=\(mechanism) app=\(app) dictated-into=\(dictatedInto ?? "unknown") "
+            + "rule=\(rule) target=\(target) caret=\(caretText) payload=\(payload) "
             + "chunks=\(chunks) pause=\(pause)us/gap total=\(UInt(pause) * UInt(gaps))us"
+    }
+
+    /// How a rule reads on the diagnostic line.
+    static func ruleDescription(_ rule: AppInsertionRule?) -> String {
+        guard let rule else { return "none" }
+        guard rule.mode == .type, let pace = rule.typingPaceMilliseconds else {
+            return rule.mode.rawValue
+        }
+        return "\(rule.mode.rawValue)@\(pace)ms"
     }
 
     /// Reads the target's state and logs the line. Skipped entirely when diagnostics are off: the
     /// accessibility read costs up to 32ms, and the insertion path should not pay that to log
     /// nothing.
-    private static func logInsertion(payload: String, chunks: Int, pause: useconds_t) {
+    /// Called by `TranscriptInserter`, which is where the rule and the recorded app are known.
+    /// Logging from inside `type()` could only see the app in front right now, which is not the
+    /// one the decision was made for.
+    static func logInsertion(payload: String, mechanism: String, dictatedInto: String?,
+                             rule: AppInsertionRule?, chunks: Int, pause: useconds_t) {
         guard Diag.isEnabled else { return }
         let metrics = FocusUtils.focusedTextMetrics()
         Diag.mark(insertionLogLine(
             app: NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown",
+            dictatedInto: dictatedInto,
+            rule: ruleDescription(rule),
+            mechanism: mechanism,
             targetLength: metrics?.length,
             caret: metrics?.caret,
             payload: payload.count,
@@ -118,7 +146,6 @@ enum TextInserter {
         let allChunks = chunks(of: text)
         let requested = paceMilliseconds.map(microseconds(fromMilliseconds:)) ?? chunkPauseMicroseconds
         let pause = chunkPause(forChunkCount: allChunks.count, requested: requested)
-        logInsertion(payload: text, chunks: allChunks.count, pause: pause)
 
         for (index, chunk) in allChunks.enumerated() {
             guard
