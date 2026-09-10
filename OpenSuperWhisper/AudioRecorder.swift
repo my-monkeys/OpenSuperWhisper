@@ -433,12 +433,25 @@ class AudioRecorder: NSObject, ObservableObject {
 
 extension AudioRecorder: AVAudioRecorderDelegate {
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        // Only the failure is worth a line: it clears `currentRecordingURL`, which is also what the
-        // connection monitor guards on, so a take can end here and leave the wait with nothing to
-        // measure.
-        if !flag {
-            Diag.mark("recorder.didFinishRecording failed — clip discarded")
-            currentRecordingURL = nil
+        guard !flag else { return }
+        Diag.mark("recorder.didFinishRecording failed - clip discarded")
+
+        // Clearing the URL is also what the connection wait guards on, so on its own it left that
+        // timer running at 20Hz with nothing to measure and no way to reach its own timeout. The
+        // bubble then sat on "Connecting" until the app was force-quit. Reported by someone whose
+        // AirPods reconfigure the input route out from under the recorder, which is one reliable
+        // way to get here; the built-in microphone never does it, which is why it only happened
+        // with AirPods.
+        currentRecordingURL = nil
+        stopConnectionMonitoring()
+        endRecordingActivity()
+        updateRecordingState(isRecording: false, isConnecting: false)
+
+        Task { @MainActor in
+            SpectrumAnalyzer.shared.stop()
+            // Said out loud rather than left to be noticed. A take that captured nothing is
+            // otherwise indistinguishable from one the user simply has not finished (#117).
+            IndicatorWindowManager.shared.reportRecordingFailure("Recording stopped: the microphone dropped out")
         }
     }
 

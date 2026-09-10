@@ -321,6 +321,17 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         }
     }
 
+    /// The recording itself died, so the bubble has to stop waiting for it and say so.
+    ///
+    /// Deliberately not routed through `flash`, which steps aside for a live recording: here the
+    /// live recording is precisely what failed, and stepping aside would leave the bubble waiting
+    /// for audio that is never coming.
+    func reportRecordingFailure(_ message: String) {
+        guard let viewModel else { return }
+        viewModel.cleanup()
+        viewModel.showError(message)
+    }
+
     private func present(_ state: RecordingState, on viewModel: IndicatorViewModel) {
         switch state {
         case .error(let message): viewModel.showError(message)
