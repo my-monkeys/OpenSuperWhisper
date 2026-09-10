@@ -72,6 +72,16 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
             .filter { !$0.isEmpty }
     }
 
+    /// Whether the rule says anything at all.
+    ///
+    /// A rule needs both halves to do anything: something to hear and something to write. One
+    /// without the other is a half-finished thought, not a rule, and it is what someone leaves
+    /// behind when they open the editor and change their mind.
+    var isBlank: Bool {
+        triggers.isEmpty
+            && replacement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// Drops one phrasing, counting from the primary at 0.
     ///
     /// Removing the primary promotes the next one instead of blanking it: an entry with no

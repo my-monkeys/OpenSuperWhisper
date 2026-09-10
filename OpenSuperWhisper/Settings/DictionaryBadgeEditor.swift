@@ -71,11 +71,16 @@ struct DictionaryBadgeEditor: View {
         }
     }
 
+    /// The rule being written, before it exists.
+    ///
+    /// Adding it up front and editing it in place meant anyone who opened the editor and thought
+    /// better of it left an "empty" badge sitting in the row, which then has to be noticed and
+    /// deleted. A rule now comes into being when it says something.
+    @State private var pending: CustomDictionaryEntry?
+
     private var addBadge: some View {
         Button {
-            let entry = CustomDictionaryEntry()
-            entries.append(entry)
-            editing = entry.id
+            pending = CustomDictionaryEntry()
         } label: {
             Image(systemName: "plus")
                 .scaledFont(size: 11, weight: .semibold)
@@ -91,6 +96,24 @@ struct DictionaryBadgeEditor: View {
         }
         .buttonStyle(.plain)
         .help("Add a rule")
+        // `popover(item:)` rather than `isPresented` plus an `if let` inside. Wrapping the editor
+        // in a conditional means clearing the state removes the content before the popover
+        // dismisses it, and the editor's `onDisappear` never runs, so the rule it was holding is
+        // silently dropped. Tested: a fully filled rule vanished on close. With `item:` the
+        // editor is unconditional, exactly as it is for an existing badge, where saving has
+        // always worked.
+        .popover(item: $pending, arrowEdge: .bottom) { draft in
+            DictionaryRuleEditor(
+                initial: draft,
+                onChange: { written in
+                    // Fired as the editor goes away, so this is the finished rule rather than a
+                    // keystroke. A rule that says nothing is one somebody started and thought
+                    // better of, and it is not worth a badge.
+                    guard !written.isBlank else { return }
+                    entries.append(written)
+                },
+                onDelete: { pending = nil })
+        }
     }
 }
 
@@ -223,7 +246,11 @@ private struct DictionaryRuleEditor: View {
             .foregroundColor(STheme.hint)
         }
         .padding(14)
-        .frame(width: 280)
+        // A floor, not a fixed size. The spacing picker is a segmented control carrying three
+        // words, and its intrinsic width is more than 280 minus the padding: forced into a fixed
+        // frame the content was centred and clipped at both edges, which is why the labels on the
+        // left arrived cut in half.
+        .frame(minWidth: 280)
         // Committed when the editor goes away, not per keystroke.
         //
         // Writing on every change fed a second update pass back into the badge row: the row
