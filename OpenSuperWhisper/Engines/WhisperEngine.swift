@@ -166,7 +166,9 @@ class WhisperEngine: TranscriptionEngine {
         var params = WhisperFullParams()
         params.strategy = settings.useBeamSearch ? .beamSearch : .greedy
         params.nThreads = Int32(nThreads)
-        params.noTimestamps = !settings.showTimestamps
+        // Timestamp tokens are what advance whisper's sliding window: without them a window whose
+        // decode ends early is neither retried nor rewound, and seek skips the rest of it (#115).
+        params.noTimestamps = false
         params.suppressBlank = settings.suppressBlankAudio
         params.translate = settings.translateToEnglish
         let isAutoDetect = settings.selectedLanguage == "auto"
@@ -250,7 +252,7 @@ class WhisperEngine: TranscriptionEngine {
                 let t1 = context.fullGetSegmentT1(iSegment: i)
                 text += String(format: "[%.1f->%.1f] ", Float(t0) / 100.0, Float(t1) / 100.0)
             }
-            text += segmentText + "\n"
+            text += segmentText + (settings.showTimestamps ? "\n" : "")
         }
         
         let cleanedText = text
