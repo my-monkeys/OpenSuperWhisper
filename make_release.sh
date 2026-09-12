@@ -45,6 +45,27 @@ else
     echo "✅ Using GitHub token from environment variable"
 fi
 
+# Checked before anything is built, because the failure it catches surfaces at the very end.
+# Notarisation is the last step and takes tens of minutes to reach; on 0.12.4 the credentials
+# turned out to be unreadable and the whole build was wasted discovering it. Two seconds here
+# buys that back.
+echo "🔑 Checking notarisation credentials..."
+if ! ( NOTARY_ENV="${NOTARY_ENV:-$HOME/.osw-notary.env}"; [ -f "${NOTARY_ENV}" ] && . "${NOTARY_ENV}"
+       xcrun notarytool history --keychain-profile "osw-notary" >/dev/null 2>&1 \
+       || { [ -n "${NOTARY_KEY:-}" ] && [ -f "${NOTARY_KEY}" ] \
+            && [ -n "${NOTARY_KEY_ID:-}" ] && [ -n "${NOTARY_ISSUER:-}" ]; } ); then
+    echo "❌ notarytool cannot authenticate, so this release would fail after the build."
+    echo "   Register the profile from a Terminal window:"
+    echo "     xcrun notarytool store-credentials \"osw-notary\" --key <p8> --key-id <id> --issuer <issuer>"
+    echo "   or write NOTARY_KEY / NOTARY_KEY_ID / NOTARY_ISSUER into ~/.osw-notary.env"
+    echo ""
+    echo "   Note: the keychain profile lives in the data-protection keychain and can only be"
+    echo "   read by a process able to show an authorisation prompt, so a release driven from a"
+    echo "   non-interactive shell needs the ~/.osw-notary.env route."
+    exit 1
+fi
+echo "✅ Notarisation credentials usable"
+
 echo ""
 echo "🚀 Making release for OpenSuperWhisper v${NEW_VERSION}"
 echo "   Code signing identity: ${CODE_SIGN_IDENTITY}"

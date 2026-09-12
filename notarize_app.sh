@@ -14,6 +14,49 @@ APP_PATH="./build/Build/Products/Release/OpenSuperWhisper.app"
 ZIP_PATH="./build/OpenSuperWhisper.zip"
 BUNDLE_ID="fr.my-monkey.opensuperwhisper"
 KEYCHAIN_PROFILE="osw-notary"
+
+# How notarytool is authenticated, worked out once and reused for both submissions.
+#
+# The keychain profile is the normal path, but it lives in the data-protection keychain, and an
+# item there can only be read by a process able to put an authorisation prompt on screen. A
+# release driven from a non-interactive shell therefore gets `errSecInteractionNotAllowed` and
+# reports it as "No Keychain password item found", which reads like the profile is missing rather
+# than unreadable. That cost a full build on 0.12.4: ten minutes of compiling before the failure
+# surfaced.
+#
+# So the App Store Connect key is accepted directly as a fallback. Put the three values in
+# ~/.osw-notary.env, outside the repo:
+#
+#   NOTARY_KEY=$HOME/.appstoreconnect/private_keys/AuthKey_XXXXXXXXXX.p8
+#   NOTARY_KEY_ID=XXXXXXXXXX
+#   NOTARY_ISSUER=00000000-0000-0000-0000-000000000000
+#
+# The .p8 is the secret and stays a file with its own permissions; the two identifiers are not
+# secret but live there anyway so nothing about the account is committed to a public repo.
+NOTARY_ENV="${NOTARY_ENV:-$HOME/.osw-notary.env}"
+[ -f "${NOTARY_ENV}" ] && . "${NOTARY_ENV}"
+
+notary_auth_args() {
+    if xcrun notarytool history --keychain-profile "${KEYCHAIN_PROFILE}" >/dev/null 2>&1; then
+        printf '%s' "--keychain-profile ${KEYCHAIN_PROFILE}"
+        return 0
+    fi
+    if [ -n "${NOTARY_KEY:-}" ] && [ -f "${NOTARY_KEY}" ] \
+       && [ -n "${NOTARY_KEY_ID:-}" ] && [ -n "${NOTARY_ISSUER:-}" ]; then
+        printf '%s' "--key ${NOTARY_KEY} --key-id ${NOTARY_KEY_ID} --issuer ${NOTARY_ISSUER}"
+        return 0
+    fi
+    return 1
+}
+
+if ! NOTARY_AUTH=$(notary_auth_args); then
+    echo "❌ notarytool has no usable credentials."
+    echo "   The keychain profile \"${KEYCHAIN_PROFILE}\" is missing or cannot be read from a"
+    echo "   non-interactive shell. Either register it from a Terminal window:"
+    echo "     xcrun notarytool store-credentials \"${KEYCHAIN_PROFILE}\" --key <p8> --key-id <id> --issuer <issuer>"
+    echo "   or write the same three values into ${NOTARY_ENV} (see the comment in this script)."
+    exit 1
+fi
 CODE_SIGN_IDENTITY="${1}"
 ARCH="${2:-arm64}"
 DEVELOPMENT_TEAM="5C67TFSJ2B"
@@ -139,7 +182,7 @@ current_dir=$(pwd)
 cd $(dirname "${APP_PATH}") && zip -r -y "${current_dir}/${ZIP_PATH}" $(basename "${APP_PATH}")
 cd "${current_dir}"
 
-xcrun notarytool submit "${ZIP_PATH}" --wait --keychain-profile "${KEYCHAIN_PROFILE}"
+xcrun notarytool submit "${ZIP_PATH}" --wait ${NOTARY_AUTH}
 xcrun stapler staple "${APP_PATH}"
 
 # Build the DMG with hdiutil (no extra tooling): the .app + an Applications symlink.
@@ -151,7 +194,7 @@ hdiutil create -volname "${APP_NAME}" -srcfolder "${DMG_STAGE}" -ov -format UDZO
 rm -rf "${DMG_STAGE}"
 
 codesign --sign "${CODE_SIGN_IDENTITY}" "${DMG_NAME}.dmg"
-xcrun notarytool submit "${DMG_NAME}.dmg" --wait --keychain-profile "${KEYCHAIN_PROFILE}"
+xcrun notarytool submit "${DMG_NAME}.dmg" --wait ${NOTARY_AUTH}
 xcrun stapler staple "${DMG_NAME}.dmg"
 
 echo "Successfully notarized ${APP_NAME} (${ARCH}) → ${DMG_NAME}.dmg"
