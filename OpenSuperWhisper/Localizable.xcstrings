@@ -9840,6 +9840,526 @@
           }
         }
       }
+    },
+    "Reset to default": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réinitialiser"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auf Standard zurücksetzen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restablecer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar padrão"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Đặt lại mặc định"
+          }
+        }
+      }
+    },
+    "Instruction": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instruction"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anweisung"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrucción"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Istruzione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrução"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Chỉ dẫn"
+          }
+        }
+      }
+    },
+    "Undo": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rückgängig"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hoàn tác"
+          }
+        }
+      }
+    },
+    "Translate to %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduire en %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auf %@ übersetzen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traducir al %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduci in %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduzir para %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dịch sang %@"
+          }
+        }
+      }
+    },
+    "Couldn't reach the cleanup backend — check its settings above.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de joindre le backend de nettoyage — vérifiez ses réglages ci-dessus."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Cleanup-Backend war nicht erreichbar — prüfe seine Einstellungen oben."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo conectar con el backend de limpieza: revisa sus ajustes más arriba."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile raggiungere il backend di pulizia: controlla le sue impostazioni qui sopra."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível acessar o backend de limpeza — verifique as configurações acima."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Không thể kết nối backend dọn dẹp — hãy kiểm tra cài đặt ở trên."
+          }
+        }
+      }
+    },
+    "The model didn't return a usable translation, so your text was kept. Small models struggle with this — Ollama or a remote model handles it reliably.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle n’a pas renvoyé de traduction exploitable ; votre texte a été conservé. Les petits modèles peinent sur cette tâche — Ollama ou un modèle distant s’en sort de façon fiable."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell hat keine brauchbare Übersetzung geliefert, dein Text wurde behalten. Kleine Modelle tun sich damit schwer — mit Ollama oder einem Remote-Modell klappt es zuverlässig."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo no devolvió una traducción utilizable, así que se conservó tu texto. A los modelos pequeños les cuesta esto: Ollama o un modelo remoto lo resuelven de forma fiable."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello non ha restituito una traduzione utilizzabile, quindi il tuo testo è stato mantenuto. I modelli piccoli faticano — Ollama o un modello remoto ci riesce in modo affidabile."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O modelo não retornou uma tradução utilizável, então seu texto foi mantido. Modelos pequenos têm dificuldade com isso — Ollama ou um modelo remoto resolve de forma confiável."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mô hình không trả về bản dịch dùng được nên văn bản của bạn được giữ nguyên. Mô hình nhỏ khó làm việc này — Ollama hoặc mô hình từ xa xử lý ổn định hơn."
+          }
+        }
+      }
+    },
+    "Closing instruction": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instruction finale"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schluss-Anweisung"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrucción final"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Istruzione finale"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrução final"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Chỉ dẫn kết thúc"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Xóa"
+          }
+        }
+      }
+    },
+    "Download model (%@)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger le modèle (%@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell laden (%@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar modelo (%@)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica modello (%@)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar modelo (%@)"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tải mô hình (%@)"
+          }
+        }
+      }
+    },
+    "Any matching per-app rule from Rules is inserted here.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toute règle par application correspondante, définie dans Règles, est insérée ici."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine passende App-Regel aus „Rules“ wird hier eingefügt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aquí se inserta la regla por aplicación correspondiente de Reglas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qui viene inserita la regola per app corrispondente definita in Regole."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A regra por aplicativo correspondente, definida em Regras, é inserida aqui."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Quy tắc theo ứng dụng phù hợp từ Rules được chèn vào đây."
+          }
+        }
+      }
+    },
+    "Loads on first use (a few seconds), then frees its memory after 5 minutes idle.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se charge à la première utilisation (quelques secondes), puis libère sa mémoire après 5 minutes d’inactivité."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird bei der ersten Nutzung geladen (ein paar Sekunden) und gibt seinen Speicher nach 5 Minuten Leerlauf wieder frei."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se carga en el primer uso (unos segundos) y libera su memoria tras 5 minutos de inactividad."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si carica al primo utilizzo (qualche secondo) e libera la memoria dopo 5 minuti di inattività."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carrega no primeiro uso (alguns segundos) e libera a memória após 5 minutos ocioso."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tải khi dùng lần đầu (vài giây), rồi giải phóng bộ nhớ sau 5 phút không dùng."
+          }
+        }
+      }
+    },
+    "Apache-2.0. One-time download, no server needed. The bigger model follows instructions far more reliably; the smaller one is quicker and lighter.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apache-2.0. Téléchargement unique, sans serveur. Le grand modèle suit les instructions bien plus fidèlement ; le petit est plus rapide et plus léger."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apache-2.0. Einmaliger Download, kein Server nötig. Das größere Modell hält sich deutlich verlässlicher an Anweisungen, das kleinere ist schneller und genügsamer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apache-2.0. Descarga única, sin servidor. El modelo grande sigue las instrucciones con mucha más fiabilidad; el pequeño es más rápido y ligero."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apache-2.0. Download una tantum, nessun server. Il modello grande segue le istruzioni in modo molto più affidabile; quello piccolo è più rapido e leggero."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apache-2.0. Download único, sem servidor. O modelo maior segue instruções com muito mais confiabilidade; o menor é mais rápido e leve."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Apache-2.0. Tải một lần, không cần máy chủ. Mô hình lớn tuân theo chỉ dẫn đáng tin cậy hơn nhiều; mô hình nhỏ nhanh và nhẹ hơn."
+          }
+        }
+      }
+    },
+    "Together these two are the entire system prompt — nothing is added around them. The closing half stays the model's last word, after any app rule. A small model tends to answer in the language the prompt is written in, so write it in the language you dictate.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À elles deux, elles constituent l’intégralité de l’invite système — rien n’est ajouté autour. La partie finale reste le dernier mot adressé au modèle, après toute règle d’application. Un petit modèle a tendance à répondre dans la langue de l’invite : rédigez-la donc dans la langue que vous dictez."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zusammen sind diese beiden der komplette System-Prompt — es wird nichts drumherum ergänzt. Die Schluss-Hälfte bleibt das letzte Wort an das Modell, nach einer etwaigen App-Regel. Ein kleines Modell antwortet meist in der Sprache, in der der Prompt geschrieben ist — schreibe ihn also in der Sprache, in der du diktierst."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Juntas, ambas son el prompt de sistema completo: no se añade nada alrededor. La parte final sigue siendo la última palabra para el modelo, después de cualquier regla de aplicación. Un modelo pequeño suele responder en el idioma en que está escrito el prompt, así que escríbelo en el idioma en que dictas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insieme costituiscono l’intero prompt di sistema: non viene aggiunto nulla attorno. La parte finale resta l’ultima parola per il modello, dopo eventuali regole per app. Un modello piccolo tende a rispondere nella lingua in cui è scritto il prompt, quindi scrivilo nella lingua in cui detti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Juntas, as duas formam o prompt de sistema completo — nada é acrescentado em volta. A parte final continua sendo a última palavra para o modelo, depois de qualquer regra de aplicativo. Um modelo pequeno tende a responder no idioma em que o prompt está escrito, então escreva-o no idioma em que você dita."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cả hai hợp thành toàn bộ system prompt — không có gì được thêm vào xung quanh. Nửa kết thúc vẫn là lời cuối gửi tới mô hình, sau mọi quy tắc theo ứng dụng. Mô hình nhỏ thường trả lời bằng ngôn ngữ mà prompt được viết, nên hãy viết bằng ngôn ngữ bạn đọc chính tả."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

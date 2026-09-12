@@ -78,6 +78,33 @@ class LLMModelManager {
         approxBytes: 1_117_320_736
     )
 
+    /// The bigger option. 1.5B is fine at punctuation but fails at anything needing real
+    /// instruction-following — it will happily obey an instruction it was asked to translate, or
+    /// rewrite a dictated letter in English. 7B handles both.
+    ///
+    /// Q3_K_M and not the usual Q4_K_M for one practical reason: every Q4 and larger quant of the
+    /// 7B is **split across multiple GGUF files** in the official repo, and the downloader here
+    /// handles one file per model. Q3_K_M is the largest single-file quant, and a 7B at Q3 is well
+    /// clear of a 1.5B at Q4. Apache-2.0, same first-party Qwen repo (verified 2026-08-11: single
+    /// file, 3.81 GB).
+    static let largeModel = LLMModelDescriptor(
+        displayName: "Qwen2.5 7B Instruct (Q3_K_M)",
+        fileName: "qwen2.5-7b-instruct-q3_k_m.gguf",
+        downloadURL: URL(string: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q3_k_m.gguf?download=true")!,
+        approxBytes: 3_808_391_040
+    )
+
+    /// Everything offered in Settings, smallest first. Only models whose licence allows shipping a
+    /// one-click download: Qwen2.5 is Apache-2.0 at 0.5B/1.5B/7B/14B — but **not** at 3B, which is
+    /// under the non-commercial Qwen Research licence despite being the obvious middle step.
+    static let availableModels: [LLMModelDescriptor] = [defaultModel, largeModel]
+
+    /// The descriptor for a stored file name, falling back to the default so an unknown or stale
+    /// preference can never leave the app without a model.
+    static func model(fileName: String) -> LLMModelDescriptor {
+        availableModels.first { $0.fileName == fileName } ?? defaultModel
+    }
+
     private let modelsDirectoryName = "llm-models"
     private var activeDownloadTasks: [String: URLSessionDownloadTask] = [:]
     private let downloadTasksLock = NSLock()
