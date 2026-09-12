@@ -42,6 +42,7 @@ class OnboardingViewModel: ObservableObject {
     @Published var unifiedModels: [OnboardingUnifiedModel] = []
     @Published var selectedModelId: UUID?
     @Published var remoteSelected: Bool = false
+    @Published var appleSelected: Bool = false
     @Published var isDownloading: Bool = false
     @Published var downloadProgress: Double = 0.0
     @Published var downloadingModelName: String?
@@ -67,6 +68,12 @@ class OnboardingViewModel: ObservableObject {
         }
         
         initializeUnifiedModels()
+
+        // Prefer Apple Speech when available so a fresh install can continue
+        // without downloading an app-managed model.
+        if AppleSpeechSupport.isSupported, selectedModelId == nil {
+            selectApple()
+        }
     }
 
     func initializeUnifiedModels() {
@@ -96,21 +103,31 @@ class OnboardingViewModel: ObservableObject {
     }
     
     var canContinue: Bool {
-        if remoteSelected { return true }
+        if remoteSelected || appleSelected { return true }
         guard let selectedId = selectedModelId else { return false }
         return unifiedModels.contains { $0.id == selectedId && $0.isDownloaded }
+    }
+
+    // Apple Speech needs no app-managed model download; system assets install on first use.
+    func selectApple() {
+        appleSelected = true
+        remoteSelected = false
+        selectedModelId = nil
+        AppPreferences.shared.selectedEngine = "apple"
     }
 
     // Selecting a remote (OpenAI-compatible) server skips the local-model
     // requirement entirely; the endpoint/key are configured later in Settings.
     func selectRemote() {
         remoteSelected = true
+        appleSelected = false
         selectedModelId = nil
         AppPreferences.shared.selectedEngine = "remote"
     }
 
     func selectModel(_ model: OnboardingUnifiedModel) {
         remoteSelected = false
+        appleSelected = false
         selectedModelId = model.id
 
         switch model.type {
@@ -483,11 +500,44 @@ struct OnboardingView: View {
                             .font(.headline)
                             .fontWeight(.semibold)
                         
-                        Text("Download a model to get started")
+                        Text(AppleSpeechSupport.isSupported
+                             ? "Apple Speech is ready, or download another model"
+                             : "Download a model to get started")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
                         VStack(spacing: 8) {
+                            if AppleSpeechSupport.isSupported {
+                                Button(action: { viewModel.selectApple() }) {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "apple.logo")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(.accentColor)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Apple Speech")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            Text("On-device system speech. No app model download required.")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        Spacer()
+                                        if viewModel.appleSelected {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundColor(.accentColor)
+                                        }
+                                    }
+                                    .padding(10)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(viewModel.appleSelected ? Color.accentColor : Color.gray.opacity(0.3),
+                                                    lineWidth: viewModel.appleSelected ? 2 : 1)
+                                    )
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+
                             ForEach($viewModel.unifiedModels) { $model in
                                 OnboardingUnifiedModelItemView(model: $model, viewModel: viewModel)
                             }
