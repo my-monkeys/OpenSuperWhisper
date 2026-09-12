@@ -162,6 +162,12 @@ final class DictationPipeline: ObservableObject {
             let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
             let wasFallback = transcriptionService.lastUsedFallback
             var text = AppPreferences.shared.cleanTranscription(rawText)
+            // The engine's own output, before the dictionary rules and any LLM cleanup, kept
+            // for the post-record hook. Tracked alongside `text` rather than read from
+            // `rawText` at the end, because the short-clip fallback below replaces the basis
+            // of the text entirely — handing a hook "No speech detected" for a clip that
+            // produced words would be worse than not telling it at all.
+            var engineText = rawText
 
             // File pass found nothing. Fall back to the live preview if it caught the words (short
             // clip); only with neither is it genuinely "no speech" — then drop it (no empty
@@ -177,6 +183,7 @@ final class DictationPipeline: ObservableObject {
                     return
                 }
                 text = fallback
+                engineText = item.streamedFallback
             }
 
             // Optional LLM cleanup (no-op when disabled; returns the raw text on failure). The
@@ -226,7 +233,10 @@ final class DictationPipeline: ObservableObject {
 
             let pasteTargetMissing = hasText ? insertText(text, targetBundleID: item.context.bundleID) : false
             if hasText {
-                PostRecordHook.runIfEnabled(text: text, audioPath: hookAudioPath, timestamp: item.startedAt, duration: 0)
+                PostRecordHook.runIfEnabled(text: text, rawText: engineText,
+                                            bundleID: item.context.bundleID,
+                                            audioPath: hookAudioPath,
+                                            timestamp: item.startedAt, duration: 0)
             }
 
             // Submit only when auto-paste actually inserted text somewhere. A short settle delay lets
