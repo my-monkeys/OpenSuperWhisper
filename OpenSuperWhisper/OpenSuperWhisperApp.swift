@@ -116,7 +116,11 @@ class AppState: ObservableObject {
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableObject {
     private var statusItem: NSStatusItem?
-    private var mainWindow: NSWindow?
+    /// The app's own window, looked up rather than remembered: SwiftUI creates it after
+    /// `applicationDidFinishLaunching` has run, and owns it from then on.
+    private var mainWindow: NSWindow? {
+        NSApplication.shared.windows.first { $0.styleMask.contains(.titled) && $0.title != "Settings" }
+    }
     private var languageSubmenu: NSMenu?
     private var modelSubmenu: NSMenu?
     private var recentSubmenu: NSMenu?
@@ -132,20 +136,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         setupStatusBarItem()
 
-        if let window = NSApplication.shared.windows.first(where: { $0.title != "Settings" }) {
-            self.mainWindow = window
-            window.delegate = self
-
-            window.minSize = NSSize(width: 450, height: 400)
-            window.maxSize = NSSize(width: 450, height: 900)
-
-            // Start in the menu bar only (don't show the main window) when requested.
-            // Never hide during onboarding — the user needs the window to finish setup.
-            if AppPreferences.shared.startHidden && AppPreferences.shared.hasCompletedOnboarding {
-                window.orderOut(nil)
-                NSApplication.shared.setActivationPolicy(.accessory)
-            }
+        // Start in the menu bar only when requested. Never during onboarding — the user needs
+        // the window to finish setup.
+        if AppPreferences.shared.startHidden && AppPreferences.shared.hasCompletedOnboarding {
+            NSApplication.shared.setActivationPolicy(.accessory)
         }
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowWillClose),
+            name: NSWindow.willCloseNotification,
+            object: nil)
 
         OpenSuperWhisperApp.startTranscriptionQueue()
         OpenSuperWhisperApp.startRetentionScheduler()
@@ -621,11 +622,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     func showMainWindow() {
         NSApplication.shared.setActivationPolicy(.regular)
 
-        // Never bring up the Settings window here — it's a separate scene. Use the
-        // stored ref only if it isn't Settings, else find the real main window.
-        let target = mainWindow.flatMap { $0.title == "Settings" ? nil : $0 }
-            ?? NSApplication.shared.windows.first { $0.styleMask.contains(.titled) && $0.title != "Settings" }
-        if let window = target {
+        if let window = mainWindow {
             if !window.isVisible {
                 window.makeKeyAndOrderFront(nil)
             }
@@ -642,24 +639,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     }
 }
 
-extension AppDelegate: NSWindowDelegate {
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        // Keep the main window alive — just hide it — instead of letting SwiftUI destroy
-        // it on close. A destroyed WindowGroup window can't be reliably re-created from
-        // within the app on macOS 26, which left the menu-bar "Open Window"/"Settings"
-        // items doing nothing. Hidden, it stays in the windows list so showMainWindow()
-        // can always bring it back. (Settings is a separate scene — let it close.)
-        guard sender.title != "Settings" else { return true }
-        sender.orderOut(nil)
-        NSApplication.shared.setActivationPolicy(.accessory)
-        return false
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        NSApplication.shared.setActivationPolicy(.accessory)
-    }
-    
-    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        return NSSize(width: 450, height: frameSize.height)
+extension AppDelegate {
+    /// Keeps the Dock icon in step with what is on screen. A window delegate cannot do this:
+    /// SwiftUI owns both scenes and never hands their windows over, so the callbacks that used
+    /// to live here were only ever reached by the status item's window.
+    @objc func windowWillClose(_ notification: Notification) {
+        // The closing window is still listed, and still visible, while this fires.
+        DispatchQueue.main.async {
+            let onScreen = NSApplication.shared.windows.contains {
+                $0.isVisible && $0.styleMask.contains(.titled)
+            }
+            let policy: NSApplication.ActivationPolicy = onScreen ? .regular : .accessory
+            guard NSApplication.shared.activationPolicy() != policy else { return }
+            NSApplication.shared.setActivationPolicy(policy)
+        }
     }
 }
