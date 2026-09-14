@@ -189,6 +189,13 @@ class SettingsViewModel: ObservableObject {
             modelPath: AppPreferences.shared.selectedWhisperModelPath)
     }
 
+    /// Whether the selected engine can be told what is already written in the field (#89).
+    /// When false the toggle is disabled: leaving it live would repeat the mistake of #99, a
+    /// switch that flips and changes nothing.
+    var canUseFieldContext: Bool {
+        EngineCapabilities.supportsFieldContext(engine: selectedEngine)
+    }
+
     /// Languages the selected engine+model can transcribe — filters the language picker (#155).
     var supportedLanguages: [String] {
         EngineCapabilities.supportedLanguages(engine: selectedEngine, fluidAudioModelVersion: fluidAudioModelVersion)
@@ -1943,8 +1950,11 @@ struct SettingsView: View {
                 sEditor($viewModel.initialPrompt, height: 48)
 
                 SRow(title: "Read what you're writing into",
-                     hint: "Takes the sentence before your cursor and lets the model expect those words. Helps with names and terms already on the page. Stays on your Mac: on-device engines only, never a remote one, and never saved.") {
-                    SToggle(isOn: $viewModel.useSurroundingTextAsContext)
+                     hint: viewModel.canUseFieldContext
+                        ? "Takes the sentence before your cursor and lets the model expect those words. Helps with names and terms already on the page. Stays on your Mac: on-device engines only, never a remote one, and never saved."
+                        : "Only Whisper can be told what to expect. The current engine has nowhere to put it.") {
+                    SToggle(isOn: $viewModel.useSurroundingTextAsContext,
+                            disabled: !viewModel.canUseFieldContext)
                 }
             }
 

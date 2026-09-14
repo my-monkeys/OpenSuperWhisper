@@ -124,6 +124,27 @@ final class SurroundingContextTests: XCTestCase {
         XCTAssertFalse(fresh.bool(forKey: "useSurroundingTextAsContext"))
     }
 
+    // MARK: - Which engines can be told anything at all
+
+    /// Whisper conditions on an initial prompt. Parakeet takes a vocabulary list, Apple takes
+    /// contextual strings, SenseVoice takes nothing, so the field's contents have nowhere to go.
+    /// The toggle is disabled there rather than left live: #99 is what a switch that flips and
+    /// changes nothing costs.
+    func testOnlyWhisperCanBeToldWhatToExpect() {
+        XCTAssertTrue(EngineCapabilities.supportsFieldContext(engine: "whisper"))
+
+        for engine in ["fluidaudio", "apple", "sensevoice"] {
+            XCTAssertFalse(EngineCapabilities.supportsFieldContext(engine: engine), engine)
+        }
+    }
+
+    /// Not for want of a prompt field. The remote engine has one and posts it to whatever server
+    /// the user configured, which is the one place this text must never reach.
+    func testTheRemoteEngineIsExcludedEvenThoughItHasAPrompt() {
+        XCTAssertTrue(EngineCapabilities.translationCapableEngines.contains("remote"))
+        XCTAssertFalse(EngineCapabilities.supportsFieldContext(engine: "remote"))
+    }
+
     // MARK: - One clip's field never reaches another clip
 
     /// Someone can start a second dictation while the first is still being transcribed, and the
