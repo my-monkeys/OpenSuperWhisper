@@ -1328,6 +1328,8 @@ struct SettingsView: View {
     struct HookVariable { let name: String; let description: String }
     static let postRecordHookVariables = [
         HookVariable(name: "$OSW_TEXT", description: "the transcription"),
+        HookVariable(name: "$OSW_RAW_TEXT", description: "before the dictionary rules and AI cleanup"),
+        HookVariable(name: "$OSW_APP_BUNDLE_ID", description: "the app you dictated into"),
         HookVariable(name: "$OSW_AUDIO_PATH", description: "wav file path (when history is on)"),
         HookVariable(name: "$OSW_TIMESTAMP", description: "ISO 8601 date"),
         HookVariable(name: "$OSW_DURATION", description: "length in seconds"),
@@ -2222,7 +2224,7 @@ struct SettingsView: View {
             SSection(title: "Post-record hook") {
                 SRow(title: "Run a command after each transcription", hint: "Launch your own script when a transcription completes.") {
                     HStack(spacing: 8) {
-                        InfoButton(text: "Runs via /bin/sh -c after each successful transcription, in the background. Your command receives the data as environment variables — OSW_TEXT, OSW_AUDIO_PATH (when history is on), OSW_TIMESTAMP, OSW_DURATION — and a JSON object on stdin with the same fields. Example: echo \"$OSW_TEXT\" >> ~/dictations.txt")
+                        InfoButton(text: "Runs via /bin/sh -c after each successful transcription, in the background. Your command receives the data as environment variables — OSW_TEXT, OSW_RAW_TEXT, OSW_APP_BUNDLE_ID, OSW_AUDIO_PATH (when history is on), OSW_TIMESTAMP, OSW_DURATION — and a JSON object on stdin with the same fields. Example: echo \"$OSW_TEXT\" >> ~/dictations.txt")
                         SToggle(isOn: $viewModel.postRecordHookEnabled)
                     }
                 }
