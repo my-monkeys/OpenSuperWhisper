@@ -76,10 +76,12 @@ final class RecordingContext {
         let url = SourceCapture.browserURL(bundleID: bundle)
         let host = SourceCapture.host(of: url)
         let title = SourceCapture.focusedWindowTitle()
-        // Only read the field when the setting asks for it. Reading what someone is writing is
-        // not something to do speculatively and then discard.
-        let written = AppPreferences.shared.useSurroundingTextAsContext
-            ? SourceCapture.focusedText() : nil
+        // Only read the field when the setting asks for it AND the engine can use it. Reading
+        // what someone is writing is not something to do speculatively and then discard, and an
+        // engine that takes no prompt would have it discarded.
+        let wantsField = AppPreferences.shared.useSurroundingTextAsContext
+            && EngineCapabilities.supportsFieldContext(engine: AppPreferences.shared.selectedEngine)
+        let written = wantsField ? SourceCapture.focusedText() : nil
         update(appName: front.localizedName, bundleID: bundle, host: host,
                fullURL: url, windowTitle: title, focusedText: written)
     }

@@ -25,6 +25,18 @@ enum EngineCapabilities {
         translationCapableEngines.contains(engine)
     }
 
+    /// Engines that can be told, in free text, what the speaker is about to say. Whisper
+    /// conditions on an initial prompt; Parakeet takes a vocabulary list, Apple takes
+    /// contextual strings and SenseVoice takes nothing, so the contents of the field have
+    /// nowhere to go there. The remote engine is left out deliberately rather than for lack of
+    /// a prompt: its prompt is posted to someone else's server, and this text is the user's own
+    /// writing (#89).
+    static let fieldContextCapableEngines: Set<String> = ["whisper"]
+
+    static func supportsFieldContext(engine: String) -> Bool {
+        fieldContextCapableEngines.contains(engine)
+    }
+
     /// Whisper can translate, but the turbo models cannot, whatever their documentation says.
     ///
     /// Measured on the same Czech clip: `ggml-small` returns English with `translate` set, while
