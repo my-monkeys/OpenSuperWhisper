@@ -247,7 +247,8 @@ class IndicatorViewModel: ObservableObject {
         let ctx = RecordingContext.shared
         let snapshot = DictationPipeline.ContextSnapshot(
             appName: ctx.appName, bundleID: ctx.bundleID,
-            windowTitle: ctx.windowTitle, fullURL: ctx.fullURL)
+            windowTitle: ctx.windowTitle, fullURL: ctx.fullURL,
+            focusedText: ctx.focusedText)
         let modelOption = ModelCatalog.activeOption()
 
         // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
