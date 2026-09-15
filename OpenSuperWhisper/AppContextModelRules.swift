@@ -41,6 +41,11 @@ final class RecordingContext {
     private(set) var fullURL: String?
     /// Focused window title at capture time (for transcript metadata).
     private(set) var windowTitle: String?
+    /// The transcription language the active keyboard layout resolved to when recording
+    /// started, when the user asked the layout to decide. Read here rather than at
+    /// transcription time: by then the layout has often changed, and the clip belongs to the
+    /// one that was active while they were speaking (#120).
+    private(set) var keyboardLanguage: String?
     /// What was already written in the field, up to the caret, when recording started.
     ///
     /// Read at record-start because by the time transcription runs the caret has usually moved
@@ -51,13 +56,14 @@ final class RecordingContext {
 
     func update(appName: String?, bundleID: String?, host: String? = nil,
                 fullURL: String? = nil, windowTitle: String? = nil,
-                focusedText: String? = nil) {
+                focusedText: String? = nil, keyboardLanguage: String? = nil) {
         self.appName = appName
         self.bundleID = bundleID
         self.host = host
         self.fullURL = fullURL
         self.windowTitle = windowTitle
         self.focusedText = focusedText
+        self.keyboardLanguage = keyboardLanguage
     }
 
     /// A label for the most specific bindable scope: the site host if we have
@@ -82,8 +88,14 @@ final class RecordingContext {
         let wantsField = AppPreferences.shared.useSurroundingTextAsContext
             && EngineCapabilities.supportsFieldContext(engine: AppPreferences.shared.selectedEngine)
         let written = wantsField ? SourceCapture.focusedText() : nil
+        let prefs = AppPreferences.shared
+        let layoutLanguage = prefs.whisperLanguage == KeyboardLanguage.selectionCode
+            ? KeyboardLanguage.current(engine: prefs.selectedEngine,
+                                       fluidAudioModelVersion: prefs.fluidAudioModelVersion)
+            : nil
         update(appName: front.localizedName, bundleID: bundle, host: host,
-               fullURL: url, windowTitle: title, focusedText: written)
+               fullURL: url, windowTitle: title, focusedText: written,
+               keyboardLanguage: layoutLanguage)
     }
 
     // One-time model override. "Just This Time" makes the *next* recording in an

@@ -22,6 +22,10 @@ final class DictationPipeline: ObservableObject {
         var bundleID: String? = nil
         var windowTitle: String? = nil
         var fullURL: String? = nil
+        /// What the keyboard layout resolved to when recording started, when the user asked the
+        /// layout to pick the language. Carried per clip for the same reason as the rest: the
+        /// layout will often have changed by the time the queue reaches this dictation (#120).
+        var keyboardLanguage: String? = nil
         /// What was written in the field when recording started, when the setting asks for it.
         /// Snapshotted like the rest: by the time the queue reaches this clip the caret has
         /// usually moved, and a later recording would otherwise lend it its own field.
@@ -143,6 +147,8 @@ final class DictationPipeline: ObservableObject {
     private func process(_ item: PendingDictation) async {
         var settings = Settings()
         settings.focusedText = item.context.focusedText
+        settings.selectedLanguage = KeyboardLanguage.language(for: settings.selectedLanguage,
+                                                              resolved: item.context.keyboardLanguage)
         do {
             let rawText: String
             if let transcribeOverride {

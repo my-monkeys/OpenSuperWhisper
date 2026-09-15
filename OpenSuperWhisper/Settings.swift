@@ -205,6 +205,9 @@ class SettingsViewModel: ObservableObject {
     /// previously selected one (e.g. switching to a model without that language) (#155). Prefers
     /// Auto-detect, then English, then whatever the model lists first — so the picker is never blank.
     func clampLanguageToSupported() {
+        // The layout option survives an engine change: it resolves against whatever the new
+        // engine supports, so there is nothing to clamp it to.
+        guard selectedLanguage != KeyboardLanguage.selectionCode else { return }
         let supported = supportedLanguages
         guard !supported.contains(selectedLanguage) else { return }
         selectedLanguage = supported.first(where: { $0 == "auto" })
@@ -1262,7 +1265,16 @@ struct Settings {
 
     init() {
         let prefs = AppPreferences.shared
-        self.selectedLanguage = prefs.whisperLanguage
+        // Resolved here rather than stored raw: "keyboard" names a way of choosing a language,
+        // not a language, and the file-drop queue and the CLI build a Settings of their own
+        // without going through the dictation pipeline. They get the layout as it is now; the
+        // pipeline overrides this with the layout as it was when the clip was recorded (#120).
+        self.selectedLanguage = KeyboardLanguage.language(
+            for: prefs.whisperLanguage,
+            resolved: prefs.whisperLanguage == KeyboardLanguage.selectionCode
+                ? KeyboardLanguage.current(engine: prefs.selectedEngine,
+                                           fluidAudioModelVersion: prefs.fluidAudioModelVersion)
+                : nil)
         self.translateToEnglish = prefs.translateToEnglish
         self.suppressBlankAudio = prefs.suppressBlankAudio
         self.showTimestamps = prefs.showTimestamps
@@ -1916,6 +1928,8 @@ struct SettingsView: View {
                         ForEach(viewModel.supportedLanguages, id: \.self) { code in
                             Text(LanguageUtil.languageNames[code] ?? code).tag(code)
                         }
+                        Divider()
+                        Text(KeyboardLanguage.displayName).tag(KeyboardLanguage.selectionCode)
                     }
                     // Recreate the picker when the engine's language set changes, so its
                     // selection never gets stuck blank on a value that left the list; and
