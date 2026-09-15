@@ -266,6 +266,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
             languageSubmenu?.addItem(languageItem)
         }
         
+        languageSubmenu?.addItem(NSMenuItem.separator())
+        let fromLayout = NSMenuItem(title: NSLocalizedString(KeyboardLanguage.displayName, comment: ""),
+                                    action: #selector(selectLanguage(_:)), keyEquivalent: "")
+        fromLayout.target = self
+        fromLayout.representedObject = KeyboardLanguage.selectionCode
+        fromLayout.state = (AppPreferences.shared.whisperLanguage == KeyboardLanguage.selectionCode) ? .on : .off
+        languageSubmenu?.addItem(fromLayout)
+
         transcriptionLanguageItem.submenu = languageSubmenu
         menu.addItem(transcriptionLanguageItem)
 

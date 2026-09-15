@@ -257,6 +257,7 @@ class IndicatorViewModel: ObservableObject {
         let snapshot = DictationPipeline.ContextSnapshot(
             appName: ctx.appName, bundleID: ctx.bundleID,
             windowTitle: ctx.windowTitle, fullURL: ctx.fullURL,
+            keyboardLanguage: ctx.keyboardLanguage,
             focusedText: ctx.focusedText)
         let modelOption = ModelCatalog.activeOption()
 

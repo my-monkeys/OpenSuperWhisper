@@ -93,6 +93,15 @@ final class KeyboardLayoutProvider {
         info.labels[keycode] ?? ""
     }
     
+    /// The languages the active input source declares, in the order it declares them, the first
+    /// being its primary. Empty for a layout that declares none.
+    static func inputSourceLanguages() -> [String] {
+        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+              let ptr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages)
+        else { return [] }
+        return Unmanaged<CFArray>.fromOpaque(ptr).takeUnretainedValue() as? [String] ?? []
+    }
+
     static func inputSourceID() -> String? {
         guard let inputSource = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
               let idPtr = TISGetInputSourceProperty(inputSource, kTISPropertyInputSourceID)
