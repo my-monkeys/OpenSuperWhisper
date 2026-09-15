@@ -269,7 +269,40 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
-    func stopRecording() -> URL? {
+    /// What a stop produced. A clip and an accidental tap used to be the same `nil`, so a
+    /// recording that captured nothing ended as quietly as one the user never meant to make,
+    /// and the only signal was noticing afterwards that the words were missing (#117).
+    enum StopOutcome {
+        case clip(URL)
+        /// Real audio, just too little of it. Dropped without a word, as it always has been:
+        /// a brushed trigger key should not queue an empty clip or flash a message.
+        case tooShort
+        /// No audio at all, so the take never began. The user spoke into nothing and has to be
+        /// told, because unlike a brushed key this one costs them what they said.
+        case noAudio
+
+        var url: URL? {
+            if case .clip(let url) = self { return url }
+            return nil
+        }
+
+        /// Classify a finished take from what it produced. Pure, so the boundary between "we
+        /// heard nothing" and "you brushed the key" is pinned by tests instead of only being
+        /// exercised by a real recorder against a real microphone.
+        ///
+        /// A duration of zero covers both a file with no samples and one the player cannot
+        /// open: neither holds anything to transcribe, and handing the second to the engine
+        /// only moves the failure somewhere with less context.
+        static func of(url: URL?, duration: TimeInterval) -> StopOutcome {
+            guard let url, duration > 0 else { return .noAudio }
+            return duration < AudioRecorder.minimumUsableDuration ? .tooShort : .clip(url)
+        }
+    }
+
+    /// Below this, a take is treated as an accidental trigger press rather than a dictation.
+    static let minimumUsableDuration: TimeInterval = 1.0
+
+    func stopRecording() -> StopOutcome {
         // Runs on the main thread (IndicatorViewModel is @MainActor). AudioQueueStop waits for the
         // queue to drain, so an input device pulled out from under it could stall the app here —
         // timed so a `▶` with no `◀` would name it rather than leaving a silent freeze.
@@ -290,18 +323,18 @@ class AudioRecorder: NSObject, ObservableObject {
             SystemVolumeController.shared.restore()
         }
 
-        if let url = currentRecordingURL,
-           let duration = try? AVAudioPlayer(contentsOf: url).duration,
-           duration < 1.0
-        {
-            try? FileManager.default.removeItem(at: url)
-            currentRecordingURL = nil
-            return nil
-        }
-
         let url = currentRecordingURL
         currentRecordingURL = nil
-        return url
+
+        let duration = url.flatMap { try? AVAudioPlayer(contentsOf: $0).duration } ?? 0
+        let outcome = StopOutcome.of(url: url, duration: duration)
+        if outcome.url == nil, let url {
+            try? FileManager.default.removeItem(at: url)
+        }
+        if case .noAudio = outcome {
+            Diag.mark("recorder.stop - no audio captured, clip discarded")
+        }
+        return outcome
     }
 
     func cancelRecording() {
