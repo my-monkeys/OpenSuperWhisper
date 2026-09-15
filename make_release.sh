@@ -217,7 +217,7 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
                 "tag_name": "'${TAG}'",
                 "target_commitish": "master",
                 "name": "Release '${NEW_VERSION}'",
-                "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew install --cask my-monkeys/tap/opensuperwhisper\n```\nUse the full `my-monkeys/tap/` path: the bare name resolves to the original unmaintained cask, not this fork.\n\n### Manual Installation\n1. Download the `'${APP_NAME}-${ARCH}-${NEW_VERSION}'.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon or Intel",
+                "body": "## OpenSuperWhisper '${NEW_VERSION}'\n\nReal-time audio transcription for macOS using Whisper.\n\n## Installation\n\n### Homebrew (Recommended)\n```bash\nbrew install --cask my-monkeys/tap/opensuperwhisper\n```\nUse the full `my-monkeys/tap/` path: the bare name resolves to the homebrew-cask entry for the original project, not this fork.\n\n### Manual Installation\n1. Download the `'${APP_NAME}-${ARCH}-${NEW_VERSION}'.dmg` file below\n2. Open the DMG and drag OpenSuperWhisper to Applications\n3. Launch the app and grant necessary permissions\n\n## Requirements\n- macOS 14.0 (Sonoma) or later\n- Apple Silicon or Intel",
                 "draft": false,
                 "prerelease": false,
                 "generate_release_notes": false
