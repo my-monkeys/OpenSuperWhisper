@@ -2059,27 +2059,40 @@ struct SettingsView: View {
 
     /// The cleanup instruction: two user-owned halves with the per-app rules from Rules sandwiched
     /// between them, and nothing else wrapped around either.
+    ///
+    /// The opening belongs to general cleanup and goes with it. The closing reaches every pass,
+    /// including one an app rule started on its own, so it stays visible either way: it carries
+    /// the guardrail, and a field that shapes someone's output has to be one they can read.
     @ViewBuilder private var instructionField: some View {
         VStack(alignment: .leading, spacing: 4) {
-            promptHalfField("Instruction",
-                            half: .opening,
-                            text: $viewModel.aiPostProcessingPrompt,
-                            defaultText: LLMPostProcessor.defaultInstruction,
-                            height: 110)
-            Text("Any matching per-app rule from Rules is inserted here.")
-                .scaledFont(size: 11).foregroundColor(STheme.hint)
-                .padding(.leading, 8)
+            if viewModel.aiPostProcessingEnabled {
+                promptHalfField("Instruction",
+                                half: .opening,
+                                text: $viewModel.aiPostProcessingPrompt,
+                                defaultText: LLMPostProcessor.defaultInstruction,
+                                height: 110)
+                Text("Any matching per-app rule from Rules is inserted here.")
+                    .scaledFont(size: 11).foregroundColor(STheme.hint)
+                    .padding(.leading, 8)
+            }
             promptHalfField("Closing instruction",
                             half: .closing,
                             text: $viewModel.aiPostProcessingClosing,
                             defaultText: LLMPostProcessor.defaultClosingInstruction,
                             height: 48)
-            Text("""
-                Together these two are the entire system prompt — nothing is added around them. \
-                The closing half stays the model's last word, after any app rule. A small model \
-                tends to answer in the language the prompt is written in, so write it in the \
-                language you dictate.
-                """)
+            Text(viewModel.aiPostProcessingEnabled
+                 ? """
+                   Together these two are the entire system prompt, nothing is added around them. \
+                   The closing half stays the model's last word, after any app rule. A small model \
+                   tends to answer in the language the prompt is written in, so write it in the \
+                   language you dictate.
+                   """
+                 : """
+                   Sent after your per-app rules from Rules, as the model's last word. It is the \
+                   only thing standing between a dictated question and a model that answers it, \
+                   so keep something in it. A small model tends to answer in the language the \
+                   prompt is written in, so write it in the language you dictate.
+                   """)
                 .scaledFont(size: 11).foregroundColor(STheme.hint)
                 .fixedSize(horizontal: false, vertical: true)
             switch viewModel.promptTranslationFailure {
@@ -2303,7 +2316,7 @@ struct SettingsView: View {
                             .padding(.leading, 16)
                     }
                 }
-                if viewModel.aiPostProcessingEnabled {
+                if viewModel.aiPostProcessingEnabled || viewModel.appContextFormattingEnabled {
                     instructionField
                 }
             }

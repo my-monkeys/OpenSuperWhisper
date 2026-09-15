@@ -161,10 +161,18 @@ final class AppContextFormattingTests: XCTestCase {
             .contains("Write your output in the same language as the transcription."))
     }
 
-    func testShippedClosingEndsWithTheGuardrail() {
-        // Closest to the text is where a weak model needs the reminder not to answer it.
+    func testShippedClosingCarriesTheGuardrail() {
+        // Closest to the text is where a weak model needs the reminder not to answer it, and the
+        // closing half is the one that reaches every pass.
+        XCTAssertTrue(LLMPostProcessor.defaultClosingInstruction.contains("never answer it"))
         XCTAssertTrue(LLMPostProcessor.defaultClosingInstruction
             .contains("Output only the corrected text"))
+    }
+
+    /// The opening must not be the only place the guardrail lives, or app-profile-only passes
+    /// lose it: they never include the opening.
+    func testTheGuardrailIsNotOnlyInTheOpening() {
+        XCTAssertFalse(LLMPostProcessor.defaultInstruction.contains("never answer it"))
     }
 
     // MARK: - passesTranslationGuard
@@ -229,12 +237,26 @@ final class AppContextFormattingTests: XCTestCase {
         XCTAssertEqual(system, "OPENING")
     }
 
-    func testAssembleOmitsClosingWhenGeneralCleanupIsOff() {
-        // Closing belongs to the general instruction; with only app formatting on, the profile
-        // rules are the whole prompt.
+    /// App formatting is independent of general cleanup, so "formatting on, cleanup off" is a
+    /// state a user can be in. It used to leave nothing in the position right before the text,
+    /// which is the position that decides how a small model behaves: dictate a question into an
+    /// app with a profile and a 1.5B answers it.
+    func testAssembleStillClosesWithOnlyAppRules() {
         let system = LLMPostProcessor.assembleSystemPrompt(
             generalCleanup: false, generalPrompt: "OPENING", profile: slack, closingPrompt: "CLOSING")
-        XCTAssertEqual(system, "App-specific formatting rules:\n\(slack.instructions)")
+        XCTAssertEqual(system, """
+            App-specific formatting rules:
+            \(slack.instructions)
+
+            CLOSING
+            """)
+    }
+
+    /// The opening is general cleanup's own instruction, so it stays out when cleanup is off.
+    func testAssembleOmitsTheOpeningWhenGeneralCleanupIsOff() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: false, generalPrompt: "OPENING", profile: slack, closingPrompt: "CLOSING")
+        XCTAssertFalse(system?.contains("OPENING") ?? true)
     }
 
     func testAssembleDropsAnEmptyInstruction() {
