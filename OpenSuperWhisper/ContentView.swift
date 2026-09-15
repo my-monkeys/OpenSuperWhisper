@@ -253,7 +253,7 @@ class ContentViewModel: ObservableObject {
 
         IndicatorWindowManager.shared.hide()
 
-        if let tempURL = recorder.stopRecording() {
+        if let tempURL = recorder.stopRecording().url {
             Task { [weak self] in
                 guard let self = self else { return }
 

@@ -53,7 +53,7 @@ final class PunctuationCalibrationModel: ObservableObject {
 
     private func stop() {
         isRecording = false
-        guard let url = AudioRecorder.shared.stopRecording(), let sentence = currentSentence else {
+        guard let url = AudioRecorder.shared.stopRecording().url, let sentence = currentSentence else {
             advance()
             return
         }
