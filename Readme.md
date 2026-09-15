@@ -15,10 +15,10 @@ Four transcription engines (three fully on-device), no subscription, no account,
 
 </div>
 
-> **Community fork maintained by [My-Monkey](https://my-monkey.fr)** — a maintained successor to
-> [`Starmel/OpenSuperWhisper`](https://github.com/Starmel/OpenSuperWhisper) (MIT). Merged work
-> credits its original authors. Compare the engines on real benchmarks at
-> [opensuperwhisper.com](https://opensuperwhisper.com).
+> **Community fork maintained by [My-Monkey](https://my-monkey.fr)**, started from
+> [`Starmel/OpenSuperWhisper`](https://github.com/Starmel/OpenSuperWhisper) (MIT), which is still
+> developed on its own side. Merged work credits its original authors. Compare the engines on real
+> benchmarks at [opensuperwhisper.com](https://opensuperwhisper.com).
 
 ## Install
 
@@ -26,8 +26,8 @@ Four transcription engines (three fully on-device), no subscription, no account,
 brew install --cask my-monkeys/tap/opensuperwhisper
 ```
 
-> ⚠️ Use the full `my-monkeys/tap/` path — the bare name `opensuperwhisper` resolves to the
-> original (unmaintained) cask in homebrew-cask, not this fork.
+> ⚠️ Use the full `my-monkeys/tap/` path. The bare name `opensuperwhisper` is the homebrew-cask
+> entry for the original project, which still serves its 0.1.0, not this fork.
 
 Or download the latest **notarized** `.dmg` from [Releases](https://github.com/my-monkeys/OpenSuperWhisper/releases),
 or [build from source](#building-from-source).

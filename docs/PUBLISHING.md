@@ -111,9 +111,9 @@ xcrun notarytool store-credentials osw-notary \
 - **`git` / `gh` / `brew` may refuse with "Xcode license not agreed".** When that happens, prefix
   just those commands with `DEVELOPER_DIR=/Library/Developer/CommandLineTools` (CLT has no license
   gate). Do **not** run `xcodebuild` under CLT. (Or accept once: `sudo xcodebuild -license accept`.)
-- **Homebrew name collision.** A cask named `opensuperwhisper` also exists in `homebrew/cask` (the
-  unmaintained Starmel original). **Always** use the fully-qualified `my-monkeys/tap/opensuperwhisper`
-  for install/upgrade, or you'll pull the wrong app.
+- **Homebrew name collision.** A cask named `opensuperwhisper` also exists in `homebrew/cask`, for
+  the original project. **Always** use the fully-qualified `my-monkeys/tap/opensuperwhisper` for
+  install/upgrade, or you'll pull the wrong app.
 - **macOS 26/27 beta toolchain bug.** The beta `ld` links the Rust autocorrect dylib with a
   mis-aligned LINKEDIT string pool that it then rejects for the arm64 slice. Workaround: a known-good
   prebuilt `vendor/libautocorrect_swift.dylib` is vendored; `notarize_app.sh` uses it automatically

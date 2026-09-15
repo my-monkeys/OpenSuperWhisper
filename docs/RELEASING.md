@@ -67,8 +67,8 @@ a `#{arch}` URL, so `brew` fetches the matching DMG. After a release, bump `vers
 brew install --cask my-monkeys/tap/opensuperwhisper
 ```
 
-> Use the full `my-monkeys/tap/` path — the bare `opensuperwhisper` resolves to the original
-> (unmaintained) cask in homebrew-cask, not this fork.
+> Use the full `my-monkeys/tap/` path. The bare `opensuperwhisper` is the homebrew-cask entry
+> for the original project, not this fork.
 
 ## Auto-update (Sparkle)
 
