@@ -74,4 +74,30 @@ final class KeyboardLanguageTests: XCTestCase {
     func testThePseudoCodeIsNotAWhisperLanguage() {
         XCTAssertFalse(LanguageUtil.availableLanguages.contains(KeyboardLanguage.selectionCode))
     }
+
+    /// And it must not escape through `Settings` either. The file-drop queue and the CLI build
+    /// their own without going near the dictation pipeline, so the resolution has to happen in
+    /// the value type rather than only on the recording path.
+    func testSettingsNeverCarriesThePseudoCode() {
+        let prefs = AppPreferences.shared
+        let saved = prefs.whisperLanguage
+        prefs.whisperLanguage = KeyboardLanguage.selectionCode
+        defer { prefs.whisperLanguage = saved }
+
+        let resolved = Settings().selectedLanguage
+
+        XCTAssertNotEqual(resolved, KeyboardLanguage.selectionCode)
+        XCTAssertTrue(LanguageUtil.availableLanguages.contains(resolved),
+                      "\(resolved) is not a language any engine would accept")
+    }
+
+    /// A fixed language goes through untouched, which is the path every existing install takes.
+    func testSettingsLeavesAFixedLanguageAlone() {
+        let prefs = AppPreferences.shared
+        let saved = prefs.whisperLanguage
+        prefs.whisperLanguage = "cs"
+        defer { prefs.whisperLanguage = saved }
+
+        XCTAssertEqual(Settings().selectedLanguage, "cs")
+    }
 }
