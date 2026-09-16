@@ -112,7 +112,9 @@ default.profraw
 *.profraw
 *.dmg
 .cursorrules
-OpenSuperWhisper.dmg.sha256
+# Per-architecture names, not just the old single-arch one: the arm64 checksum got
+# committed by accident in #112 because the pattern below did not match it.
+OpenSuperWhisper*.dmg.sha256
 dev_config.json
 # Per-machine dev code-signing identity (used by Scripts/dev-codesign.sh)
 .osw-codesign-identity
