@@ -234,19 +234,30 @@ class IndicatorViewModel: ObservableObject {
         }
 
         let outcome = recorder.stopRecording()
-        guard let tempURL = outcome.url else {
-            // A take that captured nothing has to say so. The words are gone either way, and
-            // the user's only other signal is noticing afterwards that the text never arrived,
-            // by which point they have moved on and cannot repeat what they said (#117). A clip
-            // that was merely too short stays silent: that is a brushed trigger key, not a loss.
-            if case .noAudio = outcome {
+        let tempURL = outcome.url
+        if tempURL == nil {
+            // The live-transcription tap and the recorder are separate consumers of the
+            // microphone, so one can come back empty while the other heard everything. When it
+            // does, the words are on the bubble and there is no reason to throw them away for
+            // want of a file: the dictation goes on without one (#128).
+            //
+            // With nothing from either, the take has to say so. The words are gone, and the only
+            // other signal is noticing later that the text never arrived, by which point the user
+            // has moved on and cannot repeat what they said (#117). A clip that was merely too
+            // short stays silent: that is a brushed trigger key, not a loss.
+            let heard = streamedFallback.trimmingCharacters(in: .whitespacesAndNewlines)
+            switch outcome {
+            case .noAudio where !heard.isEmpty:
+                Diag.mark("vm.startDecoding - recorder captured nothing, rescuing the live preview")
+            case .noAudio:
                 Diag.mark("vm.startDecoding - recording captured nothing, telling the user")
                 showError("Nothing was recorded, so this dictation was lost")
-            } else {
+                return
+            default:
                 Diag.mark("vm.startDecoding - clip too short, dropped without a notice")
                 delegate?.didFinishDecoding()
+                return
             }
-            return
         }
 
         // Snapshot the record-start context AND the active model now (both still belong to THIS

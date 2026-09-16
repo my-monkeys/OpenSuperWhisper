@@ -128,4 +128,54 @@ final class DictationPipelineTests: XCTestCase {
                        "clips must be transcribed in recording-start order")
         XCTAssertEqual(pipeline.pendingCount, 0, "pendingCount returns to zero once drained")
     }
+
+    /// A dictation the recorder never captured, rescued from the live preview. The tap and the
+    /// recorder are separate consumers of the microphone, so one can come back empty while the
+    /// other heard everything, and the words should not be thrown away for want of a file (#128).
+    func testADictationWithNoClipIsCarriedByItsLivePreview() async {
+        let prefs = AppPreferences.shared
+        let savedHistory = prefs.saveTranscriptionHistory
+        let savedPaste = prefs.autoPasteTranscription
+        let savedCopy = prefs.autoCopyToClipboard
+        let savedAI = prefs.aiPostProcessingEnabled
+        let savedHook = prefs.postRecordHookEnabled
+        prefs.saveTranscriptionHistory = false
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+        prefs.postRecordHookEnabled = false
+        defer {
+            prefs.saveTranscriptionHistory = savedHistory
+            prefs.autoPasteTranscription = savedPaste
+            prefs.autoCopyToClipboard = savedCopy
+            prefs.aiPostProcessingEnabled = savedAI
+            prefs.postRecordHookEnabled = savedHook
+        }
+
+        let pipeline = DictationPipeline.shared
+        let box = OrderBox()
+        // The engine must never be asked to transcribe: there is no file to hand it.
+        pipeline.transcribeOverride = { url, _ in
+            box.order.append(url.lastPathComponent)
+            return "the engine should not have run"
+        }
+        defer { pipeline.transcribeOverride = nil }
+
+        pipeline.enqueue(
+            tempURL: nil,
+            startedAt: Date(),
+            streamedFallback: "the bonfire was Bunny's idea",
+            context: DictationPipeline.ContextSnapshot(),
+            modelOption: nil)
+
+        var waited = 0
+        while pipeline.isProcessing && waited < 500 {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            waited += 1
+        }
+
+        XCTAssertFalse(pipeline.isProcessing, "a clip-less dictation must still drain")
+        XCTAssertEqual(box.order, [], "nothing to transcribe means the engine is not called")
+        XCTAssertEqual(pipeline.pendingCount, 0)
+    }
 }
