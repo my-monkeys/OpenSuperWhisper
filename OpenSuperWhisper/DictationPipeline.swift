@@ -36,7 +36,11 @@ final class DictationPipeline: ObservableObject {
         let id: UUID
         let seq: Int
         let startedAt: Date
-        let tempURL: URL
+        /// nil when the recorder captured nothing and only the live preview heard the words.
+        /// Everything downstream of transcription still applies to such a dictation: the
+        /// dictionary rules, the cleanup pass, insertion into the app it was dictated into. Only
+        /// the audio is missing, so only the audio steps are skipped (#128).
+        let tempURL: URL?
         let streamedFallback: String
         let context: ContextSnapshot
         /// Model that was active when this clip was recorded. Applied for this clip's transcription
@@ -72,7 +76,7 @@ final class DictationPipeline: ObservableObject {
 
         discarding = true
         for item in queue {
-            try? FileManager.default.removeItem(at: item.tempURL)
+            discardAudio(item.tempURL)
         }
         queue.removeAll()
         refreshPendingCount()
@@ -93,7 +97,7 @@ final class DictationPipeline: ObservableObject {
     /// Enqueue a finished recording for background transcription + paste. Returns immediately; the
     /// work drains on the serial loop. Called on the main actor from the indicator's stop handler.
     /// `seq` is monotonic and assigned here, so append order == recording-start order.
-    func enqueue(tempURL: URL, startedAt: Date, streamedFallback: String,
+    func enqueue(tempURL: URL?, startedAt: Date, streamedFallback: String,
                  context: ContextSnapshot, modelOption: DictationModelOption?,
                  submitAfterInsert: Bool = false) {
         seqCounter += 1
@@ -140,6 +144,13 @@ final class DictationPipeline: ObservableObject {
         return item
     }
 
+    /// Remove the clip, if there was one. A dictation rescued from the live preview has no file
+    /// to clean up, and five call sites should not each have to say so.
+    private func discardAudio(_ url: URL?) {
+        guard let url else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
     private func refreshPendingCount() {
         pendingCount = queue.count + (inFlight ? 1 : 0)
     }
@@ -151,11 +162,18 @@ final class DictationPipeline: ObservableObject {
                                                               resolved: item.context.keyboardLanguage)
         do {
             let rawText: String
-            if let transcribeOverride {
-                rawText = try await transcribeOverride(item.tempURL, settings)
+            if let clip = item.tempURL {
+                if let transcribeOverride {
+                    rawText = try await transcribeOverride(clip, settings)
+                } else {
+                    rawText = try await transcriptionService.transcribeAudio(
+                        url: clip, settings: settings, modelOverride: item.modelOption)
+                }
             } else {
-                rawText = try await transcriptionService.transcribeAudio(
-                    url: item.tempURL, settings: settings, modelOverride: item.modelOption)
+                // Nothing to transcribe, which is exactly what the branch below already handles:
+                // it falls back to the live preview when the file pass comes back empty. A
+                // dictation that never had a file enters through the same door.
+                rawText = ""
             }
             // Which model actually produced this text — snapshot it *now*, before the LLM and
             // audio-duration awaits below. transcribeAudio has returned so these are still this
@@ -166,7 +184,7 @@ final class DictationPipeline: ObservableObject {
             // still comes back here, and this is the last point before the text reaches the
             // user's document. Nothing is saved or inserted.
             if discarding {
-                try? FileManager.default.removeItem(at: item.tempURL)
+                discardAudio(item.tempURL)
                 return
             }
 
@@ -189,7 +207,7 @@ final class DictationPipeline: ObservableObject {
                     .cleanTranscription(item.streamedFallback)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !fallback.isEmpty else {
-                    try? FileManager.default.removeItem(at: item.tempURL)
+                    discardAudio(item.tempURL)
                     IndicatorWindowManager.shared.flash(.info("No speech detected"))
                     return
                 }
@@ -231,8 +249,14 @@ final class DictationPipeline: ObservableObject {
                     sourceFileURL: nil
                 ).url
 
-                try recorder.moveTemporaryRecording(from: item.tempURL, to: finalURL)
-                hookAudioPath = finalURL.path
+                // A rescued dictation has no audio to move. The row is still worth keeping: the
+                // text is what the user dictated, and a history entry without a clip beats losing
+                // the words. The hook is told there is no audio, exactly as it already is when
+                // history is off.
+                if let clip = item.tempURL {
+                    try recorder.moveTemporaryRecording(from: clip, to: finalURL)
+                    hookAudioPath = finalURL.path
+                }
 
                 await storeRecording(
                     id: recordingId, timestamp: timestamp, fileName: fileName,
@@ -240,7 +264,7 @@ final class DictationPipeline: ObservableObject {
                     status: .completed, progress: 1.0, context: item.context,
                     modelUsed: modelUsed, wasFallback: wasFallback)
             } else {
-                try? FileManager.default.removeItem(at: item.tempURL)
+                discardAudio(item.tempURL)
             }
 
             let pasteTargetMissing = hasText ? insertText(text, targetBundleID: item.context.bundleID) : false
@@ -268,14 +292,15 @@ final class DictationPipeline: ObservableObject {
             // status + retry message so it shows in the log and can be re-run with the regenerate (↻)
             // button. Otherwise discard. Either way, surface the failure — silent loss is worse.
             if AppPreferences.shared.saveTranscriptionHistory,
-               let saved = persistFailedRecording(timestamp: item.startedAt, tempURL: item.tempURL) {
+               let clip = item.tempURL,
+               let saved = persistFailedRecording(timestamp: item.startedAt, tempURL: clip) {
                 await storeRecording(
                     id: saved.id, timestamp: saved.timestamp, fileName: saved.fileName,
                     finalURL: saved.url, transcription: "Transcription failed — click ↻ to try again.",
                     status: .failed, progress: 0, context: item.context,
                     modelUsed: nil, wasFallback: false)
             } else {
-                try? FileManager.default.removeItem(at: item.tempURL)
+                discardAudio(item.tempURL)
             }
             IndicatorWindowManager.shared.flash(.error("Transcription failed"))
         }
