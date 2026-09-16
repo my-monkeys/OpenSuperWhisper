@@ -136,10 +136,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         setupStatusBarItem()
 
-        // Start in the menu bar only when requested. Never during onboarding — the user needs
-        // the window to finish setup.
+        // Start in the menu bar only when requested. Never during onboarding: the user needs the
+        // window to finish setup.
+        //
+        // The orderOut looks redundant next to the policy change and is not. Whether the window
+        // exists yet depends on the macOS version, which is the same disagreement that produced
+        // this bug. On 27 SwiftUI has already created it and this is what keeps it off the screen;
+        // measured by removing it, the app launches with its window up. Where it has not been
+        // created yet the lookup is nil and this does nothing, which is what the old code did
+        // there anyway, so it cannot be a regression on either.
         if AppPreferences.shared.startHidden && AppPreferences.shared.hasCompletedOnboarding {
             NSApplication.shared.setActivationPolicy(.accessory)
+            mainWindow?.orderOut(nil)
         }
 
         NotificationCenter.default.addObserver(
