@@ -259,6 +259,66 @@ final class AppContextFormattingTests: XCTestCase {
         XCTAssertFalse(system?.contains("OPENING") ?? true)
     }
 
+    // MARK: - the instruction that only exists while translating
+
+    /// The disappearance is the request. Instructions about translating, left in the general
+    /// prompt where they reach every dictation, sent a small model into mixed languages and
+    /// repetition loops on the ones that were not translations (#86).
+    func testTheTranslationInstructionIsAbsentWhenNotTranslating() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "OPENING", profile: nil,
+            closingPrompt: "CLOSING", translating: false, translationPrompt: "TRANSLATING")
+
+        XCTAssertEqual(system, "OPENING\n\nCLOSING")
+    }
+
+    /// Early, next to the contract it qualifies, and always ahead of the closing guardrail.
+    func testTheTranslationInstructionSitsAfterTheOpening() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "OPENING", profile: slack,
+            closingPrompt: "CLOSING", translating: true, translationPrompt: "TRANSLATING")
+
+        XCTAssertEqual(system, """
+            OPENING
+
+            TRANSLATING
+
+            App-specific formatting rules:
+            \(slack.instructions)
+
+            CLOSING
+            """)
+    }
+
+    /// Emptying it is a supported choice, like the other two halves.
+    func testAnEmptyTranslationInstructionDropsItsSection() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: true, generalPrompt: "OPENING", profile: nil,
+            closingPrompt: "CLOSING", translating: true, translationPrompt: "   ")
+
+        XCTAssertEqual(system, "OPENING\n\nCLOSING")
+    }
+
+    /// A pass started by an app profile alone still gets it: the text is a machine translation
+    /// whichever feature asked for the pass.
+    func testItReachesAnAppProfileOnlyPass() {
+        let system = LLMPostProcessor.assembleSystemPrompt(
+            generalCleanup: false, generalPrompt: "OPENING", profile: slack,
+            closingPrompt: "CLOSING", translating: true, translationPrompt: "TRANSLATING")
+
+        XCTAssertTrue(system?.hasPrefix("TRANSLATING") ?? false)
+        XCTAssertFalse(system?.contains("OPENING") ?? true)
+    }
+
+    func testTheShippedTranslationInstructionAsksForIdiomaticEnglish() {
+        // The literal reading comes from Whisper's own translation, measured with cleanup off,
+        // so this is the one thing worth asking the model for.
+        let shipped = LLMPostProcessor.defaultTranslationInstruction
+
+        XCTAssertTrue(shipped.contains("machine-translated"))
+        XCTAssertTrue(shipped.lowercased().contains("fluent speaker"))
+    }
+
     func testAssembleDropsAnEmptyInstruction() {
         // Clearing the field is a supported choice, not an error to paper over.
         let system = LLMPostProcessor.assembleSystemPrompt(

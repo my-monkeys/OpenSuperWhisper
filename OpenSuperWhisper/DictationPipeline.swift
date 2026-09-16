@@ -201,7 +201,8 @@ final class DictationPipeline: ObservableObject {
             // app-aware formatting rules are keyed off the app that was frontmost when the clip was
             // RECORDED — the app the user was dictating into — not whatever is frontmost now that
             // the background queue got to it. (parallel-recording)
-            text = await LLMPostProcessor.process(text, bundleID: item.context.bundleID)
+            text = await LLMPostProcessor.process(text, bundleID: item.context.bundleID,
+                                                  translating: settings.translateToEnglish)
 
             // Trailing "press enter" voice command (opt-in): strip it and remember to press Return
             // after insertion, submitting the message/prompt.
