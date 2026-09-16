@@ -201,18 +201,56 @@ enum LLMPostProcessor {
             .joined(separator: "\n\n")
     }
 
+    /// Scripts that write without spaces and pack far more meaning into a character: Han, kana,
+    /// and Hangul. A sentence in one of these is a fraction of the length of its English
+    /// equivalent, which is why a single character-count band cannot serve every language pair.
+    ///
+    /// A third is enough to decide. Japanese mixes kana with Latin loanwords and digits, so
+    /// demanding a majority would misread a perfectly ordinary sentence as a spaced one.
+    static func isDenseScript(_ text: String) -> Bool {
+        let letters = text.unicodeScalars.filter { CharacterSet.letters.contains($0) }
+        guard !letters.isEmpty else { return false }
+        let dense = letters.filter { scalar in
+            switch scalar.value {
+            case 0x3040...0x30FF,   // hiragana, katakana
+                 0x3400...0x4DBF,   // CJK ideographs, extension A
+                 0x4E00...0x9FFF,   // CJK ideographs
+                 0xF900...0xFAFF,   // CJK compatibility ideographs
+                 0xAC00...0xD7AF,   // Hangul syllables
+                 0x1100...0x11FF:   // Hangul jamo
+                return true
+            default:
+                return false
+            }
+        }
+        return Double(dense.count) / Double(letters.count) >= 0.34
+    }
+
     /// Sanity-checks a translated instruction before it replaces the one the user wrote. A small
     /// model asked to translate a prompt may instead answer it, summarize it, or return a
     /// fragment; swapping that in would quietly destroy text someone spent real time on. Length is
-    /// crude but catches the failures seen in practice — a translation lands in the same ballpark
+    /// crude but catches the failures seen in practice: a translation lands in the same ballpark
     /// as its source, an answer or a fragment does not.
+    ///
+    /// The ballpark depends on the pair, which the flat 0.5 to 2.0 band did not account for. A
+    /// correct Japanese translation of an English sentence is roughly half its length and landed
+    /// on the floor, so the button appeared to do nothing with nothing to say why. Since 0.11.0
+    /// reads its language list from whisper.cpp, all 99 are selectable and this is reachable.
+    ///
+    /// The bands stay generous on purpose. This is here to catch a model that answered the prompt
+    /// or returned a fragment, not to judge translation quality, and a false rejection costs the
+    /// user work they cannot get back.
     static func passesTranslationGuard(source: String, translated: String) -> Bool {
-        let trimmed = translated.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
+        let translated = translated.trimmingCharacters(in: .whitespacesAndNewlines)
         let source = source.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !source.isEmpty else { return false }
-        let ratio = Double(trimmed.count) / Double(source.count)
-        return ratio >= 0.5 && ratio <= 2.0
+        guard !translated.isEmpty, !source.isEmpty else { return false }
+
+        let ratio = Double(translated.count) / Double(source.count)
+        switch (isDenseScript(source), isDenseScript(translated)) {
+        case (false, true):  return ratio >= 0.15 && ratio <= 1.5   // into Japanese, Chinese, Korean
+        case (true, false):  return ratio >= 0.7 && ratio <= 6.0    // out of them
+        default:             return ratio >= 0.5 && ratio <= 2.0    // same density on both sides
+        }
     }
 
     /// Sanity-checks LLM output against its input to catch a model that ignored the transform-only
