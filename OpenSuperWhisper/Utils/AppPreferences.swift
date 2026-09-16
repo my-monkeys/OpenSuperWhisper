@@ -497,6 +497,13 @@ final class AppPreferences {
                  defaultValue: LLMPostProcessor.defaultClosingInstruction)
     var aiPostProcessingClosing: String
 
+    // Sent only while "Translate to English" is on. Kept apart from the general instruction
+    // because a prompt that mentions translating confuses the model on every dictation that
+    // isn't one (#86).
+    @UserDefault(key: "aiPostProcessingTranslation",
+                 defaultValue: LLMPostProcessor.defaultTranslationInstruction)
+    var aiPostProcessingTranslation: String
+
     // App-aware LLM formatting: per-app instructions, keyed by frontmost bundle identifier, that
     // reshape the transcription via the same local LLM (e.g. "at Rob" -> "@Rob" in Slack). This is
     // independent of `aiPostProcessingEnabled`: either feature can contribute to a single LLM pass.

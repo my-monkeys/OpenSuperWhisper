@@ -540,6 +540,13 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// Sent only while "Translate to English" is on.
+    @Published var aiPostProcessingTranslation: String {
+        didSet {
+            AppPreferences.shared.aiPostProcessingTranslation = aiPostProcessingTranslation
+        }
+    }
+
     /// Which half of the system prompt a translation applies to.
     enum PromptHalf: Hashable {
         case opening, closing
@@ -940,6 +947,7 @@ class SettingsViewModel: ObservableObject {
         self.aiRemoteAPIKey = prefs.aiRemoteAPIKey ?? ""
         self.aiPostProcessingPrompt = prefs.aiPostProcessingPrompt
         self.aiPostProcessingClosing = prefs.aiPostProcessingClosing
+        self.aiPostProcessingTranslation = prefs.aiPostProcessingTranslation
         self.builtInModelFileName = prefs.builtInModelFileName
         self.builtInModelDownloaded =
             LLMModelManager.shared.isModelDownloaded(name: prefs.builtInModelFileName)
@@ -2074,6 +2082,25 @@ struct SettingsView: View {
                 Text("Any matching per-app rule from Rules is inserted here.")
                     .scaledFont(size: 11).foregroundColor(STheme.hint)
                     .padding(.leading, 8)
+            }
+            if viewModel.translateToEnglish {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("When translating").scaledFont(size: 12).foregroundColor(STheme.text)
+                        Spacer()
+                        Button("Reset to default") {
+                            viewModel.aiPostProcessingTranslation =
+                                LLMPostProcessor.defaultTranslationInstruction
+                        }
+                        .controlSize(.small)
+                        .disabled(viewModel.aiPostProcessingTranslation
+                                  == LLMPostProcessor.defaultTranslationInstruction)
+                    }
+                    sEditor($viewModel.aiPostProcessingTranslation, height: 72)
+                    Text("Sent only while Translate to English is on, so instructions about translating never reach a dictation that isn't one. Whisper's own translation is what reads literally; this is where you ask for the English a fluent speaker would use.")
+                        .scaledFont(size: 11).foregroundColor(STheme.hint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             promptHalfField("Closing instruction",
                             half: .closing,

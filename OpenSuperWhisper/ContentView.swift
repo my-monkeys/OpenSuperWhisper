@@ -266,7 +266,8 @@ class ContentViewModel: ObservableObject {
                     // frontmost app: recording from the main window makes OSW itself frontmost, so
                     // asking the workspace here would never match a profile.
                     let text = await LLMPostProcessor.process(
-                        cleanedText, bundleID: RecordingContext.shared.bundleID)
+                        cleanedText, bundleID: RecordingContext.shared.bundleID,
+                        translating: AppPreferences.shared.translateToEnglish)
 
                     if AppPreferences.shared.saveTranscriptionHistory {
                         // Capture the current recording duration

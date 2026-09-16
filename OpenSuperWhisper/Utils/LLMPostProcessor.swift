@@ -54,7 +54,7 @@ enum LLMPostProcessor {
     /// Cleans and/or app-formats `text` for the frontmost app identified by `bundleID`. Two
     /// independent capabilities feed one LLM pass: general prose cleanup (`aiPostProcessingEnabled`)
     /// and app-aware formatting (`appContextFormattingEnabled`). Either, both, or neither may run.
-    static func process(_ text: String, bundleID: String?) async -> String {
+    static func process(_ text: String, bundleID: String?, translating: Bool = false) async -> String {
         let prefs = AppPreferences.shared
         let general = prefs.aiPostProcessingEnabled
         let formatting = prefs.appContextFormattingEnabled
@@ -66,7 +66,9 @@ enum LLMPostProcessor {
         guard let system = assembleSystemPrompt(generalCleanup: general,
                                                 generalPrompt: prefs.aiPostProcessingPrompt,
                                                 profile: prof,
-                                                closingPrompt: prefs.aiPostProcessingClosing)
+                                                closingPrompt: prefs.aiPostProcessingClosing,
+                                                translating: translating,
+                                                translationPrompt: prefs.aiPostProcessingTranslation)
         else { return text }
 
         let backend = currentBackend()
@@ -130,6 +132,23 @@ enum LLMPostProcessor {
         text: no preamble, no explanation, no commentary.
         """
 
+    /// Added to the prompt only while "Translate to English" is on, because it describes what the
+    /// text is rather than what to do with it: the output of a machine translation, not something
+    /// a person wrote.
+    ///
+    /// It exists because a single prompt cannot serve both states. Translation instructions left
+    /// in the general one confuse the model when translation is off, which @ForksApps reported as
+    /// mixed languages and repetition loops (#86). And the awkwardness they were trying to fix is
+    /// not the cleanup pass's doing: measurements in that thread pin it on Whisper's own
+    /// translation, with cleanup disabled entirely. So this asks for the one thing that actually
+    /// helps, which is idiomatic English rather than a word-order transcript of the source.
+    static let defaultTranslationInstruction = """
+        This text was machine-translated into English from another language, so it may read \
+        literally: source word order, dated phrasing, idioms rendered word for word. Rewrite those \
+        into the English a fluent speaker would use. Keep every fact, name and number exactly as \
+        they are, and do not add anything the original did not say.
+        """
+
     /// Builds the single system prompt for one LLM pass from the two independent contributors.
     /// Returns nil when neither contributes (general cleanup off AND no app profile), signalling
     /// the caller to skip the LLM entirely and return the text untouched.
@@ -150,13 +169,22 @@ enum LLMPostProcessor {
     static func assembleSystemPrompt(generalCleanup: Bool,
                                      generalPrompt: String,
                                      profile: AppContextProfile?,
-                                     closingPrompt: String = "") -> String? {
+                                     closingPrompt: String = "",
+                                     translating: Bool = false,
+                                     translationPrompt: String = "") -> String? {
         guard generalCleanup || profile != nil else { return nil }
 
         var sections: [String] = []
 
         if generalCleanup {
             sections.append(generalPrompt)
+        }
+        // Early, next to the contract it qualifies, and gone entirely when translation is off:
+        // that disappearance is the whole request. Instructions about translating, left in the
+        // general prompt where they apply to every dictation, are what sent a small model into
+        // mixed languages and repetition loops (#86).
+        if translating {
+            sections.append(translationPrompt)
         }
         if let profile = profile {
             sections.append("App-specific formatting rules:\n\(profile.instructions)")
