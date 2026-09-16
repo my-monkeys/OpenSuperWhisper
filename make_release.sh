@@ -183,7 +183,13 @@ else
     echo "🏷️ Creating git tag..."
     git tag -a "${TAG}" -m "Release ${NEW_VERSION}"
 
-    echo "📤 Pushing tag to origin..."
+    echo "📤 Pushing the bump and the tag to origin..."
+    # The branch, not just the tag. Pushing the tag alone leaves the bump commit local, and the
+    # next release then reads a stale CURRENT_PROJECT_VERSION and reuses a build number that is
+    # already published. Sparkle compares build numbers, so the new version reads as "not newer"
+    # and nobody is offered the update. That is what happened after 0.12.4: the tag carried the
+    # bump, master stayed at 0.12.3 / build 52, and the appcast was advertising 53.
+    git push origin HEAD
     git push origin "${TAG}"
 fi
 
