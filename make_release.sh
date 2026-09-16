@@ -11,7 +11,11 @@ REPO="${REPO:-my-monkeys/OpenSuperWhisper}"
 # Every existing tag is v-prefixed; Sparkle's appcast links to that form.
 TAG="v${NEW_VERSION}"
 CODE_SIGN_IDENTITY="${2}"
-GITHUB_TOKEN="${3}"
+# Third argument wins, then the environment. It used to be `"${3}"` flat, which overwrote the
+# exported variable with an empty argument every time, so the "using the token from the
+# environment" branch below could never be reached and a non-interactive run always stalled on
+# the prompt. Passing it as an argument also puts the token in the process list.
+GITHUB_TOKEN="${3:-${GITHUB_TOKEN:-}}"
 
 if [[ -z "$CODE_SIGN_IDENTITY" ]]; then
     echo "❌ Error: Code signing identity is required"
