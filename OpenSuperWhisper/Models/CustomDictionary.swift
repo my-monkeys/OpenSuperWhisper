@@ -110,7 +110,9 @@ enum CustomDictionary {
 
         var result = text
         for entry in entries {
-            let replacement = entry.replacement.trimmingCharacters(in: .whitespacesAndNewlines)
+            let replacement = entry.isRegex
+                ? entry.replacement.trimmingCharacters(in: .whitespacesAndNewlines)
+                : unescaped(entry.replacement.trimmingCharacters(in: .whitespacesAndNewlines))
             // Skip incomplete rows. A row with no trigger has nothing to match; an empty
             // `replacement` would silently DELETE every occurrence from the output — a natural
             // intermediate state when the user has filled "Heard" but not yet "Replace with".
@@ -140,8 +142,15 @@ enum CustomDictionary {
                     // Punctuation has to swallow the space on the side it belongs to, or an
                     // opening quote lands as `he said " hello`. Only horizontal space is eaten:
                     // a rule must not silently pull two paragraphs together.
-                    let eatBefore = entry.spacing == .attachesLeft ? "[ \\t]*" : ""
-                    let eatAfter = entry.spacing == .attachesRight ? "[ \\t]*" : ""
+                    // A replacement that begins or ends with a line break eats the horizontal
+                    // space on that side whatever the spacing says. Nobody wants a trailing
+                    // space before a newline, and asking someone to know that is asking them to
+                    // debug their own dictionary. Costs nothing elsewhere: until `\\n` became
+                    // expressible, no replacement could contain one (#121).
+                    let breaksBefore = replacement.first == "\n"
+                    let breaksAfter = replacement.last == "\n"
+                    let eatBefore = (entry.spacing == .attachesLeft || breaksBefore) ? "[ \\t]*" : ""
+                    let eatAfter = (entry.spacing == .attachesRight || breaksAfter) ? "[ \\t]*" : ""
                     pattern = eatBefore + leadingBoundary + escaped + trailingBoundary + eatAfter
                     // Use the trimmed replacement (consistent with promptBoost) so a stray
                     // leading/trailing space in the rule doesn't produce double spaces.
@@ -160,6 +169,38 @@ enum CustomDictionary {
             }
         }
         return result
+    }
+
+    /// Turns `\n` and `\t` typed in a replacement into a real newline and tab.
+    ///
+    /// A replacement that *is* whitespace cannot be written literally: the field is trimmed to
+    /// spot a row someone has half filled in, so typing a newline leaves the rule looking empty
+    /// and it is skipped as incomplete. Two visible characters keep the row obviously filled and
+    /// say what it means. This is what lets a spoken "new paragraph" become one (#121).
+    ///
+    /// Only for literal rules. A regex rule's replacement is an `NSRegularExpression` template
+    /// where a backslash already escapes the next character, and rewriting those would change
+    /// what existing rules do.
+    static func unescaped(_ replacement: String) -> String {
+        guard replacement.contains("\\") else { return replacement }
+        var out = ""
+        var rest = Substring(replacement)
+        while let slash = rest.firstIndex(of: "\\") {
+            out += rest[rest.startIndex..<slash]
+            let after = rest.index(after: slash)
+            guard after < rest.endIndex else {
+                out.append("\\")
+                return out
+            }
+            switch rest[after] {
+            case "n": out.append("\n")
+            case "t": out.append("\t")
+            case "\\": out.append("\\")
+            default: out.append("\\"); out.append(rest[after])
+            }
+            rest = rest[rest.index(after: after)...]
+        }
+        return out + rest
     }
 
     /// Folds rules that write the same thing into one.

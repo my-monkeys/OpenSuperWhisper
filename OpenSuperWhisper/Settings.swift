@@ -2349,7 +2349,7 @@ struct SettingsView: View {
             }
 
             SSection(title: "Dictionary") {
-                SRow(title: "Custom dictionary", hint: "Whole-word replacement, case-insensitive") {
+                SRow(title: "Custom dictionary", hint: "Whole-word replacement, case-insensitive. Write \\n in a replacement for a line break, so saying \"new paragraph\" makes one.") {
                     SToggle(isOn: $viewModel.customDictionaryEnabled)
                 }
                 if viewModel.customDictionaryEnabled {
