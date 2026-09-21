@@ -13,8 +13,9 @@ import SwiftUI
 // phase change is a morph, never a swap: on stop, the Stop control melts back into the pill while
 // Cancel slides over into its place; on a message both melt away and the pill reshapes around it.
 
-/// A reorderable element of the pill's centre.
+/// A reorderable element of the pill.
 public enum BubbleCenterElement: String, Sendable, CaseIterable {
+    case dot
     case waveform
     case label
 }
@@ -67,6 +68,11 @@ public struct RecordingBubble: View {
     /// It is drawn as the glass view's own CONTENT (before `.glassEffect`), so it materialises,
     /// moves and morphs with the glass — an overlay after it lives on another layer and ghosts.
     var rim: Double
+    /// A dimming layer inside the glass (black at this opacity). Glass takes its brightness from
+    /// what is behind it, so over a bright window it turns light grey and white text on it drops
+    /// under legible contrast; the dim keeps the pill dark enough for its text, as Apple's guidance
+    /// for text on glass recommends.
+    var dim: Double
     var onStop: (() -> Void)?
     var onCancel: (() -> Void)?
     /// Emerge the controls out of the pill once when the bubble appears (the app's entrance).
@@ -86,6 +92,7 @@ public struct RecordingBubble: View {
                 glass: GlassKind = .regular,
                 visible: Bool = true,
                 rim: Double = 0.45,
+                dim: Double = 0.35,
                 onStop: (() -> Void)? = nil,
                 onCancel: (() -> Void)? = nil,
                 emergeOnAppear: Bool = false,
@@ -102,6 +109,7 @@ public struct RecordingBubble: View {
         self.glass = glass
         self.visible = visible
         self.rim = rim
+        self.dim = dim
         self.onStop = onStop
         self.onCancel = onCancel
         self.emergeOnAppear = emergeOnAppear
@@ -154,7 +162,7 @@ public struct RecordingBubble: View {
                 // Both controls keep their slots in every phase: a tucked control is moved (a
                 // render-only offset), never removed, so the window never reflows under the pill.
                 if let onStop {
-                    control(system: "stop", id: "stop", tint: .secondary, out: stopOut, order: 0,
+                    control(system: "stop", id: "stop", tint: Color.primary.opacity(0.85), out: stopOut, order: 0,
                             tuck: 1, action: onStop)
                 }
                 if let onCancel {
@@ -162,7 +170,7 @@ public struct RecordingBubble: View {
                     // one slot out from a gap.
                     let homeShift: CGFloat = (onStop != nil && !stopOut && cancelOut) ? -slot : 0
                     control(system: phase == .processing ? "xmark" : "trash", id: "cancel",
-                            tint: .secondary, out: cancelOut, order: 1,
+                            tint: Color.primary.opacity(0.85), out: cancelOut, order: 1,
                             tuck: onStop != nil ? 2 : 1, home: homeShift, action: onCancel)
                 }
             }
@@ -185,6 +193,7 @@ public struct RecordingBubble: View {
     private var core: some View {
         coreContent
             .background { rimStroke(rim) }
+            .background { Capsule().fill(.black.opacity(dim)) }
             .glassEffect(glass.glass, in: .capsule)
             .glassEffectID("core", in: ns)
             .glassEffectTransition(.materialize)
@@ -205,9 +214,12 @@ public struct RecordingBubble: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 320, alignment: .leading)
             case .recording, .processing:
-                if showDot { recordDot }
+                // `showDot` puts the dot first when the order does not place it itself.
+                if showDot && !center.contains(.dot) { recordDot }
                 ForEach(Array(center.enumerated()), id: \.offset) { _, element in
                     switch element {
+                    case .dot:
+                        recordDot
                     case .waveform:
                         if phase == .processing {
                             ProgressView()
@@ -222,7 +234,7 @@ public struct RecordingBubble: View {
                         Text(caption ?? AttributedString(labelText))
                             // Spotlight's placeholder: regular weight, secondary grey.
                             .font(.system(size: caption == nil ? textSize : textSize * 0.85))
-                            .foregroundStyle(caption == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                            .foregroundStyle(.primary)
                             .contentTransition(.opacity)
                             .fixedSize(horizontal: caption == nil, vertical: true)
                             .frame(maxWidth: caption == nil ? nil : 300, alignment: .leading)
@@ -272,6 +284,7 @@ public struct RecordingBubble: View {
                 .frame(width: bar, height: bar)
                 .contentShape(Rectangle())
                 .background { rimStroke(rim) }
+                .background { Capsule().fill(.black.opacity(dim)) }
                 // The icon and its rim fade together, so a control still inside the pill draws no
                 // ring over it.
                 .opacity(out ? 1 : 0)

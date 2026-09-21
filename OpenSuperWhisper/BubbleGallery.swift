@@ -394,6 +394,32 @@ enum IndicatorProbe {
             t.arguments = ["-x", "\(outDir)/\(name).png"]
             try? t.run(); t.waitUntilExit()
         }
+        // PROBE_EDITOR=1: the real indicator layout editor (Settings) in a window, screenshotted, so
+        // its preview can be checked against the selected theme.
+        if ProcessInfo.processInfo.environment["PROBE_EDITOR"] != nil {
+            let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 900, height: 700),
+                             styleMask: [.titled], backing: .buffered, defer: false)
+            w.appearance = NSAppearance(named: .darkAqua)
+            w.contentView = NSHostingView(rootView:
+                Group {
+                    if ProcessInfo.processInfo.environment["PROBE_SETTINGS"] != nil {
+                        SettingsView()
+                    } else {
+                        ScrollView { IndicatorLayoutEditor(viewModel: SettingsViewModel()).padding(20) }
+                    }
+                }
+                    .frame(width: 900, height: 700)
+                    .background(Color(white: 0.1)))
+            w.orderFrontRegardless()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                let t = Process()
+                t.launchPath = "/usr/sbin/screencapture"
+                t.arguments = ["-x", "-l\(w.windowNumber)", "\(outDir)/editor.png"]
+                try? t.run(); t.waitUntilExit(); exit(0)
+            }
+            NSApplication.shared.run()
+            exit(0)
+        }
         // PROBE_CLICK=1: clicks the bubble's rightmost control (Cancel) and then, on a fresh bubble,
         // the one left of it (Stop) with synthetic mouse events, and reports whether each click
         // landed (the state changed). Uses the prefs as they are: the caller sets up (and restores)

@@ -659,15 +659,7 @@ struct IndicatorWindow: View {
     }
 
     /// The pill's centre elements (waveform / label) in the user's configured order.
-    private var glassCenter: [BubbleCenterElement] {
-        layout.leading.compactMap {
-            switch $0 {
-            case .waveform: return .waveform
-            case .label: return .label
-            default: return nil
-            }
-        }
-    }
+    private var glassCenter: [BubbleCenterElement] { layout.glassCenter }
 
     /// The live caption as one string: the confirmed part primary, the still-streaming tail dimmed.
     private var liveCaption: AttributedString {

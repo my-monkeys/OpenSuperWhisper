@@ -378,7 +378,7 @@ public struct WaveformMeter: View {
                 ForEach(0..<bandCount, id: \.self) { band in
                     let level = level(band: band, t: t)
                     Capsule()
-                        .fill(.secondary.opacity(0.3 + 0.6 * level))
+                        .fill(Color.primary.opacity(0.55 + 0.45 * level))
                         .frame(width: Self.barWidth,
                                height: Self.restHeight + (height - Self.restHeight) * level)
                 }
