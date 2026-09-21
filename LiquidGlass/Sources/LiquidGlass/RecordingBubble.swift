@@ -277,7 +277,7 @@ public struct RecordingBubble: View {
                 .opacity(out ? 1 : 0)
                 .animation(iconAnimation(out: out, order: order), value: out)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressFeedbackStyle())
         .accessibilityLabel(id == "stop" ? "Stop Recording" : "Cancel")
         .glassEffect(glass.glass.interactive(), in: .capsule)
         .glassEffectID(id, in: ns)
@@ -312,5 +312,17 @@ public struct RecordingBubble: View {
         let lag = Double(steps) * Self.stagger
         return out ? .easeOut(duration: 0.16).delay(0.1 + lag)
                    : .easeIn(duration: 0.08).delay(lag)
+    }
+}
+
+/// Press feedback for the glass controls: the glyph dips and dims while held and springs back on
+/// release. It lives on the label (inside the glass), so it moves with the glass rather than
+/// beside it; the glass's own `.interactive()` response plays alongside.
+struct PressFeedbackStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.84 : 1)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .animation(.spring(duration: 0.18, bounce: 0.4), value: configuration.isPressed)
     }
 }

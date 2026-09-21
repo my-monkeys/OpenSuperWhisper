@@ -117,10 +117,15 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         // Accept clicks only when an on-bubble button is enabled (so it's tappable);
         // otherwise stay fully click-through (baseline). Re-evaluated each show() so
         // toggling the setting takes effect on the next recording.
+        // From the layout the bubble actually draws. The old `showStop/CancelButtonOnIndicator`
+        // switches only seed the layout on migration and stay false afterwards, so reading them
+        // here left the panel click-through while the editor's buttons were on screen: every
+        // click fell through to the app underneath.
+        let layout = IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
         window?.ignoresMouseEvents = !Self.needsMouseEvents(
             position: AppPreferences.shared.indicatorPosition,
-            showsStop: AppPreferences.shared.showStopButtonOnIndicator,
-            showsCancel: AppPreferences.shared.showCancelButtonOnIndicator)
+            showsStop: layout.contains(.stopButton),
+            showsCancel: layout.contains(.cancelButton))
 
         if let window = window, let screen = targetScreen {
             let screenFrame = screen.frame

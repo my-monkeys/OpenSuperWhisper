@@ -562,13 +562,13 @@ struct IndicatorWindow: View {
     /// discard (same as the Esc cancel shortcut). Fixed-size, so they don't couple
     /// the bubble's size to the window (see the recursion-crash note above).
     private var anyIndicatorButton: Bool {
-        AppPreferences.shared.showStopButtonOnIndicator
-            || AppPreferences.shared.showCancelButtonOnIndicator
+        // The layout, not the pre-editor switches (which only seed it on migration).
+        !layout.trailing.isEmpty
     }
 
     @ViewBuilder private var indicatorControls: some View {
         HStack(spacing: 8) {
-            if AppPreferences.shared.showStopButtonOnIndicator {
+            if layout.contains(.stopButton) {
                 glassControlButton {
                     // A red ring with a red stop square inside (transparent interior).
                     Image(systemName: "stop.circle")
@@ -582,7 +582,7 @@ struct IndicatorWindow: View {
                     "Finish recording"
                 }
             }
-            if AppPreferences.shared.showCancelButtonOnIndicator {
+            if layout.contains(.cancelButton) {
                 glassControlButton {
                     // A plain red trash can — discard without transcribing.
                     Image(systemName: "trash")
@@ -710,11 +710,15 @@ struct IndicatorWindow: View {
             } : nil,
             emergeOnAppear: true
         )
-        // Measure for the manual window sizing, then report.
-        .background(GeometryReader { proxy in
-            Color.clear.preference(key: IndicatorContentSizeKey.self, value: proxy.size)
-        })
-        .onPreferenceChange(IndicatorContentSizeKey.self) { size in onContentResize(size) }
+        // Its natural size, not the window's: GlassEffectContainer takes whatever it is offered, so
+        // unfixed it measured as the 380×120 seed canvas and the window never shrank to the bubble
+        // — leaving a big invisible panel that, with the buttons on, swallowed clicks around it.
+        .fixedSize()
+        // Measure for the manual window sizing. Read directly rather than through
+        // `IndicatorContentSizeKey`: through the preference the glass bubble's size arrived as
+        // .zero (the GeometryReader saw 268×37, the handler got 0×0), so the window stayed at its
+        // seed size.
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in onContentResize(size) }
         // Animated, so the glass materialises in instead of popping.
         .onAppear { withAnimation(RecordingBubble.appear) { viewModel.isVisible = true } }
     }

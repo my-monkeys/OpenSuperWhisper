@@ -394,6 +394,47 @@ enum IndicatorProbe {
             t.arguments = ["-x", "\(outDir)/\(name).png"]
             try? t.run(); t.waitUntilExit()
         }
+        // PROBE_CLICK=1: clicks the bubble's rightmost control (Cancel) and then, on a fresh bubble,
+        // the one left of it (Stop) with synthetic mouse events, and reports whether each click
+        // landed (the state changed). Uses the prefs as they are: the caller sets up (and restores)
+        // a non-notch position with both buttons shown.
+        if ProcessInfo.processInfo.environment["PROBE_CLICK"] != nil {
+            func log(_ s: String) { FileHandle.standardOutput.write(Data((s + "\n").utf8)) }
+            log("AX trusted: \(AXIsProcessTrusted())")
+            func panel() -> NSWindow? { NSApp.windows.first { $0.level == .screenSaver && $0.isVisible } }
+            func click(fromRight slots: Int) {
+                guard let w = panel(), let screen = w.screen else { log("no panel"); return }
+                let layout = IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
+                let bar = max(26, ((layout.waveformHeight + 16) * AppPreferences.shared.glassBubbleSize).rounded())
+                let gap = (bar * 0.2).rounded()
+                let x = w.frame.maxX - bar / 2 - CGFloat(slots) * (bar + gap)
+                // CGEvent wants top-left global coordinates.
+                let y = screen.frame.maxY - w.frame.midY
+                log("panel \(w.frame) ignoresMouseEvents=\(w.ignoresMouseEvents) click at \(x),\(y)")
+                let p = CGPoint(x: x, y: y)
+                for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+                    CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: p,
+                            mouseButton: .left)?.post(tap: .cghidEventTap)
+                }
+            }
+            let steps: [(Double, () -> Void)] = [
+                (0.5, { vm = manager.show(nearPoint: nil); vm?.state = .recording; vm?.isBlinking = true }),
+                (1.3, { shot("click-0-before"); click(fromRight: 0) }),
+                (2.1, { log("after Cancel click: panel visible=\(panel() != nil), state=\(String(describing: vm?.state))") }),
+                (2.2, { vm = manager.show(nearPoint: nil); vm?.state = .recording; vm?.isBlinking = true }),
+                (3.0, { click(fromRight: 1) }),
+                (3.1, { shot("click-1-stop") }),
+                (3.3, { log("after Stop click: state=\(String(describing: vm?.state))") }),
+                (3.5, { manager.stopForce() }),
+                (4.2, { exit(0) }),
+            ]
+            for (at, step) in steps {
+                DispatchQueue.main.asyncAfter(deadline: .now() + at) { MainActor.assumeIsolated { step() } }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 15) { exit(1) }
+            NSApplication.shared.run()
+            exit(0)
+        }
         // PROBE_REAL=1: the real start path (as ShortcutManager does it: show + startRecording, the
         // mic included), frames every 150ms, then the take is DISCARDED (stopForce) — nothing is
         // transcribed or pasted.
