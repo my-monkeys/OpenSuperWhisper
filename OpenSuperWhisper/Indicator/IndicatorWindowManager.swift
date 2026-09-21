@@ -236,6 +236,19 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         showsStop || showsCancel || position == "custom"
     }
 
+    /// The Liquid Glass bubble keeps its control slots while the controls are tucked (so the window
+    /// never reflows), and those empty slots would swallow clicks meant for the app below. While it
+    /// shows a message (no control out) go click-through again, unless the bubble is draggable.
+    func setGlassControlsTucked(_ tucked: Bool) {
+        guard let window else { return }
+        let layout = IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
+        let position = AppPreferences.shared.indicatorPosition
+        let needs = Self.needsMouseEvents(position: position,
+                                          showsStop: layout.contains(.stopButton),
+                                          showsCancel: layout.contains(.cancelButton))
+        window.ignoresMouseEvents = !needs || (tucked && position != "custom")
+    }
+
     /// The origin `reposition` last asked for, so the window's own move notification is not
     /// mistaken for the user dragging the bubble.
     ///

@@ -4,8 +4,9 @@ import SwiftUI
 // Liquid Glass only exists in the macOS 26 SDK. `@available` guards the runtime, not
 // compilation — older toolchains would still parse these calls and fail. Keyed off
 // FoundationModels like the Apple Speech engine, so older SDKs build a stub that renders
-// nothing rather than failing the build.
-#if canImport(FoundationModels)
+// nothing rather than failing the build. Debug-only: these probes drive the user's real indicator
+// and shell out to `screencapture`, which has no place in a release binary.
+#if DEBUG && canImport(FoundationModels)
 
 struct Sample {
     let name: String
@@ -22,11 +23,8 @@ enum GlassKind: String, CaseIterable {
     case clearTinted      // clear + a dark tint for legibility over bright backdrops
     case regularTinted    // regular + dark tint
 
-    /// Nil on macOS 14/15: there is no glass to render, the gallery simply skips the sample
-    /// rather than failing the whole run.
     @available(macOS 26.0, *)
     var glass: Glass? {
-        guard #available(macOS 26.0, *) else { return nil }
         switch self {
         case .regular: return .regular
         case .clear: return .clear
@@ -394,11 +392,9 @@ enum IndicatorProbe {
             t.arguments = ["-x", "\(outDir)/\(name).png"]
             try? t.run(); t.waitUntilExit()
         }
-        #if DEBUG
         if let gif = ProcessInfo.processInfo.environment["PROBE_GIF"], #available(macOS 26.0, *) {
             IndicatorGIFProbe.run(styleName: gif, outDir: outDir)
         }
-        #endif
         // PROBE_EDITOR=1: the real indicator layout editor (Settings) in a window, screenshotted, so
         // its preview can be checked against the selected theme.
         if ProcessInfo.processInfo.environment["PROBE_EDITOR"] != nil {
