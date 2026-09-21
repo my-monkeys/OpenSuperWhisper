@@ -92,6 +92,10 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             // Read once per presentation rather than observed: the bubble is short-lived, and a
             // size change mid-recording would resize the window under the user (#80).
             .environment(\.appTextScale, AppPreferences.shared.textScale)
+            // Resolve the theme once per presentation (like textScale): a mid-recording change
+            // should not reskin the bubble under the user. This is the only place the indicator's
+            // theme is injected; the surface/button seams read it from the environment.
+            .environment(\.uiTheme, ThemeController.shared.resolved)
         )
         hostingController.sizingOptions = Self.hostingSizingOptions
         window?.contentViewController = hostingController

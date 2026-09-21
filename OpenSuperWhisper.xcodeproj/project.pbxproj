@@ -19,8 +19,10 @@
 		36EBCD229289171650A4E267 /* (null) in Sources */ = {isa = PBXBuildFile; };
 		36EBCD57CC6B8E2D3FC51EF5 /* (null) in Sources */ = {isa = PBXBuildFile; };
 		36EBCE4EA0197EA30ECFA1F7 /* (null) in Sources */ = {isa = PBXBuildFile; };
-		840156D02D79ED9900FB5FFE /* libwhisper.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CF2D79ED9900FB5FFE /* libwhisper.a */; };
+		5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5BA9E0DA0000000000000A02 /* Sparkle */; };
 		5BB5E04A0000000000A2 /* libsherpa-onnx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BB5E04A0000000000A1 /* libsherpa-onnx.a */; };
+		5BB5E04B0000000000B2 /* libonnxruntime.1.24.4.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		840156D02D79ED9900FB5FFE /* libwhisper.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CF2D79ED9900FB5FFE /* libwhisper.a */; };
 		840156D12D79EDA900FB5FFE /* libggml.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C52D79ED9900FB5FFE /* libggml.a */; };
 		840156D22D79EDB500FB5FFE /* libggml-base.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C72D79ED9900FB5FFE /* libggml-base.a */; };
 		840156D32D79EDBA00FB5FFE /* libggml-blas.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156C92D79ED9900FB5FFE /* libggml-blas.a */; };
@@ -28,7 +30,7 @@
 		840156D52D79EDBA00FB5FFE /* libggml-metal.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156CD2D79ED9900FB5FFE /* libggml-metal.a */; };
 		840156E02D79EE0000FB5FFE /* libllama.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156DF2D79EE0000FB5FFE /* libllama.a */; };
 		CE0EAD6E2D56ACA80067FDEE /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB */; };
-		5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5BA9E0DA0000000000000A02 /* Sparkle */; };
+		A1B2C3D40000000000000001 /* LiquidGlass in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D40000000000000002 /* LiquidGlass */; };
 		CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6D2D55777800C54EA6 /* libc++.tbd */; };
 		CE84DF712D55778000C54EA6 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6F2D55778000C54EA6 /* Metal.framework */; };
 		CE84DF722D55778000C54EA6 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF702D55778000C54EA6 /* MetalKit.framework */; };
@@ -37,22 +39,8 @@
 		CEAC00032D82F00200000000 /* libautocorrect_swift.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = CEAC00012D82F00000000000 /* libautocorrect_swift.dylib */; };
 		CEAC00042D82F10000000000 /* libautocorrect_swift.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CEAC00012D82F00000000000 /* libautocorrect_swift.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		CEAC00082D82F50000000000 /* libomp.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CEAC00072D82F40000000000 /* libomp.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		5BB5E04B0000000000B2 /* libonnxruntime.1.24.4.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		FDF288C9306184D30027FF3B /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = CE84E17E2D56550B00C54EA7 /* FluidAudio */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		CEAC00052D82F00400000000 /* Copy Files */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				CEAC00042D82F00300000000 /* libautocorrect_swift.dylib in Copy Files */,
-			);
-			name = "Copy Files";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXContainerItemProxy section */
 		840156C42D79ED9900FB5FFE /* PBXContainerItemProxy */ = {
@@ -136,6 +124,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5BB5E04A0000000000A1 /* libsherpa-onnx.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libsherpa-onnx.a"; path = "vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/libsherpa-onnx.a"; sourceTree = SOURCE_ROOT; };
+		5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libonnxruntime.1.24.4.dylib; path = build/libonnxruntime.1.24.4.dylib; sourceTree = "<group>"; };
 		840156402D79E87600FB5FFE /* libwhisper.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = libwhisper.xcodeproj; path = libwhisper/build/libwhisper.xcodeproj; sourceTree = "<group>"; };
 		840156592D79EA1A00FB5FFE /* Bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Bridge.h; sourceTree = "<group>"; };
 		CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenSuperWhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -172,7 +162,6 @@
 		CE84DF652D55762200C54EA6 /* libggml-metal.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libggml-metal.a"; sourceTree = "<group>"; };
 		CE84DF662D55762200C54EA6 /* libggml-base.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libggml-base.a"; sourceTree = "<group>"; };
 		CE84DF672D55762200C54EA6 /* libwhisper.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libwhisper.a; sourceTree = "<group>"; };
-		5BB5E04A0000000000A1 /* libsherpa-onnx.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libsherpa-onnx.a"; path = "vendor/sherpa-onnx.xcframework/macos-arm64_x86_64/libsherpa-onnx.a"; sourceTree = SOURCE_ROOT; };
 		CE84DF6D2D55777800C54EA6 /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
 		CE84DF6F2D55778000C54EA6 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		CE84DF702D55778000C54EA6 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
@@ -182,7 +171,6 @@
 		CE84DF792D5578BE00C54EA6 /* jfk.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = jfk.wav; sourceTree = "<group>"; };
 		CEAC00012D82F00000000000 /* libautocorrect_swift.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libautocorrect_swift.dylib; path = build/libautocorrect_swift.dylib; sourceTree = "<group>"; };
 		CEAC00072D82F40000000000 /* libomp.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libomp.dylib; path = build/libomp.dylib; sourceTree = "<group>"; };
-		5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libonnxruntime.1.24.4.dylib"; path = "build/libonnxruntime.1.24.4.dylib"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -221,6 +209,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FDF288C9306184D30027FF3B /* FluidAudio in Frameworks */,
 				840156D52D79EDBA00FB5FFE /* libggml-metal.a in Frameworks */,
 				840156D42D79EDBA00FB5FFE /* libggml-cpu.a in Frameworks */,
 				840156D32D79EDBA00FB5FFE /* libggml-blas.a in Frameworks */,
@@ -237,6 +226,7 @@
 				CE84E17D2D56550B00C54EA6 /* KeyboardShortcuts in Frameworks */,
 				CEAC00032D82F00200000000 /* libautocorrect_swift.dylib in Frameworks */,
 				5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */,
+				A1B2C3D40000000000000001 /* LiquidGlass in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -265,8 +255,8 @@
 				840156C92D79ED9900FB5FFE /* libggml-blas.a */,
 				840156CB2D79ED9900FB5FFE /* libggml-cpu.a */,
 				840156CD2D79ED9900FB5FFE /* libggml-metal.a */,
-				840156CF2D79ED9900FB5FFE /* libwhisper.a */,
 				840156DF2D79EE0000FB5FFE /* libllama.a */,
+				840156CF2D79ED9900FB5FFE /* libwhisper.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -419,6 +409,8 @@
 			children = (
 				CEAC00012D82F00000000000 /* libautocorrect_swift.dylib */,
 				CEAC00072D82F40000000000 /* libomp.dylib */,
+				5BB5E04A0000000000A1 /* libsherpa-onnx.a */,
+				5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -448,6 +440,7 @@
 				CE0EAD6D2D56ACA80067FDEE /* GRDB */,
 				CE84E17E2D56550B00C54EA7 /* FluidAudio */,
 				5BA9E0DA0000000000000A02 /* Sparkle */,
+				A1B2C3D40000000000000002 /* LiquidGlass */,
 			);
 			productName = OpenSuperWhisper;
 			productReference = CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */;
@@ -542,6 +535,7 @@
 				CE0EAD6C2D56ACA80067FDEE /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				CE84E17D2D56550B00C54EA7 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				5BA9E0DA0000000000000A01 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				A1B2C3D40000000000000003 /* XCLocalSwiftPackageReference "LiquidGlass" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CE57B0292D52C7BB00929AF3 /* Products */;
@@ -865,7 +859,7 @@
 					"$(inherited)",
 					"-lonnxruntime",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisper;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
@@ -934,7 +928,7 @@
 					"$(inherited)",
 					"-lonnxruntime",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisper;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisper";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
@@ -962,7 +956,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 0.12.5;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisperTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Bridge.h";
@@ -988,7 +982,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 0.12.5;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisperTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Bridge.h";
@@ -1006,7 +1000,7 @@
 				DEVELOPMENT_TEAM = 5C67TFSJ2B;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.12.5;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisperUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -1023,7 +1017,7 @@
 				DEVELOPMENT_TEAM = 5C67TFSJ2B;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.12.5;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.my-monkey.opensuperwhisperUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.my-monkey.opensuperwhisperUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -1072,7 +1066,22 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		A1B2C3D40000000000000003 /* XCLocalSwiftPackageReference "LiquidGlass" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = LiquidGlass;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
+		5BA9E0DA0000000000000A01 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 		CE0EAD6C2D56ACA80067FDEE /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift.git";
@@ -1097,17 +1106,14 @@
 				version = 0.15.4;
 			};
 		};
-		5BA9E0DA0000000000000A01 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sparkle-project/Sparkle";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.6.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		5BA9E0DA0000000000000A02 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5BA9E0DA0000000000000A01 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		CE0EAD6D2D56ACA80067FDEE /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CE0EAD6C2D56ACA80067FDEE /* XCRemoteSwiftPackageReference "GRDB.swift" */;
@@ -1123,10 +1129,10 @@
 			package = CE84E17D2D56550B00C54EA7 /* XCRemoteSwiftPackageReference "FluidAudio" */;
 			productName = FluidAudio;
 		};
-		5BA9E0DA0000000000000A02 /* Sparkle */ = {
+		A1B2C3D40000000000000002 /* LiquidGlass */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5BA9E0DA0000000000000A01 /* XCRemoteSwiftPackageReference "Sparkle" */;
-			productName = Sparkle;
+			package = A1B2C3D40000000000000003 /* XCLocalSwiftPackageReference "LiquidGlass" */;
+			productName = LiquidGlass;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

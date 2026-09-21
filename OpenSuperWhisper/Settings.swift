@@ -1560,6 +1560,7 @@ struct SettingsView: View {
 
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
+    @ObservedObject private var themeController = ThemeController.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab: SettingsTab = .dictation
     @State private var sidebarSearch = ""
@@ -2492,6 +2493,32 @@ struct SettingsView: View {
     private var advancedSettings: some View {
         SPane(title: "Advanced") {
             SSection(title: "App") {
+                SRow(title: "Appearance",
+                     hint: "Switch between the classic look and Apple's Liquid Glass. System follows macOS — Liquid Glass on macOS 26 (Tahoe) and later, the classic look below.") {
+                    Picker("", selection: $themeController.theme) {
+                        ForEach(UITheme.allCases) { theme in
+                            Text(theme.displayName).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 150)
+                    .labelsHidden()
+                }
+                SRow(title: "Bubble size",
+                     hint: "Size of the Liquid Glass recording bubble. Applies from the next recording.") {
+                    HStack(spacing: 10) {
+                        Slider(value: $themeController.glassBubbleSize,
+                               in: ThemeController.glassBubbleSizeRange, step: 0.05)
+                            .controlSize(.small)
+                            .frame(width: 150)
+                            .tint(STheme.accent)
+                        Text("\(Int((themeController.glassBubbleSize * 100).rounded()))%")
+                            .scaledFont(size: 11, design: .monospaced)
+                            .foregroundColor(STheme.hint)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .disabled(themeController.theme.resolved != .liquidGlass)
+                }
                 SRow(title: "Text size",
                      hint: "Applied on top of the system text size (System Settings → Accessibility → Display). Leave at 100% to follow macOS exactly.") {
                     HStack(spacing: 10) {
