@@ -394,6 +394,11 @@ enum IndicatorProbe {
             t.arguments = ["-x", "\(outDir)/\(name).png"]
             try? t.run(); t.waitUntilExit()
         }
+        #if DEBUG
+        if let gif = ProcessInfo.processInfo.environment["PROBE_GIF"], #available(macOS 26.0, *) {
+            IndicatorGIFProbe.run(styleName: gif, outDir: outDir)
+        }
+        #endif
         // PROBE_EDITOR=1: the real indicator layout editor (Settings) in a window, screenshotted, so
         // its preview can be checked against the selected theme.
         if ProcessInfo.processInfo.environment["PROBE_EDITOR"] != nil {

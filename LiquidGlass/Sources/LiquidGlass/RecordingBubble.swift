@@ -68,10 +68,11 @@ public struct RecordingBubble: View {
     /// It is drawn as the glass view's own CONTENT (before `.glassEffect`), so it materialises,
     /// moves and morphs with the glass — an overlay after it lives on another layer and ghosts.
     var rim: Double
-    /// A dimming layer inside the glass (black at this opacity). Glass takes its brightness from
-    /// what is behind it, so over a bright window it turns light grey and white text on it drops
-    /// under legible contrast; the dim keeps the pill dark enough for its text, as Apple's guidance
-    /// for text on glass recommends.
+    /// A dimming layer inside the glass, at this opacity. Glass takes its brightness from what is
+    /// behind it, so the backdrop can pull it toward the text's own colour and under legible
+    /// contrast; the dim pushes it the other way, as Apple's guidance for text on glass
+    /// recommends. It is black under the dark scheme's white text and white under the light
+    /// scheme's black text — a black dim in light mode greyed the pill against black text.
     var dim: Double
     var onStop: (() -> Void)?
     var onCancel: (() -> Void)?
@@ -142,6 +143,11 @@ public struct RecordingBubble: View {
     @State private var coreIn = false
     /// The controls have necked out of it (second step, a beat later).
     @State private var controlsOut = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Opposite the text colour: see `dim`.
+    private var dimColor: Color { colorScheme == .dark ? .black : .white }
 
     /// The glass is on screen at all.
     private var shown: Bool { visible && (emergeOnAppear ? coreIn : true) }
@@ -193,7 +199,7 @@ public struct RecordingBubble: View {
     private var core: some View {
         coreContent
             .background { rimStroke(rim) }
-            .background { Capsule().fill(.black.opacity(dim)) }
+            .background { Capsule().fill(dimColor.opacity(dim)) }
             .glassEffect(glass.glass, in: .capsule)
             .glassEffectID("core", in: ns)
             .glassEffectTransition(.materialize)
@@ -249,13 +255,36 @@ public struct RecordingBubble: View {
     }
 
     /// The record dot, inside the pill. Pulses while listening, steady while transcribing.
+    ///
+    /// While listening the dot breathes and casts a soft red glow onto the glass around it. The
+    /// glow is part of the glass view's content (not an overlay), so it moves and materialises
+    /// with the glass; `.plusLighter` makes it read as light on the glass rather than paint. It
+    /// runs on its own smooth clock (one breath per 1.6s, the app's blink rhythm) instead of
+    /// following `blinking`, which the app flips on a timer and which made the pulse stutter.
     private var recordDot: some View {
-        Image(systemName: "circle.fill")
-            .font(.system(size: (bar * 0.22).rounded()))
-            .foregroundStyle(.red)
-            .opacity(phase == .recording ? 1 : 0.55)
-            .symbolEffect(.pulse, options: .repeating, isActive: blinking && phase == .recording)
-            .frame(width: glyphSize)
+        let dotSize = (bar * 0.22).rounded()
+        let live = phase == .recording
+        return TimelineView(.animation(paused: !live || reduceMotion)) { timeline in
+            // 0…1, eased at both ends by the sine.
+            let breath = live
+                ? (reduceMotion ? 0.6 : (sin(timeline.date.timeIntervalSinceReferenceDate * 2 * .pi / 1.6) + 1) / 2)
+                : 0
+            ZStack {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: dotSize * 2.2, height: dotSize * 2.2)
+                    .blur(radius: dotSize * 0.9)
+                    .scaleEffect(0.85 + 0.3 * breath)
+                    .opacity(live ? 0.035 + 0.085 * breath : 0)
+                    .blendMode(.plusLighter)
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: dotSize, height: dotSize)
+                    .opacity(live ? 0.75 + 0.25 * breath : 0.55)
+            }
+        }
+        .frame(width: glyphSize, height: glyphSize)
+        .accessibilityHidden(true)
     }
 
     /// A control glass circle on the right. `tuck` is how many slots it travels left to hide in
@@ -284,7 +313,7 @@ public struct RecordingBubble: View {
                 .frame(width: bar, height: bar)
                 .contentShape(Rectangle())
                 .background { rimStroke(rim) }
-                .background { Capsule().fill(.black.opacity(dim)) }
+                .background { Capsule().fill(dimColor.opacity(dim)) }
                 // The icon and its rim fade together, so a control still inside the pill draws no
                 // ring over it.
                 .opacity(out ? 1 : 0)

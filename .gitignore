@@ -121,3 +121,6 @@ dev_config.json
 
 build-test/
 vendor/
+
+# Indicator GIFs (Scripts/indicator-gifs.sh): regenerated on demand, attached to PRs, not versioned
+docs/liquid-glass/*.gif

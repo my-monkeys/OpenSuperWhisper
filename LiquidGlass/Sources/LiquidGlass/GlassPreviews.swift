@@ -11,19 +11,24 @@ import SwiftUI
     if #available(macOS 26.0, *) { RecordingBubbleDemo() } else { Unsupported() }
 }
 
-#Preview("Layouts") {
+#Preview("States") {
     if #available(macOS 26.0, *) {
-        DesktopBackdrop(size: CGSize(width: 620, height: 380)) { LayoutColumn() }
+        DesktopBackdrop(size: CGSize(width: 640, height: 420)) { StatesColumn() }
     } else { Unsupported() }
 }
 
-#Preview("Backdrops") {
+#Preview("Layouts") {
+    if #available(macOS 26.0, *) {
+        DesktopBackdrop(size: CGSize(width: 640, height: 380)) { LayoutColumn() }
+    } else { Unsupported() }
+}
+
+#Preview("Wallpapers") {
     if #available(macOS 26.0, *) {
         HStack(spacing: 0) {
-            ForEach(BackdropStyle.allCases, id: \.self) { style in
-                DesktopBackdrop(style: style, scheme: style.preferredScheme,
-                                size: CGSize(width: 320, height: 300)) {
-                    RecordingBubble(showDot: true, center: [.waveform, .label], onStop: {}, onCancel: {})
+            ForEach(WallpaperStyle.allCases, id: \.self) { style in
+                DesktopBackdrop(style: style, size: CGSize(width: 360, height: 300)) {
+                    RecordingBubble(showDot: true, center: [.label, .waveform], onStop: {}, onCancel: {})
                 }
             }
         }
@@ -36,7 +41,7 @@ import SwiftUI
             VStack(alignment: .leading, spacing: 22) {
                 ForEach(GlassKind.allCases, id: \.rawValue) { kind in
                     HStack(spacing: 16) {
-                        RecordingBubble(showDot: true, center: [.waveform, .label],
+                        RecordingBubble(showDot: true, center: [.label, .waveform],
                                         glass: kind, onStop: {}, onCancel: {})
                         PreviewLabel(kind.displayName)
                     }
@@ -48,20 +53,21 @@ import SwiftUI
 
 // MARK: - Interactive emerge demo
 
-/// The bubble emerging: the dot necks out on the left, Stop/Cancel on the right, all from the pill.
-/// Loops; "Emerge/Collapse" toggles by hand and "Swap centre" reorders the waveform and label.
+/// The controls necking out of the pill and melting back. Loops; "Emerge/Collapse" toggles by hand
+/// and "Swap centre" reorders the waveform and label.
 @available(macOS 26.0, *)
 struct RecordingBubbleDemo: View {
     @State private var expanded = true
     @State private var autoplay = true
     @State private var swap = false
+    @State private var style: WallpaperStyle = .night
 
     var body: some View {
-        DesktopBackdrop {
+        DesktopBackdrop(style: style) {
             VStack(spacing: 26) {
                 RecordingBubble(
                     showDot: true,
-                    center: swap ? [.label, .waveform] : [.waveform, .label],
+                    center: swap ? [.waveform, .label] : [.label, .waveform],
                     labelText: "Recording…",
                     blinking: true,
                     onStop: {},
@@ -72,9 +78,15 @@ struct RecordingBubbleDemo: View {
                 HStack(spacing: 12) {
                     Button(expanded ? "Collapse" : "Emerge") { autoplay = false; expanded.toggle() }
                     Button("Swap centre") { swap.toggle() }
+                    Picker("", selection: $style) {
+                        ForEach(WallpaperStyle.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
                     Toggle("Auto", isOn: $autoplay).toggleStyle(.switch)
                 }
-                .buttonStyle(.bordered).controlSize(.small).tint(.white).foregroundStyle(.white)
+                .controlSize(.small)
+                .buttonStyle(.glass)
             }
         }
         .task(id: autoplay) {
@@ -88,28 +100,68 @@ struct RecordingBubbleDemo: View {
     }
 }
 
+// MARK: - States
+
+/// Every phase the bubble goes through in one column: listening, a live caption, transcribing
+/// (Stop melted back in, Cancel became ✕), and the messages that can follow.
+@available(macOS 26.0, *)
+struct StatesColumn: View {
+    private static var caption: AttributedString {
+        var confirmed = AttributedString("Liquid Glass bends whatever")
+        var volatile = AttributedString(" sits behind it")
+        volatile.foregroundColor = .secondary
+        confirmed.append(volatile)
+        return confirmed
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            LayoutRow("Recording") {
+                RecordingBubble(center: [.label, .waveform], onStop: {}, onCancel: {})
+            }
+            LayoutRow("Live caption") {
+                RecordingBubble(center: [.label], caption: Self.caption, onStop: {}, onCancel: {})
+            }
+            LayoutRow("Transcribing") {
+                RecordingBubble(phase: .processing, center: [.label, .waveform],
+                                labelText: "Transcribing…", onStop: {}, onCancel: {})
+            }
+            LayoutRow("Done") {
+                RecordingBubble(phase: .message(symbol: "doc.on.clipboard",
+                                                text: "Copied — press ⌘V to paste", tint: .primary),
+                                onStop: {}, onCancel: {})
+            }
+            LayoutRow("Error") {
+                RecordingBubble(phase: .message(symbol: "exclamationmark.triangle.fill",
+                                                text: "No microphone available", tint: .red),
+                                onStop: {}, onCancel: {})
+            }
+        }
+    }
+}
+
 // MARK: - Layout matrix
 
-/// The constrained layout across a few configurations: the dot is always leftmost, Stop/Cancel are
-/// always rightmost, only the waveform and the label reorder, and any element can be off.
+/// The layout across a few configurations: the dot, waveform and label reorder freely inside the
+/// pill, Stop/Cancel always sit at the trailing edge, and any element can be off.
 @available(macOS 26.0, *)
 struct LayoutColumn: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            LayoutRow("Dot · waveform · label · Stop · Cancel") {
-                RecordingBubble(showDot: true, center: [.waveform, .label], onStop: {}, onCancel: {})
+            LayoutRow("Dot · label · waveform · Stop · Cancel") {
+                RecordingBubble(center: [.dot, .label, .waveform], onStop: {}, onCancel: {})
             }
-            LayoutRow("Centre swapped: label · waveform") {
-                RecordingBubble(showDot: true, center: [.label, .waveform], onStop: {}, onCancel: {})
+            LayoutRow("Reordered: waveform · label · dot") {
+                RecordingBubble(center: [.waveform, .label, .dot], onStop: {}, onCancel: {})
             }
             LayoutRow("No dot") {
-                RecordingBubble(showDot: false, center: [.waveform, .label], onStop: {}, onCancel: {})
+                RecordingBubble(showDot: false, center: [.label, .waveform], onStop: {}, onCancel: {})
             }
             LayoutRow("Waveform only · Stop only") {
-                RecordingBubble(showDot: true, center: [.waveform], onStop: {})
+                RecordingBubble(center: [.dot, .waveform], onStop: {})
             }
             LayoutRow("Label only, no controls") {
-                RecordingBubble(showDot: true, center: [.label])
+                RecordingBubble(center: [.dot, .label])
             }
         }
     }
@@ -125,8 +177,8 @@ struct LayoutRow<Content: View>: View {
     }
     var body: some View {
         HStack(spacing: 16) {
-            content.frame(width: 330, alignment: .center)
-            PreviewLabel(title).frame(width: 210, alignment: .leading)
+            content.frame(width: 400, alignment: .leading)
+            PreviewLabel(title).frame(width: 180, alignment: .leading)
         }
     }
 }
@@ -140,77 +192,34 @@ struct Unsupported: View {
     }
 }
 
-/// A caption beside a sample, in Tahoe's header style: title-case, a semantic text style, no all-caps
-/// and no tracking. Over the vivid backdrops the secondary hierarchy is too faint, so it keeps an
-/// explicit white at reduced opacity.
+/// A caption beside a sample, in Tahoe's header style: title-case, a semantic text style, no
+/// all-caps and no tracking. Follows the backdrop's colour scheme.
 struct PreviewLabel: View {
     var text: String
     init(_ text: String) { self.text = text }
     var body: some View {
         Text(text)
             .font(.subheadline.weight(.medium))
-            .foregroundStyle(.white.opacity(0.7))
-    }
-}
-
-enum BackdropStyle: CaseIterable {
-    case aurora, bright, busy
-
-    var preferredScheme: ColorScheme { self == .bright ? .light : .dark }
-
-    var gradient: LinearGradient {
-        switch self {
-        case .aurora:
-            return LinearGradient(colors: [Color(red: 0.10, green: 0.12, blue: 0.28),
-                                           Color(red: 0.42, green: 0.16, blue: 0.52),
-                                           Color(red: 0.10, green: 0.40, blue: 0.52)],
-                                  startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .bright:
-            return LinearGradient(colors: [Color(red: 0.98, green: 0.96, blue: 0.92),
-                                           Color(red: 0.86, green: 0.90, blue: 0.98),
-                                           Color(red: 0.95, green: 0.88, blue: 0.82)],
-                                  startPoint: .top, endPoint: .bottom)
-        case .busy:
-            return LinearGradient(colors: [Color(red: 0.90, green: 0.35, blue: 0.25),
-                                           Color(red: 0.20, green: 0.55, blue: 0.35),
-                                           Color(red: 0.15, green: 0.30, blue: 0.85)],
-                                  startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
+            .foregroundStyle(.primary.opacity(0.75))
     }
 }
 
 /// Glass samples and refracts whatever sits behind it, so a preview over a flat fill tells you
-/// nothing. This puts the bubble over a vivid, slightly busy stand-in desktop so the lensing along
-/// the bubble's edge is visible.
+/// nothing. This puts the bubble on a stand-in macOS desktop (`DesktopWallpaper`, the same one the
+/// app's GIF probe uses) in the colour scheme that desktop implies.
+@available(macOS 15.0, *)
 struct DesktopBackdrop<Content: View>: View {
-    var style: BackdropStyle = .aurora
-    var scheme: ColorScheme = .dark
+    var style: WallpaperStyle = .night
     var size = CGSize(width: 560, height: 360)
     @ViewBuilder var content: Content
 
     var body: some View {
         ZStack {
-            style.gradient
-            ornaments
+            DesktopWallpaper(style)
             content
         }
         .frame(width: size.width, height: size.height)
-        .environment(\.colorScheme, scheme)
-    }
-
-    private var ornaments: some View {
-        ZStack {
-            Circle().fill(.white.opacity(0.14)).frame(width: 150).offset(x: -180, y: -90)
-            Circle().fill(.black.opacity(0.16)).frame(width: 110).offset(x: 190, y: 110)
-            RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.08))
-                .frame(width: 240, height: 64).offset(x: 140, y: -110)
-            HStack(spacing: 26) {
-                ForEach(["command", "waveform", "mic.fill", "text.cursor", "sparkles"], id: \.self) {
-                    Image(systemName: $0).font(.system(size: 30))
-                }
-            }
-            .foregroundStyle(.white.opacity(0.16))
-            .offset(y: 140)
-        }
+        .preferredColorScheme(style.scheme)
+        .colorScheme(style.scheme)
     }
 }

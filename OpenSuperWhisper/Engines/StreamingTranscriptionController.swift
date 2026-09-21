@@ -24,6 +24,14 @@ final class StreamingTranscriptionController: ObservableObject {
         [confirmedText, volatileText].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
+    #if DEBUG
+    /// Stages a caption without a live engine, for the indicator probe's screenshots and GIFs.
+    func stageCaption(confirmed: String, volatile: String) {
+        confirmedText = confirmed
+        volatileText = volatile
+    }
+    #endif
+
     private let audioEngine = AVAudioEngine()
     private var manager: SlidingWindowAsrManager?
     private var updatesTask: Task<Void, Never>?
