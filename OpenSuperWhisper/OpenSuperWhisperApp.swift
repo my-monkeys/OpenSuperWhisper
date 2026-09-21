@@ -37,12 +37,12 @@ struct OpenSuperWhisperApp: App {
             Group {
                 if !appState.hasCompletedOnboarding {
                     OnboardingView()
+                        .frame(width: 450)
+                        .frame(minHeight: 400, maxHeight: 900)
                 } else {
-                    ContentView()
+                    SettingsView()
                 }
             }
-            .frame(width: 450)
-            .frame(minHeight: 400, maxHeight: 900)
             .environmentObject(appState)
             // The main window never had this, so its history list ignored the text size
             // setting entirely while Settings obeyed it. Read through @AppStorage rather than
@@ -51,16 +51,17 @@ struct OpenSuperWhisperApp: App {
             .environment(\.appTextScale, textScale)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 450, height: 650)
+        .defaultSize(width: 780, height: 600)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .appSettings) {
+                // The primary window IS the settings UI now — just bring it forward
+                // (showMainWindow also re-creates the window if macOS dropped it).
                 Button("Settings...") {
                     if let delegate = NSApplication.shared.delegate as? AppDelegate {
                         delegate.showMainWindow()
                     }
-                    NotificationCenter.default.post(name: .openSettings, object: nil)
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
@@ -254,10 +255,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
     private func updateStatusBarMenu() {
         let menu = NSMenu()
-        
-        let openItem = NSMenuItem(title: "Open Window", action: #selector(openApp), keyEquivalent: "o")
-        openItem.target = self   // without a target macOS disables the item (it did nothing)
-        menu.addItem(openItem)
+
+        // "Settings…" (below) is the single open-GUI item: the primary window hosts the
+        // settings UI now, so a separate "Open Window" entry would be a duplicate.
 
         let transcriptionLanguageItem = NSMenuItem(title: NSLocalizedString("Language", comment: ""), action: nil, keyEquivalent: "")
         languageSubmenu = NSMenu()
@@ -387,7 +387,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         // No "," keyEquivalent: it makes macOS treat this as the standard Settings
         // command and auto-adds a gear icon, which the other plain items don't have.
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
+        // ⌘O (the old "Open Window" shortcut) rides on it now that the two merged.
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "o")
         settingsItem.target = self
         settingsItem.image = nil
         menu.addItem(settingsItem)
@@ -591,13 +592,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         statusItem?.button?.performClick(nil)
     }
     
-    @objc private func openApp() {
-        showMainWindow()
-    }
-
     @objc private func openSettings() {
+        // No .openSettings post here: the embedded view would spawn a second window.
         showMainWindow()
-        NotificationCenter.default.post(name: .openSettings, object: nil)
     }
 
     @objc private func quitApp() {
