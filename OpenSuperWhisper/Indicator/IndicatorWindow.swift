@@ -624,14 +624,18 @@ struct IndicatorWindow: View {
     }
 
     /// The indicator's state as a bubble phase.
+    /// The package draws plain strings, so every word is localized here, with the same keys the
+    /// legacy bubble uses (and so the same translations).
     private var glassPhase: BubblePhase {
         switch viewModel.state {
         case .recording where viewModel.isConfirmingCancel:
-            return .message(symbol: "escape", text: "Press Esc to cancel", tint: .orange)
+            return .message(symbol: "escape", text: String(localized: "Press Esc to cancel"), tint: .orange)
         case .recording, .idle: return .recording
         case .decoding: return .processing
-        case .connecting: return .message(symbol: nil, text: "Connecting…", tint: .primary)
-        case .busy: return .message(symbol: "hourglass", text: "Processing…", tint: .orange)
+        case .connecting:
+            return .message(symbol: nil, text: String(localized: "Connecting..."), tint: .primary)
+        case .busy:
+            return .message(symbol: "hourglass", text: String(localized: "Processing..."), tint: .orange)
         case .error(let message):
             return .message(symbol: "exclamationmark.triangle.fill", text: message, tint: .red)
         case .info(let message): return .message(symbol: "doc.on.clipboard", text: message, tint: .primary)
@@ -642,9 +646,11 @@ struct IndicatorWindow: View {
     private var glassLabel: String {
         let queued = pipeline.pendingCount
         if viewModel.state == .decoding {
-            return queued > 1 ? "Transcribing… · \(queued - 1) queued" : "Transcribing…"
+            return queued > 1 ? String(localized: "Transcribing… · \(queued - 1) queued")
+                              : String(localized: "Transcribing…")
         }
-        return queued > 0 ? "Recording… · \(queued) queued" : "Recording…"
+        return queued > 0 ? String(localized: "Recording… · \(queued) queued")
+                          : String(localized: "Recording…")
     }
 
     /// The pill's centre elements (waveform / label) in the user's configured order.
@@ -692,6 +698,11 @@ struct IndicatorWindow: View {
                     IndicatorWindowManager.shared.stopForce()
                 }
             } : nil,
+            // The legacy buttons' tooltips, so both themes say the same thing in every language.
+            stopLabel: String(localized: "Finish recording"),
+            cancelLabel: viewModel.state == .decoding
+                ? String(localized: "Throw this transcription away")
+                : String(localized: "Discard recording"),
             emergeOnAppear: true
         )
         // Its natural size, not the window's: GlassEffectContainer takes whatever it is offered, so

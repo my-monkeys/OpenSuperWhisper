@@ -13,19 +13,13 @@ enum UITheme: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var displayName: String {
+    /// A key, not a String: `Text(String)` shows its argument verbatim, so the picker would never
+    /// translate the names.
+    var displayName: LocalizedStringKey {
         switch self {
         case .system: return "System"
         case .legacy: return "Legacy"
         case .liquidGlass: return "Liquid Glass"
-        }
-    }
-
-    var helpText: String {
-        switch self {
-        case .system: return "Match the system: Liquid Glass on macOS 26 and later, the classic look below."
-        case .legacy: return "The classic material look, on every macOS version."
-        case .liquidGlass: return "Apple's Liquid Glass. Needs macOS 26 (Tahoe) or later."
         }
     }
 

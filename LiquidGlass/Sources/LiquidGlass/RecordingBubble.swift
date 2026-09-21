@@ -76,6 +76,10 @@ public struct RecordingBubble: View {
     var dim: Double
     var onStop: (() -> Void)?
     var onCancel: (() -> Void)?
+    /// What the controls say (accessibility label and tooltip). Already localized by the caller:
+    /// the package ships no strings of its own, like `labelText` and message text.
+    var stopLabel: String
+    var cancelLabel: String
     /// Emerge the controls out of the pill once when the bubble appears (the app's entrance).
     var emergeOnAppear: Bool
     /// When `emergeOnAppear` is false, this drives the emerge directly (the previews toggle it).
@@ -96,6 +100,8 @@ public struct RecordingBubble: View {
                 dim: Double = 0.35,
                 onStop: (() -> Void)? = nil,
                 onCancel: (() -> Void)? = nil,
+                stopLabel: String = "Finish recording",
+                cancelLabel: String = "Discard recording",
                 emergeOnAppear: Bool = false,
                 expanded: Bool = true) {
         self.phase = phase
@@ -113,6 +119,8 @@ public struct RecordingBubble: View {
         self.dim = dim
         self.onStop = onStop
         self.onCancel = onCancel
+        self.stopLabel = stopLabel
+        self.cancelLabel = cancelLabel
         self.emergeOnAppear = emergeOnAppear
         self.expanded = expanded
     }
@@ -320,7 +328,8 @@ public struct RecordingBubble: View {
                 .animation(iconAnimation(out: out, order: order), value: out)
         }
         .buttonStyle(PressFeedbackStyle())
-        .accessibilityLabel(id == "stop" ? "Stop Recording" : "Cancel")
+        .accessibilityLabel(id == "stop" ? stopLabel : cancelLabel)
+        .help(id == "stop" ? stopLabel : cancelLabel)
         .glassEffect(glass.glass.interactive(), in: .capsule)
         .glassEffectID(id, in: ns)
         .glassEffectTransition(.materialize)
