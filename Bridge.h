@@ -14,3 +14,5 @@
 // break every Clang module build ("'optional' file not found"). llama.h's own ggml includes
 // resolve from whisper.cpp's ggml headers, which are the shared ggml.
 #include "llama.h"
+// Swift cannot catch an NSException; see the header.
+#import "OpenSuperWhisper/Utils/ObjCException.h"
