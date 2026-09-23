@@ -33,9 +33,9 @@ struct RemoteCleanupSettingsView: View {
                 HStack(spacing: 8) {
                     Group {
                         if revealKey {
-                            TextField("", text: $viewModel.aiRemoteAPIKey, prompt: Text("leave blank for no-auth servers"))
+                            TextField("", text: $viewModel.aiRemoteAPIKey, prompt: Text("optional"))
                         } else {
-                            SecureField("", text: $viewModel.aiRemoteAPIKey, prompt: Text("leave blank for no-auth servers"))
+                            SecureField("", text: $viewModel.aiRemoteAPIKey, prompt: Text("optional"))
                         }
                     }
                     .textFieldStyle(.plain)

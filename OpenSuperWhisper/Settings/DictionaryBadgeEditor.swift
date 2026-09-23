@@ -37,6 +37,8 @@ struct DictionaryBadgeEditor: View {
                 Text(label.isEmpty ? "empty" : label)
                     .scaledFont(size: 12, weight: .medium)
                     .foregroundColor(label.isEmpty ? STheme.hint : STheme.textBright)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 // Only worth showing when there is more than the obvious one behind it.
                 if count > 1 {
                     Text("\(count)")
@@ -250,7 +252,11 @@ private struct DictionaryRuleEditor: View {
         // words, and its intrinsic width is more than 280 minus the padding: forced into a fixed
         // frame the content was centred and clipped at both edges, which is why the labels on the
         // left arrived cut in half.
-        .frame(minWidth: 280)
+        //
+        // And a ceiling: without one, a long replacement or snippet sized the popover to the
+        // whole line, well past the screen at a large text size. Capped, the fields scroll and
+        // the preview truncates in the middle as it was meant to.
+        .frame(minWidth: 280, maxWidth: 360)
         // Committed when the editor goes away, not per keystroke.
         //
         // Writing on every change fed a second update pass back into the badge row: the row
@@ -310,7 +316,7 @@ struct FlowLayout: Layout {
         for row in arrange(subviews: subviews, width: bounds.width) {
             var x = bounds.minX
             for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
+                let size = Self.size(of: subviews[index], within: bounds.width)
                 subviews[index].place(at: CGPoint(x: x, y: bounds.minY + row.y),
                                       proposal: ProposedViewSize(size))
                 x += size.width + spacing
@@ -331,7 +337,7 @@ struct FlowLayout: Layout {
         var x: CGFloat = 0
 
         for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
+            let size = Self.size(of: subviews[index], within: width)
             if !row.indices.isEmpty && x + size.width > width {
                 rows.append(row)
                 row = Row(y: row.y + row.height + spacing)
@@ -344,5 +350,13 @@ struct FlowLayout: Layout {
         }
         if !row.indices.isEmpty { rows.append(row) }
         return rows
+    }
+
+    /// A child's own size, unless it is wider than a whole line: then it gets the line and
+    /// truncates, instead of being placed at full width and drawing past the container.
+    private static func size(of subview: LayoutSubview, within width: CGFloat) -> CGSize {
+        let ideal = subview.sizeThatFits(.unspecified)
+        guard width.isFinite, ideal.width > width else { return ideal }
+        return subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
     }
 }

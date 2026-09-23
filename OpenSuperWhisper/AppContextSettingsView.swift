@@ -236,7 +236,11 @@ struct AppContextSettingsView: View {
                 }
             }
             .labelsHidden()
+            // A remote model id can be any length. Capped, it truncates instead of pushing the
+            // row wider than the pane; the tooltip keeps ids that differ only at the end apart.
+            .frame(maxWidth: 240)
             .fixedSize()
+            .help(rule.model.displayName)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
