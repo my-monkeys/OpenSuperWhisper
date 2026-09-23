@@ -34,6 +34,7 @@ final class SettingsLayoutTests: XCTestCase {
     private static let ruleBundleID = "com.example.settings-layout-test"
 
     private var realMicrophones: [MicrophoneService.AudioDevice] = []
+    private var realSelection: MicrophoneService.AudioDevice?
 
     private let preset = RemoteUserPreset(id: UUID(), name: longName,
                                           serverURL: "https://layout-test.invalid/v1",
@@ -65,6 +66,12 @@ final class SettingsLayoutTests: XCTestCase {
         MicrophoneService.shared.availableMicrophones.append(
             MicrophoneService.AudioDevice(id: "layout-test-microphone", name: Self.longName,
                                           manufacturer: nil, isBuiltIn: false))
+        // Pinned but unplugged: the picker lists it as "(not connected)" and the hint names the
+        // input used meanwhile, both of which add width to the row. Set directly, so nothing is
+        // saved to preferences.
+        realSelection = MicrophoneService.shared.selectedMicrophone
+        MicrophoneService.shared.selectedMicrophone = MicrophoneService.AudioDevice(
+            id: "layout-test-unplugged", name: Self.longName, manufacturer: nil, isBuiltIn: false)
         RemoteUserPresets.add(preset, apiKey: nil)
         prefs.remoteServerURL = preset.serverURL
         prefs.remoteServerModel = preset.model
@@ -79,6 +86,7 @@ final class SettingsLayoutTests: XCTestCase {
         RemoteUserPresets.remove(preset.id)
         AppContextModelRules.remove(bundleID: Self.ruleBundleID)
         MicrophoneService.shared.availableMicrophones = realMicrophones
+        MicrophoneService.shared.selectedMicrophone = realSelection
         for key in ["aiPostProcessingEnabled", "appContextFormattingEnabled", "retentionMaxCountEnabled",
                     "retentionMaxCount", "textScale", "remoteServerURL", "remoteServerModel", "aiBackend",
                     "selectedEngine", "customDictionaryEnabled", "customDictionaryData",

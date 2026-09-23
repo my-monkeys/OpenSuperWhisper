@@ -2250,6 +2250,17 @@ struct SettingsView: View {
         }
     }
 
+    private var microphoneHint: LocalizedStringKey {
+        if micService.followsSystemDefault {
+            return "Following the system input\(micService.currentMicrophone.map { " (\($0.name))" } ?? "") — switch headsets and it follows"
+        }
+        if micService.disconnectedSelection != nil {
+            guard let fallback = micService.currentMicrophone else { return "Not connected" }
+            return "Not connected, so recording uses \(fallback.name) until it is back"
+        }
+        return "Also switchable from the menu bar"
+    }
+
     private var backendHint: LocalizedStringKey {
         switch viewModel.aiBackend {
         case "builtin": return "A Qwen2.5 model running on this Mac"
@@ -2797,10 +2808,7 @@ struct SettingsView: View {
             }
 
             SSection(title: "Input") {
-                SRow(title: "Microphone",
-                     hint: micService.followsSystemDefault
-                        ? "Following the system input\(micService.currentMicrophone.map { " (\($0.name))" } ?? "") — switch headsets and it follows"
-                        : "Also switchable from the menu bar") {
+                SRow(title: "Microphone", hint: microphoneHint) {
                     Picker("", selection: Binding(
                         get: {
                             micService.followsSystemDefault
@@ -2819,6 +2827,11 @@ struct SettingsView: View {
                         Divider()
                         ForEach(micService.availableMicrophones, id: \.id) { device in
                             Text(device.name).tag(device.id)
+                        }
+                        // The pinned device stays in the list while it is unplugged. Without it
+                        // the selection matched no item and the popup showed nothing at all.
+                        if let missing = micService.disconnectedSelection {
+                            Text("\(missing.name) (not connected)").tag(missing.id)
                         }
                     }
                     .pickerStyle(.menu)
