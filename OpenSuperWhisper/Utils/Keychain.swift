@@ -4,7 +4,13 @@ import Security
 /// Minimal Keychain wrapper for small secrets (e.g. the Groq API key). Stored as generic passwords
 /// under the app's bundle id so they don't sit in plain-text UserDefaults.
 enum Keychain {
-    private static let service = "fr.my-monkey.opensuperwhisper"
+    /// Under XCTest, a service of its own, for the same reason `DefaultsStore` swaps its suite.
+    /// The test host is not the binary that created the user's items, so reading one raised a
+    /// Keychain prompt that nobody was there to answer and the test hung; and a write, which
+    /// deletes before it adds, would have replaced the user's real API key.
+    private static let service = DefaultsStore.isRunningTests
+        ? "\(AppIdentity.bundleID).tests"
+        : "fr.my-monkey.opensuperwhisper"
 
     static func read(_ account: String) -> String? {
         let query: [String: Any] = [
