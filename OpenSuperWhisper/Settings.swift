@@ -1512,11 +1512,11 @@ struct InfoButton: View {
 
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case dictation, models, output, rules, history, advanced, updates, feedback
+    case dictation, models, output, rules, history, transcriptions, advanced, updates, feedback
     var id: String { rawValue }
 
     /// Main navigation (sidebar top) vs utility items (sidebar footer).
-    static let main: [SettingsTab] = [.dictation, .models, .output, .rules, .history, .advanced]
+    static let main: [SettingsTab] = [.transcriptions, .dictation, .models, .output, .rules, .history, .advanced]
     static let footer: [SettingsTab] = [.updates, .feedback]
 
     var title: String {
@@ -1526,6 +1526,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .output: return "Output"
         case .rules: return "Rules"
         case .history: return "History & Privacy"
+        case .transcriptions: return "Transcriptions"
         case .advanced: return "Advanced"
         case .updates: return "Updates"
         case .feedback: return "Feedback"
@@ -1540,6 +1541,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .output: return "text.bubble"
         case .rules: return "arrow.triangle.branch"
         case .history: return "clock.arrow.circlepath"
+        case .transcriptions: return "list.bullet.rectangle.portrait"
         case .advanced: return "gearshape"
         case .updates: return "sparkles"
         case .feedback: return "heart.text.square"
@@ -1575,7 +1577,8 @@ struct SettingsView: View {
     @State private var showPunctuationCalibration = false
 
     /// `initialTab` is for the layout tests, which render every pane in turn (#138).
-    init(initialTab: SettingsTab = .dictation) {
+    /// Transcriptions is the app's first tab (#137), so it is the default.
+    init(initialTab: SettingsTab = .transcriptions) {
         _selectedTab = State(initialValue: initialTab)
     }
 
@@ -1629,6 +1632,7 @@ struct SettingsView: View {
         case .output:    transcriptionSettings
         case .rules:     AppContextSettingsView(viewModel: viewModel)
         case .history:   storageSettings
+        case .transcriptions: transcriptionsTab
         case .advanced:  advancedSettings
         case .updates:   UpdatesView()
         case .feedback:  feedbackSettings
@@ -2485,6 +2489,26 @@ struct SettingsView: View {
 
             InsertionByAppSection(viewModel: viewModel)
         }
+    }
+
+    private var transcriptionsTab: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Transcriptions")
+                    .scaledFont(size: 16, weight: .bold)
+                    .foregroundColor(STheme.textBright)
+                Spacer()
+                Text("Search and manage everything you've dictated")
+                    .scaledFont(size: 11)
+                    .foregroundColor(STheme.hint)
+            }
+            .padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 4)
+
+            ContentView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(STheme.windowBg)
     }
 
     private var storageSettings: some View {
