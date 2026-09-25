@@ -66,17 +66,29 @@ final class SpectrumAnalyzer: ObservableObject {
         // followed by CoreAudio failing to start the input at all, over and over. Passing nil
         // makes the engine use the bus's own format at the moment the tap is created, so there is
         // no snapshot left to go stale.
-        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
-            guard let self, let channel = buffer.floatChannelData?[0] else { return }
-            let incoming = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
-            // The buffer knows its own sample rate; nothing read up front can be trusted to still
-            // describe it. Sent along so the band edges are derived from the audio that arrived.
-            let sampleRate = Float(buffer.format.sampleRate)
-            Task { @MainActor in self.consume(incoming, sampleRate: sampleRate) }
+        //
+        // `format: nil` narrows the window but does not close it: a device caught mid-change can
+        // still make `installTap` raise, and an NSException here is far worse than no visualiser
+        // (see `OSWCatchException`). So it is caught and the bubble simply stays flat.
+        do {
+            try ObjCExceptionError.catching {
+                input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
+                    guard let self, let channel = buffer.floatChannelData?[0] else { return }
+                    let incoming = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+                    // The buffer knows its own sample rate; nothing read up front can be trusted to
+                    // still describe it. Sent along so the band edges are derived from the audio that
+                    // arrived.
+                    let sampleRate = Float(buffer.format.sampleRate)
+                    Task { @MainActor in self.consume(incoming, sampleRate: sampleRate) }
+                }
+            }
+        } catch {
+            Diag.mark("spectrum.installTap raised \(error.localizedDescription); visualiser off for this take")
+            return
         }
 
-        engine.prepare()
         do {
+            try ObjCExceptionError.catching { engine.prepare() }
             try engine.start()
             isRunning = true
         } catch {

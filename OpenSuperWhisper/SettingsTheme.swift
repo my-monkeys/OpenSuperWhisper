@@ -149,11 +149,49 @@ struct SPane<Content: View>: View {
             }
             .padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 4)
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) { content() }
+                SPaneStack { content() }
                     .padding(.horizontal, 24).padding(.vertical, 14)
             }
         }
         .background(STheme.windowBg)
+    }
+}
+
+/// A leading-aligned vertical stack that lays every row out at the width it is offered.
+///
+/// A `VStack` takes the width of its widest row. So one row that could not shrink laid every
+/// other row out as wide as itself, and the scroll view followed: in #138 every toggle in the
+/// Output pane ended up past the window's edge, not just the control that was too wide. Here
+/// only that row runs over, and the scroll view clips it. Heights are left open, as a VStack
+/// under a scroll view leaves them, so a row sizes its own contents exactly as it did before.
+struct SPaneStack: Layout {
+    var spacing: CGFloat = 16
+
+    #if DEBUG
+    /// Every row laid out wider than its pane since the last reset, as (row, pane) widths. Read
+    /// by SettingsLayoutTests: a row of SwiftUI-drawn text has no view of its own to measure.
+    nonisolated(unsafe) static var overflows: [(row: CGFloat, pane: CGFloat)] = []
+    #endif
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        let rows = ProposedViewSize(width: width, height: nil)
+        let height = subviews.map { $0.sizeThatFits(rows).height }.reduce(0, +)
+            + spacing * CGFloat(max(subviews.count - 1, 0))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = ProposedViewSize(width: bounds.width, height: nil)
+        var y = bounds.minY
+        for subview in subviews {
+            let size = subview.sizeThatFits(rows)
+            #if DEBUG
+            if size.width > bounds.width + 0.5 { Self.overflows.append((size.width, bounds.width)) }
+            #endif
+            subview.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: rows)
+            y += size.height + spacing
+        }
     }
 }
 

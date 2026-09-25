@@ -110,7 +110,11 @@ struct RemoteSettingsSection: View {
                     }
                 } label: {
                     Text(selectionLabel)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
+                // A saved preset is named by the user, so the label has no length limit.
+                .frame(maxWidth: 220)
                 .fixedSize()
             }
             .alert("Save preset", isPresented: $showSavePrompt) {

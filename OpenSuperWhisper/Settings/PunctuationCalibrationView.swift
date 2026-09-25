@@ -20,7 +20,14 @@ struct PunctuationCalibrationView: View {
 
             Group {
                 switch model.stage {
-                case .reading: reading
+                // Scrolls only when the sentence does not fit, at a large text size. The sheet
+                // keeps one height, so the button read for every sentence stays where it is,
+                // and the header and footer stay in view.
+                case .reading:
+                    ViewThatFits(in: .vertical) {
+                        reading
+                        ScrollView { reading.padding(.top, 18) }
+                    }
                 case .working: working
                 case .review: review
                 }
@@ -72,6 +79,9 @@ struct PunctuationCalibrationView: View {
                 .foregroundColor(STheme.textBright)
                 .multilineTextAlignment(.center)
                 .lineSpacing(8)
+                // Every line, always: this is the sentence to read aloud, and at a large text
+                // size it used to lose its last line.
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 44)
                 .textSelection(.enabled)
 

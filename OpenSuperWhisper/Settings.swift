@@ -1564,7 +1564,7 @@ struct SettingsView: View {
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
     @ObservedObject private var themeController = ThemeController.shared
     @Environment(\.dismiss) var dismiss
-    @State private var selectedTab: SettingsTab = .dictation
+    @State private var selectedTab: SettingsTab
     @State private var sidebarSearch = ""
     @FocusState private var sidebarSearchFocused: Bool
     @State private var availableUpdateTag: String?
@@ -1576,6 +1576,11 @@ struct SettingsView: View {
     @State private var appLanguage = LanguageManager.selected
     @State private var langNeedsRelaunch = false
     @State private var showPunctuationCalibration = false
+
+    /// `initialTab` is for the layout tests, which render every pane in turn (#138).
+    init(initialTab: SettingsTab = .dictation) {
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     /// Curated cancel-recording keys (the recorder can't capture Esc / single special keys).
 
@@ -1825,8 +1830,14 @@ struct SettingsView: View {
 
             Rectangle().fill(STheme.border).frame(width: 1)
 
+            // `minWidth: 0` keeps a pane that is too wide from widening this HStack. With only a
+            // max, the column took the pane's width and the root frame centred the whole row in
+            // the window, cutting the sidebar's leading edge off (#138). Leading-aligned so the
+            // overflow falls off the trailing edge, and clipped so it never draws over the
+            // sidebar.
             detailContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
                 .background(STheme.windowBg)
                 // The old footer's Done button carried this legacy reload; the window now
                 // just closes, so run it when the view goes away instead. (Model selection
@@ -1889,14 +1900,17 @@ struct SettingsView: View {
                     .scaledFont(size: 13, weight: .semibold)
                     .foregroundColor(browseEngine == tag ? STheme.accent : STheme.text)
                     .lineLimit(1)
+                // Two lines rather than one: five cards share about 500pt, so at the default
+                // window "Accurate · 99 langs" was already cut off in English.
                 Text(sub)
                     .scaledFont(size: 10.5)
                     .foregroundColor(STheme.hint)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: 9)
                 .fill(browseEngine == tag ? STheme.accentSoft : Color.clear))
             .overlay(RoundedRectangle(cornerRadius: 9)
@@ -1951,6 +1965,8 @@ struct SettingsView: View {
                 }
                 engineCard(tag: "remote", name: "Remote", sub: "Your own server")
             }
+            // Every card as tall as the tallest, now that a subtitle can take two lines.
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 24).padding(.top, 12)
 
             if browseEngine == "remote" {
@@ -1967,7 +1983,7 @@ struct SettingsView: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                SPaneStack {
                     if browseEngine == "whisper" {
                         SSection(title: "Whisper models") {
                             VStack(spacing: 8) {
@@ -2046,27 +2062,58 @@ struct SettingsView: View {
                                  defaultText: String,
                                  height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(title).scaledFont(size: 11).foregroundColor(STheme.hint)
-                Spacer()
-                if viewModel.isTranslating(half) {
-                    ProgressView().controlSize(.small).scaleEffect(0.6)
+            // The actions move under the title when they do not fit beside it. Three buttons in
+            // German ("Rückgängig", "Auf … übersetzen", "Auf Standard zurücksetzen") already
+            // truncated at the default window.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    promptHalfHeading(title, half: half)
+                    Spacer()
+                    promptHalfActions(half: half, text: text, defaultText: defaultText)
                 }
-                // Always present, like Reset: a button that appears and disappears per half makes
-                // the two rows jump around and look inconsistent.
-                Button("Undo") { viewModel.undoPromptTranslation(half) }
-                    .controlSize(.small)
-                    .disabled(viewModel.promptBeforeTranslation[half] == nil)
-                if let target = viewModel.promptTranslationTarget {
-                    Button("Translate to \(target)") { viewModel.translatePrompt(half) }
-                        .controlSize(.small)
+                VStack(alignment: .leading, spacing: 4) {
+                    promptHalfHeading(title, half: half)
+                    HStack(spacing: 6) {
+                        promptHalfActions(half: half, text: text, defaultText: defaultText)
+                    }
                 }
-                Button("Reset to default") { text.wrappedValue = defaultText }
-                    .controlSize(.small)
-                    .disabled(text.wrappedValue == defaultText)
             }
             sEditor(text, height: height)
         }
+    }
+
+    /// The spinner keeps its footprint whether or not it shows. `ViewThatFits` measures it, and
+    /// a spinner that came and went made the header switch between one row and two as a
+    /// translation started and ended, moving the editor under the pointer.
+    private func promptHalfHeading(_ title: LocalizedStringKey,
+                                   half: SettingsViewModel.PromptHalf) -> some View {
+        HStack(spacing: 6) {
+            Text(title).scaledFont(size: 11).foregroundColor(STheme.hint)
+            ZStack {
+                if viewModel.isTranslating(half) {
+                    ProgressView().controlSize(.small).scaleEffect(0.6)
+                }
+            }
+            .frame(width: 16, height: 16)
+        }
+    }
+
+    @ViewBuilder
+    private func promptHalfActions(half: SettingsViewModel.PromptHalf,
+                                   text: Binding<String>,
+                                   defaultText: String) -> some View {
+        // Always present, like Reset: a button that appears and disappears per half makes
+        // the two rows jump around and look inconsistent.
+        Button("Undo") { viewModel.undoPromptTranslation(half) }
+            .controlSize(.small)
+            .disabled(viewModel.promptBeforeTranslation[half] == nil)
+        if let target = viewModel.promptTranslationTarget {
+            Button("Translate to \(target)") { viewModel.translatePrompt(half) }
+                .controlSize(.small)
+        }
+        Button("Reset to default") { text.wrappedValue = defaultText }
+            .controlSize(.small)
+            .disabled(text.wrappedValue == defaultText)
     }
 
     /// The cleanup instruction: two user-owned halves with the per-app rules from Rules sandwiched
@@ -2207,6 +2254,25 @@ struct SettingsView: View {
         }
     }
 
+    private var microphoneHint: LocalizedStringKey {
+        if micService.followsSystemDefault {
+            return "Following the system input\(micService.currentMicrophone.map { " (\($0.name))" } ?? "") — switch headsets and it follows"
+        }
+        if micService.disconnectedSelection != nil {
+            guard let fallback = micService.currentMicrophone else { return "Not connected" }
+            return "Not connected, so recording uses \(fallback.name) until it is back"
+        }
+        return "Also switchable from the menu bar"
+    }
+
+    private var backendHint: LocalizedStringKey {
+        switch viewModel.aiBackend {
+        case "builtin": return "A Qwen2.5 model running on this Mac"
+        case "remote": return "Any OpenAI-compatible server"
+        default: return "Your local Ollama server"
+        }
+    }
+
     @ViewBuilder private var llmStatusView: some View {
         let isRemote = viewModel.aiBackend == "remote"
         switch viewModel.llmStatus {
@@ -2317,11 +2383,16 @@ struct SettingsView: View {
                 // Settings → Rules, so it stays visible while either is on — otherwise someone
                 // using formatting only would have nowhere to pick a backend or download a model.
                 if viewModel.aiPostProcessingEnabled || viewModel.appContextFormattingEnabled {
-                    SRow(title: "Backend", indented: true) {
+                    // Short labels, with the detail in the hint. macOS gives every segment the
+                    // width of the widest label, so "Remote (OpenAI-compatible)" made this one
+                    // control 606pt: wider than the whole pane at the default window, which pushed
+                    // the window's content out on both sides, sidebar included (#138). The model
+                    // name was also wrong in the label as soon as someone picked the 7B.
+                    SRow(title: "Backend", hint: backendHint, indented: true) {
                         Picker("", selection: $viewModel.aiBackend) {
-                            Text("Built-in (Qwen2.5 1.5B)").tag("builtin")
-                            Text("Ollama (local)").tag("ollama")
-                            Text("Remote (OpenAI-compatible)").tag("remote")
+                            Text("Built-in").tag("builtin")
+                            Text("Ollama").tag("ollama")
+                            Text("Remote").tag("remote")
                         }
                         .labelsHidden()
                         .pickerStyle(.segmented)
@@ -2452,7 +2523,10 @@ struct SettingsView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
                             Stepper("", value: $viewModel.retentionMaxCount, in: 1...100000)
                                 .labelsHidden()
+                            // Fixed so the title wraps rather than this word breaking in half
+                            // ("enregistrements" at a large text size).
                             Text("recordings").scaledFont(size: 11).foregroundColor(STheme.hint)
+                                .fixedSize()
                         }
                     }
                 }
@@ -2515,10 +2589,14 @@ struct SettingsView: View {
                             .controlSize(.small)
                             .frame(width: 150)
                             .tint(STheme.accent)
-                        Text("\(Int(viewModel.textScale * 100))%")
-                            .scaledFont(size: 11, design: .monospaced)
-                            .foregroundColor(STheme.hint)
-                            .frame(width: 40, alignment: .trailing)
+                        // Sized by the widest value it can show, at the current text size, rather
+                        // than a fixed 40pt that "160%" outgrows at 160%.
+                        ZStack(alignment: .trailing) {
+                            Text(verbatim: "\(Int(TextScale.maximum * 100))%").hidden()
+                            Text("\(Int((viewModel.textScale * 100).rounded()))%")
+                        }
+                        .scaledFont(size: 11, design: .monospaced)
+                        .foregroundColor(STheme.hint)
                     }
                 }
             }
@@ -2772,10 +2850,7 @@ struct SettingsView: View {
             }
 
             SSection(title: "Input") {
-                SRow(title: "Microphone",
-                     hint: micService.followsSystemDefault
-                        ? "Following the system input\(micService.currentMicrophone.map { " (\($0.name))" } ?? "") — switch headsets and it follows"
-                        : "Also switchable from the menu bar") {
+                SRow(title: "Microphone", hint: microphoneHint) {
                     Picker("", selection: Binding(
                         get: {
                             micService.followsSystemDefault
@@ -2795,9 +2870,17 @@ struct SettingsView: View {
                         ForEach(micService.availableMicrophones, id: \.id) { device in
                             Text(device.name).tag(device.id)
                         }
+                        // The pinned device stays in the list while it is unplugged. Without it
+                        // the selection matched no item and the popup showed nothing at all.
+                        if let missing = micService.disconnectedSelection {
+                            Text("\(missing.name) (not connected)").tag(missing.id)
+                        }
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
+                    // Capped before it is fixed: the popup keeps its natural width, but a device
+                    // name, which has no length limit, truncates instead of widening the row.
+                    .frame(maxWidth: 320)
                     .fixedSize()
                 }
             }

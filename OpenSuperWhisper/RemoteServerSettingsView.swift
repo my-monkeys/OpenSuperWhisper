@@ -49,10 +49,10 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                         Group {
                             if revealKey {
                                 TextField("", text: $viewModel.remoteServerAPIKey,
-                                          prompt: Text("leave blank for no-auth servers"))
+                                          prompt: Text("optional"))
                             } else {
                                 SecureField("", text: $viewModel.remoteServerAPIKey,
-                                            prompt: Text("leave blank for no-auth servers"))
+                                            prompt: Text("optional"))
                             }
                         }
                         .textFieldStyle(.plain)
@@ -176,6 +176,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                                 }
                             }
                             .labelsHidden()
+                            .frame(maxWidth: 280)
                             .fixedSize()
                         }
                         if viewModel.translateToEnglish {
