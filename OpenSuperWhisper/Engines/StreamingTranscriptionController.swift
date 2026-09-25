@@ -99,14 +99,38 @@ final class StreamingTranscriptionController: ObservableObject {
             }
         }
 
+        // `format: nil`, for the reason SpectrumAnalyzer spells out: a format read here goes stale
+        // while the recorder is still taking the device, and the tap is refused. The manager
+        // converts whatever arrives. The exception is caught for the same reason too — raised
+        // inside this main-actor task, it would leave the app to crash on the next click.
         let input = audioEngine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
-            bufferContinuation.yield(buffer)
+        do {
+            try ObjCExceptionError.catching {
+                input.installTap(onBus: 0, bufferSize: 4096, format: nil) { buffer, _ in
+                    bufferContinuation.yield(buffer)
+                }
+            }
+        } catch {
+            await abandonStart(manager)
+            throw error
         }
-        audioEngine.prepare()
-        try audioEngine.start()
+        do {
+            try ObjCExceptionError.catching { audioEngine.prepare() }
+            try audioEngine.start()
+        } catch {
+            input.removeTap(onBus: 0)
+            await abandonStart(manager)
+            throw error
+        }
         isRunning = true
+    }
+
+    /// Undoes a start() that got as far as its tasks but never reached a running engine, so the
+    /// caller's fallback to the file pass does not leave a feeder and a manager running behind it.
+    private func abandonStart(_ manager: SlidingWindowAsrManager) async {
+        stopAudio()
+        await manager.cancel()
+        self.manager = nil
     }
 
     /// Stops streaming and returns the complete transcript (nil if streaming wasn't running).

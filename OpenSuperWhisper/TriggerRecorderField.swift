@@ -207,23 +207,32 @@ struct TriggerRecorderField: View {
         persistSet()
     }
 
+    /// The prompt until a modifier goes down, then the modifiers being held. Showing all four
+    /// badges all the time, lit or not, left 56pt of a 168pt field for the prompt, and "key,
+    /// modifier or mouse…" was cut off at the default text size.
     private var recordingBody: some View {
         HStack(spacing: 4) {
-            ForEach(RecordingTrigger.modifierBadges, id: \.symbol) { badge in
-                let held = heldModifiers.contains(badge.flag)
-                Text(badge.symbol)
-                    .scaledFont(size: 11, weight: .semibold)
-                    .foregroundColor(held ? .white : STheme.hint)
-                    .frame(width: 18, height: 18)
-                    .background(RoundedRectangle(cornerRadius: 4)
-                        .fill(held ? STheme.accent : STheme.controlBg))
+            if heldBadges.isEmpty {
+                Text(placeholder)
+                    .scaledFont(size: 11)
+                    .foregroundColor(STheme.hint)
+                    .lineLimit(1)
+                    .padding(.leading, 2)
+            } else {
+                ForEach(heldBadges, id: \.symbol) { badge in
+                    Text(badge.symbol)
+                        .scaledFont(size: 11, weight: .semibold)
+                        .foregroundColor(.white)
+                        .frame(width: 18, height: 18)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(STheme.accent))
+                }
             }
-            Text(placeholder)
-                .scaledFont(size: 11)
-                .foregroundColor(STheme.hint)
-                .padding(.leading, 2)
             Spacer(minLength: 0)
         }
+    }
+
+    private var heldBadges: [(flag: NSEvent.ModifierFlags, symbol: String)] {
+        RecordingTrigger.modifierBadges.filter { heldModifiers.contains($0.flag) }
     }
 
     private var placeholder: String {

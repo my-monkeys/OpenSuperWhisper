@@ -176,6 +176,14 @@ class MicrophoneService: ObservableObject {
     /// True while no specific device is pinned, so the app follows the system input.
     var followsSystemDefault: Bool { selectedMicrophone == nil }
 
+    /// The pinned device while it is unplugged. Recording falls back to the default input
+    /// meanwhile and comes back to the pinned one when it reconnects; this is what lets the UI
+    /// say so instead of showing a picker with nothing selected.
+    var disconnectedSelection: AudioDevice? {
+        guard let selected = selectedMicrophone, !isDeviceAvailable(selected) else { return nil }
+        return selected
+    }
+
     /// The device to record from when nothing is pinned. Prefers the system input, which is
     /// what the user set in Sound settings and what every other app on the Mac will use.
     /// Falls back to the built-in mic, then to anything, so a machine whose default input
