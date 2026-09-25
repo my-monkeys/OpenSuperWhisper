@@ -15,6 +15,11 @@ final class SpectrumAnalyzer: ObservableObject {
     /// Per-band levels, 0...1, oldest-to-highest frequency. All zeros while stopped.
     @Published private(set) var bands: [Float] = Array(repeating: 0, count: SpectrumBands.count)
 
+    #if DEBUG
+    /// Stages levels without a microphone, for the indicator probe's screenshots and GIFs.
+    func stageBands(_ levels: [Float]) { bands = levels }
+    #endif
+
     private let engine = AVAudioEngine()
     private var isRunning = false
 

@@ -395,6 +395,16 @@ final class AppPreferences {
     @UserDefault(key: "indicatorPosition", defaultValue: "cursor")
     var indicatorPosition: String
 
+    /// UI theme during the Liquid Glass transition: "system", "legacy", or "liquidGlass".
+    /// Read through `ThemeController` / the `UITheme` enum, never compared as a raw string in views.
+    @UserDefault(key: "uiTheme", defaultValue: "system")
+    var uiTheme: String
+
+    /// Size factor of the Liquid Glass recording bubble (1 = Spotlight-sized). Read through
+    /// `ThemeController`.
+    @UserDefault(key: "glassBubbleSize", defaultValue: 0.8)
+    var glassBubbleSize: Double
+
     /// Where the bubble was last dragged to, as "x,y": the middle of its bottom edge in screen
     /// coordinates.
     ///

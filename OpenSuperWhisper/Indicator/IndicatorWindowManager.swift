@@ -92,6 +92,10 @@ class IndicatorWindowManager: IndicatorViewDelegate {
             // Read once per presentation rather than observed: the bubble is short-lived, and a
             // size change mid-recording would resize the window under the user (#80).
             .environment(\.appTextScale, AppPreferences.shared.textScale)
+            // Resolve the theme once per presentation (like textScale): a mid-recording change
+            // should not reskin the bubble under the user. This is the only place the indicator's
+            // theme is injected; the surface/button seams read it from the environment.
+            .environment(\.uiTheme, ThemeController.shared.resolved)
         )
         hostingController.sizingOptions = Self.hostingSizingOptions
         window?.contentViewController = hostingController
@@ -113,10 +117,15 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         // Accept clicks only when an on-bubble button is enabled (so it's tappable);
         // otherwise stay fully click-through (baseline). Re-evaluated each show() so
         // toggling the setting takes effect on the next recording.
+        // From the layout the bubble actually draws. The old `showStop/CancelButtonOnIndicator`
+        // switches only seed the layout on migration and stay false afterwards, so reading them
+        // here left the panel click-through while the editor's buttons were on screen: every
+        // click fell through to the app underneath.
+        let layout = IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
         window?.ignoresMouseEvents = !Self.needsMouseEvents(
             position: AppPreferences.shared.indicatorPosition,
-            showsStop: AppPreferences.shared.showStopButtonOnIndicator,
-            showsCancel: AppPreferences.shared.showCancelButtonOnIndicator)
+            showsStop: layout.contains(.stopButton),
+            showsCancel: layout.contains(.cancelButton))
 
         if let window = window, let screen = targetScreen {
             let screenFrame = screen.frame
@@ -225,6 +234,19 @@ class IndicatorWindowManager: IndicatorViewDelegate {
     nonisolated static func needsMouseEvents(position: String, showsStop: Bool,
                                              showsCancel: Bool) -> Bool {
         showsStop || showsCancel || position == "custom"
+    }
+
+    /// The Liquid Glass bubble keeps its control slots while the controls are tucked (so the window
+    /// never reflows), and those empty slots would swallow clicks meant for the app below. While it
+    /// shows a message (no control out) go click-through again, unless the bubble is draggable.
+    func setGlassControlsTucked(_ tucked: Bool) {
+        guard let window else { return }
+        let layout = IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
+        let position = AppPreferences.shared.indicatorPosition
+        let needs = Self.needsMouseEvents(position: position,
+                                          showsStop: layout.contains(.stopButton),
+                                          showsCancel: layout.contains(.cancelButton))
+        window.ignoresMouseEvents = !needs || (tucked && position != "custom")
     }
 
     /// The origin `reposition` last asked for, so the window's own move notification is not

@@ -1,4 +1,5 @@
 import Foundation
+import LiquidGlass
 
 /// One thing the recording bubble can show. The bubble draws exactly the elements in
 /// `IndicatorLayout.elements`, in that order, which is what makes the layout editor possible:
@@ -96,6 +97,19 @@ struct IndicatorLayout: Codable, Equatable {
     var decodingLeading: [IndicatorElement] {
         guard contains(.waveform) || contains(.label) else { return leading + [.waveform] }
         return leading
+    }
+
+    /// The Liquid Glass pill's contents in the configured order. The buttons are separate glass
+    /// shapes pinned to the trailing edge, so they are not part of it.
+    var glassCenter: [BubbleCenterElement] {
+        leading.compactMap {
+            switch $0 {
+            case .dot: return .dot
+            case .waveform: return .waveform
+            case .label: return .label
+            case .stopButton, .cancelButton: return nil
+            }
+        }
     }
 
     mutating func setVisible(_ visible: Bool, for element: IndicatorElement) {

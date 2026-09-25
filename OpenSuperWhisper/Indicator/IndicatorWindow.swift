@@ -1,6 +1,7 @@
 import AVFoundation
 import Cocoa
 import Combine
+import LiquidGlass
 import SwiftUI
 
 enum RecordingState: Equatable {
@@ -462,6 +463,9 @@ struct IndicatorWindow: View {
     @ObservedObject private var pipeline = DictationPipeline.shared
     @ObservedObject private var spectrum = SpectrumAnalyzer.shared
     @Environment(\.colorScheme) private var colorScheme
+    /// The resolved UI theme (legacy | liquidGlass), injected once at the hosting root by
+    /// `IndicatorWindowManager`. Drives the surface seam and the on-bubble button style.
+    @Environment(\.uiTheme) private var uiTheme
     /// Padding and minimum sizes follow the text setting, or the bubble keeps its shipped size
     /// however large the text is set. Notch mode is excluded: its geometry is the hardware's.
     @Environment(\.textScaleFactor) private var scale
@@ -469,12 +473,10 @@ struct IndicatorWindow: View {
     /// layout, which is why it is a plain value animated from outside the mask rather than an
     /// animation attached inside it.
     @State private var apronProgress: CGFloat = 0
-
-    private var backgroundColor: Color {
-        colorScheme == .dark
-            ? Color.black.opacity(0.24)
-            : Color.white.opacity(0.24)
-    }
+    /// The Liquid Glass bubble's size factor, read once per presentation (each `show()` builds a
+    /// new view) like the theme and text scale, so moving the slider mid-recording does not
+    /// resize the bubble under the user.
+    @State private var glassBubbleSize = CGFloat(AppPreferences.shared.glassBubbleSize)
 
     /// Wider while live-recording so the growing caption fits inside the bubble; compact otherwise.
     /// Extra width for any enabled on-bubble buttons (Spacer 8 + a 24pt control each) so
@@ -518,6 +520,22 @@ struct IndicatorWindow: View {
     
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
 
+    // The bubble's surface is now the themed `BubbleSurface` seam (Theme/BubbleSurface.swift): the
+    // Liquid Glass surface (from the LiquidGlass package) on the glass theme, the legacy material on
+    // the legacy theme, resolved once from `\.uiTheme`. Notch mode keeps its own opaque-black
+    // silhouette (below) and is not routed through the seam.
+
+    /// One of the opt-in on-bubble controls of the legacy bubble. The Liquid Glass theme never
+    /// reaches here off the notch (`glassRecordingBubble` takes over), so it keeps the plain style.
+    private func controlButton<Label: View>(@ViewBuilder label: () -> Label,
+                                            action: @escaping () -> Void,
+                                            help: () -> String) -> some View {
+        Button(action: action) { label() }
+            .buttonStyle(.plain)
+            .pointerCursorOnHover()
+            .help(help())
+    }
+
     private var layout: IndicatorLayout {
         IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout)
     }
@@ -533,37 +551,39 @@ struct IndicatorWindow: View {
     /// discard (same as the Esc cancel shortcut). Fixed-size, so they don't couple
     /// the bubble's size to the window (see the recursion-crash note above).
     private var anyIndicatorButton: Bool {
-        AppPreferences.shared.showStopButtonOnIndicator
-            || AppPreferences.shared.showCancelButtonOnIndicator
+        // The layout, not the pre-editor switches (which only seed it on migration).
+        !layout.trailing.isEmpty
     }
 
     @ViewBuilder private var indicatorControls: some View {
         HStack(spacing: 8) {
-            if AppPreferences.shared.showStopButtonOnIndicator {
-                Button { IndicatorWindowManager.shared.stopRecording() } label: {
+            if layout.contains(.stopButton) {
+                controlButton {
                     // A red ring with a red stop square inside (transparent interior).
                     Image(systemName: "stop.circle")
                         .scaledFont(size: 19, weight: .regular)
                         .foregroundColor(.red)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
+                } action: {
+                    IndicatorWindowManager.shared.stopRecording()
+                } help: {
+                    "Finish recording"
                 }
-                .buttonStyle(.plain)
-                .pointerCursorOnHover()
-                .help("Finish recording")
             }
-            if AppPreferences.shared.showCancelButtonOnIndicator {
-                Button { IndicatorWindowManager.shared.stopForce() } label: {
+            if layout.contains(.cancelButton) {
+                controlButton {
                     // A plain red trash can — discard without transcribing.
                     Image(systemName: "trash")
                         .scaledFont(size: 16, weight: .regular)
                         .foregroundColor(.red)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
+                } action: {
+                    IndicatorWindowManager.shared.stopForce()
+                } help: {
+                    "Cancel recording"
                 }
-                .buttonStyle(.plain)
-                .pointerCursorOnHover()
-                .help("Cancel recording")
             }
         }
     }
@@ -590,9 +610,132 @@ struct IndicatorWindow: View {
         }
     }
 
+    // MARK: - Liquid Glass recording bubble
+
+    /// In the Liquid Glass theme, off the notch, the bubble is the LiquidGlass package's
+    /// `RecordingBubble` for its WHOLE life — recording, transcribing and any message after — so a
+    /// state change morphs the one glass shape instead of swapping in the legacy bubble. It draws
+    /// its own glass, sizes itself and reports its size for the window, so it replaces the legacy
+    /// wrapper entirely (no double glass, no conflicting padding/clip).
+    private var glassRecordingBubble: Bool {
+        // Idle included: the legacy wrapper must never draw in this theme, not even for the frame
+        // between `show()` and `startRecording()`, or it flashes a second bubble under the glass.
+        uiTheme == .liquidGlass && !isNotchMode
+    }
+
+    /// The indicator's state as a bubble phase.
+    /// The package draws plain strings, so every word is localized here, with the same keys the
+    /// legacy bubble uses (and so the same translations).
+    private var glassPhase: BubblePhase {
+        switch viewModel.state {
+        case .recording where viewModel.isConfirmingCancel:
+            return .message(symbol: "escape", text: String(localized: "Press Esc to cancel"), tint: .orange)
+        case .recording, .idle: return .recording
+        case .decoding: return .processing
+        case .connecting:
+            return .message(symbol: nil, text: String(localized: "Connecting..."), tint: .primary)
+        case .busy:
+            return .message(symbol: "hourglass", text: String(localized: "Processing..."), tint: .orange)
+        case .error(let message):
+            return .message(symbol: "exclamationmark.triangle.fill", text: message, tint: .red)
+        case .info(let message): return .message(symbol: "doc.on.clipboard", text: message, tint: .primary)
+        }
+    }
+
+    /// The label's words, with the queue count, as the legacy label has them.
+    private var glassLabel: String {
+        let queued = pipeline.pendingCount
+        if viewModel.state == .decoding {
+            return queued > 1 ? String(localized: "Transcribing… · \(queued - 1) queued")
+                              : String(localized: "Transcribing…")
+        }
+        return queued > 0 ? String(localized: "Recording… · \(queued) queued")
+                          : String(localized: "Recording…")
+    }
+
+    /// The pill's centre elements (waveform / label) in the user's configured order.
+    private var glassCenter: [BubbleCenterElement] { layout.glassCenter }
+
+    /// The live caption as one string: the confirmed part primary, the still-streaming tail dimmed.
+    private var liveCaption: AttributedString {
+        var confirmed = AttributedString(streaming.confirmedText)
+        var volatile = AttributedString((streaming.confirmedText.isEmpty ? "" : " ") + streaming.volatileText)
+        volatile.foregroundColor = .secondary
+        confirmed.append(volatile)
+        return confirmed
+    }
+
+    @available(macOS 26.0, *)
+    private var glassBubbleContent: some View {
+        let hasText = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
+        let showsCaption = viewModel.state == .recording && hasText
+        // The caption is drawn in the label's place, so a layout without the label still needs
+        // that slot while text streams in (the legacy bubble shows the caption regardless).
+        let center = showsCaption && !glassCenter.contains(.label) ? glassCenter + [.label] : glassCenter
+        let viewModel = viewModel
+        return RecordingBubble(
+            phase: glassPhase,
+            showDot: layout.contains(.dot),
+            center: center,
+            labelText: glassLabel,
+            caption: showsCaption ? liveCaption : nil,
+            bands: spectrum.bands,
+            blinking: viewModel.isBlinking,
+            waveformHeight: meterHeight,
+            size: glassBubbleSize,
+            glass: .regular,
+            // Show/hide is the glass's own materialize, driven from here. No scale/blur/opacity
+            // around it: the system composites glass on its own layer and ignores those, so they
+            // would animate the content apart from the glass.
+            visible: viewModel.isVisible,
+            onStop: layout.contains(.stopButton) ? { IndicatorWindowManager.shared.stopRecording() } : nil,
+            // Recording: discard the take. Transcribing: throw the transcription away, as the
+            // legacy cancel does — changing your mind while a slow model works is the point.
+            onCancel: layout.contains(.cancelButton) ? {
+                if viewModel.state == .decoding {
+                    DictationPipeline.shared.discardEverything()
+                } else {
+                    IndicatorWindowManager.shared.stopForce()
+                }
+            } : nil,
+            // The legacy buttons' tooltips, so both themes say the same thing in every language.
+            stopLabel: String(localized: "Finish recording"),
+            cancelLabel: viewModel.state == .decoding
+                ? String(localized: "Throw this transcription away")
+                : String(localized: "Discard recording"),
+            emergeOnAppear: true
+        )
+        // Its natural size, not the window's: GlassEffectContainer takes whatever it is offered, so
+        // unfixed it measured as the 380×120 seed canvas and the window never shrank to the bubble
+        // — leaving a big invisible panel that, with the buttons on, swallowed clicks around it.
+        .fixedSize()
+        // Measure for the manual window sizing. Read directly rather than through
+        // `IndicatorContentSizeKey`: through the preference the glass bubble's size arrived as
+        // .zero (the GeometryReader saw 268×37, the handler got 0×0), so the window stayed at its
+        // seed size.
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in onContentResize(size) }
+        // Animated, so the glass materialises in instead of popping.
+        .onAppear { withAnimation(RecordingBubble.appear) { viewModel.isVisible = true } }
+        // A message tucks both controls but keeps their (empty) slots: don't let them eat clicks.
+        .onChange(of: glassPhase) { _, phase in
+            IndicatorWindowManager.shared.setGlassControlsTucked(phase != .recording && phase != .processing)
+        }
+    }
+
     @ViewBuilder private var classicBubble: some View {
+        if glassRecordingBubble, #available(macOS 26.0, *) {
+            glassBubbleContent
+        } else {
+            legacyBubble
+        }
+    }
+
+    @ViewBuilder private var legacyBubble: some View {
 
         // Notch mode uses the real notch silhouette (concave top wings + rounded bottom).
+        // Everywhere else a 24pt rounded rect: a one-line bubble reads as a capsule anyway (the
+        // radius clamps to half its height), and unlike a capsule it does not clip the corners of
+        // a multi-line caption or the cancel bar. The Liquid Glass bubble has its own shape.
         let rect: AnyShape = isNotchMode
             ? AnyShape(NotchShape(topRadius: notch.topRadius, bottomRadius: notch.bottomRadius))
             : AnyShape(RoundedRectangle(cornerRadius: 24))
@@ -743,13 +886,7 @@ struct IndicatorWindow: View {
                     .fill(.black)
                     .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 3)
             } else {
-                rect
-                    .fill(backgroundColor)
-                    .background {
-                        rect
-                            .fill(Material.thinMaterial)
-                    }
-                    .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
+                BubbleSurface(shape: rect)
             }
         }
         .overlay(alignment: .bottom) {
@@ -766,7 +903,8 @@ struct IndicatorWindow: View {
             }
         )
         .environment(\.colorScheme, isNotchMode ? .dark : colorScheme)
-        // Notch drops in from the top edge; the others rise from below.
+        // Notch drops in from the top edge; the others rise from below. (The Liquid Glass bubble
+        // never reaches here: it has its own materialize entrance in `glassBubbleContent`.)
         .scaleEffect(viewModel.isVisible ? 1 : (isNotchMode ? 0.85 : 0.5), anchor: isNotchMode ? .top : .center)
         .offset(y: viewModel.isVisible ? 0 : (isNotchMode ? -20 : 20))
         .opacity(viewModel.isVisible ? 1 : 0)
