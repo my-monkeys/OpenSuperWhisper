@@ -74,6 +74,10 @@ public struct RecordingBubble: View {
     /// recommends. It is black under the dark scheme's white text and white under the light
     /// scheme's black text — a black dim in light mode greyed the pill against black text.
     var dim: Double
+    /// While set, a yellow stroke runs once around the pill's outline and drains over this many
+    /// seconds: how long a "press Esc again to cancel" prompt stays armed. The legacy bubble shows
+    /// the same window as a bar that empties; on glass the outline is the pill's own edge.
+    var countdown: TimeInterval?
     var onStop: (() -> Void)?
     var onCancel: (() -> Void)?
     /// What the controls say (accessibility label and tooltip). Already localized by the caller:
@@ -98,6 +102,7 @@ public struct RecordingBubble: View {
                 visible: Bool = true,
                 rim: Double = 0.45,
                 dim: Double = 0.35,
+                countdown: TimeInterval? = nil,
                 onStop: (() -> Void)? = nil,
                 onCancel: (() -> Void)? = nil,
                 stopLabel: String = "Finish recording",
@@ -117,6 +122,7 @@ public struct RecordingBubble: View {
         self.visible = visible
         self.rim = rim
         self.dim = dim
+        self.countdown = countdown
         self.onStop = onStop
         self.onCancel = onCancel
         self.stopLabel = stopLabel
@@ -144,7 +150,8 @@ public struct RecordingBubble: View {
     // Quick and a little springy: the bubble is a transient HUD, it should snap into place.
     static let emerge = Animation.spring(duration: 0.34, bounce: 0.2)
     private static let stagger: Double = 0.04
-    static let morph = Animation.spring(duration: 0.3, bounce: 0.12)
+    static let morphDuration: TimeInterval = 0.3
+    static let morph = Animation.spring(duration: morphDuration, bounce: 0.12)
 
     @Namespace private var ns
     /// The pill has materialised (first step of the entrance).
@@ -206,6 +213,16 @@ public struct RecordingBubble: View {
     /// order — or, for a message, the message.
     private var core: some View {
         coreContent
+            // Glass content, like the rim: anything layered over the glass after `.glassEffect`
+            // is not drawn at all inside the container. It waits for the pill's morph to finish
+            // (`settle`), because drawn during the morph it came in a brighter yellow that faded
+            // once the pill settled.
+            .overlay {
+                if let countdown {
+                    CountdownOutline(duration: countdown, lineWidth: max(2, (bar * 0.07).rounded()),
+                                     settle: Self.morphDuration)
+                }
+            }
             .background { rimStroke(rim) }
             .background { Capsule().fill(dimColor.opacity(dim)) }
             .glassEffect(glass.glass, in: .capsule)
@@ -221,12 +238,15 @@ public struct RecordingBubble: View {
                     Image(systemName: symbol).font(.system(size: glyphSize * 0.85))
                         .foregroundStyle(tint.color).frame(width: glyphSize)
                 }
+                // As wide as the words, up to 320pt, then a second line. A plain maxWidth frame
+                // takes all 320 whenever it is offered them, so a short message such as "Press
+                // Esc to cancel" blew the pill up to twice its size.
                 Text(text)
                     .font(.system(size: textSize))
                     .foregroundStyle(tint.color)
                     .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 320, alignment: .leading)
+                    .fixedSize(horizontal: true, vertical: true)
             case .recording, .processing:
                 // `showDot` puts the dot first when the order does not place it itself.
                 if showDot && !center.contains(.dot) { recordDot }
@@ -375,5 +395,53 @@ struct PressFeedbackStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.84 : 1)
             .opacity(configuration.isPressed ? 0.6 : 1)
             .animation(.spring(duration: 0.18, bounce: 0.4), value: configuration.isPressed)
+    }
+}
+
+/// The pill's outline as a path that starts at the top centre and runs clockwise, so trimming it
+/// drains from a predictable point (a plain `Capsule` path starts on its left edge).
+struct CapsuleOutline: Shape {
+    func path(in rect: CGRect) -> Path {
+        let r = min(rect.height, rect.width) / 2
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        p.addArc(center: CGPoint(x: rect.maxX - r, y: rect.midY), radius: r,
+                 startAngle: .degrees(-90), endAngle: .degrees(90), clockwise: false)
+        p.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        p.addArc(center: CGPoint(x: rect.minX + r, y: rect.midY), radius: r,
+                 startAngle: .degrees(90), endAngle: .degrees(270), clockwise: false)
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// A yellow line running once around the pill's edge and draining over `duration`: the time left
+/// to confirm a cancel. A soft halo lets it read on the glass whatever is behind it.
+///
+/// It waits `settle` seconds, the pill's morph, before it appears, and runs for what remains of
+/// `duration`, so it ends when the prompt does. Linear, because it is a clock.
+struct CountdownOutline: View {
+    let duration: TimeInterval
+    let lineWidth: CGFloat
+    var settle: TimeInterval = 0
+    @State private var remaining: CGFloat = 1
+    @State private var visible = false
+
+    var body: some View {
+        CapsuleOutline()
+            .trim(from: 0, to: remaining)
+            .stroke(Color.yellow, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            .padding(lineWidth / 2)
+            .shadow(color: .yellow.opacity(0.9), radius: 4)
+            .opacity(visible ? 1 : 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + settle) {
+                    visible = true
+                    withAnimation(.linear(duration: max(0.1, duration - settle))) { remaining = 0 }
+                }
+            }
     }
 }

@@ -688,6 +688,7 @@ struct IndicatorWindow: View {
             // around it: the system composites glass on its own layer and ignores those, so they
             // would animate the content apart from the glass.
             visible: viewModel.isVisible,
+            countdown: viewModel.isConfirmingCancel ? IndicatorViewModel.cancelConfirmationWindow : nil,
             onStop: layout.contains(.stopButton) ? { IndicatorWindowManager.shared.stopRecording() } : nil,
             // Recording: discard the take. Transcribing: throw the transcription away, as the
             // legacy cancel does — changing your mind while a slow model works is the point.
