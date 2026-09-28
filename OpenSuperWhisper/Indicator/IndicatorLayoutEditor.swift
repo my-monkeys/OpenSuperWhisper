@@ -1,3 +1,4 @@
+import LiquidGlass
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -11,6 +12,8 @@ import UniformTypeIdentifiers
 struct IndicatorLayoutEditor: View {
     @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject private var spectrum = SpectrumAnalyzer.shared
+    /// Observed so the preview follows the Appearance setting (and the bubble size) live.
+    @ObservedObject private var themeController = ThemeController.shared
 
     @State private var layout: IndicatorLayout = .default
     /// Animates the preview's bars when nothing is recording, so the waveform reads as a
@@ -54,6 +57,10 @@ struct IndicatorLayoutEditor: View {
 
     private var isNotch: Bool { viewModel.indicatorPosition == "notch" }
 
+    /// The bubble renders as Liquid Glass: the theme resolves to it and the position is not the
+    /// notch (which keeps its own opaque silhouette), exactly the condition the real bubble uses.
+    private var isGlass: Bool { themeController.theme.resolved == .liquidGlass && !isNotch }
+
     /// Real levels while a recording is running, a gentle idle animation otherwise.
     private var previewBands: [Float] {
         let live = spectrum.bands
@@ -70,8 +77,18 @@ struct IndicatorLayoutEditor: View {
                 .scaledFont(size: 11, weight: .medium)
                 .foregroundColor(STheme.hint)
             ZStack {
-                RoundedRectangle(cornerRadius: 10).fill(STheme.inputBg)
-                previewBubble
+                if isGlass {
+                    // Glass takes its look from what is behind it; over the flat settings panel
+                    // it would read as a plain grey pill, so it sits on a muted desktop stand-in.
+                    RoundedRectangle(cornerRadius: 10).fill(Self.glassBackdrop)
+                } else {
+                    RoundedRectangle(cornerRadius: 10).fill(STheme.inputBg)
+                }
+                if isGlass, #available(macOS 26.0, *) {
+                    glassPreviewBubble
+                } else {
+                    previewBubble
+                }
             }
             .frame(height: 96)
             .frame(maxWidth: .infinity)
@@ -113,6 +130,30 @@ struct IndicatorLayoutEditor: View {
         .animation(.easeOut(duration: 0.15), value: layout)
     }
 
+    private static let glassBackdrop = LinearGradient(
+        colors: [Color(red: 0.16, green: 0.18, blue: 0.34),
+                 Color(red: 0.32, green: 0.18, blue: 0.38),
+                 Color(red: 0.12, green: 0.28, blue: 0.32)],
+        startPoint: .topLeading, endPoint: .bottomTrailing)
+
+    /// The real Liquid Glass bubble, from the same component and inputs the indicator uses.
+    @available(macOS 26.0, *)
+    private var glassPreviewBubble: some View {
+        RecordingBubble(showDot: layout.contains(.dot),
+                        center: layout.glassCenter,
+                        labelText: "Recording…",
+                        bands: previewBands,
+                        blinking: true,
+                        waveformHeight: layout.waveformHeight,
+                        size: CGFloat(themeController.glassBubbleSize),
+                        glass: .regular,
+                        onStop: layout.contains(.stopButton) ? {} : nil,
+                        onCancel: layout.contains(.cancelButton) ? {} : nil)
+            .fixedSize()
+            .colorScheme(.dark)
+            .animation(.easeOut(duration: 0.15), value: layout)
+    }
+
     /// Only the notch is fixed-width; the pill sizes itself, exactly as the real bubble does.
     private var previewWidth: CGFloat {
         220 + CGFloat(layout.trailing.count) * 32
@@ -132,7 +173,7 @@ struct IndicatorLayoutEditor: View {
 
             VStack(spacing: 4) {
                 ForEach(layout.order) { element in
-                    if element.isTrailingControl {
+                    if isPinned(element) {
                         row(for: element)
                     } else {
                         row(for: element)
@@ -146,6 +187,12 @@ struct IndicatorLayoutEditor: View {
         }
     }
 
+    /// Elements whose place is fixed, so they get no drag handle: the buttons, which always sit
+    /// at the trailing edge.
+    private func isPinned(_ element: IndicatorElement) -> Bool {
+        element.isTrailingControl
+    }
+
     private func row(for element: IndicatorElement) -> some View {
         let visible = layout.isVisible(element)
         return HStack(spacing: 10) {
@@ -153,7 +200,7 @@ struct IndicatorLayoutEditor: View {
             // in this list would change nothing on the bubble and only look broken.
             // Only the handle starts a drag on the others: a draggable row swallowed the
             // toggle's click.
-            if element.isTrailingControl {
+            if isPinned(element) {
                 Color.clear.frame(width: 16, height: 20)
             } else {
                 Image(systemName: "line.3.horizontal")

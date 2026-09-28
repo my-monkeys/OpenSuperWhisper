@@ -1512,16 +1512,17 @@ struct InfoButton: View {
 
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case dictation, models, output, rules, history, transcriptions, advanced, updates, feedback
+    case dictation, appearance, models, output, rules, history, transcriptions, advanced, updates, feedback
     var id: String { rawValue }
 
     /// Main navigation (sidebar top) vs utility items (sidebar footer).
-    static let main: [SettingsTab] = [.transcriptions, .dictation, .models, .output, .rules, .history, .advanced]
+    static let main: [SettingsTab] = [.transcriptions, .dictation, .appearance, .models, .output, .rules, .history, .advanced]
     static let footer: [SettingsTab] = [.updates, .feedback]
 
     var title: String {
         switch self {
         case .dictation: return "Dictation"
+        case .appearance: return "Appearance"
         case .models: return "Models"
         case .output: return "Output"
         case .rules: return "Rules"
@@ -1537,6 +1538,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .dictation: return "slider.horizontal.3"
+        case .appearance: return "paintbrush"
         case .models: return "cpu"
         case .output: return "text.bubble"
         case .rules: return "arrow.triangle.branch"
@@ -1562,6 +1564,7 @@ struct SettingsView: View {
 
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var launchAtLogin = LaunchAtLoginManager.shared
+    @ObservedObject private var themeController = ThemeController.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab: SettingsTab
     @State private var sidebarSearch = ""
@@ -1628,6 +1631,7 @@ struct SettingsView: View {
     @ViewBuilder private var detailContent: some View {
         switch selectedTab {
         case .dictation: dictationSettings
+        case .appearance: appearanceSettings
         case .models:    modelSettings
         case .output:    transcriptionSettings
         case .rules:     AppContextSettingsView(viewModel: viewModel)
@@ -2585,11 +2589,22 @@ struct SettingsView: View {
         }
     }
 
-    /// "Advanced" — the redesigned engine-internals screen (Settings Explorations 2e):
-    /// App / Decoding / Model parameters / Post-record hook / Debug, in the Atelier style.
-    private var advancedSettings: some View {
-        SPane(title: "Advanced") {
-            SSection(title: "App") {
+    /// "Appearance" — everything about how the app and the recording bubble look, in one place:
+    /// the theme, sizes, and the bubble's position and contents.
+    private var appearanceSettings: some View {
+        SPane(title: "Appearance") {
+            SSection(title: "General") {
+                SRow(title: "Theme",
+                     hint: "Switch between the classic look and Apple's Liquid Glass. System follows macOS — Liquid Glass on macOS 26 (Tahoe) and later, the classic look below.") {
+                    Picker("", selection: $themeController.theme) {
+                        ForEach(UITheme.allCases) { theme in
+                            Text(theme.displayName).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 150)
+                    .labelsHidden()
+                }
                 SRow(title: "Text size",
                      hint: "Applied on top of the system text size (System Settings → Accessibility → Display). Leave at 100% to follow macOS exactly.") {
                     HStack(spacing: 10) {
@@ -2608,6 +2623,33 @@ struct SettingsView: View {
                         .foregroundColor(STheme.hint)
                     }
                 }
+            }
+            SSection(title: "Indicator") {
+                IndicatorLayoutEditor(viewModel: viewModel)
+                SRow(title: "Bubble size",
+                     hint: "Size of the Liquid Glass recording bubble. Applies from the next recording.") {
+                    HStack(spacing: 10) {
+                        Slider(value: $themeController.glassBubbleSize,
+                               in: ThemeController.glassBubbleSizeRange, step: 0.05)
+                            .controlSize(.small)
+                            .frame(width: 150)
+                            .tint(STheme.accent)
+                        Text("\(Int((themeController.glassBubbleSize * 100).rounded()))%")
+                            .scaledFont(size: 11, design: .monospaced)
+                            .foregroundColor(STheme.hint)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .disabled(themeController.theme.resolved != .liquidGlass)
+                }
+            }
+        }
+    }
+
+    /// "Advanced" — the redesigned engine-internals screen (Settings Explorations 2e):
+    /// App / Decoding / Model parameters / Post-record hook / Debug, in the Atelier style.
+    private var advancedSettings: some View {
+        SPane(title: "Advanced") {
+            SSection(title: "App") {
                 SRow(title: "App language", hint: "Relaunch to apply.") {
                     Picker("", selection: $appLanguage) {
                         Text("System").tag("system")
@@ -2865,10 +2907,6 @@ struct SettingsView: View {
                     .frame(maxWidth: 320)
                     .fixedSize()
                 }
-            }
-
-            SSection(title: "Indicator") {
-                IndicatorLayoutEditor(viewModel: viewModel)
             }
         }
     }
