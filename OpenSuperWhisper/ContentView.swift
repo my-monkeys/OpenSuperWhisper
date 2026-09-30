@@ -398,6 +398,7 @@ struct ContentView: View {
     @State private var debouncedSearchText = ""
     @State private var showDeleteConfirmation = false
     @State private var searchTask: Task<Void, Never>? = nil
+    @FocusState private var searchFocused: Bool
 
     /// The record / stop button, pinned optically center of the single-row bar.
     private var recordButton: some View {
@@ -434,6 +435,7 @@ struct ContentView: View {
                     .scaledFont(size: 10, weight: .regular)
                     .foregroundColor(.secondary)
             }
+            .lineLimit(1)
 
             HStack(spacing: 6) {
                 Image(systemName: "arrow.down.doc.fill")
@@ -443,6 +445,7 @@ struct ContentView: View {
                     .scaledFont(size: 10, weight: .regular)
                     .foregroundColor(.secondary)
             }
+            .lineLimit(1)
         }
     }
 
@@ -531,9 +534,17 @@ struct ContentView: View {
 
                         TextField("Search in transcriptions", text: $searchText)
                             .textFieldStyle(PlainTextFieldStyle())
+                            .focused($searchFocused)
                             .onChange(of: searchText) { _, newValue in
                                 performSearch(newValue)
                             }
+                            .onReceive(NotificationCenter.default.publisher(for: .focusTranscriptionSearch)) { _ in
+                                searchFocused = true
+                            }
+
+                        if searchText.isEmpty {
+                            ShortcutBadge(text: "⌘F")
+                        }
 
                         if !searchText.isEmpty {
                             Button(action: {
@@ -729,16 +740,17 @@ struct ContentView: View {
                             .animation(.easeInOut, value: viewModel.errorMessage)
                         }
 
-                        ZStack {
-                            HStack(alignment: .center) {
-                                hintColumn
-                                Spacer(minLength: 0)
-                                HStack(spacing: 12) {
-                                    MicrophonePickerIconView(microphoneService: viewModel.microphoneService)
-                                    deleteAllButton
-                                }
-                            }
+                        // Two equal flexible sides keep the button centred, and the hints truncate
+                        // rather than run under it (long translations, large text sizes).
+                        HStack(alignment: .center, spacing: 12) {
+                            hintColumn
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             recordButton
+                            HStack(spacing: 12) {
+                                MicrophonePickerIconView(microphoneService: viewModel.microphoneService)
+                                deleteAllButton
+                            }
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }
                     .padding(.horizontal, 24)
@@ -795,7 +807,6 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
         }
-        .fileDropHandler()
         .onChange(of: viewModel.shouldClearSearch) { _, shouldClear in
             if shouldClear {
                 searchText = ""
@@ -970,24 +981,28 @@ struct RecordingRow: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
-            } else if !displayText.isEmpty {
-                HStack(alignment: .top, spacing: 8) {
-                    ZStack(alignment: .topLeading) {
-                        TranscriptionView(
-                            transcribedText: displayText,
-                            searchQuery: searchQuery,
-                            isExpanded: $showTranscription
-                        )
-
-                        if isRegenerating {
-                            ShimmerOverlay()
-                                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    hoverActions
+                // What the engine managed before failing, if anything.
+                if !recording.transcription.isEmpty {
+                    Text(recording.transcription)
+                        .scaledFont(size: 10, weight: .regular)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
                 }
+            } else if !displayText.isEmpty {
+                ZStack(alignment: .topLeading) {
+                    TranscriptionView(
+                        transcribedText: displayText,
+                        searchQuery: searchQuery,
+                        isExpanded: $showTranscription
+                    )
+
+                    if isRegenerating {
+                        ShimmerOverlay()
+                            .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
             } else if !isPending {
@@ -998,12 +1013,18 @@ struct RecordingRow: View {
                     .padding(.top, 8)
             }
 
+            // The actions share the footer with the metadata, on every kind of row: beside the
+            // text they re-wrapped it on hover, and a failed, queued or empty row had none.
             HStack(alignment: .center, spacing: 8) {
                 compactMetaLine
                 if isPending || isRegenerating {
                     progressBadge
                 }
+                hoverActions
+                    .fixedSize()
             }
+            // Tall enough for the action icons, so the card keeps its height when they appear.
+            .frame(minHeight: 22)
             .padding(.horizontal, 12)
             .padding(.top, isPending ? 5 : 7)
             .padding(.bottom, 9)
@@ -1044,6 +1065,9 @@ struct RecordingRow: View {
                         .truncationMode(.tail)
                 }
                 .foregroundColor(recording.wasFallback ? .orange : .secondary)
+                .help(recording.wasFallback
+                      ? "Local fallback — the remote server was unreachable"
+                      : "")
             }
         }
         .scaledFont(size: 10, weight: .regular)
@@ -1300,9 +1324,10 @@ struct TranscriptionView: View {
                         }
                         .buttonStyle(.plain)
                     } else {
+                        // No "Show more" below 150 characters, so no line limit either: a short
+                        // text that needs a third line in a narrow pane would be cut for good.
                         highlightedText
                             .scaledFont(size: 13, weight: .regular)
-                            .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
                     }
@@ -1473,48 +1498,10 @@ struct MainRecordButton: View {
 }
 
 enum ThemePalette {
-    static func windowBackground(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(NSColor.underPageBackgroundColor)
-            : .white
-    }
-
-    static func panelSurface(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color.gray.opacity(0.1)
-            : Color(red: 0.95, green: 0.96, blue: 0.98)
-    }
-
-    static func panelBorder(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color.gray.opacity(0.2)
-            : Color(red: 0.86, green: 0.88, blue: 0.92)
-    }
-
-    static func cardBackground(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(NSColor.controlBackgroundColor)
-            : Color.white
-    }
-
-    static func cardBorder(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(NSColor.separatorColor)
-            : Color(red: 0.86, green: 0.88, blue: 0.92)
-    }
-
     static func recordButtonBase(_ scheme: ColorScheme) -> Color {
         scheme == .dark
             ? .white
             : Color(red: 0.35, green: 0.60, blue: 0.92)
-    }
-
-    static func iconAccent(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? .accentColor : .primary
-    }
-
-    static func linkText(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? .blue : .primary
     }
 }
 
