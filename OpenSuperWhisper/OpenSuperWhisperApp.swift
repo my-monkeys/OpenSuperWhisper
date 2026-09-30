@@ -36,9 +36,10 @@ struct OpenSuperWhisperApp: App {
         WindowGroup {
             Group {
                 if !appState.hasCompletedOnboarding {
+                    // The window opens at the Settings size and keeps it once onboarding is
+                    // done, so onboarding fills it rather than sitting in a 450 pt column.
                     OnboardingView()
-                        .frame(width: 450)
-                        .frame(minHeight: 400, maxHeight: 900)
+                        .frame(minWidth: 450, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
                 } else {
                     SettingsView()
                 }
@@ -56,24 +57,18 @@ struct OpenSuperWhisperApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .appSettings) {
-                // The primary window IS the settings UI now — just bring it forward
+                // The window is the settings UI too: bring it forward on a settings pane
                 // (showMainWindow also re-creates the window if macOS dropped it).
                 Button("Settings...") {
                     if let delegate = NSApplication.shared.delegate as? AppDelegate {
                         delegate.showMainWindow()
                     }
+                    NotificationCenter.default.post(name: .showSettingsPane, object: nil)
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
         .handlesExternalEvents(matching: Set(arrayLiteral: "openMainWindow"))
-
-        // Dedicated, movable & closable settings window (sidebar layout).
-        Window("Settings", id: "settings") {
-            SettingsView()
-        }
-        .windowResizability(.contentMinSize)
-        .defaultSize(width: 780, height: 600)
     }
 
     init() {
@@ -120,7 +115,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     /// The app's own window, looked up rather than remembered: SwiftUI creates it after
     /// `applicationDidFinishLaunching` has run, and owns it from then on.
     private var mainWindow: NSWindow? {
-        NSApplication.shared.windows.first { $0.styleMask.contains(.titled) && $0.title != "Settings" }
+        NSApplication.shared.windows.first { $0.styleMask.contains(.titled) }
     }
     private var languageSubmenu: NSMenu?
     private var modelSubmenu: NSMenu?
@@ -256,8 +251,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private func updateStatusBarMenu() {
         let menu = NSMenu()
 
-        // "Settings…" (below) is the single open-GUI item: the primary window hosts the
-        // settings UI now, so a separate "Open Window" entry would be a duplicate.
+        // One window, two ways in: this one opens on the list, "Settings…" below on the settings.
+        let transcriptionsItem = NSMenuItem(title: NSLocalizedString("Transcriptions", comment: ""),
+                                            action: #selector(openTranscriptions), keyEquivalent: "o")
+        transcriptionsItem.target = self   // without a target macOS disables the item
+        menu.addItem(transcriptionsItem)
 
         let transcriptionLanguageItem = NSMenuItem(title: NSLocalizedString("Language", comment: ""), action: nil, keyEquivalent: "")
         languageSubmenu = NSMenu()
@@ -387,8 +385,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         // No "," keyEquivalent: it makes macOS treat this as the standard Settings
         // command and auto-adds a gear icon, which the other plain items don't have.
-        // ⌘O (the old "Open Window" shortcut) rides on it now that the two merged.
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "o")
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
         settingsItem.target = self
         settingsItem.image = nil
         menu.addItem(settingsItem)
@@ -593,8 +590,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     }
     
     @objc private func openSettings() {
-        // No .openSettings post here: the embedded view would spawn a second window.
         showMainWindow()
+        NotificationCenter.default.post(name: .showSettingsPane, object: nil)
+    }
+
+    @objc private func openTranscriptions() {
+        showMainWindow()
+        NotificationCenter.default.post(name: .showTranscriptions, object: nil)
     }
 
     @objc private func quitApp() {
