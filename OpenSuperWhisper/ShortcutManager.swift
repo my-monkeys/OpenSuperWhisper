@@ -22,6 +22,8 @@ extension KeyboardShortcuts.Name {
     /// number of triggers is: the combinations themselves live in `recordingTriggers`, and
     /// these slots are only how the library is told about them. (#48)
     static func recordTriggerSlot(_ index: Int) -> Self { Self("recordTriggerSlot\(index)") }
+    /// The same, for combinations in the hold-only list.
+    static func holdTriggerSlot(_ index: Int) -> Self { Self("holdTriggerSlot\(index)") }
     /// Slots are cleared up to this index when the list shrinks, so a removed combination
     /// can't stay bound. Well above any realistic number of triggers.
     static let recordTriggerSlotLimit = 16
@@ -170,6 +172,9 @@ class ShortcutManager {
             let slot = KeyboardShortcuts.Name.recordTriggerSlot(index)
             KeyboardShortcuts.onKeyDown(for: slot) { [weak self] in self?.handleKeyDown() }
             KeyboardShortcuts.onKeyUp(for: slot) { [weak self] in self?.handleKeyUp() }
+            let holdSlot = KeyboardShortcuts.Name.holdTriggerSlot(index)
+            KeyboardShortcuts.onKeyDown(for: holdSlot) { [weak self] in self?.handleKeyDown(holdOnly: true) }
+            KeyboardShortcuts.onKeyUp(for: holdSlot) { [weak self] in self?.handleKeyUp(holdOnly: true) }
         }
 
         // Ends the running take and submits it. Works alongside every trigger mode, since it is
@@ -202,6 +207,7 @@ class ShortcutManager {
     
     private func setupRecordingTrigger() {
         let set = RecordingTriggerSet.load(from: AppPreferences.shared.recordingTriggers)
+        let holdSet = RecordingTriggerSet.load(from: AppPreferences.shared.holdRecordingTriggers)
         // Optional second bindings that dictate and then submit. Separate from the trigger list:
         // they end a take rather than starting one. (#50)
         let submitButton = MouseButton(rawValue: AppPreferences.shared.submitMouseButtonHotkey) ?? .none
@@ -210,45 +216,46 @@ class ShortcutManager {
         ModifierKeyMonitor.shared.stop()
         MouseButtonMonitor.shared.stop()
 
-        let mouseButtons = set.mouseButtons + (submitButton == .none ? [] : [submitButton])
+        let mouseButtons = set.mouseButtons + holdSet.mouseButtons + (submitButton == .none ? [] : [submitButton])
         if !mouseButtons.isEmpty {
             MouseButtonMonitor.shared.onButtonDown = { [weak self] button in
                 guard let self else { return }
                 if submitButton != .none, button == submitButton {
                     self.handleSubmitKey()
                 } else {
-                    self.handleKeyDown()
+                    self.handleKeyDown(holdOnly: holdSet.mouseButtons.contains(button))
                 }
             }
             MouseButtonMonitor.shared.onButtonUp = { [weak self] button in
                 guard submitButton == .none || button != submitButton else { return }
-                self?.handleKeyUp()
+                self?.handleKeyUp(holdOnly: holdSet.mouseButtons.contains(button))
             }
             MouseButtonMonitor.shared.start(mouseButtons: mouseButtons)
         }
 
-        let modifiers = set.modifiers + (submitModifier == .none ? [] : [submitModifier])
+        let modifiers = set.modifiers + holdSet.modifiers + (submitModifier == .none ? [] : [submitModifier])
         if !modifiers.isEmpty {
             ModifierKeyMonitor.shared.onKeyDown = { [weak self] key in
                 guard let self else { return }
                 if submitModifier != .none, key == submitModifier {
                     self.handleSubmitKey()
                 } else {
-                    self.handleKeyDown()
+                    self.handleKeyDown(holdOnly: holdSet.modifiers.contains(key))
                 }
             }
             ModifierKeyMonitor.shared.onKeyUp = { [weak self] key in
                 guard submitModifier == .none || key != submitModifier else { return }
-                self?.handleKeyUp()
+                self?.handleKeyUp(holdOnly: holdSet.modifiers.contains(key))
             }
             ModifierKeyMonitor.shared.start(modifierKeys: modifiers)
         }
 
-        bindKeyComboSlots(set.keyCombos)
+        bindKeyComboSlots(set.keyCombos, to: KeyboardShortcuts.Name.recordTriggerSlot)
+        bindKeyComboSlots(holdSet.keyCombos, to: KeyboardShortcuts.Name.holdTriggerSlot)
 
-        useMouseButtonHotkey = !set.mouseButtons.isEmpty
-        useModifierOnlyHotkey = !set.modifiers.isEmpty
-        print("ShortcutManager: \(set.triggers.count) recording trigger(s) armed")
+        useMouseButtonHotkey = !set.mouseButtons.isEmpty || !holdSet.mouseButtons.isEmpty
+        useModifierOnlyHotkey = !set.modifiers.isEmpty || !holdSet.modifiers.isEmpty
+        print("ShortcutManager: \(set.triggers.count) recording trigger(s), \(holdSet.triggers.count) hold-only, armed")
     }
 
     /// Points one library slot at each recorded combination and clears the rest, so removing a
@@ -259,9 +266,10 @@ class ShortcutManager {
     /// every settings change stacked duplicates, and one key press then ran the toggle twice —
     /// starting a recording and immediately ending it, which looked like the mic firing with no
     /// indicator.
-    private func bindKeyComboSlots(_ combos: [KeyboardShortcuts.Shortcut]) {
+    private func bindKeyComboSlots(_ combos: [KeyboardShortcuts.Shortcut],
+                                   to slotName: (Int) -> KeyboardShortcuts.Name) {
         for index in 0..<KeyboardShortcuts.Name.recordTriggerSlotLimit {
-            let slot = KeyboardShortcuts.Name.recordTriggerSlot(index)
+            let slot = slotName(index)
             if index < combos.count {
                 KeyboardShortcuts.setShortcut(combos[index], for: slot)
                 KeyboardShortcuts.enable(slot)
@@ -289,7 +297,9 @@ class ShortcutManager {
         }
     }
 
-    private func handleKeyDown() {
+    /// `holdOnly` is for the hold-only triggers: the recording lasts exactly as long as the key
+    /// is down, with no tap-to-toggle window, whatever `holdToRecord` says.
+    private func handleKeyDown(holdOnly: Bool = false) {
         holdWorkItem?.cancel()
         holdMode = false
 
@@ -299,6 +309,7 @@ class ShortcutManager {
         lastKeyDownTime = now
 
         let holdToRecordEnabled = AppPreferences.shared.holdToRecord
+        if holdOnly { holdMode = true }
 
         Task { @MainActor in
             if self.activeVm == nil {
@@ -324,18 +335,22 @@ class ShortcutManager {
                 // than immediately stopping it — the same gesture as Space, without leaving the
                 // trigger key.
                 self.enterLatch()
-            } else if !self.holdMode {
+            } else if !self.holdMode || self.latched {
+                // A latched recording no longer follows the held key, so pressing a hold trigger
+                // again stops it, same as a toggle.
+                //
                 // Paired with "keyDown → start recording": a stop that is missing from the log
                 // never reached the app, which is a different bug from one that reached it and
                 // did nothing.
                 Diag.mark("keyDown → stop recording")
                 IndicatorWindowManager.shared.stopRecording()
                 self.activeVm = nil
+                self.holdMode = false
                 LatchKeyMonitor.shared.stop()
             }
         }
         
-        if holdToRecordEnabled {
+        if holdToRecordEnabled && !holdOnly {
             let workItem = DispatchWorkItem { [weak self] in
                 self?.holdMode = true
             }
@@ -344,11 +359,11 @@ class ShortcutManager {
         }
     }
     
-    private func handleKeyUp() {
+    private func handleKeyUp(holdOnly: Bool = false) {
         holdWorkItem?.cancel()
         holdWorkItem = nil
         
-        let holdToRecordEnabled = AppPreferences.shared.holdToRecord
+        let holdToRecordEnabled = AppPreferences.shared.holdToRecord || holdOnly
         
         Task { @MainActor in
             // A latched recording ignores the trigger key coming back up — that is the whole point

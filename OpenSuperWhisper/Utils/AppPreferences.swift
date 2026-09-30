@@ -45,7 +45,8 @@ final class AppPreferences {
     /// that reached that state before the editor prevented it get the submit binding cleared,
     /// since the trigger list is the one the user sees as a list. (#48)
     private func resolveTriggerConflicts() {
-        let set = RecordingTriggerSet.load(from: recordingTriggers)
+        var set = RecordingTriggerSet.load(from: recordingTriggers)
+        RecordingTriggerSet.load(from: holdRecordingTriggers).triggers.forEach { set.add($0) }
         let clash = set.conflicts(
             modifier: ModifierKey(rawValue: submitModifierOnlyHotkey) ?? .none,
             mouse: MouseButton(rawValue: submitMouseButtonHotkey) ?? .none)
@@ -302,6 +303,8 @@ final class AppPreferences {
     @UserDefault(key: "debugMode", defaultValue: false)
     var debugMode: Bool
     
+    /// Chime at the start and at the end of a take. The key predates the end chime and stays
+    /// as it is so the setting carries over.
     @UserDefault(key: "playSoundOnRecordStart", defaultValue: false)
     var playSoundOnRecordStart: Bool
 
@@ -348,6 +351,11 @@ final class AppPreferences {
     /// `migrateRecordingTriggers()` builds it from the three single-slot preferences. (#48)
     @UserDefault(key: "recordingTriggers", defaultValue: "")
     var recordingTriggers: String
+
+    /// Triggers that always record only while held, whatever `holdToRecord` says: press to
+    /// start, release to stop. Same JSON shape as `recordingTriggers`, and no key is in both.
+    @UserDefault(key: "holdRecordingTriggers", defaultValue: "")
+    var holdRecordingTriggers: String
 
     /// Single modifier for the same dictate-and-submit action. (#50)
     @UserDefault(key: "submitModifierOnlyHotkey", defaultValue: "none")

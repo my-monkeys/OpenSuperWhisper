@@ -189,6 +189,22 @@ final class RecordingTriggerSetTests: XCTestCase {
         XCTAssertEqual(set.triggers.count, 1)
     }
 
+    /// Moving a key into the hold-only list takes it out of the regular one, so one key never
+    /// means both "toggle" and "hold".
+    func testRemovingTakesTheTriggerOutOfStoredJSON() {
+        var set = RecordingTriggerSet.empty
+        set.add(.modifier(.rightOption))
+        set.add(.mouse(.button4))
+        let json = RecordingTriggerSet.removing(.modifier(.rightOption), from: set.json)
+        XCTAssertEqual(RecordingTriggerSet.load(from: json).triggers, [.mouse(.button4)])
+    }
+
+    /// A list without the trigger comes back byte-for-byte, so an untouched preference is never
+    /// rewritten (an empty, never-set list stays empty rather than becoming "[]").
+    func testRemovingLeavesAnUnrelatedListAlone() {
+        XCTAssertEqual(RecordingTriggerSet.removing(.modifier(.rightOption), from: ""), "")
+    }
+
     func testEmptyTriggerIsNeverStored() {
         var set = RecordingTriggerSet.empty
         set.add(.none)

@@ -88,13 +88,19 @@ class FluidAudioEngine: TranscriptionEngine {
         //    place FluidAudio 0.15.4 exposes decoder boosting. We feed the WAV through it
         //    rather than the mic (see `transcribeFileWithBoosting`).
         let boostTerms = activeBoostTerms()
+        let mixedSamples = try await Self.mixedSamplesIfMultiChannel(url: url)
         let rawText: String
         if boostTerms.isEmpty {
             // A fresh TDT decoder state per file keeps transcriptions independent.
             var decoderState = TdtDecoderState.make(decoderLayers: await asrManager.decoderLayerCount)
-            rawText = try await asrManager.transcribe(url, decoderState: &decoderState).text
+            if let mixedSamples {
+                rawText = try await asrManager.transcribe(mixedSamples, decoderState: &decoderState).text
+            } else {
+                rawText = try await asrManager.transcribe(url, decoderState: &decoderState).text
+            }
         } else {
-            rawText = try await transcribeFileWithBoosting(url: url, boostTerms: boostTerms)
+            rawText = try await transcribeFileWithBoosting(
+                url: url, mixedSamples: mixedSamples, boostTerms: boostTerms)
         }
 
         guard !isCancelled else {
@@ -143,7 +149,8 @@ class FluidAudioEngine: TranscriptionEngine {
     /// The audio comes entirely from `streamAudio(_:)` (the WAV read into one buffer, then sliced),
     /// never a microphone — `startStreaming(source:)` only records the source as metadata and opens
     /// no input device. `finish()` returns the merged transcript.
-    private func transcribeFileWithBoosting(url: URL, boostTerms: [String]) async throws -> String {
+    private func transcribeFileWithBoosting(url: URL, mixedSamples: [Float]?,
+                                            boostTerms: [String]) async throws -> String {
         let versionString = AppPreferences.shared.fluidAudioModelVersion
         let version: AsrModelVersion = versionString == "v2" ? .v2 : .v3
         let models = try await AsrModels.downloadAndLoad(version: version)
@@ -153,16 +160,11 @@ class FluidAudioEngine: TranscriptionEngine {
         try await manager.loadModels(models)
         try await manager.startStreaming(source: .system)
 
-        let audioFile = try AVAudioFile(forReading: url)
-        let format = audioFile.processingFormat
-        let frameCount = AVAudioFrameCount(audioFile.length)
-        guard frameCount > 0,
-            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)
-        else {
+        guard let buffer = try mixedSamples.map(Self.monoBuffer) ?? Self.readWholeFile(url) else {
             await manager.cancel()
             return ""
         }
-        try audioFile.read(into: buffer)
+        let format = buffer.format
 
         // Feed in window-sized chunks (the manager re-buffers internally for its sliding window).
         let samplesPerChunk = Int(SlidingWindowAsrConfig.default.chunkSeconds * format.sampleRate)
@@ -188,6 +190,39 @@ class FluidAudioEngine: TranscriptionEngine {
         }
 
         return try await manager.finish()
+    }
+
+    /// The recorder writes every input channel of the device. FluidAudio downmixes such a file
+    /// with AVAudioConverter, which turns speech carried by one of several unlabeled channels
+    /// into silence, so a multi-channel file goes through the active-channel mix instead.
+    /// Mono files keep FluidAudio's own reader.
+    private static func mixedSamplesIfMultiChannel(url: URL) async throws -> [Float]? {
+        guard try AVAudioFile(forReading: url).processingFormat.channelCount > 1 else { return nil }
+        guard let samples = try await AudioPCMConverter.convertAudioToPCM(fileURL: url) else {
+            throw TranscriptionError.audioConversionFailed
+        }
+        return samples
+    }
+
+    private static func monoBuffer(_ samples: [Float]) -> AVAudioPCMBuffer? {
+        guard !samples.isEmpty,
+              let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000,
+                                         channels: 1, interleaved: false),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))
+        else { return nil }
+        samples.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        return buffer
+    }
+
+    private static func readWholeFile(_ url: URL) throws -> AVAudioPCMBuffer? {
+        let audioFile = try AVAudioFile(forReading: url)
+        let frameCount = AVAudioFrameCount(audioFile.length)
+        guard frameCount > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: frameCount)
+        else { return nil }
+        try audioFile.read(into: buffer)
+        return buffer
     }
 
     /// Configures vocabulary boosting on a `SlidingWindowAsrManager` from the dictionary terms,

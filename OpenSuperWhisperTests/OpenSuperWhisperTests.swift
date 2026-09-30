@@ -27,8 +27,7 @@ final class OpenSuperWhisperTests: XCTestCase {
 
 final class WhisperEngineMultiChannelTests: XCTestCase {
     func testMakeTargetFormat_withSixChannels_returnsFormat() {
-        let engine = WhisperEngine()
-        let format = engine.makeTargetFormat(channelCount: 6)
+        let format = AudioPCMConverter.makeTargetFormat(channelCount: 6)
         
         XCTAssertNotNil(format)
         XCTAssertEqual(format?.channelCount, 6)
@@ -36,8 +35,7 @@ final class WhisperEngineMultiChannelTests: XCTestCase {
     }
     
     func testMakeTargetFormat_withZeroChannels_returnsNil() {
-        let engine = WhisperEngine()
-        XCTAssertNil(engine.makeTargetFormat(channelCount: 0))
+        XCTAssertNil(AudioPCMConverter.makeTargetFormat(channelCount: 0))
     }
 }
 

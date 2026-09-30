@@ -2780,6 +2780,22 @@ struct SettingsView: View {
                         .padding(.top, 2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Hold-to-record triggers")
+                        .scaledFont(size: 13)
+                        .foregroundColor(STheme.text)
+                    Text("These record only while held and stop when released, whatever the Hold to record setting says. Pair a toggle shortcut above with a held key here, like Right ⌥ Option.")
+                        .scaledFont(size: 11)
+                        .foregroundColor(STheme.hint)
+                        .fixedSize(horizontal: false, vertical: true)
+                    TriggerRecorderField(name: .toggleRecord,
+                                         mouseButton: $viewModel.mouseButtonHotkey,
+                                         modifierKey: $viewModel.modifierOnlyHotkey,
+                                         allowsMultiple: true,
+                                         holdOnly: true)
+                        .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 SRow(title: "Latch with Space",
                      hint: "While recording, Space (or a double-tap of the trigger) pins it so you can let go and keep talking. Space again stops it — so Space won't type into other apps during a recording") {
                     SToggle(isOn: $viewModel.latchRecordingWithSpace)
@@ -2829,13 +2845,13 @@ struct SettingsView: View {
                      hint: "Skip the double-Esc confirmation for recordings longer than 10 seconds") {
                     SToggle(isOn: $viewModel.escCancelWithoutConfirmation)
                 }
-                SRow(title: "Hold to record", hint: "Hold the shortcut to record, release to stop") {
+                SRow(title: "Hold to record", hint: "For the recording triggers: tap to toggle, or hold to record and release to stop") {
                     SToggle(isOn: $viewModel.holdToRecord)
                 }
             }
 
             SSection(title: "While recording") {
-                SRow(title: "Play sound when recording starts",
+                SRow(title: "Play sound when recording starts and stops",
                      hint: "Also plays when a recording is latched hands-free") {
                     SToggle(isOn: $viewModel.playSoundOnRecordStart)
                 }

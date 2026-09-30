@@ -37,7 +37,7 @@ final class SenseVoiceEngine: TranscriptionEngine {
         guard let recognizer else { throw TranscriptionError.contextInitializationFailed }
         isCancelled = false
 
-        let samples = try Self.read16kMonoFloat(url: url)
+        let samples = try await Self.read16kMonoFloat(url: url)
         guard !isCancelled else { throw CancellationError() }
 
         // Decode is synchronous + CPU-bound; this runs off the main thread (queue Task).
@@ -54,8 +54,16 @@ final class SenseVoiceEngine: TranscriptionEngine {
     }
 
     /// Reads any audio file and returns 16 kHz mono float32 samples (SenseVoice's required input).
-    private static func read16kMonoFloat(url: URL) throws -> [Float] {
+    /// A multi-channel file goes through the active-channel mix: AVAudioConverter's downmix
+    /// silences speech carried by one of several unlabeled channels.
+    private static func read16kMonoFloat(url: URL) async throws -> [Float] {
         let file = try AVAudioFile(forReading: url)
+        if file.processingFormat.channelCount > 1 {
+            guard let samples = try await AudioPCMConverter.convertAudioToPCM(fileURL: url) else {
+                throw TranscriptionError.audioConversionFailed
+            }
+            return samples
+        }
         let srcFormat = file.processingFormat
         guard let dstFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000,
                                             channels: 1, interleaved: false),

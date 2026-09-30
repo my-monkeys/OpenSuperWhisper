@@ -334,6 +334,11 @@ class AudioRecorder: NSObject, ObservableObject {
         if case .noAudio = outcome {
             Diag.mark("recorder.stop - no audio captured, clip discarded")
         }
+        // Only a take that goes on to be transcribed gets the end chime: a brushed key stays as
+        // silent as it always was, and a cancel is not a stop.
+        if outcome.url != nil, AppPreferences.shared.playSoundOnRecordStart {
+            playNotificationSound()
+        }
         return outcome
     }
 

@@ -169,7 +169,11 @@ final class AppleSpeechEngine: TranscriptionEngine {
         currentAnalyzer = analyzer
         defer { currentAnalyzer = nil }
 
-        let file = try AVAudioFile(forReading: url)
+        // The analyzer's own downmix silences speech carried by one of several unlabeled
+        // channels, so a multi-channel recording is fed as its active-channel mix.
+        let monoURL = try await AudioPCMConverter.monoFileIfMultiChannel(url)
+        defer { if let monoURL { try? FileManager.default.removeItem(at: monoURL) } }
+        let file = try AVAudioFile(forReading: monoURL ?? url)
 
         // Start draining results before feeding audio — the sequence ends when the
         // analyzer finishes, which is what terminates the collector.

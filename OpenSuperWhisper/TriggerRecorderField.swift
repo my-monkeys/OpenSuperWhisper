@@ -26,6 +26,9 @@ struct TriggerRecorderField: View {
     /// The record trigger keeps a list: any number of combinations, modifiers and buttons, all
     /// live at once (#48). The other actions hold one binding, so recording replaces it.
     var allowsMultiple = false
+    /// The list field for hold-only triggers rather than the regular ones. The two lists never
+    /// share a key: adding one here takes it out of the other.
+    var holdOnly = false
 
     /// Mirrors the stored shortcut. `KeyboardShortcuts.getShortcut` is not something SwiftUI
     /// observes, so reading it straight from the body left a newly recorded combination
@@ -54,12 +57,17 @@ struct TriggerRecorderField: View {
     private func loadShortcut() {
         shortcut = KeyboardShortcuts.getShortcut(for: name)
         if allowsMultiple {
-            set = RecordingTriggerSet.load(from: AppPreferences.shared.recordingTriggers)
+            set = RecordingTriggerSet.load(from: holdOnly ? AppPreferences.shared.holdRecordingTriggers
+                                                          : AppPreferences.shared.recordingTriggers)
         }
     }
 
     private func persistSet() {
-        AppPreferences.shared.recordingTriggers = set.json
+        if holdOnly {
+            AppPreferences.shared.holdRecordingTriggers = set.json
+        } else {
+            AppPreferences.shared.recordingTriggers = set.json
+        }
         NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
     }
 
@@ -145,6 +153,9 @@ struct TriggerRecorderField: View {
         .onHover { isHovering = $0 }
         .pointerCursorOnHover()
         .onAppear { loadShortcut() }
+        .onReceive(NotificationCenter.default.publisher(for: .hotkeySettingsChanged)) { _ in
+            if !isRecording { loadShortcut() }
+        }
         .onDisappear { disarm() }
         .animation(.easeOut(duration: 0.12), value: heldModifiers.rawValue)
         .animation(.easeOut(duration: 0.12), value: isRecording)
@@ -366,6 +377,11 @@ struct TriggerRecorderField: View {
     /// silently, which is exactly how a working modifier looked broken.
     private func releaseFromOtherActions(_ trigger: RecordingTrigger) {
         let prefs = AppPreferences.shared
+        if holdOnly {
+            prefs.recordingTriggers = RecordingTriggerSet.removing(trigger, from: prefs.recordingTriggers)
+        } else {
+            prefs.holdRecordingTriggers = RecordingTriggerSet.removing(trigger, from: prefs.holdRecordingTriggers)
+        }
         switch trigger {
         case .modifier(let key):
             if prefs.submitModifierOnlyHotkey == key.rawValue {
@@ -382,10 +398,9 @@ struct TriggerRecorderField: View {
 
     /// Same rule, applied when a single-binding field claims something the trigger list holds.
     private func takeOverFromRecordingTriggers(_ trigger: RecordingTrigger) {
-        var triggerSet = RecordingTriggerSet.load(from: AppPreferences.shared.recordingTriggers)
-        guard triggerSet.triggers.contains(trigger) else { return }
-        triggerSet.remove(trigger)
-        AppPreferences.shared.recordingTriggers = triggerSet.json
+        let prefs = AppPreferences.shared
+        prefs.recordingTriggers = RecordingTriggerSet.removing(trigger, from: prefs.recordingTriggers)
+        prefs.holdRecordingTriggers = RecordingTriggerSet.removing(trigger, from: prefs.holdRecordingTriggers)
     }
 
     private func clear() {

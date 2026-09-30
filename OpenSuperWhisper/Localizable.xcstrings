@@ -5321,42 +5321,42 @@
         }
       }
     },
-    "Play sound when recording starts": {
+    "Play sound when recording starts and stops": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Émettre un son au démarrage de l'enregistrement"
+            "value": "Émettre un son au début et à la fin de l'enregistrement"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ton beim Start der Aufnahme abspielen"
+            "value": "Ton beim Start und Ende der Aufnahme abspielen"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reproducir un sonido al empezar a grabar"
+            "value": "Reproducir un sonido al empezar y al terminar de grabar"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Riproduci un suono all'avvio della registrazione"
+            "value": "Riproduci un suono all'avvio e alla fine della registrazione"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reproduzir som ao iniciar a gravação"
+            "value": "Reproduzir som ao iniciar e ao terminar a gravação"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Phát âm thanh khi bắt đầu ghi âm"
+            "value": "Phát âm thanh khi bắt đầu và kết thúc ghi âm"
           }
         }
       }

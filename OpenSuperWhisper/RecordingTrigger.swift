@@ -150,6 +150,15 @@ struct RecordingTriggerSet: Equatable, Codable {
         return string
     }
 
+    /// The stored list `json` without `trigger`, returned unchanged when it isn't there so an
+    /// untouched list is never rewritten.
+    static func removing(_ trigger: RecordingTrigger, from json: String) -> String {
+        var set = load(from: json)
+        guard set.triggers.contains(trigger) else { return json }
+        set.remove(trigger)
+        return set.json
+    }
+
     /// Carries the three single-slot preferences into the list, so an existing install keeps
     /// the trigger it had.
     static func migrated(mouseRaw: String, modifierRaw: String,
