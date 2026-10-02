@@ -34,60 +34,71 @@ class FocusUtils {
         return indicatorPosition == "cursor"
     }
 
+    /// Where the indicator should anchor in "cursor" mode, in AX (Quartz) coordinates: the text
+    /// caret when the focused text element reports a believable one, otherwise that element
+    /// itself. nil when nothing with a text selection is focused, or accessibility cannot place
+    /// it, leaving the caller to fall back to the mouse.
     static func getCaretRect() -> CGRect? {
-        // Получаем системный элемент для доступа ко всему UI
         let systemElement = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(systemElement, axMessagingTimeout)
 
-        // Получаем фокусированный элемент
-        var focusedElement: CFTypeRef? // Keep as CFTypeRef? if you prefer
-        let errorFocused = AXUIElementCopyAttributeValue(systemElement,
-                                                         kAXFocusedUIElementAttribute as CFString,
-                                                         &focusedElement)
-        
-        print("errorFocused: \(errorFocused)")
-        guard errorFocused == .success else {
-            print("Не удалось получить фокусированный элемент")
-            return nil
-        }
-        
-        guard let focusedElementCF = focusedElement else { // Optional binding to safely unwrap CFTypeRef
-            print("Не удалось получить фокусированный элемент (CFTypeRef is nil)") // Extra safety check, though unlikely
-            return nil
-        }
-        
-        let element = focusedElementCF as! AXUIElement
+        var focused: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemElement,
+                                            kAXFocusedUIElementAttribute as CFString,
+                                            &focused) == .success,
+              let focused else { return nil }
+
+        let element = focused as! AXUIElement
         AXUIElementSetMessagingTimeout(element, axMessagingTimeout)
-        // Получаем выделенный текстовый диапазон у фокусированного элемента
-        var selectedTextRange: AnyObject?
-        let errorRange = AXUIElementCopyAttributeValue(element,
-                                                       kAXSelectedTextRangeAttribute as CFString,
-                                                       &selectedTextRange)
-        guard errorRange == .success,
-              let textRange = selectedTextRange
-        else {
-            print("Не удалось получить диапазон выделенного текста")
-            return nil
-        }
-        
-        // Используем параметризованный атрибут для получения границ диапазона (положение каретки)
-        var caretBounds: CFTypeRef?
-        let errorBounds = AXUIElementCopyParameterizedAttributeValue(element,
-                                                                     kAXBoundsForRangeParameterizedAttribute as CFString,
-                                                                     textRange,
-                                                                     &caretBounds)
-        
-        print("errorbounds: \(errorBounds), caretBounds \(String(describing: caretBounds))")
-        guard errorBounds == .success else {
-            print("Не удалось получить границы каретки")
-            return nil
-        }
-        
-        let rect = caretBounds as! AXValue
-        
-        return rect.toCGRect()
+
+        // Only a text element has a caret to follow. Without a selection range this is a button,
+        // a web area or the like, and its frame says nothing about where the user is typing.
+        var range: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element,
+                                            kAXSelectedTextRangeAttribute as CFString,
+                                            &range) == .success,
+              let range else { return nil }
+
+        return caretAnchorRect(caret: bounds(of: range, in: element), element: frame(of: element))
     }
-    
+
+    /// Chooses between what the focused element says about its caret and its own frame.
+    ///
+    /// A successful bounds query is not a believable one. Chrome's address bar answers with an
+    /// empty rect at the bottom-left corner of the primary display, wherever its window actually
+    /// is, which put the bubble in the corner of a different screen. A real caret has height, so
+    /// one without is discarded in favour of the field. Where a caret with height sits is not
+    /// second-guessed: TextEdit reports a valid one above its text view's own frame. Pure, for
+    /// testing.
+    static func caretAnchorRect(caret: CGRect?, element: CGRect?) -> CGRect? {
+        if let caret, caret.height > 0 { return caret }
+        return element.flatMap { $0.width > 0 && $0.height > 0 ? $0 : nil }
+    }
+
+    private static func bounds(of range: CFTypeRef, in element: AXUIElement) -> CGRect? {
+        var bounds: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element,
+                                                         kAXBoundsForRangeParameterizedAttribute as CFString,
+                                                         range,
+                                                         &bounds) == .success,
+              let bounds else { return nil }
+        return (bounds as! AXValue).toCGRect()
+    }
+
+    private static func frame(of element: AXUIElement) -> CGRect? {
+        var position: CFTypeRef?
+        var size: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &position) == .success,
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &size) == .success,
+              let position, let size else { return nil }
+
+        var origin = CGPoint.zero
+        var extent = CGSize.zero
+        guard AXValueGetValue(position as! AXValue, .cgPoint, &origin),
+              AXValueGetValue(size as! AXValue, .cgSize, &extent) else { return nil }
+        return CGRect(origin: origin, size: extent)
+    }
+
     /// Converts a point from AX API coordinate system (Quartz: origin at top-left of primary screen, Y increases downward)
     /// to Cocoa coordinate system (origin at bottom-left of primary screen, Y increases upward)
     static func convertAXPointToCocoa(_ axPoint: CGPoint) -> NSPoint {
