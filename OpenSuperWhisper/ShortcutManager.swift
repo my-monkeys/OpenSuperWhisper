@@ -285,10 +285,20 @@ class ShortcutManager {
     /// able to do both made the outcome depend on which one you happened to press first, which
     /// is invisible from the outside. (#50)
     private func handleSubmitKey() {
+        endActiveTake(submit: true)
+    }
+
+    /// The stop phrase was heard at the end of the live transcript: end the take the way the
+    /// trigger would, through here so the hold and latch state is cleared with it. (#145)
+    func endTakeOnStopPhrase() {
+        endActiveTake(submit: AppPreferences.shared.stopPhraseSubmits)
+    }
+
+    private func endActiveTake(submit: Bool) {
         Task { @MainActor in
-            // Nothing to submit: this key has no meaning outside a recording.
+            // Nothing to end: these have no meaning outside a recording.
             guard let vm = self.activeVm else { return }
-            vm.submitAfterInsert = true
+            if submit { vm.submitAfterInsert = true }
             self.holdWorkItem?.cancel()
             self.holdWorkItem = nil
             self.holdMode = false

@@ -50,6 +50,13 @@ class IndicatorViewModel: ObservableObject {
     private var hideTimer: Timer?
     private var confirmCancelTimer: Timer?
     private var liveStreamingActive = false
+    /// Listens to the live caption for the stop phrase while a take records (#145).
+    private var stopPhraseWatch: AnyCancellable?
+    private var stopPhraseFire: DispatchWorkItem?
+    /// How long the phrase has to stay at the end of the caption before the take ends. The
+    /// preview revises its tail as more audio arrives; a phrase that was only a passing guess
+    /// is gone again by then, and one that was really said is still there.
+    static let stopPhraseSettle: TimeInterval = 0.5
     private var cancellables = Set<AnyCancellable>()
     
     private let recordingStore: RecordingStore
@@ -170,12 +177,50 @@ class IndicatorViewModel: ObservableObject {
             Task { @MainActor in
                 do {
                     try await StreamingTranscriptionController.shared.start(boostTerms: terms)
+                    self.watchForStopPhrase()
                 } catch {
                     print("Live streaming start failed: \(error)")
                     self.liveStreamingActive = false
                 }
             }
         }
+    }
+
+    /// Ends the take once the stop phrase sits at the end of the live caption and stays there
+    /// for `stopPhraseSettle`. The stop goes through `ShortcutManager`, like a trigger press.
+    private func watchForStopPhrase() {
+        let phrase = AppPreferences.shared.stopPhrase
+        guard liveStreamingActive,
+              !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let live = StreamingTranscriptionController.shared
+        stopPhraseWatch = live.$confirmedText.combineLatest(live.$volatileText)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                let heard = AppPreferences.parseStopPhrase(live.liveCaption, phrase: phrase).matched
+                guard heard else {
+                    self.stopPhraseFire?.cancel()
+                    self.stopPhraseFire = nil
+                    return
+                }
+                guard self.stopPhraseFire == nil else { return }
+                let fire = DispatchWorkItem { [weak self] in
+                    guard let self, self.liveStreamingActive,
+                          AppPreferences.parseStopPhrase(live.liveCaption, phrase: phrase).matched
+                    else { return }
+                    Diag.mark("stop phrase heard → stop recording")
+                    self.stopWatchingForStopPhrase()
+                    ShortcutManager.shared.endTakeOnStopPhrase()
+                }
+                self.stopPhraseFire = fire
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.stopPhraseSettle, execute: fire)
+            }
+    }
+
+    private func stopWatchingForStopPhrase() {
+        stopPhraseWatch = nil
+        stopPhraseFire?.cancel()
+        stopPhraseFire = nil
     }
 
     /// Decides what an Esc-cancel should do. Returns `true` when the recording
@@ -227,6 +272,7 @@ class IndicatorViewModel: ObservableObject {
         // Grab the live-streaming preview text (if any) BEFORE cancelling the stream, then hand
         // off. A very short clip can come back empty from the offline file pass even when the
         // sliding-window preview caught it — the pipeline uses this as its fallback. (#short-dictation)
+        stopWatchingForStopPhrase()
         var streamedFallback = ""
         if liveStreamingActive {
             liveStreamingActive = false
@@ -329,12 +375,14 @@ class IndicatorViewModel: ObservableObject {
         hideTimer?.invalidate()
         hideTimer = nil
         cancellables.removeAll()
+        stopWatchingForStopPhrase()
     }
 
     func cancelRecording() {
         hideTimer?.invalidate()
         hideTimer = nil
         recorder.cancelRecording()
+        stopWatchingForStopPhrase()
         if liveStreamingActive {
             liveStreamingActive = false
             Task { await StreamingTranscriptionController.shared.cancel() }

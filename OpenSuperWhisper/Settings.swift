@@ -769,6 +769,18 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var stopPhrase: String {
+        didSet {
+            AppPreferences.shared.stopPhrase = stopPhrase
+        }
+    }
+
+    @Published var stopPhraseSubmits: Bool {
+        didSet {
+            AppPreferences.shared.stopPhraseSubmits = stopPhraseSubmits
+        }
+    }
+
     /// App-aware LLM formatting: per-app instructions, keyed by the bundle identifier of the app
     /// dictated into, that reshape the transcription via the same LLM cleanup pass (e.g. "at Rob"
     /// -> "@Rob" in Slack). Independent of `aiPostProcessingEnabled`: either can contribute to one
@@ -960,6 +972,8 @@ class SettingsViewModel: ObservableObject {
         self.pasteInsteadOfTyping = prefs.pasteInsteadOfTyping
         self.notifyWhenNoPasteTarget = prefs.notifyWhenNoPasteTarget
         self.submitOnVoiceCommand = prefs.submitOnVoiceCommand
+        self.stopPhrase = prefs.stopPhrase
+        self.stopPhraseSubmits = prefs.stopPhraseSubmits
         self.appContextFormattingEnabled = prefs.appContextFormattingEnabled
         self.typingPaceMilliseconds = prefs.typingPaceMilliseconds
         self.appInsertionRules = prefs.appInsertionRules
@@ -2914,6 +2928,18 @@ struct SettingsView: View {
                             disabled: viewModel.selectedEngine != "fluidaudio")
                 }
                 .frame(minHeight: 26)
+                if viewModel.liveTranscriptionEnabled && viewModel.selectedEngine == "fluidaudio" {
+                    SRow(title: "Stop phrase",
+                         hint: "Saying it as the last words ends the recording, and it is left out of the text. Empty = off",
+                         indented: true) {
+                        sInput($viewModel.stopPhrase, prompt: "over and out", width: 150)
+                    }
+                    if !viewModel.stopPhrase.trimmingCharacters(in: .whitespaces).isEmpty {
+                        SRow(title: "Press Return after the stop phrase", indented: true) {
+                            SToggle(isOn: $viewModel.stopPhraseSubmits)
+                        }
+                    }
+                }
                 SRow(title: "Pause media during recording",
                      hint: "Resumes what was actually playing when you stop") {
                     SToggle(isOn: $viewModel.pauseMediaOnRecord)

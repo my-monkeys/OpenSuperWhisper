@@ -636,6 +636,40 @@ final class AppPreferences {
         return (String(text[..<range.lowerBound]), true)
     }
 
+    /// Words that end a recording when spoken last, so a take started remotely (a phone Shortcut
+    /// sending the trigger over SSH) needs no second press. Empty = off. It is heard on the live
+    /// transcript, so it only works where live transcription runs (Parakeet). (#145)
+    @UserDefault(key: "stopPhrase", defaultValue: "")
+    var stopPhrase: String
+
+    /// Also press Return when the stop phrase ends a take, like the submit shortcut does. (#145)
+    @UserDefault(key: "stopPhraseSubmits", defaultValue: false)
+    var stopPhraseSubmits: Bool
+
+    /// The dictation with a trailing stop phrase removed. The phrase is a command, not content,
+    /// so it is dropped whichever way the take ended.
+    func stripStopPhrase(_ text: String) -> String {
+        Self.parseStopPhrase(text, phrase: stopPhrase).text
+    }
+
+    /// Pure matching behind `stripStopPhrase` and the live watcher (unit-tested directly). Same
+    /// shape as `parseSubmitCommand`: anchored to the end, case-insensitive, the phrase's words
+    /// separated by any run of spaces or commas, trailing punctuation allowed. The first word
+    /// must start a word, so "over and out" does not match inside "hangover and out".
+    static func parseStopPhrase(_ text: String, phrase: String) -> (text: String, matched: Bool) {
+        let words = phrase
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .map(NSRegularExpression.escapedPattern(for:))
+        guard !words.isEmpty else { return (text, false) }
+        let pattern = "[\\s,]*(?<![\\p{L}\\p{N}])" + words.joined(separator: "[\\s,]+") + "[\\s\\p{P}]*$"
+        guard let range = text.range(
+            of: pattern, options: [.regularExpression, .caseInsensitive]) else {
+            return (text, false)
+        }
+        return (String(text[..<range.lowerBound]), true)
+    }
+
     /// Pause currently-playing media while recording, then resume. Opt-in (default
     /// off): it uses the private MediaRemote API and changes system playback.
     @UserDefault(key: "pauseMediaOnRecord", defaultValue: false)

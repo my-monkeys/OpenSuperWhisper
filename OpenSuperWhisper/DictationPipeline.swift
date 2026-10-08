@@ -190,21 +190,24 @@ final class DictationPipeline: ObservableObject {
 
             let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
             let wasFallback = transcriptionService.lastUsedFallback
-            var text = AppPreferences.shared.cleanTranscription(rawText)
+            // The stop phrase goes first, before the dictionary rules can reshape it. (#145)
+            let spokenText = AppPreferences.shared.stripStopPhrase(rawText)
+            var text = AppPreferences.shared.cleanTranscription(spokenText)
             // The engine's own output, before the dictionary rules and any LLM cleanup, kept
             // for the post-record hook. Tracked alongside `text` rather than read from
             // `rawText` at the end, because the short-clip fallback below replaces the basis
             // of the text entirely — handing a hook "No speech detected" for a clip that
             // produced words would be worse than not telling it at all.
-            var engineText = rawText
+            var engineText = spokenText
 
             // File pass found nothing. Fall back to the live preview if it caught the words (short
             // clip); only with neither is it genuinely "no speech" — then drop it (no empty
             // recording) and surface a brief notice. (#short-dictation)
             if text == TranscriptionResult.noSpeech
                 || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let streamed = AppPreferences.shared.stripStopPhrase(item.streamedFallback)
                 let fallback = AppPreferences.shared
-                    .cleanTranscription(item.streamedFallback)
+                    .cleanTranscription(streamed)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !fallback.isEmpty else {
                     discardAudio(item.tempURL)
@@ -212,7 +215,7 @@ final class DictationPipeline: ObservableObject {
                     return
                 }
                 text = fallback
-                engineText = item.streamedFallback
+                engineText = streamed
             }
 
             // Optional LLM cleanup (no-op when disabled; returns the raw text on failure). The
