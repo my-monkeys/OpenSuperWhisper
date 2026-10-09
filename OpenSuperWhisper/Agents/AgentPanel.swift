@@ -20,26 +20,43 @@ final class AgentPanelController {
 
     private var returnMonitor: Any?
 
-    /// While a reply is dictated, Return in the panel stops and sends it, unless the user has
-    /// a stop-and-submit binding of their own, which then does that job alone.
-    func watchReturnKey(_ watching: Bool) {
-        if let returnMonitor { NSEvent.removeMonitor(returnMonitor) }
-        returnMonitor = nil
-        guard watching, AgentShortcutHints.submitKeys() == nil else { return }
+    /// Return in the panel, handled here rather than by the field: a multi-line SwiftUI field
+    /// takes Return for itself and never submits, so pressing it did nothing. Return sends,
+    /// ⇧Return starts a new line. While a reply is dictated, Return stops and sends it, unless
+    /// the user has a stop-and-submit binding of their own, which then does that job alone.
+    private func watchReturnKey() {
+        guard returnMonitor == nil else { return }
         returnMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let isReturn = event.keyCode == 36 || event.keyCode == 76  // Return, keypad Enter
             guard isReturn, event.window is AgentPanel,
-                  let request = AgentInbox.shared.current,
-                  AgentInbox.shared.armedReplyID == request.id else { return event }
-            AgentInbox.shared.stopDictatingAndSend(request)
+                  !event.modifierFlags.contains(.shift),
+                  let request = AgentInbox.shared.current else { return event }
+            let inbox = AgentInbox.shared
+            if inbox.armedReplyID == request.id {
+                guard AgentShortcutHints.submitKeys() == nil else { return event }
+                inbox.stopDictatingAndSend(request)
+            } else {
+                inbox.send(request)
+            }
             return nil
         }
+    }
+
+    private func stopWatchingReturnKey() {
+        if let returnMonitor { NSEvent.removeMonitor(returnMonitor) }
+        returnMonitor = nil
     }
 
     private init() {}
 
     func update(visible: Bool) {
-        if visible { show() } else { hide() }
+        if visible {
+            show()
+            watchReturnKey()
+        } else {
+            hide()
+            stopWatchingReturnKey()
+        }
     }
 
     private func show() {
@@ -535,6 +552,7 @@ struct AgentShortcutHints {
         } else {
             if let trigger { hints.append(.init(keys: trigger, action: "dictate")) }
             hints.append(.init(keys: "⏎", action: "send"))
+            hints.append(.init(keys: "⇧⏎", action: "new line"))
         }
         return hints
     }
