@@ -36,6 +36,7 @@ class OnboardingViewModel: ObservableObject {
             case .rightOption:
                 AppPreferences.shared.modifierOnlyHotkey = ModifierKey.rightOption.rawValue
             }
+            AppPreferences.shared.setRightOptionTrigger(selectedShortcut == .rightOption)
             NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
         }
     }

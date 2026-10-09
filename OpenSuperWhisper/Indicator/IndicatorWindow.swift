@@ -50,6 +50,19 @@ class IndicatorViewModel: ObservableObject {
     private var hideTimer: Timer?
     private var confirmCancelTimer: Timer?
     private var liveStreamingActive = false
+    /// Listens to the live caption for the stop phrase while a take records (#145).
+    private var stopPhraseWatch: AnyCancellable?
+    private var stopPhraseCheck: Timer?
+    /// The phrase ended this take; carried on the queued clip so the text is cut there.
+    private var endedByStopPhrase = false
+    /// Quiet needed after the phrase before the take ends, from Settings. The caption trails
+    /// the voice by about a second, so a phrase can sit at its end while the next words are
+    /// still being spoken; only silence on the microphone says the speaker has really finished.
+    static var stopPhraseSilence: TimeInterval {
+        let range = AppPreferences.stopPhraseSilenceRange
+        let ms = min(max(AppPreferences.shared.stopPhraseSilenceMs, range.lowerBound), range.upperBound)
+        return TimeInterval(ms) / 1000
+    }
     private var cancellables = Set<AnyCancellable>()
     
     private let recordingStore: RecordingStore
@@ -170,12 +183,54 @@ class IndicatorViewModel: ObservableObject {
             Task { @MainActor in
                 do {
                     try await StreamingTranscriptionController.shared.start(boostTerms: terms)
+                    self.watchForStopPhrase()
                 } catch {
                     print("Live streaming start failed: \(error)")
                     self.liveStreamingActive = false
                 }
             }
         }
+    }
+
+    /// Ends the take once the stop phrase sits at the end of the live caption and the
+    /// microphone has been quiet for `stopPhraseSilence`. The stop goes through
+    /// `ShortcutManager`, like a trigger press.
+    private func watchForStopPhrase() {
+        let phrase = AppPreferences.shared.stopPhrase
+        guard liveStreamingActive,
+              !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        endedByStopPhrase = false
+        let live = StreamingTranscriptionController.shared
+        stopPhraseWatch = live.$confirmedText.combineLatest(live.$volatileText)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard AppPreferences.parseStopPhrase(live.liveCaption, phrase: phrase).matched else {
+                    self.stopPhraseCheck?.invalidate()
+                    self.stopPhraseCheck = nil
+                    return
+                }
+                guard self.stopPhraseCheck == nil else { return }
+                self.stopPhraseCheck = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+                    Task { @MainActor in self?.checkStopPhraseSilence() }
+                }
+            }
+    }
+
+    private func checkStopPhraseSilence() {
+        guard liveStreamingActive,
+              StreamingTranscriptionController.shared.voiceActivity.silenceDuration >= Self.stopPhraseSilence
+        else { return }
+        Diag.mark("stop phrase heard, then silence → stop recording")
+        stopWatchingForStopPhrase()
+        endedByStopPhrase = true
+        ShortcutManager.shared.endTakeOnStopPhrase()
+    }
+
+    private func stopWatchingForStopPhrase() {
+        stopPhraseWatch = nil
+        stopPhraseCheck?.invalidate()
+        stopPhraseCheck = nil
     }
 
     /// Decides what an Esc-cancel should do. Returns `true` when the recording
@@ -227,6 +282,7 @@ class IndicatorViewModel: ObservableObject {
         // Grab the live-streaming preview text (if any) BEFORE cancelling the stream, then hand
         // off. A very short clip can come back empty from the offline file pass even when the
         // sliding-window preview caught it — the pipeline uses this as its fallback. (#short-dictation)
+        stopWatchingForStopPhrase()
         var streamedFallback = ""
         if liveStreamingActive {
             liveStreamingActive = false
@@ -282,7 +338,9 @@ class IndicatorViewModel: ObservableObject {
             streamedFallback: streamedFallback,
             context: snapshot,
             modelOption: modelOption,
-            submitAfterInsert: submitAfterInsert)
+            submitAfterInsert: submitAfterInsert,
+            endedByStopPhrase: endedByStopPhrase)
+        endedByStopPhrase = false
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.
         delegate?.didFinishDecoding()
@@ -329,12 +387,14 @@ class IndicatorViewModel: ObservableObject {
         hideTimer?.invalidate()
         hideTimer = nil
         cancellables.removeAll()
+        stopWatchingForStopPhrase()
     }
 
     func cancelRecording() {
         hideTimer?.invalidate()
         hideTimer = nil
         recorder.cancelRecording()
+        stopWatchingForStopPhrase()
         if liveStreamingActive {
             liveStreamingActive = false
             Task { await StreamingTranscriptionController.shared.cancel() }
