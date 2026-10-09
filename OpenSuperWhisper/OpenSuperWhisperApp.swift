@@ -154,6 +154,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         OpenSuperWhisperApp.startTranscriptionQueue()
         OpenSuperWhisperApp.startRetentionScheduler()
+        AgentBridge.registerRunningApp()
+        AgentInbox.shared.start()
         observeMicrophoneChanges()
 
         // The Apple Speech locale lists are async-only; refresh the sync caches the

@@ -28,7 +28,13 @@ class IndicatorWindowManager: IndicatorViewDelegate {
 
     private init() {}
     
+    /// Set for a recording started from the agent panel, which shows its own controls: the
+    /// bubble is set up as usual, but kept off screen. Read once, by the next `show`.
+    var hideNextBubble = false
+
     func show(nearPoint point: NSPoint? = nil) -> IndicatorViewModel {
+        let offScreen = hideNextBubble
+        hideNextBubble = false
         
         KeyboardShortcuts.enable(.escape)
 
@@ -186,7 +192,7 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         window?.level = .screenSaver
         window?.collectionBehavior = [.fullScreenAuxiliary, .stationary, .canJoinAllSpaces, .ignoresCycle]
 
-        window?.orderFront(nil)
+        if !offScreen { window?.orderFront(nil) }
         return newViewModel
     }
 

@@ -1,0 +1,11 @@
+{
+  "name": "opensuperwhisper",
+  "owner": { "name": "My-Monkey", "url": "https://github.com/my-monkeys" },
+  "plugins": [
+    {
+      "name": "opensuperwhisper",
+      "source": "./integrations/claude-code/plugin",
+      "description": "Answer Claude Code by voice from OpenSuperWhisper when it finishes a task."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Hands a Claude Code hook to the running OpenSuperWhisper app. The app writes where its binary
+# is and its pid at launch; with no live app this exits at once and Claude Code carries on as if
+# the plugin were not installed.
+dir="$HOME/Library/Application Support/fr.my-monkey.opensuperwhisper/agents"
+pid=$(cat "$dir/app.pid" 2>/dev/null) || exit 0
+kill -0 "$pid" 2>/dev/null || exit 0
+exe=$(cat "$dir/app.executable" 2>/dev/null) || exit 0
+[ -x "$exe" ] || exit 0
+exec "$exe" agent-hook "$@"

@@ -29,7 +29,7 @@ enum CLI {
     /// Returns true if these arguments are a CLI invocation (and the GUI should not launch).
     static func shouldHandle(_ args: [String]) -> Bool {
         guard args.count >= 2 else { return false }
-        return (["transcribe", "bench", "--help", "-h"] + debugModes).contains(args[1])
+        return (["transcribe", "bench", "agent-hook", "--help", "-h"] + debugModes).contains(args[1])
     }
 
     /// The Liquid Glass probes (screenshots, synthetic clicks, the user's real indicator): Debug
@@ -45,6 +45,8 @@ enum CLI {
             print(usage); exit(0)
         }
         let mode = args[1]
+        // Run by the Claude Code plugin on every hook, so it answers before anything heavier.
+        if mode == "agent-hook" { AgentHookCommand.run(args) }
         #if DEBUG && canImport(FoundationModels)
         if mode == "gallery" {
             MainActor.assumeIsolated {

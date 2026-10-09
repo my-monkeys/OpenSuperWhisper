@@ -688,6 +688,49 @@ final class AppPreferences {
     var stopPhraseSilenceMs: Int
     static let stopPhraseSilenceRange = 300...3000
 
+    /// Answer coding agents from OpenSuperWhisper when their plugin is installed. Off, the
+    /// plugin's hook exits at once and the agent waits in its terminal as usual.
+    @UserDefault(key: "agentsEnabled", defaultValue: true)
+    var agentsEnabled: Bool
+
+    /// Which moments bring the panel up. Each off, that hook hands straight back to the terminal.
+    @UserDefault(key: "agentAskOnStop", defaultValue: true)
+    var agentAskOnStop: Bool
+    @UserDefault(key: "agentAskOnPermission", defaultValue: true)
+    var agentAskOnPermission: Bool
+    @UserDefault(key: "agentAskOnQuestion", defaultValue: true)
+    var agentAskOnQuestion: Bool
+
+    /// How long the panel waits for an answer before handing the agent back to its terminal.
+    /// Claude Code kills the hook at 600 s, so this stays under it.
+    @UserDefault(key: "agentWaitSeconds", defaultValue: 300)
+    var agentWaitSeconds: Int
+    static let agentWaitChoices = [60, 120, 300, 590]
+
+    /// Projects whose agents always use their terminal, by folder path. A subfolder counts.
+    @UserDefault(key: "agentDisabledProjects", defaultValue: [String]())
+    var agentDisabledProjects: [String]
+    /// The folders agents have asked from, newest first, for the Agents pane to list.
+    @UserDefault(key: "agentRecentProjects", defaultValue: [String]())
+    var agentRecentProjects: [String]
+    static let agentRecentProjectLimit = 20
+
+    func rememberAgentProject(_ path: String) {
+        guard !path.isEmpty else { return }
+        agentRecentProjects = Array(([path] + agentRecentProjects.filter { $0 != path })
+            .prefix(Self.agentRecentProjectLimit))
+    }
+
+    func agentProjectEnabled(_ path: String) -> Bool {
+        !agentDisabledProjects.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
+    func setAgentProject(_ path: String, enabled: Bool) {
+        var disabled = agentDisabledProjects.filter { $0 != path }
+        if !enabled { disabled.append(path) }
+        agentDisabledProjects = disabled
+    }
+
     /// The dictation with a trailing stop phrase removed. The phrase is a command, not content,
     /// so it is dropped whichever way the take ended. `cutAtLast` is for a take the phrase
     /// ended: the recorder runs on a moment after it, so the text is cut at its last

@@ -1,0 +1,8 @@
+{
+  "name": "opensuperwhisper",
+  "version": "0.1.0",
+  "description": "Answer Claude Code by voice from OpenSuperWhisper when it finishes a task.",
+  "author": { "name": "My-Monkey", "url": "https://github.com/my-monkeys" },
+  "homepage": "https://opensuperwhisper.com",
+  "license": "MIT"
+}
