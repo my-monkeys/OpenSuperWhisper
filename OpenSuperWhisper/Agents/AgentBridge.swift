@@ -61,6 +61,10 @@ struct AgentRequest: Codable, Identifiable, Equatable {
     enum Kind: String, Codable {
         /// The agent finished its turn; the answer becomes its next instruction.
         case stop
+        /// The agent wants to run a tool it needs permission for.
+        case permission
+        /// The agent asked a multiple-choice question (its AskUserQuestion tool).
+        case question
     }
 
     let id: String
@@ -80,6 +84,11 @@ struct AgentRequest: Codable, Identifiable, Equatable {
     let expiresAt: Date
     /// The waiting hook. A dead one means Claude Code cancelled it (Esc, or its own timeout).
     let hookPID: Int32
+    /// For a permission: the tool, and what it would do (the command, the file, the URL).
+    var tool: String? = nil
+    var toolDetail: String? = nil
+    /// For a question: what the agent asked, in its order.
+    var questions: [AgentQuestion]? = nil
 
     var projectName: String { URL(fileURLWithPath: cwd).lastPathComponent }
 
@@ -89,21 +98,42 @@ struct AgentRequest: Codable, Identifiable, Equatable {
     }
 }
 
+/// One question from the agent's AskUserQuestion tool.
+struct AgentQuestion: Codable, Equatable {
+    struct Option: Codable, Equatable {
+        let label: String
+        var description: String? = nil
+    }
+
+    let question: String
+    var header: String? = nil
+    let options: [Option]
+    var multiSelect: Bool = false
+}
+
 /// The user's answer to one request.
 struct AgentResponse: Codable, Equatable {
     enum Action: String, Codable {
         /// Send `text` to the agent.
         case reply
-        /// Let the agent stop as it would have without the plugin.
+        /// Hand the request back to the terminal, as if the plugin were not there.
         case dismiss
+        /// Let the tool run.
+        case allow
+        /// Refuse it; `text`, when given, tells the agent what to do instead.
+        case deny
+        /// The chosen options, keyed by question.
+        case answer
     }
 
     let action: Action
     var text: String = ""
+    var answers: [String: String] = [:]
 
-    init(action: Action, text: String = "") {
+    init(action: Action, text: String = "", answers: [String: String] = [:]) {
         self.action = action
         self.text = text
+        self.answers = answers
     }
 
     /// `text` may be absent: a dismissal has nothing to say, and the synthesized decoder would
@@ -112,5 +142,6 @@ struct AgentResponse: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         action = try container.decode(Action.self, forKey: .action)
         text = try container.decodeIfPresent(String.self, forKey: .text) ?? ""
+        answers = try container.decodeIfPresent([String: String].self, forKey: .answers) ?? [:]
     }
 }

@@ -1,5 +1,5 @@
 {
-  "description": "OpenSuperWhisper: answer the agent by voice when it stops",
+  "description": "OpenSuperWhisper: answer the agent by voice when it stops, asks for permission or asks a question",
   "hooks": {
     "Stop": [
       {
@@ -7,6 +7,29 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/osw-agent-hook\" stop",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/osw-agent-hook\" permission",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/osw-agent-hook\" question",
             "timeout": 600
           }
         ]

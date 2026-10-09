@@ -55,4 +55,77 @@ final class AgentHookTests: XCTestCase {
         try Data(#"{"action":"dismiss"}"#.utf8).write(to: url)
         XCTAssertEqual(AgentBridge.read(AgentResponse.self, from: url), AgentResponse(action: .dismiss))
     }
+
+    // MARK: Permissions
+
+    func testPermissionRequestShowsTheCommand() {
+        let request = AgentHookCommand.makePermissionRequest(from: [
+            "session_id": "s", "cwd": "/p", "tool_name": "Bash",
+            "tool_input": ["command": "rm -rf build", "description": "Clean the build"],
+        ])
+        XCTAssertEqual(request?.kind, .permission)
+        XCTAssertEqual(request?.tool, "Bash")
+        XCTAssertEqual(request?.toolDetail, "rm -rf build")
+        XCTAssertEqual(request?.message, "Clean the build")
+    }
+
+    private func decision(_ data: Data?) -> [String: Any]? {
+        guard let data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let specific = json["hookSpecificOutput"] as? [String: Any] else { return nil }
+        XCTAssertEqual(specific["hookEventName"] as? String, "PermissionRequest")
+        return specific["decision"] as? [String: Any]
+    }
+
+    func testAllowAndDenyInThePermissionShape() {
+        XCTAssertEqual(decision(AgentHookCommand.permissionHookOutput(for: AgentResponse(action: .allow)))?["behavior"] as? String, "allow")
+        let denied = decision(AgentHookCommand.permissionHookOutput(for: AgentResponse(action: .deny, text: "Use make clean")))
+        XCTAssertEqual(denied?["behavior"] as? String, "deny")
+        XCTAssertEqual(denied?["message"] as? String, "Use make clean")
+        XCTAssertNil(AgentHookCommand.permissionHookOutput(for: AgentResponse(action: .dismiss)))
+    }
+
+    // MARK: Questions
+
+    private let questionInput: [String: Any] = [
+        "questions": [["question": "Which branch?", "header": "Branch", "multiSelect": false,
+                       "options": [["label": "main", "description": "Ship it"], ["label": "dev"]]]],
+    ]
+
+    func testQuestionRequestKeepsTheOptions() {
+        let request = AgentHookCommand.makeQuestionRequest(from: ["session_id": "s", "cwd": "/p",
+                                                                  "tool_name": "AskUserQuestion",
+                                                                  "tool_input": questionInput])
+        XCTAssertEqual(request?.questions?.first?.options.map(\.label), ["main", "dev"])
+        XCTAssertEqual(request?.questions?.first?.header, "Branch")
+    }
+
+    func testAnswersGoBackInsideTheToolInput() throws {
+        let data = try XCTUnwrap(AgentHookCommand.questionHookOutput(
+            for: AgentResponse(action: .answer, answers: ["Which branch?": "dev"]), toolInput: questionInput))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let specific = try XCTUnwrap(json["hookSpecificOutput"] as? [String: Any])
+        XCTAssertEqual(specific["permissionDecision"] as? String, "allow")
+        let updated = try XCTUnwrap(specific["updatedInput"] as? [String: Any])
+        XCTAssertEqual(updated["answers"] as? [String: String], ["Which branch?": "dev"])
+        XCTAssertNotNil(updated["questions"], "the whole input goes back, not only the answers")
+    }
+
+    // MARK: Spoken answers
+
+    func testSpokenVerdicts() {
+        XCTAssertEqual(AgentInbox.verdict("Oui."), true)
+        XCTAssertEqual(AgentInbox.verdict("vas-y"), true)
+        XCTAssertEqual(AgentInbox.verdict("d'accord"), true)
+        XCTAssertEqual(AgentInbox.verdict("No"), false)
+        XCTAssertEqual(AgentInbox.verdict("non merci"), false)
+        XCTAssertNil(AgentInbox.verdict("no, use make clean instead of rm"))
+        XCTAssertNil(AgentInbox.verdict(""))
+    }
+
+    func testSpokenOptionPicksTheMatchingLabel() {
+        let question = AgentQuestion(question: "Which?", options: [.init(label: "Parakeet Ultra"), .init(label: "Whisper")])
+        XCTAssertEqual(AgentInbox.option(matching: "parakeet ultra.", in: question), "Parakeet Ultra")
+        XCTAssertEqual(AgentInbox.option(matching: "Let's go with Whisper", in: question), "Whisper")
+        XCTAssertNil(AgentInbox.option(matching: "neither", in: question))
+    }
 }

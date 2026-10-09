@@ -15,6 +15,8 @@ final class AgentInbox: ObservableObject {
     /// The request a dictation in progress is answering. Taken by the recording when it stops,
     /// so the words go to the agent instead of being pasted wherever the cursor is.
     @Published private(set) var armedReplyID: String?
+    /// For questions: the options picked so far, per request, per question.
+    @Published var selections: [String: [String: Set<String>]] = [:]
 
     private var timer: Timer?
     private var started = false
@@ -43,6 +45,9 @@ final class AgentInbox: ObservableObject {
         for id in drafts.keys where !requests.contains(where: { $0.id == id }) {
             drafts[id] = nil
         }
+        for id in selections.keys where !requests.contains(where: { $0.id == id }) {
+            selections[id] = nil
+        }
         if let armed = armedReplyID, !requests.contains(where: { $0.id == armed }) {
             armedReplyID = nil
         }
@@ -68,10 +73,71 @@ final class AgentInbox: ObservableObject {
         return live.sorted { $0.createdAt < $1.createdAt }
     }
 
+    /// Sends what the composer holds, which means something different per kind: the next
+    /// instruction after a stop, a refusal with directions for a permission, a free answer
+    /// for a question.
     func send(_ request: AgentRequest) {
         let text = (drafts[request.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        answer(request, with: AgentResponse(action: .reply, text: text))
+        switch request.kind {
+        case .stop:
+            guard !text.isEmpty else { return }
+            answer(request, with: AgentResponse(action: .reply, text: text))
+        case .permission:
+            guard !text.isEmpty else { return }
+            deny(request)
+        case .question:
+            submitAnswers(request)
+        }
+    }
+
+    func allow(_ request: AgentRequest) {
+        answer(request, with: AgentResponse(action: .allow))
+    }
+
+    /// Refuses; whatever is in the composer goes along as what to do instead.
+    func deny(_ request: AgentRequest) {
+        let text = (drafts[request.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        answer(request, with: AgentResponse(action: .deny, text: text))
+    }
+
+    func toggle(_ option: String, in question: AgentQuestion, of request: AgentRequest) {
+        var picked = selections[request.id]?[question.question] ?? []
+        if question.multiSelect {
+            if picked.contains(option) { picked.remove(option) } else { picked.insert(option) }
+        } else {
+            picked = picked == [option] ? [] : [option]
+        }
+        selections[request.id, default: [:]][question.question] = picked
+    }
+
+    func isPicked(_ option: String, in question: AgentQuestion, of request: AgentRequest) -> Bool {
+        selections[request.id]?[question.question]?.contains(option) == true
+    }
+
+    /// Answers keyed by question, in the form AskUserQuestion takes: picked labels joined with
+    /// commas, or the composer's text for the first question nothing was picked for.
+    func answers(for request: AgentRequest) -> [String: String] {
+        var free = (drafts[request.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        var answers: [String: String] = [:]
+        for question in request.questions ?? [] {
+            let picked = question.options.map(\.label).filter { isPicked($0, in: question, of: request) }
+            if !picked.isEmpty {
+                answers[question.question] = picked.joined(separator: ", ")
+            } else if !free.isEmpty {
+                answers[question.question] = free
+                free = ""
+            }
+        }
+        return answers
+    }
+
+    func canSubmitAnswers(_ request: AgentRequest) -> Bool {
+        answers(for: request).count == (request.questions?.count ?? 0)
+    }
+
+    func submitAnswers(_ request: AgentRequest) {
+        guard canSubmitAnswers(request) else { return }
+        answer(request, with: AgentResponse(action: .answer, answers: answers(for: request)))
     }
 
     func dismiss(_ request: AgentRequest) {
@@ -83,6 +149,7 @@ final class AgentInbox: ObservableObject {
         try? AgentBridge.write(response, to: url)
         pending.removeAll { $0.id == request.id }
         drafts[request.id] = nil
+        selections[request.id] = nil
         if armedReplyID == request.id { armedReplyID = nil }
         AgentPanelController.shared.update(visible: !pending.isEmpty)
     }
@@ -104,9 +171,56 @@ final class AgentInbox: ObservableObject {
     /// first; `send` is the "press enter" voice command or the submit shortcut, which send it.
     func receiveDictation(_ text: String, for id: String, send: Bool) {
         guard let request = pending.first(where: { $0.id == id }) else { return }
-        let existing = (drafts[id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let added = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch request.kind {
+        case .permission:
+            // "Yes" or "no" on its own decides; anything longer is directions for a refusal.
+            switch Self.verdict(added) {
+            case .some(true): allow(request); return
+            case .some(false): deny(request); return
+            case .none: break
+            }
+        case .question:
+            // Saying an option picks it; saying something else is a free answer.
+            if let question = request.questions?.first,
+               let option = Self.option(matching: added, in: question) {
+                if !isPicked(option, in: question, of: request) { toggle(option, in: question, of: request) }
+                if send || request.questions?.count == 1 { submitAnswers(request) }
+                return
+            }
+        case .stop:
+            break
+        }
+        let existing = (drafts[id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         drafts[id] = [existing, added].filter { !$0.isEmpty }.joined(separator: " ")
         if send { self.send(request) }
+    }
+
+    /// true for a spoken yes, false for a no, nil for anything else. Only a short answer counts,
+    /// so "no, use the other file" stays directions rather than a bare refusal.
+    nonisolated static func verdict(_ text: String) -> Bool? {
+        let words = text.lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .filter { !$0.isEmpty }
+        guard (1...3).contains(words.count) else { return nil }
+        // Words, not phrases: "d'accord" and "vas-y" arrive split at the apostrophe and dash.
+        let yes: Set<String> = ["yes", "yeah", "yep", "ok", "okay", "allow", "approve", "go",
+                                "oui", "ouais", "vas", "vasy", "valide", "autorise", "accepte", "accord"]
+        let no: Set<String> = ["no", "nope", "deny", "refuse", "stop", "non", "annule", "nan"]
+        if words.contains(where: no.contains) { return false }
+        if words.contains(where: yes.contains) { return true }
+        return nil
+    }
+
+    /// The option whose label the dictation names, ignoring case and punctuation.
+    nonisolated static func option(matching text: String, in question: AgentQuestion) -> String? {
+        func normalized(_ value: String) -> String {
+            value.lowercased().components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        let said = normalized(text)
+        guard !said.isEmpty else { return nil }
+        return question.options.first { normalized($0.label) == said }?.label
+            ?? question.options.first { said.contains(normalized($0.label)) }?.label
     }
 }

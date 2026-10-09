@@ -15,11 +15,19 @@ enum AgentHookCommand {
 
     static func run(_ args: [String]) -> Never {
         let event = args.count >= 3 ? args[2] : ""
-        guard event == "stop", AppPreferences.shared.agentsEnabled else { exit(0) }
+        guard AppPreferences.shared.agentsEnabled else { exit(0) }
 
         let input = FileHandle.standardInput.readDataToEndOfFile()
-        guard let request = makeStopRequest(from: input) else { exit(0) }
-        guard let requestURL = AgentBridge.requestURL(request.id),
+        guard let json = try? JSONSerialization.jsonObject(with: input) as? [String: Any] else { exit(0) }
+        let request: AgentRequest?
+        switch event {
+        case "stop": request = makeStopRequest(from: input)
+        case "permission": request = makePermissionRequest(from: json)
+        case "question": request = makeQuestionRequest(from: json)
+        default: request = nil
+        }
+        guard let request,
+              let requestURL = AgentBridge.requestURL(request.id),
               let responseURL = AgentBridge.responseURL(request.id),
               (try? AgentBridge.write(request, to: requestURL)) != nil else { exit(0) }
 
@@ -29,27 +37,118 @@ enum AgentHookCommand {
         let response = waitForResponse(at: responseURL, until: request.expiresAt)
         try? FileManager.default.removeItem(at: requestURL)
         try? FileManager.default.removeItem(at: responseURL)
-        if let output = stopHookOutput(for: response) {
+        if let output = output(for: request.kind, response: response, hookInput: json) {
             FileHandle.standardOutput.write(output)
         }
         exit(0)
+    }
+
+    static func output(for kind: AgentRequest.Kind, response: AgentResponse?,
+                       hookInput: [String: Any]) -> Data? {
+        switch kind {
+        case .stop: return stopHookOutput(for: response)
+        case .permission: return permissionHookOutput(for: response)
+        case .question: return questionHookOutput(for: response, toolInput: hookInput["tool_input"] as? [String: Any])
+        }
+    }
+
+    private static func baseRequest(kind: AgentRequest.Kind, json: [String: Any], message: String,
+                                    now: Date, pid: Int32) -> AgentRequest {
+        AgentRequest(
+            id: UUID().uuidString,
+            kind: kind,
+            agent: "Claude Code",
+            sessionID: (json["session_id"] as? String) ?? "",
+            title: (json["transcript_path"] as? String).flatMap(sessionTitle(transcriptPath:)),
+            cwd: (json["cwd"] as? String) ?? FileManager.default.currentDirectoryPath,
+            message: message,
+            createdAt: now,
+            expiresAt: now.addingTimeInterval(maxWait),
+            hookPID: pid)
+    }
+
+    static func makePermissionRequest(from json: [String: Any], now: Date = Date(),
+                                      pid: Int32 = getpid()) -> AgentRequest? {
+        guard let tool = json["tool_name"] as? String else { return nil }
+        let input = (json["tool_input"] as? [String: Any]) ?? [:]
+        var request = baseRequest(kind: .permission, json: json,
+                                  message: (input["description"] as? String) ?? "", now: now, pid: pid)
+        request.tool = tool
+        request.toolDetail = toolDetail(tool: tool, input: input)
+        return request
+    }
+
+    static func makeQuestionRequest(from json: [String: Any], now: Date = Date(),
+                                    pid: Int32 = getpid()) -> AgentRequest? {
+        guard let input = json["tool_input"] as? [String: Any],
+              let raw = input["questions"] as? [[String: Any]] else { return nil }
+        let questions: [AgentQuestion] = raw.compactMap { item in
+            guard let question = item["question"] as? String else { return nil }
+            let options = ((item["options"] as? [[String: Any]]) ?? []).compactMap { option -> AgentQuestion.Option? in
+                guard let label = option["label"] as? String else { return nil }
+                return AgentQuestion.Option(label: label, description: option["description"] as? String)
+            }
+            return AgentQuestion(question: question, header: item["header"] as? String,
+                                 options: options, multiSelect: (item["multiSelect"] as? Bool) ?? false)
+        }
+        guard !questions.isEmpty else { return nil }
+        var request = baseRequest(kind: .question, json: json, message: "", now: now, pid: pid)
+        request.questions = questions
+        return request
+    }
+
+    /// What the tool is about to do, in the form a person checks: the command, the file, the
+    /// address. Anything else falls back to its input, as compact JSON.
+    static func toolDetail(tool: String, input: [String: Any]) -> String {
+        for key in ["command", "file_path", "url", "pattern", "path", "query"] {
+            if let value = input[key] as? String, !value.isEmpty { return value }
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: input, options: [.prettyPrinted, .sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return "" }
+        return String(text.prefix(2_000))
+    }
+
+    /// Allow or deny, in the shape PermissionRequest expects. A dismissal prints nothing, and
+    /// Claude Code shows its own prompt in the terminal as usual.
+    static func permissionHookOutput(for response: AgentResponse?) -> Data? {
+        guard let response else { return nil }
+        var decision: [String: Any]
+        switch response.action {
+        case .allow:
+            decision = ["behavior": "allow"]
+        case .deny:
+            let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            decision = ["behavior": "deny",
+                        "message": text.isEmpty ? "The user declined this, from OpenSuperWhisper." : text]
+        default:
+            return nil
+        }
+        return try? JSONSerialization.data(withJSONObject: [
+            "hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": decision],
+        ])
+    }
+
+    /// The answers go in the tool's own input, which the hook returns whole: Claude Code then
+    /// runs AskUserQuestion with them already filled in and never shows the prompt.
+    static func questionHookOutput(for response: AgentResponse?, toolInput: [String: Any]?) -> Data? {
+        guard let response, response.action == .answer, !response.answers.isEmpty,
+              var updated = toolInput else { return nil }
+        updated["answers"] = response.answers
+        return try? JSONSerialization.data(withJSONObject: [
+            "hookSpecificOutput": [
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "updatedInput": updated,
+            ],
+        ])
     }
 
     static func makeStopRequest(from input: Data, now: Date = Date(),
                                 pid: Int32 = getpid()) -> AgentRequest? {
         guard let json = try? JSONSerialization.jsonObject(with: input) as? [String: Any] else { return nil }
         let message = (json["last_assistant_message"] as? String) ?? ""
-        return AgentRequest(
-            id: UUID().uuidString,
-            kind: .stop,
-            agent: "Claude Code",
-            sessionID: (json["session_id"] as? String) ?? "",
-            title: (json["transcript_path"] as? String).flatMap(sessionTitle(transcriptPath:)),
-            cwd: (json["cwd"] as? String) ?? FileManager.default.currentDirectoryPath,
-            message: message.trimmingCharacters(in: .whitespacesAndNewlines),
-            createdAt: now,
-            expiresAt: now.addingTimeInterval(maxWait),
-            hookPID: pid)
+        return baseRequest(kind: .stop, json: json,
+                           message: message.trimmingCharacters(in: .whitespacesAndNewlines), now: now, pid: pid)
     }
 
     /// How far back from the end of the transcript to look. Claude Code writes the title
