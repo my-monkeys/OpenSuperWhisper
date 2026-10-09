@@ -15,7 +15,6 @@ enum AgentHookCommand {
 
     static func run(_ args: [String]) -> Never {
         let event = args.count >= 3 ? args[2] : ""
-        guard AppPreferences.shared.agentsEnabled else { exit(0) }
 
         let input = FileHandle.standardInput.readDataToEndOfFile()
         guard let json = try? JSONSerialization.jsonObject(with: input) as? [String: Any] else { exit(0) }
@@ -46,6 +45,9 @@ enum AgentHookCommand {
     /// Whether the user wants the panel for this one: the project is remembered for the Agents
     /// pane either way, then the pane's switches decide.
     static func shouldAsk(_ request: AgentRequest, prefs: AppPreferences = .shared) -> Bool {
+        // An agent the user did not turn on gets nothing, not even a remembered project: it
+        // may only be running the hook because it copied another agent's plugin.
+        guard prefs.agentKindEnabled(request.agentKind) else { return false }
         prefs.rememberAgentProject(request.cwd)
         guard prefs.agentProjectEnabled(request.cwd) else { return false }
         switch request.kind {
@@ -70,18 +72,51 @@ enum AgentHookCommand {
     }
 
     private static func baseRequest(kind: AgentRequest.Kind, json: [String: Any], message: String,
-                                    now: Date, pid: Int32) -> AgentRequest {
-        AgentRequest(
+                                    now: Date, pid: Int32,
+                                    environment: [String: String] = ProcessInfo.processInfo.environment) -> AgentRequest {
+        let agent = AgentKind.detect(input: json, environment: environment)
+        let sessionID = (json["session_id"] as? String) ?? ""
+        var request = AgentRequest(
             id: UUID().uuidString,
             kind: kind,
-            agent: "Claude Code",
-            sessionID: (json["session_id"] as? String) ?? "",
-            title: (json["transcript_path"] as? String).flatMap(sessionTitle(transcriptPath:)),
+            agent: agent.displayName,
+            sessionID: sessionID,
+            title: title(for: agent, sessionID: sessionID, transcriptPath: json["transcript_path"] as? String),
             cwd: (json["cwd"] as? String) ?? FileManager.default.currentDirectoryPath,
             message: message,
             createdAt: now,
             expiresAt: now.addingTimeInterval(wait),
             hookPID: pid)
+        request.source = agent
+        return request
+    }
+
+    /// Each agent keeps its session names somewhere of its own.
+    static func title(for agent: AgentKind, sessionID: String, transcriptPath: String?) -> String? {
+        switch agent {
+        case .codex:
+            let index = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".codex/session_index.jsonl")
+            guard let data = try? Data(contentsOf: index) else { return nil }
+            return codexThreadName(inIndex: String(decoding: data, as: UTF8.self), sessionID: sessionID)
+        default:
+            return transcriptPath.flatMap(sessionTitle(transcriptPath:))
+        }
+    }
+
+    /// Codex appends `{"id", "thread_name", "updated_at"}` to its session index each time a
+    /// thread is named; the last line for an id is the current name.
+    static func codexThreadName(inIndex text: String, sessionID: String) -> String? {
+        guard !sessionID.isEmpty else { return nil }
+        var name: String?
+        for line in text.split(separator: "\n") where line.contains(sessionID) {
+            guard let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                  json["id"] as? String == sessionID,
+                  let threadName = json["thread_name"] as? String else { continue }
+            name = threadName
+        }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
     }
 
     static func makePermissionRequest(from json: [String: Any], now: Date = Date(),
