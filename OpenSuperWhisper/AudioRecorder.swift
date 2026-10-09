@@ -14,6 +14,9 @@ class AudioRecorder: NSObject, ObservableObject {
     private var audioRecorder: AVAudioRecorder?
     private var audioPlayer: AVAudioPlayer?
     private var notificationSound: NSSound?
+    /// The volume duck waiting for the start chime to finish. Cancelled by a stop that lands
+    /// first, or the duck would fire after the restore and leave the Mac turned down.
+    private var pendingDuck: DispatchWorkItem?
     private let temporaryDirectory: URL
     private var currentRecordingURL: URL?
     private var notificationObserver: Any?
@@ -193,12 +196,26 @@ class AudioRecorder: NSObject, ObservableObject {
         if AppPreferences.shared.pauseMediaOnRecord {
             MediaPlaybackController.shared.pauseMedia()
         }
-        if AppPreferences.shared.reduceVolumeOnRecord {
-            SystemVolumeController.shared.duck(to: Float32(AppPreferences.shared.reduceVolumeLevel))
-        }
-
+        // Chime first, then lower the volume: ducked first, the start chime played at the
+        // ducked level, 10% by default, and could not be heard at all, while the end chime,
+        // played after the restore, could.
+        var chimeLength: TimeInterval = 0
         if AppPreferences.shared.playSoundOnRecordStart {
             playNotificationSound()
+            chimeLength = notificationSound?.duration ?? 0
+        }
+        if AppPreferences.shared.reduceVolumeOnRecord {
+            let level = Float32(AppPreferences.shared.reduceVolumeLevel)
+            // Checked when it fires: a take stopped meanwhile has already restored the volume.
+            let duck = DispatchWorkItem { [weak self] in
+                guard self?.currentRecordingURL != nil else { return }
+                SystemVolumeController.shared.duck(to: level)
+            }
+            DispatchQueue.main.async { [weak self] in
+                self?.pendingDuck?.cancel()
+                self?.pendingDuck = duck
+                DispatchQueue.main.asyncAfter(deadline: .now() + chimeLength, execute: duck)
+            }
         }
 
         // A UUID suffix keeps each recording's temp file unique. Without it, two recordings
@@ -327,6 +344,7 @@ class AudioRecorder: NSObject, ObservableObject {
             MediaPlaybackController.shared.resumeMedia()
         }
         if AppPreferences.shared.reduceVolumeOnRecord {
+            cancelPendingDuck()
             SystemVolumeController.shared.restore()
         }
 
@@ -349,6 +367,13 @@ class AudioRecorder: NSObject, ObservableObject {
         return outcome
     }
 
+    private func cancelPendingDuck() {
+        DispatchQueue.main.async { [weak self] in
+            self?.pendingDuck?.cancel()
+            self?.pendingDuck = nil
+        }
+    }
+
     func cancelRecording() {
         // Same blocking AudioQueueStop as `stopRecording`, timed for the same reason.
         Diag.measure("AVAudioRecorder.stop (cancel)") { audioRecorder?.stop() }
@@ -361,6 +386,7 @@ class AudioRecorder: NSObject, ObservableObject {
             MediaPlaybackController.shared.resumeMedia()
         }
         if AppPreferences.shared.reduceVolumeOnRecord {
+            cancelPendingDuck()
             SystemVolumeController.shared.restore()
         }
         
