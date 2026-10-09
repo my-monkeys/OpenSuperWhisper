@@ -302,6 +302,13 @@ class ShortcutManager {
         endActiveTake(submit: true)
     }
 
+    /// Starts a recording, or stops the one running, as one press of the trigger would. For the
+    /// agent panel's Dictate button.
+    func toggleRecordingFromApp() {
+        handleKeyDown()
+        handleKeyUp()
+    }
+
     /// The stop phrase was heard at the end of the live transcript: end the take the way the
     /// trigger would, through here so the hold and latch state is cleared with it. (#145)
     func endTakeOnStopPhrase() {

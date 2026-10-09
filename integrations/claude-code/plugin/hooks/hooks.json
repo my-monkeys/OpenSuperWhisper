@@ -1,0 +1,16 @@
+{
+  "description": "OpenSuperWhisper: answer the agent by voice when it stops",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/osw-agent-hook\" stop",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

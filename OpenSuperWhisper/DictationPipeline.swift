@@ -30,6 +30,9 @@ final class DictationPipeline: ObservableObject {
         /// Snapshotted like the rest: by the time the queue reaches this clip the caret has
         /// usually moved, and a later recording would otherwise lend it its own field.
         var focusedText: String? = nil
+        /// The waiting agent this dictation answers, from the agent panel. Its text goes back
+        /// to that agent instead of into the focused app.
+        var agentReplyID: String? = nil
     }
 
     private struct PendingDictation {
@@ -274,6 +277,14 @@ final class DictationPipeline: ObservableObject {
                     modelUsed: modelUsed, wasFallback: wasFallback)
             } else {
                 discardAudio(item.tempURL)
+            }
+
+            // An answer to a waiting agent goes back to it, not into whatever has the cursor.
+            if let replyID = item.context.agentReplyID {
+                if hasText {
+                    AgentInbox.shared.receiveDictation(text, for: replyID, send: shouldSubmit)
+                }
+                return
             }
 
             let pasteTargetMissing = hasText ? insertText(text, targetBundleID: item.context.bundleID) : false

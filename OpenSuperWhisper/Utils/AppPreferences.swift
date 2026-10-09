@@ -688,6 +688,11 @@ final class AppPreferences {
     var stopPhraseSilenceMs: Int
     static let stopPhraseSilenceRange = 300...3000
 
+    /// Answer coding agents from OpenSuperWhisper when their plugin is installed. Off, the
+    /// plugin's hook exits at once and the agent waits in its terminal as usual.
+    @UserDefault(key: "agentsEnabled", defaultValue: true)
+    var agentsEnabled: Bool
+
     /// The dictation with a trailing stop phrase removed. The phrase is a command, not content,
     /// so it is dropped whichever way the take ended. `cutAtLast` is for a take the phrase
     /// ended: the recorder runs on a moment after it, so the text is cut at its last

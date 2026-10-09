@@ -326,7 +326,8 @@ class IndicatorViewModel: ObservableObject {
             appName: ctx.appName, bundleID: ctx.bundleID,
             windowTitle: ctx.windowTitle, fullURL: ctx.fullURL,
             keyboardLanguage: ctx.keyboardLanguage,
-            focusedText: ctx.focusedText)
+            focusedText: ctx.focusedText,
+            agentReplyID: AgentInbox.shared.takeArmedReply())
         let modelOption = ModelCatalog.activeOption()
 
         // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
@@ -395,6 +396,7 @@ class IndicatorViewModel: ObservableObject {
         hideTimer = nil
         recorder.cancelRecording()
         stopWatchingForStopPhrase()
+        _ = AgentInbox.shared.takeArmedReply()
         if liveStreamingActive {
             liveStreamingActive = false
             Task { await StreamingTranscriptionController.shared.cancel() }
