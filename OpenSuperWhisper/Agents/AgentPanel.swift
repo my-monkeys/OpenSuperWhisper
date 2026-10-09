@@ -337,12 +337,7 @@ struct AgentPanelView: View {
                     onDelete: { inbox.discardDictation() },
                     onStop: { inbox.stopDictating() })
 
-                TextField(placeholder(for: request, listening: listening), text: draft(for: request), axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13.5))
-                    .lineLimit(1...6)
-                    .padding(.vertical, 8)
-                    .onSubmit { inbox.send(request) }
+                replyField(for: request, listening: listening)
 
                 if listening {
                     composerButton("arrow.up", tint: .white, fill: STheme.accent,
@@ -384,6 +379,34 @@ struct AgentPanelView: View {
         }
         .lineLimit(1)
     }
+
+    /// The field grows with its text up to `replyMaxHeight`, then scrolls, and always to its
+    /// last line: a dictated reply lands at the end, and the field used to stay on the first
+    /// lines, hiding the words just added.
+    private func replyField(for request: AgentRequest, listening: Bool) -> some View {
+        let text = inbox.drafts[request.id] ?? ""
+        return ScrollViewReader { proxy in
+            ScrollView {
+                TextField(placeholder(for: request, listening: listening), text: draft(for: request), axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13.5))
+                    .padding(.vertical, 8)
+                    .onSubmit { inbox.send(request) }
+                    .id(Self.replyEnd)
+            }
+            .scrollIndicators(.never)
+            .defaultScrollAnchor(.bottom)
+            .frame(maxHeight: Self.replyMaxHeight)
+            .fixedSize(horizontal: false, vertical: true)
+            .onChange(of: text) {
+                proxy.scrollTo(Self.replyEnd, anchor: .bottom)
+            }
+        }
+    }
+
+    static let replyEnd = "reply-end"
+    /// About six lines of the reply's 13.5 pt text.
+    static let replyMaxHeight: CGFloat = 116
 
     private func composerButton(_ symbol: String, tint: Color, fill: Color, help: String,
                                 action: @escaping () -> Void) -> some View {
