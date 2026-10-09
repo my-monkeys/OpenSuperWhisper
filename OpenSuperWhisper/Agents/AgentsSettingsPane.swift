@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Settings › Agents: the Claude Code plugin, which moments bring the panel up, how long it
-/// waits, and which projects use it.
+/// Settings › Agents: one section per agent (the plugin, and whether OpenSuperWhisper answers
+/// for it), then which moments bring the panel up, how long it waits, and which projects use it.
 struct AgentsSettingsPane: View {
     /// nil until the background check answers.
     @State private var status: ClaudeCodePlugin.Status?
@@ -10,7 +10,11 @@ struct AgentsSettingsPane: View {
     @State private var step: String?
     @State private var error: String?
 
-    @State private var enabled = AppPreferences.shared.agentsEnabled
+    @State private var claudeOn = AppPreferences.shared.agentKindEnabled(.claudeCode)
+    @State private var codexOn = AppPreferences.shared.agentKindEnabled(.codex)
+    @State private var codexHasPlugin = false
+    /// The moments and projects only matter while some agent is answered.
+    private var enabled: Bool { claudeOn || codexOn }
     @State private var askOnStop = AppPreferences.shared.agentAskOnStop
     @State private var askOnPermission = AppPreferences.shared.agentAskOnPermission
     @State private var askOnQuestion = AppPreferences.shared.agentAskOnQuestion
@@ -25,9 +29,32 @@ struct AgentsSettingsPane: View {
                 if let error {
                     SWarnBox { Text(error).textSelection(.enabled) }
                 }
-                SRow(title: "Answer from OpenSuperWhisper",
-                     hint: "Off, agents wait in their terminal as if the plugin were not installed") {
-                    SToggle(isOn: $enabled)
+                SRow(title: "Answer Claude Code",
+                     hint: "Off, Claude Code waits in its terminal as if the plugin were not installed") {
+                    SToggle(isOn: $claudeOn)
+                }
+            }
+
+            SSection(title: "Codex") {
+                HStack(spacing: 12) {
+                    AgentAvatar(kind: .codex)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(codexHasPlugin ? "Codex has the plugin" : "Codex doesn't have the plugin")
+                            .scaledFont(size: 13, weight: .medium)
+                            .foregroundColor(STheme.text)
+                        Text(codexHasPlugin
+                             ? "Codex copies Claude Code's plugins on its own. It stays in its terminal until you turn it on here."
+                             : "Codex picks up the plugin by itself once it is installed for Claude Code.")
+                            .scaledFont(size: 11)
+                            .foregroundColor(STheme.hint)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 4)
+                SRow(title: "Answer Codex",
+                     hint: "Codex asks once to trust the plugin's hooks: run /hooks in Codex. Its questions stay in the terminal for now") {
+                    SToggle(isOn: $codexOn)
                 }
             }
 
@@ -50,7 +77,9 @@ struct AgentsSettingsPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 220)
+                    // Its own width: a fixed 220 pt was narrower than four segments at the
+                    // default text size, and "10 min" ran past the pane's right edge.
+                    .fixedSize()
                     .disabled(!enabled)
                 }
             }
@@ -71,8 +100,12 @@ struct AgentsSettingsPane: View {
             }
         }
         .onAppear(perform: refresh)
-        .task { status = await ClaudeCodePlugin.status() }
-        .onChange(of: enabled) { AppPreferences.shared.agentsEnabled = enabled }
+        .task {
+            status = await ClaudeCodePlugin.status()
+            codexHasPlugin = CodexPlugin.isEnabled()
+        }
+        .onChange(of: claudeOn) { AppPreferences.shared.setAgentKind(.claudeCode, enabled: claudeOn) }
+        .onChange(of: codexOn) { AppPreferences.shared.setAgentKind(.codex, enabled: codexOn) }
         .onChange(of: askOnStop) { AppPreferences.shared.agentAskOnStop = askOnStop }
         .onChange(of: askOnPermission) { AppPreferences.shared.agentAskOnPermission = askOnPermission }
         .onChange(of: askOnQuestion) { AppPreferences.shared.agentAskOnQuestion = askOnQuestion }
@@ -81,7 +114,7 @@ struct AgentsSettingsPane: View {
 
     private var pluginRow: some View {
         HStack(spacing: 12) {
-            AgentAvatar()
+            AgentAvatar(kind: .claudeCode)
             VStack(alignment: .leading, spacing: 2) {
                 Text(statusTitle)
                     .scaledFont(size: 13, weight: .medium)

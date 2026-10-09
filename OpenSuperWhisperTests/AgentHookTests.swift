@@ -137,8 +137,9 @@ final class AgentHookTests: XCTestCase {
 
     func testADisabledProjectAndItsSubfoldersStayInTheTerminal() {
         let prefs = AppPreferences.shared
-        let saved = (prefs.agentDisabledProjects, prefs.agentRecentProjects, prefs.agentAskOnStop)
-        defer { (prefs.agentDisabledProjects, prefs.agentRecentProjects, prefs.agentAskOnStop) = saved }
+        let saved = (prefs.agentDisabledProjects, prefs.agentRecentProjects, prefs.agentAskOnStop, prefs.agentEnabledKinds)
+        defer { (prefs.agentDisabledProjects, prefs.agentRecentProjects, prefs.agentAskOnStop, prefs.agentEnabledKinds) = saved }
+        prefs.agentEnabledKinds = AgentKind.allCases.map(\.rawValue)
         prefs.agentAskOnStop = true
         prefs.agentDisabledProjects = []
         prefs.setAgentProject("/code/site", enabled: false)
@@ -151,9 +152,68 @@ final class AgentHookTests: XCTestCase {
 
     func testTurningAMomentOffSkipsThePanel() {
         let prefs = AppPreferences.shared
-        let saved = prefs.agentAskOnStop
-        defer { prefs.agentAskOnStop = saved }
+        let saved = (prefs.agentAskOnStop, prefs.agentEnabledKinds)
+        defer { (prefs.agentAskOnStop, prefs.agentEnabledKinds) = saved }
+        prefs.agentEnabledKinds = AgentKind.allCases.map(\.rawValue)
         prefs.agentAskOnStop = false
         XCTAssertFalse(AgentHookCommand.shouldAsk(stopRequest(cwd: "/code/other")))
+    }
+
+    // MARK: Telling the agents apart
+
+    func testCodexIsKnownByItsTurnID() {
+        XCTAssertEqual(AgentKind.detect(input: ["turn_id": "t", "session_id": "s"], environment: [:]), .codex)
+    }
+
+    func testCodexIsKnownByItsPluginRootWithoutClaudesProjectDir() {
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["PLUGIN_ROOT": "/p"]), .codex)
+    }
+
+    func testClaudeCodeIsKnownByItsOwnFields() {
+        XCTAssertEqual(AgentKind.detect(input: ["prompt_id": "p"], environment: [:]), .claudeCode)
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["CLAUDE_PROJECT_DIR": "/p",
+                                                                  "PLUGIN_ROOT": "/p"]), .claudeCode)
+    }
+
+    func testCursorAndGeminiWinOverTheClaudeCompatibilityVariable() {
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["CURSOR_VERSION": "2", "CLAUDE_PROJECT_DIR": "/p"]), .cursor)
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["GEMINI_SESSION_ID": "g", "CLAUDE_PROJECT_DIR": "/p"]), .gemini)
+    }
+
+    func testAnAgentTheUserDidNotTurnOnGetsNothing() {
+        let prefs = AppPreferences.shared
+        let saved = (prefs.agentEnabledKinds, prefs.agentRecentProjects)
+        defer { (prefs.agentEnabledKinds, prefs.agentRecentProjects) = saved }
+        prefs.agentEnabledKinds = [AgentKind.claudeCode.rawValue]
+        prefs.agentRecentProjects = []
+        var request = stopRequest(cwd: "/code/codex-only")
+        request.source = .codex
+        XCTAssertFalse(AgentHookCommand.shouldAsk(request))
+        XCTAssertEqual(prefs.agentRecentProjects, [], "not even remembered")
+        request.source = .claudeCode
+        XCTAssertTrue(AgentHookCommand.shouldAsk(request))
+    }
+
+    func testCodexThreadNameIsTheLastOneForTheSession() {
+        let index = """
+        {"id":"a","thread_name":"First name","updated_at":"1"}
+        {"id":"b","thread_name":"Other","updated_at":"2"}
+        {"id":"a","thread_name":"Renamed","updated_at":"3"}
+        """
+        XCTAssertEqual(AgentHookCommand.codexThreadName(inIndex: index, sessionID: "a"), "Renamed")
+        XCTAssertNil(AgentHookCommand.codexThreadName(inIndex: index, sessionID: "missing"))
+    }
+
+    func testCodexPluginStateIsReadFromItsConfig() {
+        let on = """
+        [plugins."opensuperwhisper@opensuperwhisper"]
+        enabled = true
+
+        [plugins."other@x"]
+        enabled = false
+        """
+        XCTAssertTrue(CodexPlugin.isEnabled(inConfig: on))
+        XCTAssertFalse(CodexPlugin.isEnabled(inConfig: on.replacingOccurrences(of: "enabled = true", with: "enabled = false")))
+        XCTAssertFalse(CodexPlugin.isEnabled(inConfig: "[plugins.\"other@x\"]\nenabled = true"))
     }
 }

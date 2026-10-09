@@ -104,3 +104,25 @@ enum ClaudeCodePlugin {
     }
 }
 
+
+/// Codex has no install step of ours: it imports Claude Code's plugin marketplaces and enables
+/// the plugins it finds, ours included. This only reads whether it has done so, from its config.
+enum CodexPlugin {
+    static func isEnabled() -> Bool {
+        let config = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
+        guard let text = try? String(contentsOf: config, encoding: .utf8) else { return false }
+        return isEnabled(inConfig: text)
+    }
+
+    /// True when the plugin's table is there and says `enabled = true` before the next table.
+    static func isEnabled(inConfig text: String) -> Bool {
+        let header = "[plugins.\"\(ClaudeCodePlugin.pluginID)\"]"
+        guard let start = text.range(of: header) else { return false }
+        for line in text[start.upperBound...].split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("[") { return false }
+            if trimmed.replacingOccurrences(of: " ", with: "") == "enabled=true" { return true }
+        }
+        return false
+    }
+}

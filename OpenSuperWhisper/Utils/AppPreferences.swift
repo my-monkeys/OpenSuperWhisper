@@ -688,11 +688,6 @@ final class AppPreferences {
     var stopPhraseSilenceMs: Int
     static let stopPhraseSilenceRange = 300...3000
 
-    /// Answer coding agents from OpenSuperWhisper when their plugin is installed. Off, the
-    /// plugin's hook exits at once and the agent waits in its terminal as usual.
-    @UserDefault(key: "agentsEnabled", defaultValue: true)
-    var agentsEnabled: Bool
-
     /// Which moments bring the panel up. Each off, that hook hands straight back to the terminal.
     @UserDefault(key: "agentAskOnStop", defaultValue: true)
     var agentAskOnStop: Bool
@@ -706,6 +701,23 @@ final class AppPreferences {
     @UserDefault(key: "agentWaitSeconds", defaultValue: 300)
     var agentWaitSeconds: Int
     static let agentWaitChoices = [60, 120, 300, 590]
+
+    /// The agents OpenSuperWhisper answers for, by `AgentKind` raw value. Claude Code only by
+    /// default: it is the one the plugin is installed for, and an agent that picked the plugin
+    /// up by itself (Codex imports Claude Code's marketplaces) stays in its terminal until the
+    /// user turns it on in Settings.
+    @UserDefault(key: "agentEnabledKinds", defaultValue: [AgentKind.claudeCode.rawValue])
+    var agentEnabledKinds: [String]
+
+    func agentKindEnabled(_ kind: AgentKind) -> Bool {
+        agentEnabledKinds.contains(kind.rawValue)
+    }
+
+    func setAgentKind(_ kind: AgentKind, enabled: Bool) {
+        var kinds = agentEnabledKinds.filter { $0 != kind.rawValue }
+        if enabled { kinds.append(kind.rawValue) }
+        agentEnabledKinds = kinds
+    }
 
     /// Projects whose agents always use their terminal, by folder path. A subfolder counts.
     @UserDefault(key: "agentDisabledProjects", defaultValue: [String]())

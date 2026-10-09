@@ -56,6 +56,55 @@ enum AgentBridge {
     }
 }
 
+/// Which coding agent ran the hook. One plugin serves several: Codex imports Claude Code's
+/// plugin marketplaces on its own and runs the same hooks, so the hook has to tell them apart
+/// from what it receives, and only answer for the agents the user turned on.
+enum AgentKind: String, Codable, CaseIterable {
+    case claudeCode
+    case codex
+    case cursor
+    case gemini
+    case unknown
+
+    var displayName: String {
+        switch self {
+        case .claudeCode: return "Claude Code"
+        case .codex: return "Codex"
+        case .cursor: return "Cursor"
+        case .gemini: return "Gemini CLI"
+        case .unknown: return "Coding agent"
+        }
+    }
+
+    /// The desktop app whose icon stands for this agent, when it is installed.
+    var iconBundleID: String? {
+        switch self {
+        case .claudeCode: return "com.anthropic.claudefordesktop"
+        case .codex: return "com.openai.codex"
+        case .cursor: return "com.todesktop.230313mzl4w4u92"
+        case .gemini, .unknown: return nil
+        }
+    }
+
+    /// Reads the hook's stdin and environment. No field names the agent outright, so this goes
+    /// by what each one adds: Codex sends a `turn_id` on every turn and sets `PLUGIN_ROOT`
+    /// without `CLAUDE_PROJECT_DIR`; Cursor and Gemini set `CLAUDE_PROJECT_DIR` for
+    /// compatibility, so they are checked before Claude Code's own markers.
+    static func detect(input: [String: Any], environment: [String: String]) -> AgentKind {
+        if input["turn_id"] != nil
+            || (environment["PLUGIN_ROOT"] != nil && environment["CLAUDE_PROJECT_DIR"] == nil) {
+            return .codex
+        }
+        if input["cursor_version"] != nil || environment["CURSOR_VERSION"] != nil { return .cursor }
+        if environment["GEMINI_SESSION_ID"] != nil { return .gemini }
+        if input["prompt_id"] != nil || input["scratchpad_dir"] != nil || input["effort"] != nil
+            || environment["CLAUDE_PROJECT_DIR"] != nil {
+            return .claudeCode
+        }
+        return .unknown
+    }
+}
+
 /// An agent waiting on the user.
 struct AgentRequest: Codable, Identifiable, Equatable {
     enum Kind: String, Codable {
@@ -89,6 +138,11 @@ struct AgentRequest: Codable, Identifiable, Equatable {
     var toolDetail: String? = nil
     /// For a question: what the agent asked, in its order.
     var questions: [AgentQuestion]? = nil
+    /// The agent behind it, for its icon. Optional so a request written by an older hook
+    /// still reads.
+    var source: AgentKind? = nil
+
+    var agentKind: AgentKind { source ?? .claudeCode }
 
     var projectName: String { URL(fileURLWithPath: cwd).lastPathComponent }
 

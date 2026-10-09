@@ -176,7 +176,7 @@ struct AgentPanelView: View {
 
     private func header(for request: AgentRequest) -> some View {
         HStack(alignment: .center, spacing: 12) {
-            AgentAvatar()
+            AgentAvatar(kind: request.agentKind)
             VStack(alignment: .leading, spacing: 2) {
                 Text(request.displayTitle)
                     .font(.system(size: 15, weight: .semibold))
@@ -505,16 +505,22 @@ struct AgentPanelView: View {
 }
 
 /// Who is talking: the agent's own icon, tucked against OpenSuperWhisper's, the two of them
-/// working together. Claude's icon comes from the Claude app when it is installed, so the
-/// mark is the one the user already knows and nothing of Anthropic's ships in this bundle;
-/// without it, a spark in Claude's orange stands in.
+/// working together. The agent's icon comes from its desktop app when it is installed, so the
+/// mark is the one the user already knows and nothing of theirs ships in this bundle; without
+/// it, a symbol in the agent's colour stands in.
 struct AgentAvatar: View {
-    static let claudeBundleID = "com.anthropic.claudefordesktop"
-    static let claudeOrange = Color(red: 0.85, green: 0.47, blue: 0.34)
+    var kind: AgentKind = .claudeCode
 
-    static let claudeIcon: NSImage? = NSWorkspace.shared
-        .urlForApplication(withBundleIdentifier: claudeBundleID)
-        .map { NSWorkspace.shared.icon(forFile: $0.path) }
+    @MainActor private static var icons: [AgentKind: NSImage] = [:]
+
+    @MainActor static func icon(for kind: AgentKind) -> NSImage? {
+        if let cached = icons[kind] { return cached }
+        guard let id = kind.iconBundleID,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return nil }
+        let image = NSWorkspace.shared.icon(forFile: url.path)
+        icons[kind] = image
+        return image
+    }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -522,22 +528,42 @@ struct AgentAvatar: View {
                 .resizable()
                 .frame(width: 36, height: 36)
             // Its own rounded square, as is: a shadow is enough to lift it off the other one.
-            claude(size: 22)
+            agent(size: 22)
                 .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
                 .offset(x: 9, y: 5)
         }
         .frame(width: 46, height: 40, alignment: .topLeading)
     }
 
-    @ViewBuilder private func claude(size: CGFloat) -> some View {
-        if let icon = Self.claudeIcon {
+    @ViewBuilder private func agent(size: CGFloat) -> some View {
+        if let icon = Self.icon(for: kind) {
             Image(nsImage: icon).resizable().frame(width: size, height: size)
         } else {
-            Image(systemName: "sparkle")
+            Image(systemName: Self.fallbackSymbol(kind))
                 .font(.system(size: size * 0.45, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(width: size, height: size)
-                .background(Circle().fill(Self.claudeOrange))
+                .background(RoundedRectangle(cornerRadius: size * 0.24).fill(Self.fallbackColor(kind)))
+        }
+    }
+
+    private static func fallbackSymbol(_ kind: AgentKind) -> String {
+        switch kind {
+        case .claudeCode: return "sparkle"
+        case .codex: return "chevron.left.forwardslash.chevron.right"
+        case .gemini: return "sparkles"
+        case .cursor: return "cursorarrow"
+        case .unknown: return "terminal"
+        }
+    }
+
+    private static func fallbackColor(_ kind: AgentKind) -> Color {
+        switch kind {
+        case .claudeCode: return Color(red: 0.85, green: 0.47, blue: 0.34)
+        case .codex: return Color(white: 0.12)
+        case .gemini: return Color(red: 0.26, green: 0.52, blue: 0.96)
+        case .cursor: return Color(white: 0.2)
+        case .unknown: return Color.gray
         }
     }
 }
