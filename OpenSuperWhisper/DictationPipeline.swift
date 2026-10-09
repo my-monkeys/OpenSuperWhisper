@@ -48,6 +48,10 @@ final class DictationPipeline: ObservableObject {
         let modelOption: DictationModelOption?
         /// This take was started by the submit mouse button, so press Return after inserting (#50).
         let submitAfterInsert: Bool
+        /// The stop phrase ended this take, so it was said, and anything after it is the tail
+        /// of speech the recorder caught before stopping. The text is cut at its last
+        /// occurrence rather than only stripped from the very end (#145).
+        let endedByStopPhrase: Bool
     }
 
     /// Dictations waiting in the queue plus the one currently being processed. Drives optional
@@ -99,7 +103,7 @@ final class DictationPipeline: ObservableObject {
     /// `seq` is monotonic and assigned here, so append order == recording-start order.
     func enqueue(tempURL: URL?, startedAt: Date, streamedFallback: String,
                  context: ContextSnapshot, modelOption: DictationModelOption?,
-                 submitAfterInsert: Bool = false) {
+                 submitAfterInsert: Bool = false, endedByStopPhrase: Bool = false) {
         seqCounter += 1
         queue.append(PendingDictation(
             id: UUID(),
@@ -109,7 +113,8 @@ final class DictationPipeline: ObservableObject {
             streamedFallback: streamedFallback,
             context: context,
             modelOption: modelOption,
-            submitAfterInsert: submitAfterInsert))
+            submitAfterInsert: submitAfterInsert,
+            endedByStopPhrase: endedByStopPhrase))
         refreshPendingCount()
         startLoopIfNeeded()
     }
@@ -191,7 +196,7 @@ final class DictationPipeline: ObservableObject {
             let modelUsed = transcriptionService.lastUsedModel?.displayName ?? ModelCatalog.activeOption()?.displayName
             let wasFallback = transcriptionService.lastUsedFallback
             // The stop phrase goes first, before the dictionary rules can reshape it. (#145)
-            let spokenText = AppPreferences.shared.stripStopPhrase(rawText)
+            let spokenText = AppPreferences.shared.stripStopPhrase(rawText, cutAtLast: item.endedByStopPhrase)
             var text = AppPreferences.shared.cleanTranscription(spokenText)
             // The engine's own output, before the dictionary rules and any LLM cleanup, kept
             // for the post-record hook. Tracked alongside `text` rather than read from
@@ -205,7 +210,8 @@ final class DictationPipeline: ObservableObject {
             // recording) and surface a brief notice. (#short-dictation)
             if text == TranscriptionResult.noSpeech
                 || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let streamed = AppPreferences.shared.stripStopPhrase(item.streamedFallback)
+                let streamed = AppPreferences.shared.stripStopPhrase(item.streamedFallback,
+                                                                     cutAtLast: item.endedByStopPhrase)
                 let fallback = AppPreferences.shared
                     .cleanTranscription(streamed)
                     .trimmingCharacters(in: .whitespacesAndNewlines)

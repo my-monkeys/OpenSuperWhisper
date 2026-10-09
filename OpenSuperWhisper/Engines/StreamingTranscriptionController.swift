@@ -44,6 +44,11 @@ final class StreamingTranscriptionController: ObservableObject {
     /// old caption and its lingering `isRunning` blocks the next recording (#stale-caption).
     private var startGeneration = 0
 
+    /// When the microphone last carried speech, for the stop phrase: the caption lags the
+    /// voice by a second or so, so a phrase sitting at its end is only final once the room
+    /// has gone quiet too (#145). Written from the audio thread.
+    let voiceActivity = VoiceActivity()
+
     private init() {}
 
     /// Starts streaming. Throws if models/mic can't be set up — callers should fall back to the
@@ -114,7 +119,10 @@ final class StreamingTranscriptionController: ObservableObject {
         let input = audioEngine.inputNode
         do {
             try ObjCExceptionError.catching {
+                let voiceActivity = self.voiceActivity
+                voiceActivity.reset()
                 input.installTap(onBus: 0, bufferSize: 4096, format: nil) { buffer, _ in
+                    voiceActivity.observe(buffer)
                     bufferContinuation.yield(buffer)
                 }
             }

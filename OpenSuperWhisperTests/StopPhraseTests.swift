@@ -59,4 +59,34 @@ final class StopPhraseTests: XCTestCase {
         XCTAssertTrue(r.matched)
         XCTAssertEqual(r.text, "On s'arrête là.")
     }
+
+    // A take the phrase ended: the recorder ran on a moment after it.
+
+    private func cut(_ s: String, _ phrase: String = "stop") -> (text: String, matched: Bool) {
+        AppPreferences.parseStopPhrase(s, phrase: phrase, anchoredToEnd: false)
+    }
+
+    func testCutDropsWordsCaughtAfterThePhrase() {
+        let r = cut("Send the report tonight. Stop. Je continue")
+        XCTAssertTrue(r.matched)
+        XCTAssertEqual(r.text, "Send the report tonight.")
+    }
+
+    func testCutUsesTheLastOccurrence() {
+        let r = cut("Stop the build, then stop")
+        XCTAssertTrue(r.matched)
+        XCTAssertEqual(r.text, "Stop the build, then")
+    }
+
+    func testCutLeavesTextAloneWhenThePhraseIsFarFromTheEnd() {
+        // The final phrase was misheard; the only match left is content said long before.
+        let text = "Stop the build and tell everyone the release moves to Friday morning instead"
+        let r = cut(text)
+        XCTAssertFalse(r.matched)
+        XCTAssertEqual(r.text, text)
+    }
+
+    func testCutNeedsAWholeWord() {
+        XCTAssertFalse(cut("we went to the bus stops").matched)
+    }
 }

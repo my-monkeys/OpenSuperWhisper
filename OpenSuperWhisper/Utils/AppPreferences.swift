@@ -676,29 +676,48 @@ final class AppPreferences {
     @UserDefault(key: "stopPhraseSubmits", defaultValue: false)
     var stopPhraseSubmits: Bool
 
+    /// Milliseconds of silence the microphone needs after the stop phrase before the take
+    /// ends. Shorter stops sooner; longer survives a pause right after saying the phrase as
+    /// content. (#145)
+    @UserDefault(key: "stopPhraseSilenceMs", defaultValue: 1000)
+    var stopPhraseSilenceMs: Int
+    static let stopPhraseSilenceRange = 300...3000
+
     /// The dictation with a trailing stop phrase removed. The phrase is a command, not content,
-    /// so it is dropped whichever way the take ended.
-    func stripStopPhrase(_ text: String) -> String {
-        Self.parseStopPhrase(text, phrase: stopPhrase).text
+    /// so it is dropped whichever way the take ended. `cutAtLast` is for a take the phrase
+    /// ended: the recorder runs on a moment after it, so the text is cut at its last
+    /// occurrence, dropping whatever was caught after.
+    func stripStopPhrase(_ text: String, cutAtLast: Bool = false) -> String {
+        Self.parseStopPhrase(text, phrase: stopPhrase, anchoredToEnd: !cutAtLast).text
     }
 
     /// Pure matching behind `stripStopPhrase` and the live watcher (unit-tested directly). Same
     /// shape as `parseSubmitCommand`: anchored to the end, case-insensitive, the phrase's words
     /// separated by any run of spaces or commas, trailing punctuation allowed. The first word
     /// must start a word, so "over and out" does not match inside "hangover and out".
-    static func parseStopPhrase(_ text: String, phrase: String) -> (text: String, matched: Bool) {
+    static func parseStopPhrase(_ text: String, phrase: String,
+                                anchoredToEnd: Bool = true) -> (text: String, matched: Bool) {
         let words = phrase
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .map(NSRegularExpression.escapedPattern(for:))
         guard !words.isEmpty else { return (text, false) }
-        let pattern = "[\\s,]*(?<![\\p{L}\\p{N}])" + words.joined(separator: "[\\s,]+") + "[\\s\\p{P}]*$"
-        guard let range = text.range(
-            of: pattern, options: [.regularExpression, .caseInsensitive]) else {
+        let body = "[\\s,]*(?<![\\p{L}\\p{N}])" + words.joined(separator: "[\\s,]+") + "(?![\\p{L}\\p{N}])"
+        let pattern = anchoredToEnd ? body + "[\\s\\p{P}]*$" : body
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+              let last = regex.matches(in: text, range: NSRange(text.startIndex..., in: text)).last,
+              let range = Range(last.range, in: text) else {
             return (text, false)
         }
+        // Cutting mid-text is only safe near the end: if the file pass misheard the final
+        // phrase, the last match found could be one said much earlier, as content.
+        let tail = text[range.upperBound...].split(whereSeparator: { $0.isWhitespace })
+        guard tail.count <= stopPhraseTailWords else { return (text, false) }
         return (String(text[..<range.lowerBound]), true)
     }
+
+    /// How many words the recorder may catch after the stop phrase and still have them cut.
+    static let stopPhraseTailWords = 6
 
     /// Pause currently-playing media while recording, then resume. Opt-in (default
     /// off): it uses the private MediaRemote API and changes system playback.

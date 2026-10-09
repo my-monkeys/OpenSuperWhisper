@@ -52,11 +52,17 @@ class IndicatorViewModel: ObservableObject {
     private var liveStreamingActive = false
     /// Listens to the live caption for the stop phrase while a take records (#145).
     private var stopPhraseWatch: AnyCancellable?
-    private var stopPhraseFire: DispatchWorkItem?
-    /// How long the phrase has to stay at the end of the caption before the take ends. The
-    /// preview revises its tail as more audio arrives; a phrase that was only a passing guess
-    /// is gone again by then, and one that was really said is still there.
-    static let stopPhraseSettle: TimeInterval = 0.5
+    private var stopPhraseCheck: Timer?
+    /// The phrase ended this take; carried on the queued clip so the text is cut there.
+    private var endedByStopPhrase = false
+    /// Quiet needed after the phrase before the take ends, from Settings. The caption trails
+    /// the voice by about a second, so a phrase can sit at its end while the next words are
+    /// still being spoken; only silence on the microphone says the speaker has really finished.
+    static var stopPhraseSilence: TimeInterval {
+        let range = AppPreferences.stopPhraseSilenceRange
+        let ms = min(max(AppPreferences.shared.stopPhraseSilenceMs, range.lowerBound), range.upperBound)
+        return TimeInterval(ms) / 1000
+    }
     private var cancellables = Set<AnyCancellable>()
     
     private let recordingStore: RecordingStore
@@ -186,41 +192,45 @@ class IndicatorViewModel: ObservableObject {
         }
     }
 
-    /// Ends the take once the stop phrase sits at the end of the live caption and stays there
-    /// for `stopPhraseSettle`. The stop goes through `ShortcutManager`, like a trigger press.
+    /// Ends the take once the stop phrase sits at the end of the live caption and the
+    /// microphone has been quiet for `stopPhraseSilence`. The stop goes through
+    /// `ShortcutManager`, like a trigger press.
     private func watchForStopPhrase() {
         let phrase = AppPreferences.shared.stopPhrase
         guard liveStreamingActive,
               !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        endedByStopPhrase = false
         let live = StreamingTranscriptionController.shared
         stopPhraseWatch = live.$confirmedText.combineLatest(live.$volatileText)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                let heard = AppPreferences.parseStopPhrase(live.liveCaption, phrase: phrase).matched
-                guard heard else {
-                    self.stopPhraseFire?.cancel()
-                    self.stopPhraseFire = nil
+                guard AppPreferences.parseStopPhrase(live.liveCaption, phrase: phrase).matched else {
+                    self.stopPhraseCheck?.invalidate()
+                    self.stopPhraseCheck = nil
                     return
                 }
-                guard self.stopPhraseFire == nil else { return }
-                let fire = DispatchWorkItem { [weak self] in
-                    guard let self, self.liveStreamingActive,
-                          AppPreferences.parseStopPhrase(live.liveCaption, phrase: phrase).matched
-                    else { return }
-                    Diag.mark("stop phrase heard → stop recording")
-                    self.stopWatchingForStopPhrase()
-                    ShortcutManager.shared.endTakeOnStopPhrase()
+                guard self.stopPhraseCheck == nil else { return }
+                self.stopPhraseCheck = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+                    Task { @MainActor in self?.checkStopPhraseSilence() }
                 }
-                self.stopPhraseFire = fire
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.stopPhraseSettle, execute: fire)
             }
+    }
+
+    private func checkStopPhraseSilence() {
+        guard liveStreamingActive,
+              StreamingTranscriptionController.shared.voiceActivity.silenceDuration >= Self.stopPhraseSilence
+        else { return }
+        Diag.mark("stop phrase heard, then silence → stop recording")
+        stopWatchingForStopPhrase()
+        endedByStopPhrase = true
+        ShortcutManager.shared.endTakeOnStopPhrase()
     }
 
     private func stopWatchingForStopPhrase() {
         stopPhraseWatch = nil
-        stopPhraseFire?.cancel()
-        stopPhraseFire = nil
+        stopPhraseCheck?.invalidate()
+        stopPhraseCheck = nil
     }
 
     /// Decides what an Esc-cancel should do. Returns `true` when the recording
@@ -328,7 +338,9 @@ class IndicatorViewModel: ObservableObject {
             streamedFallback: streamedFallback,
             context: snapshot,
             modelOption: modelOption,
-            submitAfterInsert: submitAfterInsert)
+            submitAfterInsert: submitAfterInsert,
+            endedByStopPhrase: endedByStopPhrase)
+        endedByStopPhrase = false
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.
         delegate?.didFinishDecoding()
