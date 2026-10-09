@@ -315,21 +315,14 @@ struct AgentPanelView: View {
         .disabled(disabled)
     }
 
-    /// One line, like a chat box: the field, then every control on the right. While a reply is
-    /// being dictated they read delete, recording, stop, and send stops and sends at once.
+    /// One line, like a chat box: the microphone on the left, the field, send on the right.
+    /// While a reply is dictated the microphone opens into delete, recording and stop, and send
+    /// stops the take and sends it.
     private func composer(for request: AgentRequest) -> some View {
         let listening = inbox.armedReplyID == request.id
         let hasDraft = !(inbox.drafts[request.id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
         return VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .center, spacing: 8) {
-                TextField(placeholder(for: request, listening: listening), text: draft(for: request), axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13.5))
-                    .lineLimit(1...6)
-                    .padding(.vertical, 8)
-                    .padding(.leading, 10)
-                    .onSubmit { inbox.send(request) }
-
                 if listening {
                     composerButton("trash", tint: STheme.hint, fill: STheme.controlBg.opacity(0.8),
                                    help: "Delete this recording") { inbox.discardDictation() }
@@ -341,11 +334,22 @@ struct AgentPanelView: View {
                         .help("Recording")
                     composerButton("stop.fill", tint: STheme.accent, fill: STheme.accentSoft,
                                    help: "Stop, and put the words in the field") { inbox.stopDictating() }
-                    composerButton("arrow.up", tint: .white, fill: STheme.accent,
-                                   help: "Stop and send") { inbox.stopDictatingAndSend(request) }
                 } else {
                     composerButton("mic.fill", tint: STheme.accent, fill: STheme.accentSoft,
                                    help: "Dictate the answer") { inbox.dictateReply(to: request) }
+                }
+
+                TextField(placeholder(for: request, listening: listening), text: draft(for: request), axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13.5))
+                    .lineLimit(1...6)
+                    .padding(.vertical, 8)
+                    .onSubmit { inbox.send(request) }
+
+                if listening {
+                    composerButton("arrow.up", tint: .white, fill: STheme.accent,
+                                   help: "Stop and send") { inbox.stopDictatingAndSend(request) }
+                } else {
                     composerButton("arrow.up", tint: .white,
                                    fill: hasDraft ? STheme.accent : STheme.hint.opacity(0.35),
                                    help: "Send (⏎)") { inbox.send(request) }
