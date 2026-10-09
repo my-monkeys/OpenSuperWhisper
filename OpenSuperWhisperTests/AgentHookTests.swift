@@ -21,7 +21,7 @@ final class AgentHookTests: XCTestCase {
         XCTAssertEqual(request?.projectName, "site")
         XCTAssertEqual(request?.message, "Done. Shall I deploy?")
         XCTAssertEqual(request?.hookPID, 42)
-        XCTAssertEqual(request?.expiresAt, now.addingTimeInterval(AgentHookCommand.maxWait))
+        XCTAssertEqual(request?.expiresAt, now.addingTimeInterval(AgentHookCommand.wait))
     }
 
     func testGarbageInputMakesNoRequest() {
@@ -127,5 +127,33 @@ final class AgentHookTests: XCTestCase {
         XCTAssertEqual(AgentInbox.option(matching: "parakeet ultra.", in: question), "Parakeet Ultra")
         XCTAssertEqual(AgentInbox.option(matching: "Let's go with Whisper", in: question), "Whisper")
         XCTAssertNil(AgentInbox.option(matching: "neither", in: question))
+    }
+
+    // MARK: The Agents pane's switches
+
+    private func stopRequest(cwd: String) -> AgentRequest {
+        AgentHookCommand.makeStopRequest(from: stopInput(["session_id": "s", "cwd": cwd]))!
+    }
+
+    func testADisabledProjectAndItsSubfoldersStayInTheTerminal() {
+        let prefs = AppPreferences.shared
+        let saved = (prefs.agentDisabledProjects, prefs.agentRecentProjects, prefs.agentAskOnStop)
+        defer { (prefs.agentDisabledProjects, prefs.agentRecentProjects, prefs.agentAskOnStop) = saved }
+        prefs.agentAskOnStop = true
+        prefs.agentDisabledProjects = []
+        prefs.setAgentProject("/code/site", enabled: false)
+
+        XCTAssertFalse(AgentHookCommand.shouldAsk(stopRequest(cwd: "/code/site")))
+        XCTAssertFalse(AgentHookCommand.shouldAsk(stopRequest(cwd: "/code/site/docs")))
+        XCTAssertTrue(AgentHookCommand.shouldAsk(stopRequest(cwd: "/code/site-v2")), "a prefix that is not a subfolder")
+        XCTAssertEqual(prefs.agentRecentProjects.first, "/code/site-v2", "every project is remembered, asked or not")
+    }
+
+    func testTurningAMomentOffSkipsThePanel() {
+        let prefs = AppPreferences.shared
+        let saved = prefs.agentAskOnStop
+        defer { prefs.agentAskOnStop = saved }
+        prefs.agentAskOnStop = false
+        XCTAssertFalse(AgentHookCommand.shouldAsk(stopRequest(cwd: "/code/other")))
     }
 }

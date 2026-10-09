@@ -26,8 +26,8 @@ enum AgentHookCommand {
         case "question": request = makeQuestionRequest(from: json)
         default: request = nil
         }
-        guard let request,
-              let requestURL = AgentBridge.requestURL(request.id),
+        guard let request, shouldAsk(request) else { exit(0) }
+        guard let requestURL = AgentBridge.requestURL(request.id),
               let responseURL = AgentBridge.responseURL(request.id),
               (try? AgentBridge.write(request, to: requestURL)) != nil else { exit(0) }
 
@@ -41,6 +41,23 @@ enum AgentHookCommand {
             FileHandle.standardOutput.write(output)
         }
         exit(0)
+    }
+
+    /// Whether the user wants the panel for this one: the project is remembered for the Agents
+    /// pane either way, then the pane's switches decide.
+    static func shouldAsk(_ request: AgentRequest, prefs: AppPreferences = .shared) -> Bool {
+        prefs.rememberAgentProject(request.cwd)
+        guard prefs.agentProjectEnabled(request.cwd) else { return false }
+        switch request.kind {
+        case .stop: return prefs.agentAskOnStop
+        case .permission: return prefs.agentAskOnPermission
+        case .question: return prefs.agentAskOnQuestion
+        }
+    }
+
+    /// The pane's wait, never past what Claude Code allows the hook.
+    static var wait: TimeInterval {
+        TimeInterval(min(max(AppPreferences.shared.agentWaitSeconds, 30), Int(maxWait)))
     }
 
     static func output(for kind: AgentRequest.Kind, response: AgentResponse?,
@@ -63,7 +80,7 @@ enum AgentHookCommand {
             cwd: (json["cwd"] as? String) ?? FileManager.default.currentDirectoryPath,
             message: message,
             createdAt: now,
-            expiresAt: now.addingTimeInterval(maxWait),
+            expiresAt: now.addingTimeInterval(wait),
             hookPID: pid)
     }
 

@@ -1554,11 +1554,11 @@ struct ShortcutBadge: View {
 
 /// The settings tabs, shown as a vertical sidebar in the dedicated settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case dictation, appearance, models, output, rules, history, transcriptions, advanced, updates, feedback
+    case dictation, appearance, models, output, rules, agents, history, transcriptions, advanced, updates, feedback
     var id: String { rawValue }
 
     /// Main navigation (sidebar top) vs utility items (sidebar footer).
-    static let main: [SettingsTab] = [.transcriptions, .dictation, .appearance, .models, .output, .rules, .history, .advanced]
+    static let main: [SettingsTab] = [.transcriptions, .dictation, .appearance, .models, .output, .rules, .agents, .history, .advanced]
     static let footer: [SettingsTab] = [.updates, .feedback]
 
     var title: String {
@@ -1568,6 +1568,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .models: return "Models"
         case .output: return "Output"
         case .rules: return "Rules"
+        case .agents: return "Agents"
         case .history: return "History & Privacy"
         case .transcriptions: return "Transcriptions"
         case .advanced: return "Advanced"
@@ -1584,6 +1585,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .models: return "cpu"
         case .output: return "text.bubble"
         case .rules: return "arrow.triangle.branch"
+        case .agents: return "terminal"
         case .history: return "clock.arrow.circlepath"
         case .transcriptions: return "list.bullet.rectangle.portrait"
         case .advanced: return "gearshape"
@@ -1696,6 +1698,7 @@ struct SettingsView: View {
         case .models:    modelSettings
         case .output:    transcriptionSettings
         case .rules:     AppContextSettingsView(viewModel: viewModel)
+        case .agents:    AgentsSettingsPane()
         case .history:   storageSettings
         case .transcriptions: EmptyView()  // kept mounted by `detailStack`
         case .advanced:  advancedSettings
