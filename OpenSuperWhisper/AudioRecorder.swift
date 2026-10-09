@@ -133,6 +133,11 @@ class AudioRecorder: NSObject, ObservableObject {
         case stop = "notification-stop"
     }
 
+    /// How long the chime is worth hearing before the volume may drop. The file runs about
+    /// 1.8 s, silence included, and waiting for all of it left the room loud well into the
+    /// take. Measured, the note has faded by about 20 dB at 150 ms.
+    static let chimeAudibleLength: TimeInterval = 0.15
+
     func playNotificationSound(_ chime: Chime = .start) {
         // Try to play using NSSound first
         guard let soundURL = Bundle.main.url(forResource: chime.rawValue, withExtension: "mp3") else {
@@ -202,7 +207,7 @@ class AudioRecorder: NSObject, ObservableObject {
         var chimeLength: TimeInterval = 0
         if AppPreferences.shared.playSoundOnRecordStart {
             playNotificationSound()
-            chimeLength = notificationSound?.duration ?? 0
+            chimeLength = Self.chimeAudibleLength
         }
         if AppPreferences.shared.reduceVolumeOnRecord {
             let level = Float32(AppPreferences.shared.reduceVolumeLevel)
