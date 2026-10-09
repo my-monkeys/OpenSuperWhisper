@@ -8,7 +8,7 @@ import SwiftUI
 final class AgentPanelController {
     static let shared = AgentPanelController()
 
-    static let width: CGFloat = 380
+    static let width: CGFloat = 560
     static let margin: CGFloat = 16
 
     private var panel: AgentPanel?
@@ -75,10 +75,21 @@ final class AgentPanel: NSPanel {
 
 struct AgentPanelView: View {
     @ObservedObject var inbox: AgentInbox
+    /// Which waiting agent is shown when several are; falls back to the oldest.
+    @State private var selectedID: String?
+
+    /// Long replies scroll inside the card rather than growing it past most of the screen.
+    private var maxMessageHeight: CGFloat {
+        ((NSScreen.main?.visibleFrame.height ?? 900) * 0.55).rounded()
+    }
+
+    private var current: AgentRequest? {
+        inbox.pending.first { $0.id == selectedID } ?? inbox.pending.first
+    }
 
     var body: some View {
         Group {
-            if let request = inbox.pending.first {
+            if let request = current {
                 card(for: request)
             }
         }
@@ -86,85 +97,135 @@ struct AgentPanelView: View {
     }
 
     private func card(for request: AgentRequest) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             header(for: request)
             ScrollView {
-                Text(Self.rendered(request.message))
-                    .font(.system(size: 12))
-                    .foregroundColor(STheme.text)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                MarkdownView(markdown: request.message.isEmpty ? "_No message._" : request.message)
+                    .padding(.trailing, 6)
             }
-            .frame(maxHeight: 170)
+            .frame(maxHeight: maxMessageHeight)
             .fixedSize(horizontal: false, vertical: true)
-
-            TextField("Reply, or dictate it", text: draft(for: request), axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
-                .lineLimit(1...6)
-                .padding(.horizontal, 9).padding(.vertical, 7)
-                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                .overlay(RoundedRectangle(cornerRadius: 7)
-                    .stroke(inbox.armedReplyID == request.id ? STheme.accent : STheme.controlBorder, lineWidth: 1))
-                .onSubmit { inbox.send(request) }
-
-            actions(for: request)
+            composer(for: request)
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 12).fill(STheme.windowBg))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(STheme.controlBorder, lineWidth: 1))
+        .padding(.horizontal, 22).padding(.top, 18).padding(.bottom, 16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+        .padding(10)  // room for the shadow inside the borderless panel
     }
 
     private func header(for request: AgentRequest) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "terminal")
-                .font(.system(size: 11, weight: .semibold))
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "sparkle")
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(STheme.accent)
-            Text("\(request.agent) · \(request.projectName)")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(STheme.textBright)
-                .lineLimit(1)
-            Spacer(minLength: 6)
-            if inbox.pending.count > 1 {
-                Text("\(inbox.pending.count - 1) more waiting")
-                    .font(.system(size: 10.5))
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(STheme.accentSoft))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(request.displayTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(STheme.textBright)
+                    .lineLimit(1)
+                // Redrawn every half minute so "2 minutes ago" keeps counting while it waits.
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    Text(subtitle(for: request, now: context.date))
+                        .font(.system(size: 11.5))
+                        .foregroundColor(STheme.hint)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            if inbox.pending.count > 1 { pager(for: request) }
+            Button { inbox.dismiss(request) } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(STheme.hint)
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(STheme.controlBg.opacity(0.6)))
+            }
+            .buttonStyle(.plain)
+            .pointerCursorOnHover()
+            .help("Let it stop: the agent waits in its terminal, as it would without OpenSuperWhisper")
+        }
+    }
+
+    private func subtitle(for request: AgentRequest, now: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.dateTimeStyle = .named  // "now" rather than "in 0 seconds"
+        let age = formatter.localizedString(for: min(request.createdAt, now), relativeTo: now)
+        let project = request.title == nil ? "" : " · \(request.projectName)"
+        return "\(request.agent)\(project) · \(age)"
+    }
+
+    private func pager(for request: AgentRequest) -> some View {
+        let index = inbox.pending.firstIndex { $0.id == request.id } ?? 0
+        return HStack(spacing: 2) {
+            pagerButton("chevron.left", disabled: index == 0) { selectedID = inbox.pending[index - 1].id }
+            Text("\(index + 1)/\(inbox.pending.count)")
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundColor(STheme.hint)
+            pagerButton("chevron.right", disabled: index >= inbox.pending.count - 1) {
+                selectedID = inbox.pending[index + 1].id
             }
         }
     }
 
-    private func actions(for request: AgentRequest) -> some View {
+    private func pagerButton(_ symbol: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .bold))
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.plain)
+        .foregroundColor(disabled ? STheme.hint.opacity(0.4) : STheme.text)
+        .disabled(disabled)
+    }
+
+    /// One line, like a chat box: the microphone on the left, the field, send on the right.
+    private func composer(for request: AgentRequest) -> some View {
         let listening = inbox.armedReplyID == request.id
         let hasDraft = !(inbox.drafts[request.id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        return HStack(spacing: 8) {
-            Button {
-                inbox.dictateReply(to: request)
-            } label: {
-                Label(listening ? "Listening…" : "Dictate", systemImage: listening ? "waveform" : "mic.fill")
-                    .font(.system(size: 11.5, weight: .medium))
+        return HStack(alignment: .bottom, spacing: 10) {
+            Button { inbox.dictateReply(to: request) } label: {
+                Image(systemName: listening ? "waveform" : "mic.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(listening ? .white : STheme.accent)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(listening ? STheme.accent : STheme.accentSoft))
+                    .symbolEffect(.variableColor.iterative, isActive: listening)
             }
+            .buttonStyle(.plain)
+            .pointerCursorOnHover()
+            .help(listening ? "Listening. Stop as usual, with your trigger or the stop phrase"
+                            : "Dictate the answer")
             .disabled(listening)
-            Spacer()
-            Button("Let it stop") { inbox.dismiss(request) }
-                .font(.system(size: 11.5))
-                .help("The agent stops and waits in its terminal, as it would without OpenSuperWhisper")
-            Button("Send") { inbox.send(request) }
-                .font(.system(size: 11.5, weight: .semibold))
-                .disabled(!hasDraft)
+
+            TextField(listening ? "Listening…" : "Answer \(request.agent)", text: draft(for: request), axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13.5))
+                .lineLimit(1...6)
+                .padding(.vertical, 8)
+                .onSubmit { inbox.send(request) }
+
+            Button { inbox.send(request) } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(hasDraft ? STheme.accent : STheme.hint.opacity(0.35)))
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasDraft)
+            .help("Send (⏎)")
         }
-        .controlSize(.small)
+        .padding(.leading, 6).padding(.trailing, 6).padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(STheme.inputBg.opacity(0.75)))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .strokeBorder(listening ? STheme.accent.opacity(0.7) : STheme.controlBorder.opacity(0.6), lineWidth: 1))
     }
 
     private func draft(for request: AgentRequest) -> Binding<String> {
         Binding(get: { inbox.drafts[request.id] ?? "" },
                 set: { inbox.drafts[request.id] = $0 })
-    }
-
-    /// The agent writes Markdown; inline styling (bold, code, links) reads better than the raw
-    /// asterisks and backticks, and blocks stay as written.
-    static func rendered(_ message: String) -> AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        return (try? AttributedString(markdown: message, options: options)) ?? AttributedString(message)
     }
 }

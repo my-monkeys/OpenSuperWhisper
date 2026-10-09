@@ -44,11 +44,43 @@ enum AgentHookCommand {
             kind: .stop,
             agent: "Claude Code",
             sessionID: (json["session_id"] as? String) ?? "",
+            title: (json["transcript_path"] as? String).flatMap(sessionTitle(transcriptPath:)),
             cwd: (json["cwd"] as? String) ?? FileManager.default.currentDirectoryPath,
             message: message.trimmingCharacters(in: .whitespacesAndNewlines),
             createdAt: now,
             expiresAt: now.addingTimeInterval(maxWait),
             hookPID: pid)
+    }
+
+    /// How far back from the end of the transcript to look. Claude Code writes the title
+    /// records again on every turn, so the tail always has the current ones, and a long
+    /// session's transcript runs to tens of megabytes.
+    static let titleScanBytes = 4 << 20
+
+    /// The session's name: the last name given with /rename, else the last one Claude Code
+    /// wrote itself. nil when neither is there yet (a first turn may not have one).
+    static func sessionTitle(transcriptPath: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: transcriptPath) else { return nil }
+        defer { try? handle.close() }
+        let size = (try? handle.seekToEnd()) ?? 0
+        try? handle.seek(toOffset: size > UInt64(titleScanBytes) ? size - UInt64(titleScanBytes) : 0)
+        guard let data = try? handle.readToEnd() else { return nil }
+        return sessionTitle(inTranscript: String(decoding: data, as: UTF8.self))
+    }
+
+    static func sessionTitle(inTranscript text: String) -> String? {
+        var custom: String?
+        var generated: String?
+        for line in text.split(separator: "\n") where line.contains("title\"") {
+            guard let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { continue }
+            switch json["type"] as? String {
+            case "custom-title": custom = (json["customTitle"] as? String) ?? custom
+            case "ai-title": generated = (json["aiTitle"] as? String) ?? generated
+            default: break
+            }
+        }
+        let title = (custom ?? generated)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title?.isEmpty == false ? title : nil
     }
 
     /// A Stop hook keeps the agent going by "blocking" the stop with a reason; the reason is what

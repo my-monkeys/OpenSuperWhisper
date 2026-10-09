@@ -68,6 +68,9 @@ struct AgentRequest: Codable, Identifiable, Equatable {
     /// "Claude Code" today; the field is there for the other agents the same plugin shape fits.
     let agent: String
     let sessionID: String
+    /// The session's name in Claude Code: the one given with /rename, else the one it wrote
+    /// itself. What tells two agents in the same project apart.
+    var title: String? = nil
     /// The project the agent runs in. Its last component is what the panel shows.
     let cwd: String
     /// What the agent said last, shown so the reply has its context.
@@ -79,6 +82,11 @@ struct AgentRequest: Codable, Identifiable, Equatable {
     let hookPID: Int32
 
     var projectName: String { URL(fileURLWithPath: cwd).lastPathComponent }
+
+    var displayTitle: String {
+        guard let title, !title.isEmpty else { return projectName }
+        return title
+    }
 }
 
 /// The user's answer to one request.
