@@ -304,9 +304,24 @@ class ShortcutManager {
 
     /// Starts a recording, or stops the one running, as one press of the trigger would. For the
     /// agent panel's Dictate button.
-    func toggleRecordingFromApp() {
+    @MainActor func toggleRecordingFromApp(showBubble: Bool = true) {
+        if activeVm == nil, !showBubble {
+            IndicatorWindowManager.shared.hideNextBubble = true
+        }
         handleKeyDown()
         handleKeyUp()
+    }
+
+    /// Discards the running take, without the confirmation Esc asks for on a long one: this is
+    /// a button the user aimed at, not a key that may have been brushed.
+    func cancelRecordingFromApp() {
+        Task { @MainActor in
+            guard self.activeVm != nil else { return }
+            IndicatorWindowManager.shared.stopForce()
+            self.activeVm = nil
+            self.holdMode = false
+            LatchKeyMonitor.shared.stop()
+        }
     }
 
     /// The stop phrase was heard at the end of the live transcript: end the take the way the

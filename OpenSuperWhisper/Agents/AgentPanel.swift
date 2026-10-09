@@ -338,21 +338,37 @@ struct AgentPanelView: View {
                 .padding(.vertical, 8)
                 .onSubmit { inbox.send(request) }
 
-            Button { inbox.send(request) } label: {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(hasDraft ? STheme.accent : STheme.hint.opacity(0.35)))
+            if listening {
+                // The recording runs without the usual bubble, so its controls live here.
+                composerButton("trash", tint: STheme.hint, fill: STheme.controlBg.opacity(0.8),
+                               help: "Delete this recording") { inbox.discardDictation() }
+                composerButton("stop.fill", tint: .white, fill: STheme.accent,
+                               help: "Stop, and put the words in the field") { inbox.stopDictating() }
+            } else {
+                composerButton("arrow.up", tint: .white,
+                               fill: hasDraft ? STheme.accent : STheme.hint.opacity(0.35),
+                               help: "Send (⏎)") { inbox.send(request) }
+                    .disabled(!hasDraft)
             }
-            .buttonStyle(.plain)
-            .disabled(!hasDraft)
-            .help("Send (⏎)")
         }
         .padding(.leading, 6).padding(.trailing, 6).padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(STheme.inputBg.opacity(0.75)))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
             .strokeBorder(listening ? STheme.accent.opacity(0.7) : STheme.controlBorder.opacity(0.6), lineWidth: 1))
+    }
+
+    private func composerButton(_ symbol: String, tint: Color, fill: Color, help: String,
+                                action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(tint)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(fill))
+        }
+        .buttonStyle(.plain)
+        .pointerCursorOnHover()
+        .help(help)
     }
 
     private func draft(for request: AgentRequest) -> Binding<String> {

@@ -158,7 +158,19 @@ final class AgentInbox: ObservableObject {
     /// stop phrase) ends it as usual.
     func dictateReply(to request: AgentRequest) {
         armedReplyID = request.id
+        // The panel shows the recording itself, with its own stop and delete buttons.
+        ShortcutManager.shared.toggleRecordingFromApp(showBubble: false)
+    }
+
+    /// Ends the reply being dictated; its text then lands in the composer as usual.
+    func stopDictating() {
         ShortcutManager.shared.toggleRecordingFromApp()
+    }
+
+    /// Throws the reply being dictated away.
+    func discardDictation() {
+        ShortcutManager.shared.cancelRecordingFromApp()
+        armedReplyID = nil
     }
 
     /// Hands the armed request to the recording that is stopping, and disarms.
