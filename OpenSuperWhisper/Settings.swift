@@ -2928,16 +2928,21 @@ struct SettingsView: View {
                             disabled: viewModel.selectedEngine != "fluidaudio")
                 }
                 .frame(minHeight: 26)
-                if viewModel.liveTranscriptionEnabled && viewModel.selectedEngine == "fluidaudio" {
-                    SRow(title: "Stop phrase",
-                         hint: "Saying it as the last words ends the recording, and it is left out of the text. Empty = off",
-                         indented: true) {
-                        sInput($viewModel.stopPhrase, prompt: "over and out", width: 150)
-                    }
-                    if !viewModel.stopPhrase.trimmingCharacters(in: .whitespaces).isEmpty {
-                        SRow(title: "Press Return after the stop phrase", indented: true) {
-                            SToggle(isOn: $viewModel.stopPhraseSubmits)
-                        }
+                // Always listed, so it can be found; it is heard on the live caption, so it only
+                // takes input while live transcription runs.
+                let stopPhraseAvailable = viewModel.liveTranscriptionEnabled && viewModel.selectedEngine == "fluidaudio"
+                SRow(title: "Stop phrase",
+                     hint: stopPhraseAvailable
+                        ? "Saying it as the last words ends the recording, and it is left out of the text. Empty = off"
+                        : "Turn on Live transcription to use it",
+                     indented: true) {
+                    sInput($viewModel.stopPhrase, prompt: "over and out", width: 150)
+                        .disabled(!stopPhraseAvailable)
+                        .opacity(stopPhraseAvailable ? 1 : 0.45)
+                }
+                if stopPhraseAvailable && !viewModel.stopPhrase.trimmingCharacters(in: .whitespaces).isEmpty {
+                    SRow(title: "Press Return after the stop phrase", indented: true) {
+                        SToggle(isOn: $viewModel.stopPhraseSubmits)
                     }
                 }
                 SRow(title: "Pause media during recording",

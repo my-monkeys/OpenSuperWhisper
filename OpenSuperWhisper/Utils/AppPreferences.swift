@@ -57,11 +57,41 @@ final class AppPreferences {
     /// Carries the three single-slot trigger preferences into the list. Idempotent: only runs
     /// while the new key is unset. The old keys stay readable so a downgrade still finds them.
     private func migrateRecordingTriggers() {
-        guard recordingTriggers.isEmpty else { return }
+        guard recordingTriggers.isEmpty else {
+            healOnboardingTrigger()
+            return
+        }
         recordingTriggers = RecordingTriggerSet.migrated(
             mouseRaw: mouseButtonHotkey,
             modifierRaw: modifierOnlyHotkey,
             shortcut: KeyboardShortcuts.getShortcut(for: .toggleRecord)).json
+    }
+
+    /// Onboarding's Right ⌥ choice is the list's job now. It used to land only in the old
+    /// single-slot key, which the migration above had already read on first launch, so a
+    /// fresh install kept a trigger list with no Right ⌥ and Settings showed the key as
+    /// unbound. Adds or removes it in the regular list, never touching the hold-only one.
+    func setRightOptionTrigger(_ enabled: Bool) {
+        var set = RecordingTriggerSet.load(from: recordingTriggers)
+        let trigger = RecordingTrigger.modifier(.rightOption)
+        if enabled {
+            guard !RecordingTriggerSet.load(from: holdRecordingTriggers).triggers.contains(trigger)
+            else { return }
+            set.add(trigger)
+        } else {
+            set.remove(trigger)
+        }
+        recordingTriggers = set.json
+    }
+
+    /// One-time repair for installs onboarded with that bug: the old key still says Right ⌥
+    /// while neither list has it. Once only, so removing it in Settings afterwards sticks.
+    private func healOnboardingTrigger() {
+        let flag = "onboardingTriggerHealed"
+        guard !DefaultsStore.current.bool(forKey: flag) else { return }
+        DefaultsStore.current.set(true, forKey: flag)
+        guard modifierOnlyHotkey == ModifierKey.rightOption.rawValue else { return }
+        setRightOptionTrigger(true)
     }
 
     /// Carry the old independent indicator switches into one ordered layout, so an existing

@@ -485,16 +485,11 @@ struct ContentView: View {
     }
 
     private var currentShortcutDescription: String {
-        let mouseButton = MouseButton(rawValue: AppPreferences.shared.mouseButtonHotkey) ?? .none
-        if mouseButton != .none {
-            return mouseButton.shortSymbol
-        }
-        let modifierKey = ModifierKey(rawValue: AppPreferences.shared.modifierOnlyHotkey) ?? .none
-        if modifierKey != .none {
-            return modifierKey.shortSymbol
-        } else if let shortcut = KeyboardShortcuts.getShortcut(for: .toggleRecord) {
-            return shortcut.description
-        }
+        // The trigger list is what the app listens to; the old single-slot keys can disagree.
+        let set = RecordingTriggerSet.load(from: AppPreferences.shared.recordingTriggers)
+        if let button = set.mouseButtons.first { return button.shortSymbol }
+        if let key = set.modifiers.first { return key.shortSymbol }
+        if let combo = set.keyCombos.first { return combo.description }
         return ""
     }
     
