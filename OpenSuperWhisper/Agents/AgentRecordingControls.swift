@@ -13,6 +13,10 @@ struct AgentRecordingControls: View {
 
     static let size: CGFloat = 34
     static let spacing: CGFloat = 8
+    /// How close two shapes must be for the glass to blend them. Kept under `spacing`, so once
+    /// they have separated they stay clean circles; at the container's old 12 pt the settled
+    /// shapes were still close enough to be bridged, and each kept a point toward the next.
+    static let blendDistance: CGFloat = 4
     /// Soft enough to read as liquid, damped enough not to wobble when it settles.
     static let morph = Animation.spring(response: 0.5, dampingFraction: 0.74)
 
@@ -33,7 +37,7 @@ struct AgentRecordingControls: View {
 
     @available(macOS 26.0, *)
     private var glassControls: some View {
-        GlassEffectContainer(spacing: Self.spacing + 4) {
+        GlassEffectContainer(spacing: Self.blendDistance) {
             HStack(spacing: Self.spacing) {
                 if listening {
                     icon("trash", tint: .red, action: onDelete, help: "Delete this recording")
@@ -77,7 +81,16 @@ struct AgentRecordingControls: View {
 
     /// One shape for both states, so it grows from the microphone's circle into the meter's pill
     /// rather than one being swapped for the other.
+    /// A Button rather than a tap gesture: under interactive glass a tap gesture could lose the
+    /// click to the glass's own press handling, so it sometimes took a second one.
     private var center: some View {
+        Button { if !listening { onDictate() } } label: { centerLabel }
+            .buttonStyle(.plain)
+            .pointerCursorOnHover()
+            .help(listening ? "Recording" : "Dictate the answer")
+    }
+
+    private var centerLabel: some View {
         ZStack {
             if listening {
                 AgentLiveMeter()
@@ -91,9 +104,6 @@ struct AgentRecordingControls: View {
         }
         .frame(width: listening ? Self.meterWidth : Self.size, height: Self.size)
         .contentShape(Capsule())
-        .onTapGesture { if !listening { onDictate() } }
-        .pointerCursorOnHover()
-        .help(listening ? "Recording" : "Dictate the answer")
     }
 
     static var meterWidth: CGFloat {

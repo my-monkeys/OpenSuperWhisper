@@ -37,7 +37,7 @@ final class AgentPanelController {
             panel.isOpaque = false
             panel.hasShadow = true
             panel.hidesOnDeactivate = false
-            let host = NSHostingView(rootView: AgentPanelView(inbox: .shared))
+            let host = FirstClickHostingView(rootView: AgentPanelView(inbox: .shared))
             host.sizingOptions = [.preferredContentSize]
             panel.contentView = host
             // The card grows with the reply; keep its top edge where it was.
@@ -70,6 +70,13 @@ final class AgentPanelController {
         panel.setFrameOrigin(NSPoint(x: visible.maxX - size.width - Self.margin,
                                      y: visible.maxY - size.height - Self.margin))
     }
+}
+
+/// The panel opens without focus, and AppKit spends the first click on an unfocused window
+/// making it key: the microphone looked as if it ignored the press. This lets that first
+/// click reach the button too.
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 /// Borderless panels refuse key status by default, which would leave the reply field unable to
