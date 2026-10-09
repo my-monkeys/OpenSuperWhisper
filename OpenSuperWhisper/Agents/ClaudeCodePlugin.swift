@@ -33,17 +33,22 @@ enum ClaudeCodePlugin {
         return enabled[pluginID] as? Bool == true
     }
 
-    static func install() async -> Result<Void, PluginError> {
+    /// `step` names what is running, for the pane to show: adding the marketplace clones the
+    /// repository from GitHub and can take a while, and a bare spinner said nothing about it.
+    static func install(step: @escaping @MainActor (String) -> Void) async -> Result<Void, PluginError> {
+        await step("Adding the OpenSuperWhisper marketplace from GitHub…")
         // Adding a marketplace that is already there fails; that one is not a reason to stop.
         if case .failure(let error) = await run(["plugin", "marketplace", "add", marketplace]),
            !error.message.localizedCaseInsensitiveContains("already") {
             return .failure(error)
         }
+        await step("Installing the plugin into Claude Code…")
         return await run(["plugin", "install", pluginID]).map { _ in }
     }
 
-    static func uninstall() async -> Result<Void, PluginError> {
-        await run(["plugin", "uninstall", pluginID]).map { _ in }
+    static func uninstall(step: @escaping @MainActor (String) -> Void) async -> Result<Void, PluginError> {
+        await step("Removing the plugin from Claude Code…")
+        return await run(["plugin", "uninstall", pluginID]).map { _ in }
     }
 
     struct PluginError: Error, Equatable {

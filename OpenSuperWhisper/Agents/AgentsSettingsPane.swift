@@ -6,6 +6,8 @@ struct AgentsSettingsPane: View {
     /// nil until the background check answers.
     @State private var status: ClaudeCodePlugin.Status?
     @State private var working = false
+    /// What the install or removal is doing right now, shown in place of the status hint.
+    @State private var step: String?
     @State private var error: String?
 
     @State private var enabled = AppPreferences.shared.agentsEnabled
@@ -84,7 +86,7 @@ struct AgentsSettingsPane: View {
                 Text(statusTitle)
                     .scaledFont(size: 13, weight: .medium)
                     .foregroundColor(STheme.text)
-                Text(statusHint)
+                Text(working ? (step ?? "Working…") : statusHint)
                     .scaledFont(size: 11)
                     .foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
@@ -97,10 +99,10 @@ struct AgentsSettingsPane: View {
                 case nil:
                     ProgressView().controlSize(.small)
                 case .installed:
-                    Button("Remove") { change(ClaudeCodePlugin.uninstall) }
+                    Button("Remove") { change { await ClaudeCodePlugin.uninstall(step: $0) } }
                         .controlSize(.small)
                 case .notInstalled:
-                    Button("Install the plugin") { change(ClaudeCodePlugin.install) }
+                    Button("Install the plugin") { change { await ClaudeCodePlugin.install(step: $0) } }
                         .controlSize(.small)
                         .buttonStyle(.borderedProminent)
                         .tint(STheme.accent)
@@ -134,12 +136,16 @@ struct AgentsSettingsPane: View {
         }
     }
 
-    private func change(_ action: @escaping () async -> Result<Void, ClaudeCodePlugin.PluginError>) {
+    private func change(
+        _ action: @escaping (@escaping @MainActor (String) -> Void) async -> Result<Void, ClaudeCodePlugin.PluginError>
+    ) {
         working = true
+        step = nil
         error = nil
         Task {
-            let result = await action()
+            let result = await action { step = $0 }
             working = false
+            step = nil
             if case .failure(let failure) = result { error = failure.message }
             status = await ClaudeCodePlugin.status()
         }

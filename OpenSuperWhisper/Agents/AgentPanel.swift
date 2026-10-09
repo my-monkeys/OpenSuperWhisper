@@ -18,10 +18,55 @@ final class AgentPanelController {
     /// The panel is the key window: the user clicked into it, so their trigger answers it.
     var hasFocus: Bool { panel?.isKeyWindow == true && panel?.isVisible == true }
 
+    private var returnMonitor: Any?
+
+    /// Return in the panel, handled here rather than by the field: a multi-line SwiftUI field
+    /// takes Return for itself and never submits, so pressing it did nothing. Return sends,
+    /// ⇧Return starts a new line. While a reply is dictated, Return stops and sends it, unless
+    /// the user has a stop-and-submit binding of their own, which then does that job alone.
+    private func watchReturnKey() {
+        guard returnMonitor == nil else { return }
+        returnMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let isReturn = event.keyCode == 36 || event.keyCode == 76  // Return, keypad Enter
+            guard isReturn, event.window is AgentPanel else { return event }
+            // The field does not break the line on ⇧Return either, so the break is typed here,
+            // at the caret, through the field's own text view.
+            if event.modifierFlags.contains(.shift) {
+                (event.window?.firstResponder as? NSTextView)?.insertNewlineIgnoringFieldEditor(nil)
+                return nil
+            }
+            guard let request = AgentInbox.shared.current else { return event }
+            let inbox = AgentInbox.shared
+            if inbox.armedReplyID == request.id {
+                guard AgentShortcutHints.submitKeys() == nil else { return event }
+                inbox.stopDictatingAndSend(request)
+            } else {
+                inbox.send(request)
+            }
+            return nil
+        }
+    }
+
+    /// Makes the panel key, so the reply field can take the caret.
+    func focus() {
+        panel?.makeKey()
+    }
+
+    private func stopWatchingReturnKey() {
+        if let returnMonitor { NSEvent.removeMonitor(returnMonitor) }
+        returnMonitor = nil
+    }
+
     private init() {}
 
     func update(visible: Bool) {
-        if visible { show() } else { hide() }
+        if visible {
+            show()
+            watchReturnKey()
+        } else {
+            hide()
+            stopWatchingReturnKey()
+        }
     }
 
     private func show() {
@@ -87,6 +132,9 @@ final class AgentPanel: NSPanel {
 
 struct AgentPanelView: View {
     @ObservedObject var inbox: AgentInbox
+    /// The reply field takes the caret back when a take ends, so the user sees where the
+    /// words went and can carry on typing.
+    @FocusState private var replyFocused: Bool
     /// Which waiting agent is shown when several are; falls back to the oldest.
 
     /// Long replies scroll inside the card rather than growing it past most of the screen.
@@ -372,6 +420,12 @@ struct AgentPanelView: View {
             shortcutHints(listening: listening)
                 .padding(.leading, 14)
         }
+        .onChange(of: listening) {
+            guard !listening else { return }
+            AgentPanelController.shared.focus()
+            // The field is rebuilt as the bar unfolds; focus it once it is back.
+            DispatchQueue.main.async { replyFocused = true }
+        }
     }
 
     /// The keys that work here, spelled the way the user set them up. The recording trigger
@@ -406,7 +460,7 @@ struct AgentPanelView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13.5))
                     .padding(.vertical, 8)
-                    .onSubmit { inbox.send(request) }
+                    .focused($replyFocused)
                     .id(Self.replyEnd)
             }
             .scrollIndicators(.never)
@@ -493,26 +547,31 @@ struct AgentShortcutHints {
     let keys: String
     let action: String
 
-    @MainActor static func current(listening: Bool) -> [AgentShortcutHints] {
+    /// The user's own stop-and-submit binding, spelled out; nil when they have none.
+    @MainActor static func submitKeys() -> String? {
         let prefs = AppPreferences.shared
-        let trigger = RecordingTriggerSet.load(from: prefs.recordingTriggers).triggers.first
-            .map { $0.caps.joined(separator: " ") }
         let submit = RecordingTrigger.resolve(
             mouseRaw: prefs.submitMouseButtonHotkey,
             modifierRaw: prefs.submitModifierOnlyHotkey,
             shortcut: KeyboardShortcuts.getShortcut(for: .toggleRecordAndSubmit))
-        let submitKeys: String? = ModifierChord(storageValue: prefs.submitModifierChord)
-            .map { $0.symbols.joined() }
+        return ModifierChord(storageValue: prefs.submitModifierChord).map { $0.symbols.joined() }
             ?? (submit == .none ? nil : submit.caps.joined(separator: " "))
+    }
 
+    @MainActor static func current(listening: Bool) -> [AgentShortcutHints] {
+        let prefs = AppPreferences.shared
+        let trigger = RecordingTriggerSet.load(from: prefs.recordingTriggers).triggers.first
+            .map { $0.caps.joined(separator: " ") }
         var hints: [AgentShortcutHints] = []
         if listening {
             if let trigger { hints.append(.init(keys: trigger, action: "stop")) }
-            if let submitKeys { hints.append(.init(keys: submitKeys, action: "stop and send")) }
+            // Return stands in for a stop-and-submit binding the user has not set up.
+            hints.append(.init(keys: submitKeys() ?? "⏎", action: "stop and send"))
             hints.append(.init(keys: "esc", action: "delete"))
         } else {
             if let trigger { hints.append(.init(keys: trigger, action: "dictate")) }
             hints.append(.init(keys: "⏎", action: "send"))
+            hints.append(.init(keys: "⇧⏎", action: "new line"))
         }
         return hints
     }

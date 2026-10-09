@@ -301,7 +301,17 @@ class OnboardingViewModel: ObservableObject {
                     throw CancellationError()
                 }
                 
-                let models = try await AsrModels.downloadAndLoad(version: asrVersion)
+                // Same progress as the Models pane: FluidAudio reports it, forward only.
+                let models = try await AsrModels.downloadAndLoad(version: asrVersion) { progress in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.isDownloading else { return }
+                        let value = max(self.downloadProgress, progress.fractionCompleted)
+                        self.downloadProgress = value
+                        if let index = self.unifiedModels.firstIndex(where: { $0.id == model.id }) {
+                            self.unifiedModels[index].downloadProgress = value
+                        }
+                    }
+                }
                 
                 guard !Task.isCancelled else {
                     await MainActor.run {
