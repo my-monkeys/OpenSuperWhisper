@@ -29,6 +29,15 @@ struct TriggerRecorderField: View {
     /// The list field for hold-only triggers rather than the regular ones. The two lists never
     /// share a key: adding one here takes it out of the other.
     var holdOnly = false
+    /// Where a single-binding field stores a chord (⌘⌥ alone). nil = this field takes none.
+    /// The regular trigger list takes chords in its own JSON; the hold-only list never does,
+    /// since a chord fires on release and has nothing to hold.
+    var chord: Binding<String>? = nil
+
+    private var allowsChord: Bool {
+        guard allowsModifier else { return false }
+        return allowsMultiple ? !holdOnly : chord != nil
+    }
 
     /// Mirrors the stored shortcut. `KeyboardShortcuts.getShortcut` is not something SwiftUI
     /// observes, so reading it straight from the body left a newly recorded combination
@@ -39,6 +48,7 @@ struct TriggerRecorderField: View {
     @State private var isHovering = false
     @State private var monitors: [Any] = []
     @State private var detector = SingleModifierDetector()
+    @State private var chordDetector = ChordDetector()
 
     /// The stored list, for the multi-trigger field. Mirrored in state so a change redraws:
     /// preferences are not something SwiftUI observes.
@@ -46,6 +56,9 @@ struct TriggerRecorderField: View {
 
     private var triggers: [RecordingTrigger] {
         guard allowsMultiple else {
+            if let stored = chord?.wrappedValue, let chord = ModifierChord(storageValue: stored) {
+                return [.chord(chord)]
+            }
             let single = RecordingTrigger.resolve(mouseRaw: mouseButton.rawValue,
                                                   modifierRaw: modifierKey.rawValue,
                                                   shortcut: shortcut)
@@ -261,6 +274,7 @@ struct TriggerRecorderField: View {
         isRecording = true
         heldModifiers = []
         detector.reset()
+        chordDetector.reset()
         // Pause live hotkeys so re-recording the current trigger doesn't start a dictation.
         KeyboardShortcuts.isEnabled = false
         ModifierKeyMonitor.shared.stop()
@@ -268,15 +282,19 @@ struct TriggerRecorderField: View {
 
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
             heldModifiers = event.modifierFlags.intersection([.control, .option, .shift, .command])
+            let chord = chordDetector.handleFlagsChanged(flags: event.modifierFlags)
             if let key = detector.handleFlagsChanged(keyCode: event.keyCode,
                                                      flags: event.modifierFlags), allowsModifier {
                 save(.modifier(key))
+            } else if let chord, allowsChord {
+                save(.chord(chord))
             }
             return event
         }!)
 
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             detector.contaminate()
+            chordDetector.contaminate()
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 .subtracting(.function)
             if modifiers.isEmpty {
@@ -352,6 +370,7 @@ struct TriggerRecorderField: View {
             clear()
         case .keyCombo(let shortcut):
             if !allowsMultiple { mouseButton = .none; modifierKey = .none }
+            chord?.wrappedValue = ""
             KeyboardShortcuts.setShortcut(shortcut, for: name)
             self.shortcut = shortcut
         case .modifier(let key):
@@ -360,6 +379,7 @@ struct TriggerRecorderField: View {
                 KeyboardShortcuts.setShortcut(nil, for: name)
                 self.shortcut = nil
             }
+            chord?.wrappedValue = ""
             modifierKey = key
         case .mouse(let button):
             if !allowsMultiple {
@@ -367,7 +387,14 @@ struct TriggerRecorderField: View {
                 KeyboardShortcuts.setShortcut(nil, for: name)
                 self.shortcut = nil
             }
+            chord?.wrappedValue = ""
             mouseButton = button
+        case .chord(let captured):
+            mouseButton = .none
+            modifierKey = .none
+            KeyboardShortcuts.setShortcut(nil, for: name)
+            self.shortcut = nil
+            chord?.wrappedValue = captured.storageValue
         }
         disarm()
     }
@@ -391,6 +418,10 @@ struct TriggerRecorderField: View {
             if prefs.submitMouseButtonHotkey == button.rawValue {
                 prefs.submitMouseButtonHotkey = MouseButton.none.rawValue
             }
+        case .chord(let chord):
+            if prefs.submitModifierChord == chord.storageValue {
+                prefs.submitModifierChord = ""
+            }
         case .keyCombo, .none:
             break
         }
@@ -406,6 +437,7 @@ struct TriggerRecorderField: View {
     private func clear() {
         mouseButton = .none
         modifierKey = .none
+        chord?.wrappedValue = ""
         KeyboardShortcuts.setShortcut(nil, for: name)
         shortcut = nil
     }
@@ -414,6 +446,7 @@ struct TriggerRecorderField: View {
         for monitor in monitors { NSEvent.removeMonitor(monitor) }
         monitors = []
         detector.reset()
+        chordDetector.reset()
         KeyboardShortcuts.isEnabled = true
         isRecording = false
         heldModifiers = []

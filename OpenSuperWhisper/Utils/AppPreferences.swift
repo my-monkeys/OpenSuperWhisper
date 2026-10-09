@@ -391,6 +391,11 @@ final class AppPreferences {
     @UserDefault(key: "submitModifierOnlyHotkey", defaultValue: "none")
     var submitModifierOnlyHotkey: String
 
+    /// Stop-and-submit as a chord of modifiers (⌘⌥ alone), stored as `ModifierChord`'s flags.
+    /// Empty = none. Kept apart from the single-modifier key so older builds still read that.
+    @UserDefault(key: "submitModifierChord", defaultValue: "")
+    var submitModifierChord: String
+
     // When false (default), pressing Esc to cancel a recording longer than
     // ~10s first asks for confirmation (press Esc again) instead of discarding
     // it outright — a safety net against an accidental Esc losing a long dictation.
