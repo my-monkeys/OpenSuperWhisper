@@ -92,4 +92,17 @@ struct AgentResponse: Codable, Equatable {
 
     let action: Action
     var text: String = ""
+
+    init(action: Action, text: String = "") {
+        self.action = action
+        self.text = text
+    }
+
+    /// `text` may be absent: a dismissal has nothing to say, and the synthesized decoder would
+    /// reject it rather than use the default, leaving the hook waiting out its full timeout.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        action = try container.decode(Action.self, forKey: .action)
+        text = try container.decodeIfPresent(String.self, forKey: .text) ?? ""
+    }
 }

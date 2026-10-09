@@ -48,4 +48,11 @@ final class AgentHookTests: XCTestCase {
         try AgentBridge.write(AgentResponse(action: .reply, text: "go"), to: url)
         XCTAssertEqual(AgentBridge.read(AgentResponse.self, from: url), AgentResponse(action: .reply, text: "go"))
     }
+
+    func testADismissalWithoutTextStillDecodes() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("osw-agent-\(UUID()).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(#"{"action":"dismiss"}"#.utf8).write(to: url)
+        XCTAssertEqual(AgentBridge.read(AgentResponse.self, from: url), AgentResponse(action: .dismiss))
+    }
 }
