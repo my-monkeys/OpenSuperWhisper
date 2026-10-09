@@ -50,7 +50,9 @@ struct AgentsSettingsPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 220)
+                    // Its own width: a fixed 220 pt was narrower than four segments at the
+                    // default text size, and "10 min" ran past the pane's right edge.
+                    .fixedSize()
                     .disabled(!enabled)
                 }
             }
