@@ -1,5 +1,6 @@
 import AppKit
 import KeyboardShortcuts
+import LiquidGlass
 import SwiftUI
 
 /// A floating panel in the top-right corner, shown while an agent waits. It does not take focus
@@ -326,12 +327,7 @@ struct AgentPanelView: View {
                 if listening {
                     composerButton("trash", tint: STheme.hint, fill: STheme.controlBg.opacity(0.8),
                                    help: "Delete this recording") { inbox.discardDictation() }
-                    Image(systemName: "waveform")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(STheme.accent)
-                        .symbolEffect(.variableColor.iterative, isActive: true)
-                        .frame(width: 34, height: 34)
-                        .help("Recording")
+                    AgentRecordingPill()
                     composerButton("stop.fill", tint: STheme.accent, fill: STheme.accentSoft,
                                    help: "Stop, and put the words in the field") { inbox.stopDictating() }
                 } else {
@@ -472,5 +468,19 @@ struct AgentShortcutHints {
             hints.append(.init(keys: "⏎", action: "send"))
         }
         return hints
+    }
+}
+
+/// The live microphone meter, the same bars the recording bubble draws, in a pill the height
+/// of the buttons beside it.
+struct AgentRecordingPill: View {
+    @ObservedObject private var spectrum = SpectrumAnalyzer.shared
+
+    var body: some View {
+        WaveformMeter(height: 18, bands: spectrum.bands)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(Capsule().fill(STheme.accentSoft))
+            .help("Recording")
     }
 }
