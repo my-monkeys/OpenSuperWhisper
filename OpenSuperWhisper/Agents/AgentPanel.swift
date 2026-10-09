@@ -337,7 +337,21 @@ struct AgentPanelView: View {
                     onDelete: { inbox.discardDictation() },
                     onStop: { inbox.stopDictating() })
 
-                replyField(for: request, listening: listening)
+                // While the microphone is open the bar folds to one line that says so, then
+                // opens back onto the whole reply: a multi-line draft beside the controls made a
+                // tall bar with most of its width doing nothing.
+                if listening {
+                    Text(Self.listeningLabel(draft: inbox.drafts[request.id] ?? ""))
+                        .font(.system(size: 13.5))
+                        .foregroundColor(STheme.hint)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity)
+                } else {
+                    replyField(for: request, listening: listening)
+                        .transition(.opacity)
+                }
 
                 if listening {
                     composerButton("arrow.up", tint: .white, fill: STheme.accent,
@@ -353,6 +367,7 @@ struct AgentPanelView: View {
             .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(STheme.inputBg.opacity(0.75)))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(listening ? STheme.accent.opacity(0.7) : STheme.controlBorder.opacity(0.6), lineWidth: 1))
+            .animation(AgentRecordingControls.morph, value: listening)
 
             shortcutHints(listening: listening)
                 .padding(.leading, 14)
@@ -402,6 +417,13 @@ struct AgentPanelView: View {
                 proxy.scrollTo(Self.replyEnd, anchor: .bottom)
             }
         }
+    }
+
+    /// What the folded bar reads: that it is listening, and how the reply so far ends, so a
+    /// second take that continues a first still has its context.
+    static func listeningLabel(draft: String) -> String {
+        let soFar = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return soFar.isEmpty ? "Listening…" : "Listening… after \u{201C}\(soFar)\u{201D}"
     }
 
     static let replyEnd = "reply-end"
