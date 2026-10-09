@@ -18,6 +18,24 @@ final class AgentPanelController {
     /// The panel is the key window: the user clicked into it, so their trigger answers it.
     var hasFocus: Bool { panel?.isKeyWindow == true && panel?.isVisible == true }
 
+    private var returnMonitor: Any?
+
+    /// While a reply is dictated, Return in the panel stops and sends it, unless the user has
+    /// a stop-and-submit binding of their own, which then does that job alone.
+    func watchReturnKey(_ watching: Bool) {
+        if let returnMonitor { NSEvent.removeMonitor(returnMonitor) }
+        returnMonitor = nil
+        guard watching, AgentShortcutHints.submitKeys() == nil else { return }
+        returnMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let isReturn = event.keyCode == 36 || event.keyCode == 76  // Return, keypad Enter
+            guard isReturn, event.window is AgentPanel,
+                  let request = AgentInbox.shared.current,
+                  AgentInbox.shared.armedReplyID == request.id else { return event }
+            AgentInbox.shared.stopDictatingAndSend(request)
+            return nil
+        }
+    }
+
     private init() {}
 
     func update(visible: Bool) {
@@ -493,22 +511,26 @@ struct AgentShortcutHints {
     let keys: String
     let action: String
 
-    @MainActor static func current(listening: Bool) -> [AgentShortcutHints] {
+    /// The user's own stop-and-submit binding, spelled out; nil when they have none.
+    @MainActor static func submitKeys() -> String? {
         let prefs = AppPreferences.shared
-        let trigger = RecordingTriggerSet.load(from: prefs.recordingTriggers).triggers.first
-            .map { $0.caps.joined(separator: " ") }
         let submit = RecordingTrigger.resolve(
             mouseRaw: prefs.submitMouseButtonHotkey,
             modifierRaw: prefs.submitModifierOnlyHotkey,
             shortcut: KeyboardShortcuts.getShortcut(for: .toggleRecordAndSubmit))
-        let submitKeys: String? = ModifierChord(storageValue: prefs.submitModifierChord)
-            .map { $0.symbols.joined() }
+        return ModifierChord(storageValue: prefs.submitModifierChord).map { $0.symbols.joined() }
             ?? (submit == .none ? nil : submit.caps.joined(separator: " "))
+    }
 
+    @MainActor static func current(listening: Bool) -> [AgentShortcutHints] {
+        let prefs = AppPreferences.shared
+        let trigger = RecordingTriggerSet.load(from: prefs.recordingTriggers).triggers.first
+            .map { $0.caps.joined(separator: " ") }
         var hints: [AgentShortcutHints] = []
         if listening {
             if let trigger { hints.append(.init(keys: trigger, action: "stop")) }
-            if let submitKeys { hints.append(.init(keys: submitKeys, action: "stop and send")) }
+            // Return stands in for a stop-and-submit binding the user has not set up.
+            hints.append(.init(keys: submitKeys() ?? "⏎", action: "stop and send"))
             hints.append(.init(keys: "esc", action: "delete"))
         } else {
             if let trigger { hints.append(.init(keys: trigger, action: "dictate")) }

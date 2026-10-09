@@ -14,7 +14,9 @@ final class AgentInbox: ObservableObject {
     @Published var drafts: [String: String] = [:]
     /// The request a dictation in progress is answering. Taken by the recording when it stops,
     /// so the words go to the agent instead of being pasted wherever the cursor is.
-    @Published private(set) var armedReplyID: String?
+    @Published private(set) var armedReplyID: String? {
+        didSet { AgentPanelController.shared.watchReturnKey(armedReplyID != nil) }
+    }
     /// Which waiting agent the panel shows when several are; nil means the oldest.
     @Published var selectedID: String?
     /// A reply whose dictation should go out as soon as it is transcribed (the panel's send
