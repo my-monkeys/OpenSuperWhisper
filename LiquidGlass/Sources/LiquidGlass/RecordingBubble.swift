@@ -306,6 +306,10 @@ public struct RecordingBubble: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(width: Self.captionWidth, alignment: .leading)
             .frame(maxHeight: lineHeight * CGFloat(Self.captionLines), alignment: .bottom)
+            // Its own text's height, up to the cap. Without this the frame took whatever height
+            // the bubble offered, two lines' worth, and a first single line sat at the bottom of
+            // an empty second one, off centre against the dot and the meter.
+            .fixedSize(horizontal: false, vertical: true)
             .clipped()
             // SwiftUI's line spacing is not quite the font's, so the descenders of the line that
             // scrolled away peek over the top edge. A short fade hides them.
