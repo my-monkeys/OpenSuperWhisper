@@ -360,6 +360,11 @@ class ShortcutManager {
         Task { @MainActor in
             if self.activeVm == nil {
                 Diag.mark("keyDown → start recording")
+                // Pressed while the agent panel has focus: the take answers the agent there,
+                // and the panel shows the recording instead of the bubble.
+                if AgentInbox.shared.claimTrigger() {
+                    IndicatorWindowManager.shared.hideNextBubble = true
+                }
                 let cursorPosition = FocusUtils.getCurrentCursorPosition()
                 var caret: CGRect? = nil
                 // Only "cursor" mode needs the caret; other positions anchor to

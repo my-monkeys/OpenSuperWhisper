@@ -15,6 +15,16 @@ final class AgentInbox: ObservableObject {
     /// The request a dictation in progress is answering. Taken by the recording when it stops,
     /// so the words go to the agent instead of being pasted wherever the cursor is.
     @Published private(set) var armedReplyID: String?
+    /// Which waiting agent the panel shows when several are; nil means the oldest.
+    @Published var selectedID: String?
+    /// A reply whose dictation should go out as soon as it is transcribed (the panel's send
+    /// button pressed while recording).
+    private var sendWhenTranscribedID: String?
+
+    var current: AgentRequest? {
+        pending.first { $0.id == selectedID } ?? pending.first
+    }
+
     /// For questions: the options picked so far, per request, per question.
     @Published var selections: [String: [String: Set<String>]] = [:]
 
@@ -47,6 +57,9 @@ final class AgentInbox: ObservableObject {
         }
         for id in selections.keys where !requests.contains(where: { $0.id == id }) {
             selections[id] = nil
+        }
+        if let selected = selectedID, !requests.contains(where: { $0.id == selected }) {
+            selectedID = nil
         }
         if let armed = armedReplyID, !requests.contains(where: { $0.id == armed }) {
             armedReplyID = nil
@@ -167,6 +180,23 @@ final class AgentInbox: ObservableObject {
         ShortcutManager.shared.toggleRecordingFromApp()
     }
 
+    /// Ends the reply being dictated and sends it once its words are in.
+    func stopDictatingAndSend(_ request: AgentRequest) {
+        sendWhenTranscribedID = request.id
+        stopDictating()
+    }
+
+    /// The user's own recording trigger, pressed while the panel has focus: the take answers
+    /// the agent on screen, with the panel's controls instead of the bubble. Returns whether it
+    /// took the press; the caller then starts the recording as usual.
+    func claimTrigger() -> Bool {
+        guard armedReplyID == nil, AgentPanelController.shared.hasFocus, let request = current else {
+            return false
+        }
+        armedReplyID = request.id
+        return true
+    }
+
     /// Throws the reply being dictated away.
     func discardDictation() {
         ShortcutManager.shared.cancelRecordingFromApp()
@@ -181,8 +211,10 @@ final class AgentInbox: ObservableObject {
 
     /// The finished dictation for a reply. Added to the draft so a second take continues the
     /// first; `send` is the "press enter" voice command or the submit shortcut, which send it.
-    func receiveDictation(_ text: String, for id: String, send: Bool) {
+    func receiveDictation(_ text: String, for id: String, send requested: Bool) {
         guard let request = pending.first(where: { $0.id == id }) else { return }
+        let send = requested || sendWhenTranscribedID == id
+        if sendWhenTranscribedID == id { sendWhenTranscribedID = nil }
         let added = text.trimmingCharacters(in: .whitespacesAndNewlines)
         switch request.kind {
         case .permission:

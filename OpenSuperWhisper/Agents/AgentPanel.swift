@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 /// A floating panel in the top-right corner, shown while an agent waits. It does not take focus
@@ -12,6 +13,9 @@ final class AgentPanelController {
     static let margin: CGFloat = 16
 
     private var panel: AgentPanel?
+
+    /// The panel is the key window: the user clicked into it, so their trigger answers it.
+    var hasFocus: Bool { panel?.isKeyWindow == true && panel?.isVisible == true }
 
     private init() {}
 
@@ -76,7 +80,6 @@ final class AgentPanel: NSPanel {
 struct AgentPanelView: View {
     @ObservedObject var inbox: AgentInbox
     /// Which waiting agent is shown when several are; falls back to the oldest.
-    @State private var selectedID: String?
 
     /// Long replies scroll inside the card rather than growing it past most of the screen.
     private var maxMessageHeight: CGFloat {
@@ -84,7 +87,7 @@ struct AgentPanelView: View {
     }
 
     private var current: AgentRequest? {
-        inbox.pending.first { $0.id == selectedID } ?? inbox.pending.first
+        inbox.current
     }
 
     var body: some View {
@@ -291,12 +294,12 @@ struct AgentPanelView: View {
     private func pager(for request: AgentRequest) -> some View {
         let index = inbox.pending.firstIndex { $0.id == request.id } ?? 0
         return HStack(spacing: 2) {
-            pagerButton("chevron.left", disabled: index == 0) { selectedID = inbox.pending[index - 1].id }
+            pagerButton("chevron.left", disabled: index == 0) { inbox.selectedID = inbox.pending[index - 1].id }
             Text("\(index + 1)/\(inbox.pending.count)")
                 .font(.system(size: 11, weight: .medium).monospacedDigit())
                 .foregroundColor(STheme.hint)
             pagerButton("chevron.right", disabled: index >= inbox.pending.count - 1) {
-                selectedID = inbox.pending[index + 1].id
+                inbox.selectedID = inbox.pending[index + 1].id
             }
         }
     }
@@ -312,49 +315,72 @@ struct AgentPanelView: View {
         .disabled(disabled)
     }
 
-    /// One line, like a chat box: the microphone on the left, the field, send on the right.
+    /// One line, like a chat box: the field, then every control on the right. While a reply is
+    /// being dictated they read delete, recording, stop, and send stops and sends at once.
     private func composer(for request: AgentRequest) -> some View {
         let listening = inbox.armedReplyID == request.id
         let hasDraft = !(inbox.drafts[request.id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        return HStack(alignment: .center, spacing: 10) {
-            Button { inbox.dictateReply(to: request) } label: {
-                Image(systemName: listening ? "waveform" : "mic.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(listening ? .white : STheme.accent)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(listening ? STheme.accent : STheme.accentSoft))
-                    .symbolEffect(.variableColor.iterative, isActive: listening)
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .center, spacing: 8) {
+                TextField(placeholder(for: request, listening: listening), text: draft(for: request), axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13.5))
+                    .lineLimit(1...6)
+                    .padding(.vertical, 8)
+                    .padding(.leading, 10)
+                    .onSubmit { inbox.send(request) }
+
+                if listening {
+                    composerButton("trash", tint: STheme.hint, fill: STheme.controlBg.opacity(0.8),
+                                   help: "Delete this recording") { inbox.discardDictation() }
+                    Image(systemName: "waveform")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(STheme.accent)
+                        .symbolEffect(.variableColor.iterative, isActive: true)
+                        .frame(width: 34, height: 34)
+                        .help("Recording")
+                    composerButton("stop.fill", tint: STheme.accent, fill: STheme.accentSoft,
+                                   help: "Stop, and put the words in the field") { inbox.stopDictating() }
+                    composerButton("arrow.up", tint: .white, fill: STheme.accent,
+                                   help: "Stop and send") { inbox.stopDictatingAndSend(request) }
+                } else {
+                    composerButton("mic.fill", tint: STheme.accent, fill: STheme.accentSoft,
+                                   help: "Dictate the answer") { inbox.dictateReply(to: request) }
+                    composerButton("arrow.up", tint: .white,
+                                   fill: hasDraft ? STheme.accent : STheme.hint.opacity(0.35),
+                                   help: "Send (⏎)") { inbox.send(request) }
+                        .disabled(!hasDraft)
+                }
             }
-            .buttonStyle(.plain)
-            .pointerCursorOnHover()
-            .help(listening ? "Listening. Stop as usual, with your trigger or the stop phrase"
-                            : "Dictate the answer")
-            .disabled(listening)
+            .padding(.leading, 6).padding(.trailing, 6).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(STheme.inputBg.opacity(0.75)))
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(listening ? STheme.accent.opacity(0.7) : STheme.controlBorder.opacity(0.6), lineWidth: 1))
 
-            TextField(placeholder(for: request, listening: listening), text: draft(for: request), axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13.5))
-                .lineLimit(1...6)
-                .padding(.vertical, 8)
-                .onSubmit { inbox.send(request) }
+            shortcutHints(listening: listening)
+                .padding(.leading, 14)
+        }
+    }
 
-            if listening {
-                // The recording runs without the usual bubble, so its controls live here.
-                composerButton("trash", tint: STheme.hint, fill: STheme.controlBg.opacity(0.8),
-                               help: "Delete this recording") { inbox.discardDictation() }
-                composerButton("stop.fill", tint: .white, fill: STheme.accent,
-                               help: "Stop, and put the words in the field") { inbox.stopDictating() }
-            } else {
-                composerButton("arrow.up", tint: .white,
-                               fill: hasDraft ? STheme.accent : STheme.hint.opacity(0.35),
-                               help: "Send (⏎)") { inbox.send(request) }
-                    .disabled(!hasDraft)
+    /// The keys that work here, spelled the way the user set them up. The recording trigger
+    /// answers the agent once the panel has focus (a click in it is enough).
+    private func shortcutHints(listening: Bool) -> some View {
+        let hints = AgentShortcutHints.current(listening: listening)
+        return HStack(spacing: 14) {
+            ForEach(hints, id: \.action) { hint in
+                HStack(spacing: 5) {
+                    Text(hint.keys)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundColor(STheme.text)
+                        .padding(.horizontal, 5).padding(.vertical, 1.5)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(STheme.controlBg.opacity(0.8)))
+                    Text(hint.action)
+                        .font(.system(size: 10.5))
+                        .foregroundColor(STheme.hint)
+                }
             }
         }
-        .padding(.leading, 6).padding(.trailing, 6).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(STheme.inputBg.opacity(0.75)))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(listening ? STheme.accent.opacity(0.7) : STheme.controlBorder.opacity(0.6), lineWidth: 1))
+        .lineLimit(1)
     }
 
     private func composerButton(_ symbol: String, tint: Color, fill: Color, help: String,
@@ -412,5 +438,35 @@ struct AgentAvatar: View {
                 .frame(width: size, height: size)
                 .background(Circle().fill(Self.claudeOrange))
         }
+    }
+}
+
+/// The shortcut hints under the composer, read from the user's own bindings.
+struct AgentShortcutHints {
+    let keys: String
+    let action: String
+
+    @MainActor static func current(listening: Bool) -> [AgentShortcutHints] {
+        let prefs = AppPreferences.shared
+        let trigger = RecordingTriggerSet.load(from: prefs.recordingTriggers).triggers.first
+            .map { $0.caps.joined(separator: " ") }
+        let submit = RecordingTrigger.resolve(
+            mouseRaw: prefs.submitMouseButtonHotkey,
+            modifierRaw: prefs.submitModifierOnlyHotkey,
+            shortcut: KeyboardShortcuts.getShortcut(for: .toggleRecordAndSubmit))
+        let submitKeys: String? = ModifierChord(storageValue: prefs.submitModifierChord)
+            .map { $0.symbols.joined() }
+            ?? (submit == .none ? nil : submit.caps.joined(separator: " "))
+
+        var hints: [AgentShortcutHints] = []
+        if listening {
+            if let trigger { hints.append(.init(keys: trigger, action: "stop")) }
+            if let submitKeys { hints.append(.init(keys: submitKeys, action: "stop and send")) }
+            hints.append(.init(keys: "esc", action: "delete"))
+        } else {
+            if let trigger { hints.append(.init(keys: trigger, action: "dictate")) }
+            hints.append(.init(keys: "⏎", action: "send"))
+        }
+        return hints
     }
 }
