@@ -1227,7 +1227,19 @@ class SettingsViewModel: ObservableObject {
                     throw CancellationError()
                 }
                 
-                let models = try await AsrModels.downloadAndLoad(version: version)
+                // FluidAudio reports its own progress, listing, then the files, then compiling;
+                // without the handler the bar sat empty through a 614 MB download. Only ever
+                // forward, since the compile phase may start counting again from lower.
+                let models = try await AsrModels.downloadAndLoad(version: version) { progress in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.isDownloading else { return }
+                        let value = max(self.downloadProgress, progress.fractionCompleted)
+                        self.downloadProgress = value
+                        if let index = self.downloadableFluidAudioModels.firstIndex(where: { $0.id == model.id }) {
+                            self.downloadableFluidAudioModels[index].downloadProgress = value
+                        }
+                    }
+                }
                 
                 guard !Task.isCancelled else {
                     await MainActor.run {
