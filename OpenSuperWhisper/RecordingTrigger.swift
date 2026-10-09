@@ -30,6 +30,8 @@ enum RecordingTrigger: Equatable, Codable {
     case keyCombo(KeyboardShortcuts.Shortcut)
     case modifier(ModifierKey)
     case mouse(MouseButton)
+    /// Two or more modifiers pressed together and released with no other key, like ⌘⌥.
+    case chord(ModifierChord)
 
     /// Key caps for the settings field, one per key.
     @MainActor var caps: [String] {
@@ -46,6 +48,8 @@ enum RecordingTrigger: Equatable, Codable {
             return [key.displayName]
         case .mouse(let button):
             return [button.displayName]
+        case .chord(let chord):
+            return chord.symbols
         }
     }
 
@@ -89,10 +93,11 @@ enum RecordingTrigger: Equatable, Codable {
         case .keyCombo: return .keyCombo
         case .modifier: return .modifier
         case .mouse: return .mouse
+        case .chord: return .chord
         }
     }
 
-    enum Kind { case keyCombo, modifier, mouse }
+    enum Kind { case keyCombo, modifier, mouse, chord }
 }
 
 /// The recording triggers, in the order they were added. Any number of each kind: the old shape
@@ -109,6 +114,10 @@ struct RecordingTriggerSet: Equatable, Codable {
 
     var mouseButtons: [MouseButton] {
         triggers.compactMap { if case .mouse(let button) = $0 { return button } else { return nil } }
+    }
+
+    var chords: [ModifierChord] {
+        triggers.compactMap { if case .chord(let chord) = $0 { return chord } else { return nil } }
     }
 
     var keyCombos: [KeyboardShortcuts.Shortcut] {
@@ -169,6 +178,67 @@ struct RecordingTriggerSet: Equatable, Codable {
             set.add(trigger)
         }
         return set
+    }
+}
+
+/// Two or more modifiers held together, either side, then released without any other key in
+/// between: ⌘⌥ on its own. It fires on release, not on press, because ⌘⌥ is also the start of
+/// ordinary shortcuts (⌘⌥I, ⌘⌥Esc); only a press that ends with no key added is a chord.
+struct ModifierChord: Codable, Hashable {
+    /// `NSEvent.ModifierFlags` raw value, restricted to ⌃ ⌥ ⇧ ⌘.
+    let flags: UInt
+
+    static let families: NSEvent.ModifierFlags = [.control, .option, .shift, .command]
+
+    /// nil unless at least two of ⌃ ⌥ ⇧ ⌘ are in `flags`.
+    init?(_ flags: NSEvent.ModifierFlags) {
+        let kept = flags.intersection(Self.families)
+        guard RecordingTrigger.modifierBadges.filter({ kept.contains($0.flag) }).count >= 2 else { return nil }
+        self.flags = kept.rawValue
+    }
+
+    var modifierFlags: NSEvent.ModifierFlags { NSEvent.ModifierFlags(rawValue: flags) }
+
+    var symbols: [String] {
+        RecordingTrigger.modifierBadges.filter { modifierFlags.contains($0.flag) }.map(\.symbol)
+    }
+
+    /// Stored form for the single-binding fields ("" = none).
+    var storageValue: String { String(flags) }
+
+    init?(storageValue: String) {
+        guard let raw = UInt(storageValue) else { return nil }
+        self.init(NSEvent.ModifierFlags(rawValue: raw))
+    }
+}
+
+/// Recognises a chord the way `SingleModifierDetector` recognises a lone modifier: track the
+/// widest set of modifiers held during one press, and report it once everything is up, unless
+/// a non-modifier key was pressed meanwhile. Shared by the settings field and the live monitor.
+struct ChordDetector {
+    private var peak: NSEvent.ModifierFlags = []
+    private var contaminated = false
+
+    /// Feed each `flagsChanged`. Returns the chord when a clean press of two or more ends.
+    mutating func handleFlagsChanged(flags: NSEvent.ModifierFlags) -> ModifierChord? {
+        let held = flags.intersection(ModifierChord.families)
+        guard held.isEmpty else {
+            peak.formUnion(held)
+            return nil
+        }
+        defer { reset() }
+        guard !contaminated else { return nil }
+        return ModifierChord(peak)
+    }
+
+    /// A key pressed while modifiers are down turns the press into an ordinary shortcut.
+    mutating func contaminate() {
+        if !peak.isEmpty { contaminated = true }
+    }
+
+    mutating func reset() {
+        peak = []
+        contaminated = false
     }
 }
 

@@ -212,6 +212,8 @@ class ShortcutManager {
         // they end a take rather than starting one. (#50)
         let submitButton = MouseButton(rawValue: AppPreferences.shared.submitMouseButtonHotkey) ?? .none
         let submitModifier = ModifierKey(rawValue: AppPreferences.shared.submitModifierOnlyHotkey) ?? .none
+        let submitChord = ModifierChord(storageValue: AppPreferences.shared.submitModifierChord)
+        let triggerChords = set.chords
 
         ModifierKeyMonitor.shared.stop()
         MouseButtonMonitor.shared.stop()
@@ -234,7 +236,19 @@ class ShortcutManager {
         }
 
         let modifiers = set.modifiers + holdSet.modifiers + (submitModifier == .none ? [] : [submitModifier])
-        if !modifiers.isEmpty {
+        let chords = triggerChords + (submitChord.map { [$0] } ?? [])
+        // A chord fires once, on release, so it acts as a tap: toggle a recording, or submit.
+        // Hold-to-record has no meaning for it.
+        ModifierKeyMonitor.shared.onChord = { [weak self] chord in
+            guard let self else { return }
+            if chord == submitChord {
+                self.handleSubmitKey()
+            } else if triggerChords.contains(chord) {
+                self.handleKeyDown()
+                self.handleKeyUp()
+            }
+        }
+        if !modifiers.isEmpty || !chords.isEmpty {
             ModifierKeyMonitor.shared.onKeyDown = { [weak self] key in
                 guard let self else { return }
                 if submitModifier != .none, key == submitModifier {
@@ -247,14 +261,14 @@ class ShortcutManager {
                 guard submitModifier == .none || key != submitModifier else { return }
                 self?.handleKeyUp(holdOnly: holdSet.modifiers.contains(key))
             }
-            ModifierKeyMonitor.shared.start(modifierKeys: modifiers)
+            ModifierKeyMonitor.shared.start(modifierKeys: modifiers, chords: chords)
         }
 
         bindKeyComboSlots(set.keyCombos, to: KeyboardShortcuts.Name.recordTriggerSlot)
         bindKeyComboSlots(holdSet.keyCombos, to: KeyboardShortcuts.Name.holdTriggerSlot)
 
         useMouseButtonHotkey = !set.mouseButtons.isEmpty || !holdSet.mouseButtons.isEmpty
-        useModifierOnlyHotkey = !set.modifiers.isEmpty || !holdSet.modifiers.isEmpty
+        useModifierOnlyHotkey = !set.modifiers.isEmpty || !holdSet.modifiers.isEmpty || !chords.isEmpty
         print("ShortcutManager: \(set.triggers.count) recording trigger(s), \(holdSet.triggers.count) hold-only, armed")
     }
 

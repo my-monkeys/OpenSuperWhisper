@@ -306,6 +306,13 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var submitModifierChord: String {
+        didSet {
+            AppPreferences.shared.submitModifierChord = submitModifierChord
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+        }
+    }
+
     @Published var submitModifierOnlyHotkey: ModifierKey {
         didSet {
             AppPreferences.shared.submitModifierOnlyHotkey = submitModifierOnlyHotkey.rawValue
@@ -943,6 +950,7 @@ class SettingsViewModel: ObservableObject {
         self.textScale = prefs.textScale
         self.submitMouseButtonHotkey = MouseButton(rawValue: prefs.submitMouseButtonHotkey) ?? .none
         self.submitModifierOnlyHotkey = ModifierKey(rawValue: prefs.submitModifierOnlyHotkey) ?? .none
+        self.submitModifierChord = prefs.submitModifierChord
         self.showStopButtonOnIndicator = prefs.showStopButtonOnIndicator
         self.showCancelButtonOnIndicator = prefs.showCancelButtonOnIndicator
         self.remoteFallbackEnabled = prefs.remoteFallbackEnabled
@@ -2838,7 +2846,7 @@ struct SettingsView: View {
                     Text("Recording trigger")
                         .scaledFont(size: 13)
                         .foregroundColor(STheme.text)
-                    Text("Click Add, then do the thing: press a combination with ⌘ ⌥ ⌃, tap a single modifier on its own, or click a spare mouse button. Keep several and use whichever suits the moment.")
+                    Text("Click Add, then do the thing: press a combination with ⌘ ⌥ ⌃, tap a single modifier or two together (⌘⌥) on their own, or click a spare mouse button. Keep several and use whichever suits the moment.")
                         .scaledFont(size: 11)
                         .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2907,7 +2915,8 @@ struct SettingsView: View {
                      hint: "Ends the recording and presses Return, so the message sends itself. Only works while recording — it never starts one. Unbound by default; ⌫ clears it") {
                     TriggerRecorderField(name: .toggleRecordAndSubmit,
                                          mouseButton: $viewModel.submitMouseButtonHotkey,
-                                         modifierKey: $viewModel.submitModifierOnlyHotkey)
+                                         modifierKey: $viewModel.submitModifierOnlyHotkey,
+                                         chord: $viewModel.submitModifierChord)
                         .frame(width: 168)
                 }
                 SRow(title: "Cancel without confirmation",
