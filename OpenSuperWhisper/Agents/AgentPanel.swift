@@ -28,9 +28,14 @@ final class AgentPanelController {
         guard returnMonitor == nil else { return }
         returnMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let isReturn = event.keyCode == 36 || event.keyCode == 76  // Return, keypad Enter
-            guard isReturn, event.window is AgentPanel,
-                  !event.modifierFlags.contains(.shift),
-                  let request = AgentInbox.shared.current else { return event }
+            guard isReturn, event.window is AgentPanel else { return event }
+            // The field does not break the line on ⇧Return either, so the break is typed here,
+            // at the caret, through the field's own text view.
+            if event.modifierFlags.contains(.shift) {
+                (event.window?.firstResponder as? NSTextView)?.insertNewlineIgnoringFieldEditor(nil)
+                return nil
+            }
+            guard let request = AgentInbox.shared.current else { return event }
             let inbox = AgentInbox.shared
             if inbox.armedReplyID == request.id {
                 guard AgentShortcutHints.submitKeys() == nil else { return event }
@@ -40,6 +45,11 @@ final class AgentPanelController {
             }
             return nil
         }
+    }
+
+    /// Makes the panel key, so the reply field can take the caret.
+    func focus() {
+        panel?.makeKey()
     }
 
     private func stopWatchingReturnKey() {
@@ -122,6 +132,9 @@ final class AgentPanel: NSPanel {
 
 struct AgentPanelView: View {
     @ObservedObject var inbox: AgentInbox
+    /// The reply field takes the caret back when a take ends, so the user sees where the
+    /// words went and can carry on typing.
+    @FocusState private var replyFocused: Bool
     /// Which waiting agent is shown when several are; falls back to the oldest.
 
     /// Long replies scroll inside the card rather than growing it past most of the screen.
@@ -407,6 +420,12 @@ struct AgentPanelView: View {
             shortcutHints(listening: listening)
                 .padding(.leading, 14)
         }
+        .onChange(of: listening) {
+            guard !listening else { return }
+            AgentPanelController.shared.focus()
+            // The field is rebuilt as the bar unfolds; focus it once it is back.
+            DispatchQueue.main.async { replyFocused = true }
+        }
     }
 
     /// The keys that work here, spelled the way the user set them up. The recording trigger
@@ -441,7 +460,7 @@ struct AgentPanelView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13.5))
                     .padding(.vertical, 8)
-                    .onSubmit { inbox.send(request) }
+                    .focused($replyFocused)
                     .id(Self.replyEnd)
             }
             .scrollIndicators(.never)
