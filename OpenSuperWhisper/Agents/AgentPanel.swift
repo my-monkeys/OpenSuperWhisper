@@ -116,11 +116,7 @@ struct AgentPanelView: View {
 
     private func header(for request: AgentRequest) -> some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(STheme.accent)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(STheme.accentSoft))
+            AgentAvatar()
             VStack(alignment: .leading, spacing: 2) {
                 Text(request.displayTitle)
                     .font(.system(size: 15, weight: .semibold))
@@ -227,5 +223,43 @@ struct AgentPanelView: View {
     private func draft(for request: AgentRequest) -> Binding<String> {
         Binding(get: { inbox.drafts[request.id] ?? "" },
                 set: { inbox.drafts[request.id] = $0 })
+    }
+}
+
+/// Who is talking: the agent's own icon, tucked against OpenSuperWhisper's, the two of them
+/// working together. Claude's icon comes from the Claude app when it is installed, so the
+/// mark is the one the user already knows and nothing of Anthropic's ships in this bundle;
+/// without it, a spark in Claude's orange stands in.
+struct AgentAvatar: View {
+    static let claudeBundleID = "com.anthropic.claudefordesktop"
+    static let claudeOrange = Color(red: 0.85, green: 0.47, blue: 0.34)
+
+    static let claudeIcon: NSImage? = NSWorkspace.shared
+        .urlForApplication(withBundleIdentifier: claudeBundleID)
+        .map { NSWorkspace.shared.icon(forFile: $0.path) }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 36, height: 36)
+            // Its own rounded square, as is: a shadow is enough to lift it off the other one.
+            claude(size: 22)
+                .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                .offset(x: 9, y: 5)
+        }
+        .frame(width: 46, height: 40, alignment: .topLeading)
+    }
+
+    @ViewBuilder private func claude(size: CGFloat) -> some View {
+        if let icon = Self.claudeIcon {
+            Image(nsImage: icon).resizable().frame(width: size, height: size)
+        } else {
+            Image(systemName: "sparkle")
+                .font(.system(size: size * 0.45, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Self.claudeOrange))
+        }
     }
 }
