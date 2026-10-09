@@ -324,16 +324,11 @@ struct AgentPanelView: View {
         let hasDraft = !(inbox.drafts[request.id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
         return VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .center, spacing: 8) {
-                if listening {
-                    composerButton("trash", tint: STheme.hint, fill: STheme.controlBg.opacity(0.8),
-                                   help: "Delete this recording") { inbox.discardDictation() }
-                    AgentRecordingPill()
-                    composerButton("stop.fill", tint: STheme.accent, fill: STheme.accentSoft,
-                                   help: "Stop, and put the words in the field") { inbox.stopDictating() }
-                } else {
-                    composerButton("mic.fill", tint: STheme.accent, fill: STheme.accentSoft,
-                                   help: "Dictate the answer") { inbox.dictateReply(to: request) }
-                }
+                AgentRecordingControls(
+                    listening: listening,
+                    onDictate: { inbox.dictateReply(to: request) },
+                    onDelete: { inbox.discardDictation() },
+                    onStop: { inbox.stopDictating() })
 
                 TextField(placeholder(for: request, listening: listening), text: draft(for: request), axis: .vertical)
                     .textFieldStyle(.plain)
@@ -471,16 +466,3 @@ struct AgentShortcutHints {
     }
 }
 
-/// The live microphone meter, the same bars the recording bubble draws, in a pill the height
-/// of the buttons beside it.
-struct AgentRecordingPill: View {
-    @ObservedObject private var spectrum = SpectrumAnalyzer.shared
-
-    var body: some View {
-        WaveformMeter(height: 18, bands: spectrum.bands)
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .background(Capsule().fill(STheme.accentSoft))
-            .help("Recording")
-    }
-}
