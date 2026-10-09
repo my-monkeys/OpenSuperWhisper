@@ -185,7 +185,7 @@ struct AgentPanelView: View {
     private func composer(for request: AgentRequest) -> some View {
         let listening = inbox.armedReplyID == request.id
         let hasDraft = !(inbox.drafts[request.id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-        return HStack(alignment: .bottom, spacing: 10) {
+        return HStack(alignment: .center, spacing: 10) {
             Button { inbox.dictateReply(to: request) } label: {
                 Image(systemName: listening ? "waveform" : "mic.fill")
                     .font(.system(size: 14, weight: .semibold))
