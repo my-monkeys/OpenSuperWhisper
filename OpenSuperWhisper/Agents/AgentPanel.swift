@@ -209,9 +209,9 @@ struct AgentPanelView: View {
 
             Button { inbox.send(request) } label: {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 34, height: 34)
                     .background(Circle().fill(hasDraft ? STheme.accent : STheme.hint.opacity(0.35)))
             }
             .buttonStyle(.plain)
