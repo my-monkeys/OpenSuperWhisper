@@ -62,6 +62,9 @@ delete):
   script fails if such instructions show up in the iOS device slice. Faster kernels need a
   device floor that rules those chips out (dot product starts with the A13, and iPadOS 26 still
   runs on A12 iPads), decided with the iPhone app.
+- The iOS Simulator slice has no x86_64. A static library is never linked, so the package
+  builds for `generic/platform=iOS Simulator` anyway, but anything that links it there (core
+  tests, the iPhone app) builds with `ARCHS=arm64`.
 - `SherpaOnnx.xcframework`: the existing macOS static library, module map moved to
   `Headers/sherpa_onnx/`. macOS only for now. onnxruntime stays linked by the app
   (`OTHER_LDFLAGS[arch=arm64]`), never by the package: SwiftPM cannot condition a link on the
