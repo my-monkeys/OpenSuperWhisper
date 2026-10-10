@@ -10,7 +10,11 @@ enum Keychain {
     /// deletes before it adds, would have replaced the user's real API key.
     static let service = DefaultsStore.isRunningTests
         ? "\(AppIdentity.bundleID).tests"
-        : "fr.my-monkey.opensuperwhisper"
+        : productionService
+
+    /// The service every shipped build stores its items under. Named on its own so a test can
+    /// pin it while `service` points elsewhere: a different spelling would lose every saved key.
+    static let productionService = "fr.my-monkey.opensuperwhisper"
 
     static func read(_ account: String) -> String? {
         let query: [String: Any] = [
