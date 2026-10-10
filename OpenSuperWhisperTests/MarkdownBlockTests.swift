@@ -93,6 +93,10 @@ final class MarkdownBlockTests: XCTestCase {
         XCTAssertEqual(blocks, [.quote([.code(language: "swift", text: "if ok {\n    run()\n}")])])
     }
 
+    func testWrappedListItemInAQuoteStaysWithItsItem() {
+        XCTAssertEqual(MarkdownBlock.parse("> - a\n>   wrapped\n> - b"), [.quote([.bullet(items: ["a wrapped", "b"])])])
+    }
+
     func testTextAroundAQuoteIsUntouched() {
         let blocks = MarkdownBlock.parse("""
         Before.
