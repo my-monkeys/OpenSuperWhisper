@@ -5,8 +5,8 @@ import Combine
 @MainActor
 public class TranscriptionQueue: ObservableObject {
     public static let shared = TranscriptionQueue(transcriptionService: .shared, recordingStore: .shared,
-                                           makeSettings: CoreAccess.makeSettings,
-                                           confirmEnableHistory: CoreAccess.confirmEnableHistory)
+                                                  makeSettings: CoreAccess.makeSettings,
+                                                  confirmEnableHistory: CoreAccess.confirmEnableHistory)
 
     @Published public private(set) var isProcessing = false
     @Published public private(set) var currentRecordingId: UUID?
