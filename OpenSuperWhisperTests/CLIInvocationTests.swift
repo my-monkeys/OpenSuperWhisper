@@ -34,10 +34,10 @@ final class CLIInvocationTests: XCTestCase {
 
     func testEveryOptionTogether() {
         let expected = CLI.Invocation(mode: .transcribe, target: "a.wav", json: true,
-                                      modelPath: "/m/ggml-tiny.en.bin", raw: true, language: "fr")
+                                      modelPath: "/m/ggml-tiny.en.bin", raw: true)
         XCTAssertEqual(parse("transcribe", "a.wav", "--model", "/m/ggml-tiny.en.bin",
-                             "--raw", "--language", "fr", "--json"), expected)
-        XCTAssertEqual(parse("transcribe", "a.wav", "--json", "--language", "fr",
+                             "--raw", "--json"), expected)
+        XCTAssertEqual(parse("transcribe", "a.wav", "--json",
                              "--raw", "--model", "/m/ggml-tiny.en.bin"), expected)
     }
 
@@ -49,9 +49,7 @@ final class CLIInvocationTests: XCTestCase {
     /// A missing value is a usage error, not an option silently swallowed as a file name.
     func testAnOptionWithoutItsValueIsRejected() {
         XCTAssertNil(parse("transcribe", "a.wav", "--model"))
-        XCTAssertNil(parse("transcribe", "a.wav", "--language"))
         XCTAssertNil(parse("transcribe", "a.wav", "--model", "--raw"))
-        XCTAssertNil(parse("transcribe", "a.wav", "--language", "--json"))
     }
 
     func testOtherCommandsAndAMissingTargetAreNotInvocations() {
@@ -63,7 +61,7 @@ final class CLIInvocationTests: XCTestCase {
     }
 
     func testHelpDocumentsTheNewOptions() {
-        for option in ["--json", "--model", "--raw", "--language"] {
+        for option in ["--json", "--model", "--raw"] {
             XCTAssertTrue(CLI.usage.contains(option), option)
         }
     }
@@ -124,13 +122,7 @@ final class CLISettingsTests: XCTestCase {
     /// `--raw` gives exactly what the Whisper goldens are recorded with, so the release smoke
     /// check and `WhisperGoldenTests` expect the same transcript.
     func testRawIgnoresEveryPreferenceAndThePromptFile() throws {
-        assertPinned(try settings("--raw"), language: "en")
-    }
-
-    func testLanguageOverridesRawAndAppSettingsAlike() throws {
-        assertPinned(try settings("--raw", "--language", "fr"), language: "fr")
-        XCTAssertEqual(try settings("--language", "fr").selectedLanguage, "fr")
-        XCTAssertEqual(try settings("--language", "fr").initialPrompt, "From the prompt file.")
+        assertPinned(try settings("--raw"))
     }
 
     /// `--model` picks the engine, not the settings.
@@ -138,10 +130,9 @@ final class CLISettingsTests: XCTestCase {
         XCTAssertEqual(try settings("--model", "m.bin").selectedLanguage, "de")
     }
 
-    private func assertPinned(_ settings: Settings, language: String,
-                              file: StaticString = #filePath, line: UInt = #line) {
+    private func assertPinned(_ settings: Settings, file: StaticString = #filePath, line: UInt = #line) {
         let pinned = Fixtures.pinnedSettings()
-        XCTAssertEqual(settings.selectedLanguage, language, file: file, line: line)
+        XCTAssertEqual(settings.selectedLanguage, pinned.selectedLanguage, file: file, line: line)
         XCTAssertEqual(settings.translateToEnglish, pinned.translateToEnglish, file: file, line: line)
         XCTAssertEqual(settings.suppressBlankAudio, pinned.suppressBlankAudio, file: file, line: line)
         XCTAssertEqual(settings.showTimestamps, pinned.showTimestamps, file: file, line: line)

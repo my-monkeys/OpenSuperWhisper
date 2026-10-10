@@ -4,7 +4,7 @@ import Foundation
 /// Headless command-line transcription (#150). Reached from the app's entry point when the first
 /// argument is `transcribe`, so it reuses the exact same engines as the GUI without a second target.
 ///
-///   OpenSuperWhisper transcribe <audio-file> [--json] [--model <ggml-file>] [--raw] [--language <code>]
+///   OpenSuperWhisper transcribe <audio-file> [--json] [--model <ggml-file>] [--raw]
 ///
 /// Uses whatever engine/model is configured in the app, unless `--model` names a Whisper model.
 /// Prints the transcription to stdout (plain text, or a JSON object with `--json`) and exits — no
@@ -22,9 +22,7 @@ enum CLI {
       --model <file>     Transcribe with Whisper on this ggml model file, whatever engine the
                          app is set to.
       --raw              Ignore the prompt file, the custom dictionary and the transcription
-                         settings made in the app: a fresh install's defaults, in English
-                         unless --language says otherwise.
-      --language <code>  Transcribe in this language (en, fr, auto, ...).
+                         settings made in the app: a fresh install's defaults, in English.
       -h, --help         Show this help.
 
     `bench` loads the configured model once and transcribes every .wav in the directory, printing a
@@ -45,7 +43,6 @@ enum CLI {
         var json = false
         var modelPath: String?
         var raw = false
-        var language: String?
     }
 
     /// Nil when the arguments are not a usable `transcribe` or `bench` call, including an option
@@ -63,9 +60,6 @@ enum CLI {
             case "--model":
                 guard let path = options.next(), !path.hasPrefix("-") else { return nil }
                 invocation.modelPath = path
-            case "--language":
-                guard let code = options.next(), !code.hasPrefix("-") else { return nil }
-                invocation.language = code
             default:
                 continue
             }
@@ -73,17 +67,13 @@ enum CLI {
         return invocation
     }
 
-    /// The app's default transcription language, which `--raw` uses unless told otherwise.
+    /// The app's default transcription language, which `--raw` uses.
     static let rawLanguage = "en"
 
     /// What the engine is told. With `--raw`, nothing the user has set up can reach it, so a
     /// release can be checked against a recorded transcript whatever the Mac's settings.
     static func settings(for invocation: Invocation) -> Settings {
-        var settings = invocation.raw ? Settings(freshInstallLanguage: rawLanguage) : Settings()
-        if let language = invocation.language {
-            settings.selectedLanguage = language
-        }
-        return settings
+        invocation.raw ? Settings(freshInstallLanguage: rawLanguage) : Settings()
     }
 
     /// Returns true if these arguments are a CLI invocation (and the GUI should not launch).

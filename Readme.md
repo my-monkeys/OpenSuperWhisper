@@ -117,6 +117,10 @@ opensuperwhisper transcribe path/to/audio.wav          # text on stdout
 opensuperwhisper transcribe path/to/audio.wav --json   # { "file", "text" }
 ```
 
+`--model path/to/ggml-model.bin` transcribes with Whisper on that model whatever engine the app is
+set to, and `--raw` ignores your prompt, custom dictionary and transcription settings (English, a
+fresh install's defaults), so nothing set up in the app changes the result.
+
 Engine logs go to stderr, so it pipes cleanly: `opensuperwhisper transcribe note.m4a > note.txt`.
 Set up a model in the app at least once first. There's also a **post-record hook** to run your own
 shell command after each dictation (text + audio path via env vars / JSON on stdin).
