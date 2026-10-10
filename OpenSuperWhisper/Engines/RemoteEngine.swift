@@ -27,6 +27,14 @@ final class RemoteEngine: TranscriptionEngine {
 
     var onProgressUpdate: ((Float) -> Void)?
 
+    /// Where `makeSession` gets its configuration: a fresh `.default` in the app. A test passes
+    /// one carrying a stub URLProtocol, which a session built here would otherwise never see.
+    private let sessionConfiguration: () -> URLSessionConfiguration
+
+    init(sessionConfiguration: @escaping () -> URLSessionConfiguration = { .default }) {
+        self.sessionConfiguration = sessionConfiguration
+    }
+
     /// Loaded once a server URL is configured. The remote model itself is not
     /// fetched locally, so "loaded" just means we have somewhere to call.
     var isModelLoaded: Bool {
@@ -171,12 +179,12 @@ final class RemoteEngine: TranscriptionEngine {
     /// interval must live on the session configuration.
     ///
     /// Internal, like `makeRequest` and `endpoint(for:)`, so tests can pin what would be sent
-    /// without sending it: this session is built here, so a URLProtocol stub never sees it.
+    /// without sending it.
     func makeSession() -> URLSession {
         let interval = timeoutEnabled
             ? max(1, timeoutSeconds)
             : Self.noTimeoutInterval
-        let config = URLSessionConfiguration.default
+        let config = sessionConfiguration()
         config.timeoutIntervalForRequest = interval
         config.timeoutIntervalForResource = interval
         return URLSession(configuration: config)
