@@ -5,7 +5,7 @@ import OpenSuperWhisperCore
 /// AppPreferences is still created the first time something reads it, in the GUI, the CLI and
 /// the agent hook alike.
 enum AppCore {
-    static let configuration = CoreConfiguration(
+    private static let configuration = CoreConfiguration(
         preferences: { AppPreferences.shared },
         storageRoot: { AppIdentity.storageRoot()! },
         vadModelPath: { Bundle(for: WhisperEngine.self).path(forResource: "ggml-silero-v5.1.2", ofType: "bin") },

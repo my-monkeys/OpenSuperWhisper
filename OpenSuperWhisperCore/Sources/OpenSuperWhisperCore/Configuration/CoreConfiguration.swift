@@ -73,7 +73,7 @@ extension CoreConfiguration {
         return configuration
     }
 
-    public static let notInstalledMessage = """
+    static let notInstalledMessage = """
         OpenSuperWhisperCore was used before CoreConfiguration.install(_:). The macOS app installs it \
         on the first line of AppMain.main (AppCore.install()); a SwiftUI preview calls AppCore.install() \
         in its body; core tests call CoreConfiguration.replaceForTesting(_:) or use the designated initialisers.
