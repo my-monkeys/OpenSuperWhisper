@@ -61,10 +61,16 @@ final class AppPreferences {
             healOnboardingTrigger()
             return
         }
+        // KeyboardShortcuts only reads UserDefaults.standard, which in the test host is the user's
+        // real domain: every test process would start with their binding. Tests get what a fresh
+        // install gets.
+        let legacyShortcut = DefaultsStore.isRunningTests
+            ? KeyboardShortcuts.Name.toggleRecord.defaultShortcut
+            : KeyboardShortcuts.getShortcut(for: .toggleRecord)
         recordingTriggers = RecordingTriggerSet.migrated(
             mouseRaw: mouseButtonHotkey,
             modifierRaw: modifierOnlyHotkey,
-            shortcut: KeyboardShortcuts.getShortcut(for: .toggleRecord)).json
+            shortcut: legacyShortcut).json
     }
 
     /// Onboarding's Right ⌥ choice is the list's job now. It used to land only in the old
