@@ -89,8 +89,8 @@ rm -rf build
 mkdir -p build
 
 # The core package's xcframeworks, always rebuilt from scratch with this toolchain so a release
-# never ships a dev artifact.
-FORCE=1 ./Scripts/build-native.sh
+# never ships a dev artifact, and only from the submodule commits HEAD pins, with clean worktrees.
+RELEASE=1 ./Scripts/build-native.sh
 
 # autocorrect: universal, pinned to deployment target 14.0 (the SDK default is far higher).
 #

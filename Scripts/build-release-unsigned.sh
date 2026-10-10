@@ -49,8 +49,9 @@ mkdir -p build
 # only removes the dylibs it stages there, so none of the dev build's copies is linked by mistake.
 rm -f build/libautocorrect_swift.dylib build/libonnxruntime*.dylib
 
-# The core package's xcframeworks, always rebuilt from scratch, as for a release.
-FORCE=1 ./Scripts/build-native.sh
+# The core package's xcframeworks, always rebuilt from scratch, as for a release, and only from
+# the submodule commits HEAD pins, with clean worktrees.
+RELEASE=1 ./Scripts/build-native.sh
 
 # The dylibs are signed ad hoc where notarize_app.sh uses the Developer ID: an arm64 binary that
 # install_name_tool has edited no longer loads without a signature.

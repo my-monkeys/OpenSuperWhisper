@@ -17,6 +17,11 @@
 # sherpa library) is kept next to the outputs; when it matches and the slices asked for are
 # already built, nothing happens. FORCE=1 rebuilds every requested slice from a clean configure.
 #
+# RELEASE=1 (notarize_app.sh, build-release-unsigned.sh) implies FORCE=1 and first refuses
+# submodules that are not exactly the commits this repository's HEAD pins: uninitialised, on
+# another commit, conflicted, or with tracked or untracked changes. A dev build only stamps that
+# state, so a local experiment rebuilds; a release must not ship it.
+#
 # Merging uses `libtool -static`, never `ld -r` or a master object: the whisper and llama
 # symbols are private externs (-fvisibility=hidden) and would become locals.
 set -euo pipefail
@@ -28,7 +33,9 @@ WORK="$ROOT/build-native"
 OUT="$ROOT/OpenSuperWhisperCore/Binaries"
 STAMP="$OUT/.stamp"
 SHERPA="$ROOT/vendor/sherpa-onnx.xcframework/macos-arm64_x86_64"
+RELEASE="${RELEASE:-0}"
 FORCE="${FORCE:-0}"
+[[ "$RELEASE" == 1 ]] && FORCE=1
 
 case "${1:-macos}" in
   macos) REQUESTED="macos" ;;
@@ -54,6 +61,30 @@ fail() { echo "build-native: error: $*" >&2; exit 1; }
 for tool in cmake xcodebuild libtool lipo otool nm git shasum; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
+# Fails unless every submodule under libwhisper/ is checked out at the commit HEAD records, with
+# no conflict and a clean worktree (untracked files count, ignored ones do not).
+require_pinned_submodules() {
+  local status path pinned actual problems=""
+  status="$(git -C "$ROOT" submodule status --recursive -- libwhisper)" \
+    || fail "git submodule status failed"
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    path="$(echo "${line:1}" | awk '{print $2}')"
+    case "${line:0:1}" in
+      -) problems+=$'\n'"  $path: not initialised"; continue ;;
+      U) problems+=$'\n'"  $path: merge conflict"; continue ;;
+    esac
+    pinned="$(git -C "$ROOT" rev-parse "HEAD:$path" 2>/dev/null || echo none)"
+    actual="$(git -C "$ROOT/$path" rev-parse HEAD)"
+    [[ "$actual" == "$pinned" ]] || problems+=$'\n'"  $path: at $actual, HEAD pins $pinned"
+    [[ -z "$(git -C "$ROOT/$path" status --porcelain)" ]] \
+      || problems+=$'\n'"  $path: uncommitted or untracked changes"
+  done <<<"$status"
+  [[ -z "$problems" ]] || fail "a release builds only the pinned, clean submodules:$problems
+(git submodule update --init --recursive, and clean or stash local changes)"
+}
+
+[[ "$RELEASE" == 1 ]] && require_pinned_submodules
 [[ -f "$SRC/whisper.cpp/CMakeLists.txt" && -f "$SRC/llama.cpp/CMakeLists.txt" ]] \
   || fail "libwhisper submodules are not checked out (git submodule update --init --recursive)"
 

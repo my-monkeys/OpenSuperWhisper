@@ -90,7 +90,9 @@ delete):
   architecture, and the Intel build must not load it.
 - The stamp covers: submodule SHAs and their uncommitted diff, `libwhisper/CMakeLists.txt`,
   the script, `xcodebuild -version`, `cmake --version`, the configure arguments and the
-  platform set. `FORCE=1` rebuilds. Release builds always force.
+  platform set. `FORCE=1` rebuilds. Release builds pass `RELEASE=1`, which forces and first
+  refuses any submodule that is uninitialised, conflicted, on another commit than HEAD pins, or
+  has tracked or untracked changes; a dev build only stamps that state.
 - Gate for the swap: symbol lists and sizes of the new macOS slice match the Release archives
   of today's subproject for both architectures; `nm -m` on the app shows a single
   `_whisper_full` and `_ggml_backend_metal_reg` (`_ggml_backend_metal_init` is dead-stripped
