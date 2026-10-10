@@ -1514,6 +1514,7 @@ enum ThemePalette {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
+        let _ = AppCore.install()
         ContentView()
     }
 }

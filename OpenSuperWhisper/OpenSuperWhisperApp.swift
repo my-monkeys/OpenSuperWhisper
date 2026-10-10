@@ -15,6 +15,7 @@ import OpenSuperWhisperCore
 @main
 enum AppMain {
     static func main() {
+        AppCore.install()
         // `OpenSuperWhisper transcribe <file>` runs headless and never launches the GUI (#150).
         let args = CommandLine.arguments
         if CLI.shouldHandle(args) {

@@ -1256,5 +1256,6 @@ struct IndicatorWindowPreview: View {
 }
 
 #Preview {
+    let _ = AppCore.install()
     IndicatorWindowPreview()
 }

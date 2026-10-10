@@ -909,6 +909,7 @@ struct OnboardingShortcutCard: View {
 }
 
 #Preview {
+    let _ = AppCore.install()
     OnboardingView()
 }
 

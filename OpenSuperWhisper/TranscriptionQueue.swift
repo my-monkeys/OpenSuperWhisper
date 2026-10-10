@@ -107,15 +107,7 @@ class TranscriptionQueue: ObservableObject {
 
     func addFileToQueue(url: URL) async {
         if !AppPreferences.shared.saveTranscriptionHistory {
-            let alert = NSAlert()
-            alert.messageText = "Transcription History Disabled"
-            alert.informativeText = "Transcription saving is currently disabled. Would you like to enable it so this recording can be saved?"
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "Enable & Save")
-            alert.addButton(withTitle: "Cancel")
-
-            let response = alert.runModal()
-            guard response == .alertFirstButtonReturn else {
+            guard AppCore.confirmEnableHistory() else {
                 return
             }
             AppPreferences.shared.saveTranscriptionHistory = true

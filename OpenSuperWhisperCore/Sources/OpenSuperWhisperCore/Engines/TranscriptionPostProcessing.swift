@@ -1,5 +1,4 @@
 import Foundation
-import OpenSuperWhisperCore
 
 /// The steps every engine owes a transcription before it is handed back.
 ///
@@ -10,18 +9,26 @@ import OpenSuperWhisperCore
 ///
 /// Having one implementation does not by itself stop a sixth engine from forgetting to call it,
 /// so `EveryEngineFinishesTests` checks that they all do.
-enum TranscriptionPostProcessing {
+public enum TranscriptionPostProcessing {
 
     /// Trims, applies Asian autocorrect and the custom dictionary, and reports silence.
     ///
     /// The order is not arbitrary: autocorrect rewrites spacing inside CJK text, and dictionary
     /// rules match on word boundaries, so running the dictionary first would have it matching
     /// against spacing that is about to change.
-    static func finish(_ text: String, settings: Settings) -> String {
+    public static func finish(_ text: String, settings: TranscriptionSettings) -> String {
+        finish(text, settings: settings, formatText: CoreAccess.formatText)
+    }
+
+    /// The host's formatter is a parameter so a test can supply its own. It is only called when
+    /// Asian autocorrect applies, so the configuration is read no more often than the Rust
+    /// formatter used to be.
+    static func finish(_ text: String, settings: TranscriptionSettings,
+                       formatText: (String) -> String) -> String {
         var processed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if settings.shouldApplyAsianAutocorrect && !processed.isEmpty {
-            processed = AutocorrectWrapper.format(processed)
+            processed = formatText(processed)
         }
 
         if settings.shouldApplyCustomDictionary {
