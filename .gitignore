@@ -124,3 +124,8 @@ vendor/
 
 # Indicator GIFs (Scripts/indicator-gifs.sh): regenerated on demand, attached to PRs, not versioned
 docs/liquid-glass/*.gif
+
+# Native xcframeworks and their scratch builds (Scripts/build-native.sh): rebuilt from the
+# submodules, never committed
+OpenSuperWhisperCore/Binaries/
+/build-native/
