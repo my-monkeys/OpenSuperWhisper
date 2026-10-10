@@ -597,6 +597,30 @@ Recorded as the slices land, so the plan above keeps its original wording.
     the packages and patching FluidAudio would do. The review offered to factor the patch step out
     of run.sh; the job timeout went up to the sum of its step timeouts instead, which leaves the
     developers' entry point alone.
+31. Hosts do not build core types through their initialisers yet. The initialisers that take a
+    dependency (`WhisperModelManager`, `LLMModelManager` and `SenseVoiceModelManager` with
+    `storageRoot:`, `RecordingStore(storageRoot:)`, the queue's, `WhisperEngine`'s and
+    `BuiltInLlamaBackend(computePolicy:)`) are internal and reached by the core tests through
+    `@testable import`. A host goes through `CoreConfiguration` and the `.shared` instances built
+    from it, as the macOS app does. Making them public waits for the iPhone app, together with
+    deviation 9, since a store on another root is not fully injected yet.
+32. `AppleSpeechSupport` reads and writes three keys (`appleSpeechSupportedLanguages`,
+    `appleSpeechInstalledLanguages`, `appleSpeechLocaleOverrides`) on `DefaultsStore.current`
+    directly, not through `CorePreferences`, so the protocol does not list every member the core
+    reads or writes. The keys and the store are the ones 0.13.3 used, so nothing changes for the
+    macOS app, but an iPhone host cannot redirect them, and in the core tests they go to the
+    per-process defaults suite rather than the in-memory test preferences.
+33. The compute policy is fixed per process. It is a plain value of the configuration a host
+    installs once, the shared llama backend keeps the one it was built with, and `WhisperEngine`
+    reads it when it is built, so a host cannot run on Metal in the foreground and on the CPU only
+    in the background. The plan's `.cpuOnly` "for iPhone background work" needs a policy read per
+    load (or passed per call) first; the `ComputePolicy` comment now says so.
+34. `SenseVoiceModelManager` is public and compiled on iOS, where no SenseVoice engine exists, so
+    an iPhone host could download a model nothing loads. Putting it behind the engine's
+    `#if os(macOS) && arch(arm64)` would break the Intel app, whose onboarding names it outside any
+    `#if` (the SenseVoice choice is hidden at run time there), and `os(macOS)` alone would change a
+    moved test file (`StorageRootInjectionTests`) and two core tests. Left as it is for the iPhone
+    app to settle.
 
 ## Follow-ups kept out of the extraction
 
@@ -617,10 +641,13 @@ and the context to the CPU device (`devices` in the model params) and set `op_of
 for both, ggml should not initialise the Metal device in that mode, and a core test should then
 assert through the ggml log that neither `ggml_metal_device_init` nor `ggml_metal_init` appears;
 the download-catalog strings in `Localizable.xcstrings`, rendered verbatim today so their
-translations are unused; and the `RecordingStore` to `TranscriptionQueue` call together with
-`Recording.url` reading the configured root (deviation 9). Closed in slice 5: the iOS Simulator
-package build in CI (the `core-tests` job builds and tests the core there) and the question of a
-committed `OpenSuperWhisperCore/Package.resolved` (deviation 24).
+translations are unused; the `RecordingStore` to `TranscriptionQueue` call together with
+`Recording.url` reading the configured root (deviation 9), then public injecting initialisers
+(deviation 31); `AppleSpeechSupport`'s three keys through `CorePreferences` (deviation 32); a
+compute policy that can change between loads, so background work alone runs on the CPU
+(deviation 33); and `SenseVoiceModelManager` kept out of iOS builds (deviation 34). Closed in
+slice 5: the iOS Simulator package build in CI (the `core-tests` job builds and tests the core
+there) and the question of a committed `OpenSuperWhisperCore/Package.resolved` (deviation 24).
 
 Release builds used to be instrumented for code coverage (Xcode enables it for the scheme),
 so every CLI run wrote a `default.profraw` into the caller's directory. Fixed on master by
