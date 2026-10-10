@@ -253,6 +253,129 @@ final class PersistedContractTests: XCTestCase {
         XCTAssertEqual(entries.first?.isRegex, false)
     }
 
+    // MARK: - Payloads exactly as 0.13.3 stores them
+
+    // Round-trips cannot catch a renamed case or key: both sides of the trip change together.
+    // Each test below stores a value as 0.13.3 writes it, every non-default case included, and
+    // reads it through the accessor the app uses. A rename makes these decoders fail, and every
+    // one of them answers a failure with an empty or default value, silently resetting the
+    // user's setting.
+
+    /// Stored in `customDictionaryData` (a private accessor, so written to the store directly).
+    func testStoredDictionaryEntriesDecode() throws {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        DefaultsStore.current.set(Data(#"""
+            [{"replacement":"\"","alternates":["opening quote"],"spacing":"attachesRight","isRegex":false,\#
+            "id":"6F1C2B3A-0000-4000-8000-000000000006","original":"open quote"},\#
+            {"replacement":"\"","alternates":[],"spacing":"attachesLeft","isRegex":false,\#
+            "id":"6F1C2B3A-0000-4000-8000-000000000007","original":"close quote"},\#
+            {"replacement":"$1!","alternates":[],"spacing":"standalone","isRegex":true,\#
+            "id":"6F1C2B3A-0000-4000-8000-000000000008","original":"(\\w+) bang"}]
+            """#.utf8), forKey: "customDictionaryData")
+
+        XCTAssertEqual(AppPreferences.shared.customDictionaryEntries, [
+            CustomDictionaryEntry(id: UUID(uuidString: "6F1C2B3A-0000-4000-8000-000000000006")!,
+                                  original: "open quote", replacement: "\"", alternates: ["opening quote"],
+                                  spacing: .attachesRight, isRegex: false),
+            CustomDictionaryEntry(id: UUID(uuidString: "6F1C2B3A-0000-4000-8000-000000000007")!,
+                                  original: "close quote", replacement: "\"", spacing: .attachesLeft),
+            CustomDictionaryEntry(id: UUID(uuidString: "6F1C2B3A-0000-4000-8000-000000000008")!,
+                                  original: #"(\w+) bang"#, replacement: "$1!", isRegex: true),
+        ])
+    }
+
+    /// Stored in `appContextProfilesData`. Moves with LLM cleanup.
+    func testStoredAppContextProfilesDecode() {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        DefaultsStore.current.set(Data(#"""
+            [{"id":"6F1C2B3A-0000-4000-8000-000000000003","bundleIdentifier":"com.apple.Terminal",\#
+            "appName":"Terminal","instructions":"slash → \/\nNo trailing period."}]
+            """#.utf8), forKey: "appContextProfilesData")
+
+        XCTAssertEqual(AppPreferences.shared.appContextProfiles, [
+            AppContextProfile(id: UUID(uuidString: "6F1C2B3A-0000-4000-8000-000000000003")!,
+                              bundleIdentifier: "com.apple.Terminal", appName: "Terminal",
+                              instructions: "slash → /\nNo trailing period."),
+        ])
+    }
+
+    /// Stored in `appInsertionRulesData`, both modes, with and without a pace of its own.
+    func testStoredAppInsertionRulesDecode() {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        DefaultsStore.current.set(Data(#"""
+            [{"typingPaceMilliseconds":12,"id":"6F1C2B3A-0000-4000-8000-000000000004",\#
+            "bundleIdentifier":"com.x","appName":"X","mode":"type"},\#
+            {"id":"6F1C2B3A-0000-4000-8000-000000000005","bundleIdentifier":"com.y","appName":"Y","mode":"paste"}]
+            """#.utf8), forKey: "appInsertionRulesData")
+
+        XCTAssertEqual(AppPreferences.shared.appInsertionRules, [
+            AppInsertionRule(id: UUID(uuidString: "6F1C2B3A-0000-4000-8000-000000000004")!,
+                             bundleIdentifier: "com.x", appName: "X", mode: .type, typingPaceMilliseconds: 12),
+            AppInsertionRule(id: UUID(uuidString: "6F1C2B3A-0000-4000-8000-000000000005")!,
+                             bundleIdentifier: "com.y", appName: "Y", mode: .paste),
+        ])
+    }
+
+    /// Stored in `recordingTriggers` (and, same shape, the hold list): one trigger of each kind.
+    /// The synthesised enum coding writes the case name and an "_0" for its payload, so renaming
+    /// a case, or labelling its associated value, unbinds the trigger. ⌘⌥D is carbon key 2 with
+    /// cmdKey|optionKey, and the chord's flags are NSEvent's ⌘|⌥.
+    func testStoredRecordingTriggersDecode() {
+        let json = #"""
+            {"triggers":[{"keyCombo":{"_0":{"carbonKeyCode":2,"carbonModifiers":2304}}},\#
+            {"modifier":{"_0":"rightOption"}},{"mouse":{"_0":"button4"}},\#
+            {"chord":{"_0":{"flags":1572864}}}]}
+            """#
+
+        XCTAssertEqual(RecordingTriggerSet.load(from: json).triggers, [
+            .keyCombo(KeyboardShortcuts.Shortcut(.d, modifiers: [.command, .option])),
+            .modifier(.rightOption),
+            .mouse(.button4),
+            .chord(ModifierChord([.command, .option])!),
+        ])
+    }
+
+    /// The raw values a stored single modifier or mouse button can hold, beyond the one above.
+    func testModifierAndMouseRawValues() {
+        XCTAssertEqual(ModifierKey.allCases.map(\.rawValue),
+                       ["none", "leftCommand", "rightCommand", "leftOption", "rightOption",
+                        "leftShift", "rightShift", "leftControl", "rightControl", "fn"])
+        XCTAssertEqual(MouseButton.allCases.map(\.rawValue),
+                       ["none", "middle", "button4", "button5", "button6", "button7"])
+    }
+
+    /// Stored in `indicatorLayout`, naming every element. A decoding failure falls back to
+    /// `.default` rather than failing, hence the explicit inequality.
+    func testStoredIndicatorLayoutDecodes() {
+        let layout = IndicatorLayout.load(from: #"""
+            {"hidden":["label"],"order":["cancelButton","label","waveform","dot","stopButton"],"waveformHeight":24}
+            """#)
+
+        XCTAssertNotEqual(layout, .default)
+        XCTAssertEqual(layout.order, [.cancelButton, .label, .waveform, .dot, .stopButton])
+        XCTAssertEqual(layout.hidden, [.label])
+        XCTAssertEqual(layout.waveformHeight, 24)
+    }
+
+    /// `contextAwareModelMode` and `retentionMaxAgeUnit` are stored raw and fall back to their
+    /// default ("ask", "days") on an unknown value, so every case is pinned, not only the default.
+    func testStoredModeAndUnitRawValues() {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        for (raw, mode) in [("ask", ContextAwareModelMode.ask), ("auto", .auto), ("off", .off)] {
+            prefs.contextAwareModelModeRaw = raw
+            XCTAssertEqual(prefs.contextAwareModelMode, mode, raw)
+        }
+
+        XCTAssertEqual(RetentionUnit(rawValue: "minutes"), .minutes)
+        XCTAssertEqual(RetentionUnit(rawValue: "hours"), .hours)
+        XCTAssertEqual(RetentionUnit(rawValue: "days"), .days)
+    }
+
     /// Stored in the `status` column of every recording row.
     func testRecordingStatusRawValues() {
         XCTAssertEqual(RecordingStatus.pending.rawValue, "pending")
