@@ -68,20 +68,31 @@ final class AgentInbox: ObservableObject {
         AgentPanelController.shared.update(visible: !pending.isEmpty)
     }
 
-    /// Live requests on disk: not expired, and their hook still waiting.
-    static func loadRequests(now: Date) -> [AgentRequest] {
-        guard let directory = AgentBridge.requestsDirectory,
+    /// Live requests on disk: not expired, their hook still waiting, and not answered yet.
+    nonisolated static func loadRequests(
+        now: Date,
+        requests: URL? = AgentBridge.requestsDirectory,
+        responses: URL? = AgentBridge.responsesDirectory
+    ) -> [AgentRequest] {
+        guard let requests, let responses,
               let files = try? FileManager.default.contentsOfDirectory(
-                at: directory, includingPropertiesForKeys: nil) else { return [] }
+                at: requests, includingPropertiesForKeys: nil) else { return [] }
         var live: [AgentRequest] = []
         for file in files where file.pathExtension == "json" {
             guard let request = AgentBridge.read(AgentRequest.self, from: file) else { continue }
-            if request.expiresAt > now && AgentBridge.isAlive(pid: request.hookPID) {
-                live.append(request)
-            } else {
+            let response = responses.appendingPathComponent("\(request.id).json")
+            guard request.expiresAt > now && AgentBridge.isAlive(pid: request.hookPID) else {
                 // Its hook was cancelled (Esc in the terminal) or killed, so nothing will
-                // clean up after it.
+                // clean up after it, including an answer it never got to read.
                 try? FileManager.default.removeItem(at: file)
+                try? FileManager.default.removeItem(at: response)
+                continue
+            }
+            // Answered: the request file stays until the hook's next poll reads the answer and
+            // deletes both. Listing it in that gap would bring the panel back for a moment
+            // after the user sent.
+            if !FileManager.default.fileExists(atPath: response.path) {
+                live.append(request)
             }
         }
         return live.sorted { $0.createdAt < $1.createdAt }
