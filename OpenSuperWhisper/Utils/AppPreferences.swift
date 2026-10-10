@@ -741,7 +741,20 @@ final class AppPreferences {
     }
 
     func agentProjectEnabled(_ path: String) -> Bool {
-        !agentDisabledProjects.contains { path == $0 || path.hasPrefix($0 + "/") }
+        Self.agentProjectTurnedOff(path, by: agentDisabledProjects) == nil
+    }
+
+    /// The turned-off folder that keeps agents in `path` in their terminal: `path` itself, or
+    /// the nearest turned-off folder above it. nil when they use the panel. The hook and the
+    /// Agents pane both ask here, so a project's switch cannot read on while it is off (#171).
+    static func agentProjectTurnedOff(_ path: String, by disabled: [String]) -> String? {
+        disabled.filter { agentFolder($0, covers: path) }.max { $0.count < $1.count }
+    }
+
+    /// Whether a switch on `folder` reaches agents started in `path`: the folder itself and
+    /// everything below it, but not a sibling that only starts with the same name.
+    private static func agentFolder(_ folder: String, covers path: String) -> Bool {
+        path == folder || path.hasPrefix(folder + "/")
     }
 
     func setAgentProject(_ path: String, enabled: Bool) {
