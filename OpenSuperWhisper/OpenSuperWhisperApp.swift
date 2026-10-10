@@ -73,19 +73,26 @@ struct OpenSuperWhisperApp: App {
 
     init() {
         MainThreadWatchdog.shared.start()
-        _ = ShortcutManager.shared
+        // A test host would grab the hotkeys and rewrite the user's bindings in UserDefaults.standard.
+        if !DefaultsStore.isRunningTests {
+            _ = ShortcutManager.shared
+        }
         _ = MicrophoneService.shared
     }
 }
 
 extension OpenSuperWhisperApp {
     static func startTranscriptionQueue() {
+        // A test host must not transcribe or delete pending recordings on its own.
+        guard !DefaultsStore.isRunningTests else { return }
         Task { @MainActor in
             TranscriptionQueue.shared.startProcessingQueue()
         }
     }
 
     static func startRetentionScheduler() {
+        // A test host must not delete recordings behind the tests' backs.
+        guard !DefaultsStore.isRunningTests else { return }
         Task { @MainActor in
             RecordingStore.shared.startRetentionScheduler()
         }
