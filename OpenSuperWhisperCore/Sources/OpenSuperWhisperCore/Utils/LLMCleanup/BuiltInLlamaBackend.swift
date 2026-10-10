@@ -20,6 +20,7 @@ public final class BuiltInLlamaBackend: LLMCleanupBackend {
     private static let idleUnloadDelay: TimeInterval = 5 * 60
 
     private let manager = LLMModelManager.shared
+    private let computePolicy: ComputePolicy
     private let inferenceQueue = DispatchQueue(
         label: "fr.my-monkey.opensuperwhisper.llm-inference", qos: .userInitiated)
 
@@ -29,7 +30,6 @@ public final class BuiltInLlamaBackend: LLMCleanupBackend {
     /// Which GGUF `context` was loaded from, so a model switch can be noticed. Also
     /// `inferenceQueue`-confined.
     private var loadedFileName: String?
-    private let computePolicy: ComputePolicy
 
     private init(computePolicy: ComputePolicy) {
         self.computePolicy = computePolicy
