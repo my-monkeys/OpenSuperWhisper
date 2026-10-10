@@ -19,8 +19,10 @@ struct AgentsSettingsPane: View {
     @State private var askOnPermission = AppPreferences.shared.agentAskOnPermission
     @State private var askOnQuestion = AppPreferences.shared.agentAskOnQuestion
     @State private var waitSeconds = AppPreferences.shared.agentWaitSeconds
-    @State private var projects = AppPreferences.shared.agentRecentProjects
-    @State private var disabledProjects = Set(AppPreferences.shared.agentDisabledProjects)
+    @State private var projects = AgentsSettingsPane.listedProjects(
+        recent: AppPreferences.shared.agentRecentProjects,
+        disabled: AppPreferences.shared.agentDisabledProjects)
+    @State private var disabledProjects = AppPreferences.shared.agentDisabledProjects
 
     var body: some View {
         SPane(title: "Agents", subtitle: "Answer coding agents by voice") {
@@ -90,12 +92,7 @@ struct AgentsSettingsPane: View {
                         .scaledFont(size: 11.5)
                         .foregroundColor(STheme.hint)
                 } else {
-                    ForEach(projects, id: \.self) { path in
-                        SRow(title: LocalizedStringKey(URL(fileURLWithPath: path).lastPathComponent),
-                             hint: LocalizedStringKey(Self.abbreviated(path))) {
-                            SToggle(isOn: projectBinding(path), disabled: !enabled)
-                        }
-                    }
+                    ForEach(projects, id: \.self, content: projectRow)
                 }
             }
         }
@@ -185,17 +182,56 @@ struct AgentsSettingsPane: View {
     }
 
     private func refresh() {
-        projects = AppPreferences.shared.agentRecentProjects
-        disabledProjects = Set(AppPreferences.shared.agentDisabledProjects)
+        disabledProjects = AppPreferences.shared.agentDisabledProjects
+        projects = Self.listedProjects(recent: AppPreferences.shared.agentRecentProjects,
+                                       disabled: disabledProjects)
+    }
+
+    private func projectRow(_ path: String) -> some View {
+        let turnedOffBy = AppPreferences.agentProjectTurnedOff(path, by: disabledProjects)
+        let parent = turnedOffBy == path ? nil : turnedOffBy
+        let coveredBelow = projects.filter { $0 != path && AppPreferences.agentFolder(path, covers: $0) }.count
+        return VStack(alignment: .leading, spacing: 2) {
+            SRow(title: LocalizedStringKey(URL(fileURLWithPath: path).lastPathComponent),
+                 hint: LocalizedStringKey(Self.abbreviated(path))) {
+                // Under a turned-off folder the switch stays put: the folder's rule covers
+                // everything below it, and turning the folder on from here would also turn on
+                // its other projects without saying so.
+                SToggle(isOn: projectBinding(path), disabled: !enabled || parent != nil)
+            }
+            if let parent {
+                caption("Off because \(Self.abbreviated(parent)) is off. Turn that folder back on to use the panel here.",
+                        color: STheme.warn)
+            } else if turnedOffBy != nil, coveredBelow > 0 {
+                caption(coveredBelow == 1
+                        ? "Also keeps 1 project below in the terminal."
+                        : "Also keeps \(coveredBelow) projects below in the terminal.",
+                        color: STheme.hint)
+            }
+        }
+    }
+
+    private func caption(_ text: String, color: Color) -> some View {
+        Text(text)
+            .scaledFont(size: 11)
+            .foregroundColor(color)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func projectBinding(_ path: String) -> Binding<Bool> {
         Binding(
-            get: { !disabledProjects.contains(path) },
+            get: { AppPreferences.agentProjectTurnedOff(path, by: disabledProjects) == nil },
             set: { on in
                 AppPreferences.shared.setAgentProject(path, enabled: on)
-                disabledProjects = Set(AppPreferences.shared.agentDisabledProjects)
+                disabledProjects = AppPreferences.shared.agentDisabledProjects
             })
+    }
+
+    /// The recent projects, after the turned-off folders that are not among them. A folder that
+    /// left the recent list (or was never in it) still keeps everything below it in the
+    /// terminal, and this list is the only place to turn it back on.
+    static func listedProjects(recent: [String], disabled: [String]) -> [String] {
+        disabled.filter { !recent.contains($0) }.sorted() + recent
     }
 
     static func label(forWait seconds: Int) -> String {
