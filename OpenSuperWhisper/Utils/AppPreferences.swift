@@ -31,6 +31,13 @@ struct OptionalUserDefault<T> {
 final class AppPreferences {
     static let shared = AppPreferences()
     private init() {
+        runMigrations()
+    }
+
+    /// Brings preferences written by older builds up to date, in this order. Runs once, from
+    /// `init`, the first time anything touches `shared`. Internal only so a test can replay it
+    /// on a store seeded with legacy keys: each step checks the state it migrates from first.
+    func runMigrations() {
         migrateOldPreferences()
         seedAppContextPresetsIfNeeded()
         migrateGroqToRemote()
