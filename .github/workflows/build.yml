@@ -82,6 +82,99 @@ jobs:
               | "- passed only on retry: \(.nodeIdentifier): \([.. | objects | select(.nodeType? == "Failure Message") | .name][0])"' <<< "$tests"
             jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"' <<< "$tests"
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      # Every test of the slice 4 reference is still hosted unless the map says it moved to the
+      # core (docs/test-moves-slice5.txt), and no moved test came back. Not strict: the goldens
+      # skip here, so statuses differ from the reference.
+      - name: Check the hosted tests against the moves to the core
+        if: ${{ !cancelled() && hashFiles('build/TestResults.xcresult/Info.plist') != '' }}
+        run: Scripts/check-test-moves.sh --hosted build/TestResults.xcresult --allow-absent KeyboardLayoutProviderTests
+
+  # The core package's own tests (docs/core-extraction.md, slice 5), on macOS and on the iOS
+  # Simulator, through Scripts/test-core.sh like a local run. Its native cache holds the iOS
+  # slices too, under a key of its own so it never overwrites the build job's macOS-only one.
+  # TEST_RUNNER_OSW_GOLDEN_MACHINE=0 skips the exact whisper strings; the one cpu-only whisper
+  # smoke test still runs on both destinations, without the paravirtual GPU. The llama tests
+  # skip, since CI has no GGUF model.
+  core-tests:
+    runs-on: macos-26
+    timeout-minutes: 100
+    env:
+      TEST_RUNNER_OSW_GOLDEN_MACHINE: "0"
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: brew install cmake rust
+      - name: Compute the native build cache key
+        id: native-key
+        run: |
+          inputs=$( (git submodule status libwhisper | awk '{print $1, $2}'; xcodebuild -version; cmake --version) | shasum -a 256 | cut -d' ' -f1)
+          echo "key=native-${inputs}" >> "$GITHUB_OUTPUT"
+      - name: Restore the native xcframeworks, iOS slices included
+        uses: actions/cache@v6
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-key.outputs.key }}-all-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
+      # Before run.sh, so the stamp already covers the macOS slices run.sh asks for.
+      - name: Build the native slices for macOS and iOS
+        timeout-minutes: 45
+        run: Scripts/fetch-sherpa.sh && Scripts/build-native.sh all
+      # Resolves SourcePackages, patches FluidAudio, and shows the app still builds.
+      - name: Build with run.sh
+        timeout-minutes: 30
+        run: ./run.sh build
+      - name: Run the core tests on macOS
+        timeout-minutes: 25
+        run: |
+          Scripts/test-core.sh macos -resultBundlePath build-core/macos.xcresult \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 300
+      - name: Pick an iOS Simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | jq -r '
+            .devices | to_entries
+            | map(select(.key | test("SimRuntime\\.iOS-")))
+            | map(.key as $k | {version: ($k | capture("iOS-(?<v>[0-9-]+)$").v | split("-") | map(tonumber)),
+                                iphones: (.value | map(select(.name | startswith("iPhone"))))})
+            | map(select(.iphones | length > 0))
+            | sort_by(.version) | last | .iphones[0].udid // empty')
+          if [ -z "$udid" ]; then echo "::error::no available iPhone simulator on this runner"; exit 1; fi
+          xcrun simctl list devices available | grep "$udid"
+          echo "OSW_SIM_DESTINATION=platform=iOS Simulator,id=$udid" >> "$GITHUB_ENV"
+      - name: Run the core tests on the iOS Simulator
+        timeout-minutes: 30
+        run: |
+          Scripts/test-core.sh ios -resultBundlePath build-core/ios.xcresult \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 300
+      - name: Summarize the core tests and check the moves
+        if: ${{ !cancelled() }}
+        run: |
+          for destination in macos ios; do
+            results=build-core/$destination.xcresult
+            [ -f "$results/Info.plist" ] || { echo "### Core tests ($destination): no results" | tee -a "$GITHUB_STEP_SUMMARY"; continue; }
+            summary=$(xcrun xcresulttool get test-results summary --path "$results")
+            tests=$(xcrun xcresulttool get test-results tests --path "$results")
+            {
+              echo "### Core tests ($destination): $(jq -r .result <<< "$summary")"
+              jq -r '"\(.passedTests) passed, \(.failedTests) failed, \(.skippedTests) skipped"' <<< "$summary"
+              jq -r '.testFailures[] | "- failed: \(.testIdentifierString // .testName): \(.failureText)"' <<< "$summary"
+              jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Passed")
+                | select(any(.children[]?; .nodeType == "Repetition" and .result == "Failed"))
+                | "- passed only on retry: \(.nodeIdentifier)"' <<< "$tests"
+              jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"' <<< "$tests"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          Scripts/check-test-moves.sh --core-macos build-core/macos.xcresult --core-ios build-core/ios.xcresult
+      - name: Upload the core test results
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: core-test-results
+          path: |
+            build-core/macos.xcresult
+            build-core/ios.xcresult
+          if-no-files-found: ignore
 
   # The Intel lane of notarize_app.sh, unsigned: nothing else compiles the x86_64 app, where
   # SenseVoice and onnxruntime must stay out. Built on Apple Silicon like a release, not tested.
