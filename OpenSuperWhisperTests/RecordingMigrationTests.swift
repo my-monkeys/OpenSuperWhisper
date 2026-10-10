@@ -115,10 +115,11 @@ final class RecordingMigrationTests: XCTestCase {
 
     // MARK: - 0.13.3 fixture
 
+    /// From the test bundle, where the synchronized group copies it, so the tests do not depend
+    /// on the source checkout sitting where it was compiled.
     private func copyOfFixture() throws -> URL {
-        let fixture = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Fixtures/recordings-0.13.3.sqlite")
+        let fixture = try XCTUnwrap(Bundle(for: RecordingMigrationTests.self)
+            .url(forResource: "recordings-0.13.3", withExtension: "sqlite"))
         let copy = directory.appendingPathComponent("recordings.sqlite")
         try FileManager.default.copyItem(at: fixture, to: copy)
         return copy
