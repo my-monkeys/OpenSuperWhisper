@@ -107,11 +107,24 @@ class RecordingStore: ObservableObject {
         }
     }
 
+    /// A store on a database the caller opened, so the migrations and the record mapping can be
+    /// exercised on a scratch or fixture file. The app only ever uses `shared`.
+    init(databaseQueue: DatabaseQueue) throws {
+        dbQueue = databaseQueue
+        try setupDatabase()
+    }
+
     nonisolated static func databaseURL(in root: URL) -> URL {
         root.appendingPathComponent("recordings.sqlite")
     }
 
     private nonisolated func setupDatabase() throws {
+        try Self.makeMigrator().migrate(dbQueue)
+    }
+
+    /// Every schema migration, in order. Their identifiers are stored in each user's database
+    /// (`grdb_migrations`), so they are never renamed or reordered.
+    nonisolated static func makeMigrator() -> DatabaseMigrator {
         var migrator = DatabaseMigrator()
         
         migrator.registerMigration("v1") { db in
@@ -176,7 +189,7 @@ class RecordingStore: ObservableObject {
             }
         }
 
-        try migrator.migrate(dbQueue)
+        return migrator
     }
     
     private nonisolated func fetchAllRecordings() async throws -> [Recording] {
