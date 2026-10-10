@@ -432,9 +432,12 @@ Recorded as the slices land, so the plan above keeps its original wording.
     public without it. Apart from that, rows 4.1 to 4.3 made public exactly the §5.1 members and
     the §5.2 engine witnesses; the app's remaining code needed nothing more.
 17. The compute policy (4.4) has no test of its own. The spec adds no test file in slice 4, and
-    the hosted suite must reproduce `reference-slice4.txt` exactly. `.automatic` is covered by the
-    unchanged Whisper goldens, VAD pins and llama lifecycle test; `.cpuOnly` is first exercised
-    by the core test target (slice 5).
+    the hosted suite must reproduce `reference-slice4.txt` exactly. On the Whisper side,
+    `.automatic` is covered by the unchanged goldens, VAD pins and lifecycle test, which build
+    `WhisperEngine` through the convenience init and so read the installed policy. On the llama
+    side, the hosted suite never runs `BuiltInLlamaBackend.loadContextOnQueue`; its `.automatic`
+    branch is the unchanged `LlamaContext(modelPath:)` call, which the lifecycle test exercises
+    directly. `.cpuOnly` is first exercised by the core test target (slice 5).
 
 ## Follow-ups kept out of the extraction
 
