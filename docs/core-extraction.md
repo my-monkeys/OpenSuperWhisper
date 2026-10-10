@@ -307,6 +307,32 @@ passes the full suite, and goes through an adversarial review before the next on
    4. `Scripts/build-native.sh all` to rebuild the iOS slices the release build dropped, and
       `./run.sh build` for the dev derived data that `notarize_app.sh`'s `rm -rf build` deleted.
 3. `CoreConfiguration`, `TranscriptionSettings`, and the pure models and helpers.
+   Done, in six commits that each build and pass the suite. `DefaultsStore`, `AppIdentity`,
+   `Keychain`, the `UserDefault` wrappers, `TranscriptionResult` and `TranscriptionError` moved
+   first, then the custom dictionary, `AppContextProfile`, `TranscriptionPrompt`,
+   `LanguageUtil`, `VoiceActivity`, `AudioPCMConverter`, `DictationModelOption` and the
+   download catalogs (split out of `ModelCatalog.swift` and `Settings.swift`). `Settings` is now
+   the core's `TranscriptionSettings`; the app keeps `typealias Settings` with its `init()` and
+   the prompt-file statics in an extension, and both app initialisers delegate to the public
+   memberwise init in the old assignment order. `AppMain.main` installs a `CoreConfiguration`
+   on its first line (`AppCore.install()`), the three SwiftUI previews install it in their
+   body, and `TranscriptionPostProcessing` moved with a formatter parameter. Last, every file
+   that moves in slice 4 was rewired in the app, without moving: preferences, the storage root,
+   the VAD model path and the history consent go through `CoreAccess`, spelled as the core's
+   internal one, through a temporary app copy that reads the installed configuration and traps
+   when nothing is installed. The model managers and the recording store take
+   `init(storageRoot:)`, `WhisperEngine` takes its VAD path, the queue takes its settings
+   factory and an async consent closure, availability checks name iOS 26 and SenseVoice code is
+   behind `#if os(macOS) && arch(arm64)`.
+   Measured: the suite went from 858 passed and 9 skipped to 868 passed and 9 skipped, the ten
+   new tests (`ErrorBridgingTests`, `CoreConfigurationTests`, `HistoryConsentTests`,
+   `StorageRootInjectionTests`) being the only difference, with the llama half of the lifecycle
+   test run. The package builds for the iOS Simulator at every commit. The release smoke check
+   (`build-release-unsigned.sh`, then `smoke-release.sh --expect docs/smoke/post-swap-<arch>.txt`)
+   gives reports identical to the post-swap references on arm64 and on x86_64 under Rosetta,
+   and the test bundle holds no symbol, type descriptor or ObjC class of the core, GRDB,
+   FluidAudio or OSWSenseVoice, and no native sentinel. `Localizable.xcstrings` and the package
+   pins did not change.
 4. Engines, LLM cleanup, model managers and catalogs, the transcription service, recording
    storage and the queue.
 5. Core test target (macOS and iOS Simulator, run with the patched FluidAudio checkout);
@@ -316,6 +342,57 @@ the core only has to keep building for iOS, which every slice checks. Notes for 
 project: record in the foreground, transcribe on device (Parakeet, Apple Speech on iOS 26)
 or remotely, exclude models from backup, and scope `make_release.sh` to the macOS target
 before an iOS target joins the project.
+
+## Deviations from this plan
+
+Recorded as the slices land, so the plan above keeps its original wording.
+
+1. SenseVoice engine location. `SenseVoiceEngine` and `SenseVoiceModelManager` go in the
+   `OpenSuperWhisperCore` target, with the engine behind `#if os(macOS) && arch(arm64)`.
+   `OSWSenseVoice` keeps sherpa and `SenseVoiceRecognizer`. The engine conforms to core types
+   and `OSWSenseVoice` is a dependency of the core, so the engine cannot live there without a
+   cycle.
+2. Seam names. The plan's `vadModelURL` is `vadModelPath: () -> String?`, which keeps today's
+   lookup expression byte-identical. The storage root is a non-optional `() -> URL`.
+3. New configuration fields. `CoreConfiguration` also carries `makeSettings` (main actor) and
+   `confirmEnableHistory` (main actor, `async`), because the queue moves to the core. The
+   consent closure is `async` so an iPhone host can present its own UI without a public-API
+   change. On macOS it wraps the same `runModal`, and the queue calls it from the main actor,
+   so nothing suspends.
+4. Sendable seam. `CoreConfiguration` is `Sendable` with `@Sendable` closures, and
+   `CorePreferences` is `AnyObject, Sendable`. `AppPreferences` declares `@unchecked Sendable`,
+   which changes nothing at run time: engines already read it from detached tasks and from the
+   llama queue, and all its state is in UserDefaults and the Keychain.
+5. Preview exemption. The core cannot build a preview configuration that reads
+   `AppPreferences`. Instead of the core skipping the trap in previews, each preview calls
+   `AppCore.install()`, and previews then read what they read today.
+6. "Pure text cleanup steps" narrowed to TranscriptionPostProcessing, the custom dictionary and
+   TranscriptionPrompt. The AppPreferences filler-word, stop-phrase and submit functions,
+   `IndicatorViewModel.applyPostProcessing`, PunctuationCalibration, KeyboardLanguage and
+   RecentTranscripts stay in the app until the iPhone app needs them.
+7. Text formatter injection. The formatter reaches `TranscriptionPostProcessing.finish` as a
+   parameter fed by the configuration, not through five engine initialisers. The configuration
+   is only read when Asian autocorrect applies, as the Rust formatter was only called then.
+8. Error domain. `TranscriptionError` pins its `NSError` domain to
+   `"OpenSuperWhisper.TranscriptionError"`, so user-visible error text stays identical. The
+   codes 0, 1 and 2 already matched without an explicit `errorCode`.
+9. RecordingStore still calls the queue. The plan says the consent closure "also removes
+   RecordingStore's call into the queue". `RecordingStore.deleteRecording` still calls
+   `TranscriptionQueue.shared.cancelRecording`. Once both types are in the core it compiles and
+   behaves as today; deleting a pending recording still creates the queue and, through it,
+   `TranscriptionService.shared`.
+10. The history consent test does not end on a failed recording. A dropped file whose source
+    does not exist is removed by the queue's first pass (`cleanupMissingFiles`) before
+    `processRecording` could mark it failed, and that removal goes through the call in item 9.
+    `HistoryConsentTests` therefore checks that the accepted file reaches the store as pending,
+    then that the queue finishes and the recording is gone, which is today's behaviour.
+11. Gate wording. The static check for `Settings()` in core code also matched
+    `CoreAccess.makeSettings()`, the spelling the plan asks for; the check now requires that
+    `Settings()` is not part of a longer name. G6 lists `_sqlite3_open` as a sentinel present in
+    the app image, but GRDB uses the system SQLite, so the app only references it; the checks on
+    the test bundle are unaffected.
+12. `WhisperEngine`'s convenience `init(modelPathOverride:)` is not marked `public` while the
+    class is still in the app (slice 3). It becomes public when the engine moves (slice 4).
 
 ## Follow-ups kept out of the extraction
 
@@ -327,6 +404,13 @@ on model downloads; API keys sent over plain http; the remote local-fallback fac
 (`fallbackEngineChoice`) handing an option's identifier to Whisper as a model path for
 SenseVoice on Intel (`"default"`) and for any engine it does not know (`"remote"` included),
 and building the selected Whisper model for `"apple"` below macOS 26.
+
+Also out of scope, found while extracting: an iOS Simulator package build in CI (it needs the
+iOS native slices cached); a committed `OpenSuperWhisperCore/Package.resolved` (slice 5);
+file-name-based model paths for iOS; `.cpuOnly` for llama should also set `op_offload = false`
+(and be checked to create no `MTLDevice`) before the iPhone app relies on it in the background;
+the download-catalog strings in `Localizable.xcstrings`, rendered verbatim today so their
+translations are unused; and the `RecordingStore` to `TranscriptionQueue` call (deviation 9).
 
 Release builds used to be instrumented for code coverage (Xcode enables it for the scheme),
 so every CLI run wrote a `default.profraw` into the caller's directory. Fixed on master by
