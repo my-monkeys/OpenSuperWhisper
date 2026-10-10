@@ -53,23 +53,39 @@ final class ScratchPreferences {
 
 /// An exclusive `flock` on a file every test process of this app can see. The kernel drops it
 /// if the process dies, so a crashed test cannot wedge the others.
+///
+/// Re-entrant within a process: a `flock` belongs to the open file description, so a second
+/// scratch opening the file again while the first still holds it would wait on itself forever.
+/// The first holder takes the lock, nested ones only count, and the last release drops it.
 private final class KeychainLock {
     private static let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("\(AppIdentity.bundleID)-tests-keychain.lock").path
 
-    private var descriptor: Int32
+    private static let guardLock = NSLock()
+    private static var depth = 0
+    private static var descriptor: Int32 = -1
+
+    private var held = true
 
     init() {
-        descriptor = open(Self.path, O_CREAT | O_RDWR, 0o600)
-        precondition(descriptor >= 0, "cannot open \(Self.path)")
-        flock(descriptor, LOCK_EX)
+        Self.guardLock.lock(); defer { Self.guardLock.unlock() }
+        if Self.depth == 0 {
+            Self.descriptor = open(Self.path, O_CREAT | O_RDWR, 0o600)
+            precondition(Self.descriptor >= 0, "cannot open \(Self.path)")
+            flock(Self.descriptor, LOCK_EX)
+        }
+        Self.depth += 1
     }
 
     func release() {
-        guard descriptor >= 0 else { return }
-        flock(descriptor, LOCK_UN)
-        close(descriptor)
-        descriptor = -1
+        Self.guardLock.lock(); defer { Self.guardLock.unlock() }
+        guard held else { return }
+        held = false
+        Self.depth -= 1
+        guard Self.depth == 0 else { return }
+        flock(Self.descriptor, LOCK_UN)
+        close(Self.descriptor)
+        Self.descriptor = -1
     }
 
     deinit { release() }
