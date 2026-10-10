@@ -70,7 +70,11 @@ delete):
 Consequence, accepted on purpose: Debug builds and the test suite switch from native-kernel,
 -O0 ggml to the shipped configuration (generic kernels, Release). This closes a divergence
 instead of adding one. The Whisper goldens are recorded under both configurations in slice 0
-so the switch is measured, not assumed.
+so the switch is measured, not assumed. Measured: the goldens are byte-identical under
+run.sh's native-kernel -O0 build, the generic-kernel universal configure at -O0, and that
+configure with `CMAKE_{C,CXX}_FLAGS_DEBUG='-O3 -DNDEBUG'` (Apple Silicon, Metal, Xcode 27.0);
+the exact VAD pins match under the first and the last. A golden that breaks in slice 1 or 2
+therefore points at the move itself, not at the optimisation level.
 
 Entry points call the script before package resolution (a missing binary target breaks
 resolution): `run.sh`, CI (cache keyed on the stamp inputs), `notarize_app.sh` (after its

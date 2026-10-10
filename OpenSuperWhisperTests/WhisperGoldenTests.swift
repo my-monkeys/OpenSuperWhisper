@@ -9,11 +9,14 @@ import XCTest
 /// behaviour change to explain, never a golden to re-record without review.
 ///
 /// The strings can depend on the ggml kernels and the GPU, so they are only promised on the
-/// machine and toolchain they were recorded with (Apple Silicon M-series, Metal, Xcode 27.0).
-/// They came out byte-identical under both libwhisper configurations the plan moves between:
-/// run.sh's (GGML_NATIVE=ON, so -mcpu=native+dotprod+i8mm) and notarize_app.sh's (GGML_NATIVE=OFF,
-/// arm64 and x86_64, generic CPU kernels), both built Debug by the test run. A config switch
-/// that changes them is a real difference, not an expected one.
+/// machine and toolchain they were recorded with (Apple Silicon M-series, Metal, Xcode 27.0);
+/// `Fixtures.requireGoldenMachine()` skips them elsewhere. They came out byte-identical under
+/// three libwhisper configurations: run.sh's (GGML_NATIVE=ON, so -mcpu=native+dotprod+i8mm, at
+/// -O0), notarize_app.sh's configure (GGML_NATIVE=OFF, arm64 and x86_64, generic CPU kernels)
+/// at -O0, and that same configure with the Debug flags set to -O3 -DNDEBUG, which is the
+/// generic-kernel optimised build the plan moves Debug and the tests to. The exact VAD pins in
+/// `WhisperEngineVadTests` came later and were checked under the first and the last. A config
+/// switch that changes them is a real difference, not an expected one.
 final class WhisperGoldenTests: XCTestCase {
 
     static let jfkTranscript =
