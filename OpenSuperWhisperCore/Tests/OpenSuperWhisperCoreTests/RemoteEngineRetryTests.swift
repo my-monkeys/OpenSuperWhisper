@@ -1,5 +1,4 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// The Remote engine retries only *transient* failures — a self-hosted endpoint
@@ -8,7 +7,7 @@ import XCTest
 /// request, auth, a genuine JSON 405) or a bad URL. This guards that
 /// classification so a long dictation isn't lost to a one-off server bounce,
 /// while a real error still fails fast.
-final class RemoteEngineRetryTests: XCTestCase {
+final class RemoteEngineRetryTests: CoreTestCase {
 
     // MARK: - HTTP status classification
 

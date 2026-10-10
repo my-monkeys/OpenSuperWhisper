@@ -1,12 +1,11 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// Remote/cloud transcription failures are common and user-actionable — a wrong
 /// or missing API key, an unreachable server, or an HTTP error — so the Remote
 /// engine surfaces a descriptive `LocalizedError` instead of a bare generic
 /// failure. This guards that each case yields a non-empty, on-point message.
-final class RemoteErrorTests: XCTestCase {
+final class RemoteErrorTests: CoreTestCase {
 
     func testMissingKeyMentionsAKey() {
         let msg = RemoteError.missingAPIKey.errorDescription ?? ""

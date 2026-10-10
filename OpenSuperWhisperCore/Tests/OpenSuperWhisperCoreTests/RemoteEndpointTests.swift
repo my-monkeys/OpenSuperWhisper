@@ -1,5 +1,4 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// The Remote engine builds `<base>/v1/audio/<action>` from a user-typed server
@@ -7,7 +6,7 @@ import XCTest
 /// `/v1` segment. This guards that normalization so every reasonable base URL
 /// resolves to exactly one correct endpoint — no missing scheme, no `//`, no
 /// duplicated `/v1`.
-final class RemoteEndpointTests: XCTestCase {
+final class RemoteEndpointTests: CoreTestCase {
 
     private func url(_ base: String, _ action: String = "transcriptions") -> String? {
         RemoteEngine.endpoint(base: base, action: action)?.absoluteString

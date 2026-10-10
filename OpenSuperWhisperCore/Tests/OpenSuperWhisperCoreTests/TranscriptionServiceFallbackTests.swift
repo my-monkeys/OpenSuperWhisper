@@ -1,5 +1,4 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// The remote local-fallback triggers only on "can't use the server" errors —
@@ -7,7 +6,7 @@ import XCTest
 /// local model wouldn't fix, and never on a non-remote error. This guards that
 /// classification (same shape as the retry classifier). Also pins the central
 /// translation-capability set the fallback picker and the translate toggle share.
-final class TranscriptionServiceFallbackTests: XCTestCase {
+final class TranscriptionServiceFallbackTests: CoreTestCase {
 
     func testFallsBackOnNetworkAnd5xx() {
         XCTAssertTrue(TranscriptionService.shouldUseFallback(for: RemoteError.network(nil)))

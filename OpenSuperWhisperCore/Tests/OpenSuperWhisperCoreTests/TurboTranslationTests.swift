@@ -1,6 +1,5 @@
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// Whisper translates, but its turbo builds do not, and they say nothing about it.
@@ -9,7 +8,7 @@ import XCTest
 /// `translate` set, `ggml-large-v3-turbo-q5_0` returned the Czech unchanged and byte-identical
 /// to the untranslated run. Since every Whisper model the setup screen offers is a turbo build,
 /// a user who followed setup had no configuration that could translate, and nothing said so.
-final class TurboTranslationTests: XCTestCase {
+final class TurboTranslationTests: CoreTestCase {
 
     func testTurboModelsCannotTranslate() {
         for name in ["ggml-large-v3-turbo.bin",

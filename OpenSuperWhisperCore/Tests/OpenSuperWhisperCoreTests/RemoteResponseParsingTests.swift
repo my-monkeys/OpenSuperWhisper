@@ -1,12 +1,11 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// The Remote engine parses the server's success body for the transcript text
 /// (OpenAI `{"text":...}`, tolerating `{"result":...}` or a bare string), and on
 /// failure pulls a human-readable message from an error body. This guards both
 /// parsers and their documented fallbacks.
-final class RemoteResponseParsingTests: XCTestCase {
+final class RemoteResponseParsingTests: CoreTestCase {
 
     private func data(_ s: String) -> Data { Data(s.utf8) }
 
