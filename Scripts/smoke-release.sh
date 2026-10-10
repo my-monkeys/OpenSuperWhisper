@@ -11,7 +11,8 @@
 # Homebrew runs it, where Bundle.main has no resources and the VAD model is only found through
 # the engine's own bundle. x86_64 runs under Rosetta. --arch defaults to the binary's only slice.
 #
-# Fails when a run exits non-zero or its stderr lacks whisper.cpp's "loading VAD model" line for
+# Refuses to run while the app's "Unload model when idle" setting is on (see below). Fails when a
+# run exits non-zero or its stderr lacks whisper.cpp's "loading VAD model" line for
 # this app's Contents/Resources/ggml-silero-v5.1.2.bin; when an arm64 run does not use Metal;
 # when the VAD model is missing from Contents/Resources; when _whisper_full or
 # _ggml_backend_metal_reg is not defined exactly once across the app's binaries; when
@@ -63,6 +64,14 @@ if [[ -z "$ARCH" ]]; then
 fi
 case "$ARCH" in arm64|x86_64) ;; *) usage ;; esac
 [[ " $SLICES " == *" $ARCH "* ]] || fail "the binary has no $ARCH slice (it has: $SLICES)"
+
+# The exit-code check is what catches a ggml without the fork's Metal teardown fix, which aborts
+# in exit() while a whisper context is alive. WhisperEngine reads this preference even under
+# --model --raw, and with it on the context is already freed when the CLI exits.
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")"
+case "$(defaults read "$BUNDLE_ID" unloadWhisperModelWhenIdle 2>/dev/null || true)" in
+  1|true|YES) fail "Whisper's \"Unload model when idle\" is on in $BUNDLE_ID's settings: the CLI would exit with no context loaded and prove nothing. Turn it off for the check." ;;
+esac
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
