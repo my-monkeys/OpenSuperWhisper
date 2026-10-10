@@ -217,16 +217,23 @@ passes the full suite, and goes through an adversarial review before the next on
    - Tooling: drop the dangling `WhisperCppBindingTests` scheme entry; CLI flags `--model`
      and `--raw` for a deterministic smoke check; `Scripts/smoke-release.sh` (both
      architectures, app path and Homebrew-style symlink, VAD load line, Metal init, exit
-     code with a model loaded, one ggml, libomp and onnxruntime per architecture, signature);
-     CI runs the unit tests (serially, tests that need the Mac's own keyboard layouts, screens
-     or Bluetooth microphone skipped) and an unsigned x86_64 Release build.
+     code with a model loaded, one ggml, libomp and onnxruntime per architecture, signature).
+     CI runs the unit tests serially and an unsigned x86_64 Release build. It skips only the
+     tests that switch the system keyboard layout; the Bluetooth microphone and notch tests
+     skip themselves without the hardware. Changed from the first plan, which also skipped the
+     timing-sensitive host tests: CI runs them, retries a failing test once
+     (`-retry-tests-on-failure -test-iterations 2`) and names in the job summary any test that
+     only passed on the retry. ErrorFeedbackTests and ClipboardRestoreTests schedule their
+     timers and their checks on the same main queue, so they should hold on a slow VM, and a
+     retry shows when they do not.
      The Whisper goldens and the exact VAD boundaries are only promised on an Apple Silicon
      Mac with its Metal GPU: `Fixtures.requireGoldenMachine()` skips them on another arch, with
      no Metal device or a GPU outside the Apple families, and when
      `TEST_RUNNER_OSW_GOLDEN_MACHINE=0` is set, which CI sets unless its runner is known to
-     match. The llama lifecycle test reads its model only from `TEST_RUNNER_OSW_TEST_GGUF` and
-     skips without it; the required-tests check sets it, so the llama half cannot drop out
-     unnoticed.
+     match. That skips every test that runs Whisper (the context lifecycle included), so CI
+     does not exercise Whisper inference. The llama lifecycle test reads its model only from
+     `TEST_RUNNER_OSW_TEST_GGUF` and skips without it; the required-tests check sets it, so the
+     llama half cannot drop out unnoticed.
 1. Native build script and an empty core package wired into the app (Debug, Release,
    x86_64, iOS Simulator), proving module lookup without linking any native symbol from it,
    hosted `@testable` access, and no duplicate copy in the test bundle.

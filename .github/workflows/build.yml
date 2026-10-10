@@ -7,6 +7,7 @@ on:
 
 jobs:
   build:
+    timeout-minutes: 90
     # Pinned to the macOS 26 runner: it ships only Xcode 26.x (macOS 26 SDK), so the
     # Apple Speech engine (SpeechTranscriber/AssetInventory, gated on
     # `#if canImport(FoundationModels)`) is always compiled and tested. `macos-latest`
@@ -42,12 +43,17 @@ jobs:
           key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
       - name: Build with run.sh
         run: ./run.sh build
-      # Serial, on run.sh's derived data and its patched FluidAudio checkout. Skipped here: tests
-      # that need hardware or a desktop a VM does not have (they switch the system keyboard layout,
-      # read the attached screens, or need a paired Bluetooth microphone). The Whisper goldens and
-      # exact VAD pins skip themselves through TEST_RUNNER_OSW_GOLDEN_MACHINE=0: they are only
-      # promised on Apple Silicon with its own GPU, and the runner's is paravirtual.
+      # Serial, on run.sh's derived data and its patched FluidAudio checkout. Only
+      # KeyboardLayoutProviderTests is skipped here, because it switches the system keyboard
+      # layout; tests that need a Bluetooth microphone or a notched screen skip themselves.
+      # TEST_RUNNER_OSW_GOLDEN_MACHINE=0 skips every test that runs Whisper (goldens, VAD pins, the
+      # context lifecycle), since their outputs are only promised on Apple Silicon with its own
+      # GPU: CI does not exercise Whisper inference. A failing test runs once more and the summary
+      # names any that only passed on that retry: the timing-sensitive ones (ErrorFeedbackTests,
+      # ClipboardRestoreTests) should hold on a VM, as their timers and checks share the main
+      # queue, and a retry shows when they do not.
       - name: Run the unit tests
+        timeout-minutes: 45
         env:
           TEST_RUNNER_OSW_GOLDEN_MACHINE: "0"
         run: |
@@ -56,11 +62,8 @@ jobs:
             -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation -skipMacroValidation \
             -only-testing:OpenSuperWhisperTests \
             -skip-testing:OpenSuperWhisperTests/KeyboardLayoutProviderTests \
-            -skip-testing:OpenSuperWhisperTests/NotchMetricsTests/testAScreenWithoutACutoutReportsNoneRatherThanAStandIn \
-            -skip-testing:OpenSuperWhisperTests/NotchMetricsTests/testACutoutReportsTheSafeAreaInsetExactly \
-            -skip-testing:OpenSuperWhisperTests/MicrophoneServiceBluetoothTests/testBluetoothDetection_MACAddress \
-            -skip-testing:OpenSuperWhisperTests/MicrophoneServiceRequiresConnectionTests/testRequiresConnection_Bluetooth \
             -parallel-testing-enabled NO \
+            -retry-tests-on-failure -test-iterations 2 \
             -resultBundlePath build/TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" | xcpretty --simple --color
       - name: Summarize the unit tests
@@ -72,14 +75,18 @@ jobs:
             echo "### Unit tests: $(jq -r .result <<< "$summary")"
             jq -r '"\(.passedTests) passed, \(.failedTests) failed, \(.skippedTests) skipped"' <<< "$summary"
             jq -r '.testFailures[] | "- failed: \(.testIdentifierString // .testName): \(.failureText)"' <<< "$summary"
-            xcrun xcresulttool get test-results tests --path "$results" \
-              | jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"'
+            tests=$(xcrun xcresulttool get test-results tests --path "$results")
+            jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Passed")
+              | select(any(.children[]?; .nodeType == "Repetition" and .result == "Failed"))
+              | "- passed only on retry: \(.nodeIdentifier): \([.. | objects | select(.nodeType? == "Failure Message") | .name][0])"' <<< "$tests"
+            jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"' <<< "$tests"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
   # The Intel lane of notarize_app.sh, unsigned: nothing else compiles the x86_64 app, where
   # SenseVoice and onnxruntime must stay out. Built on Apple Silicon like a release, not tested.
   release-x86_64:
     runs-on: macos-26
+    timeout-minutes: 120
     steps:
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v6
