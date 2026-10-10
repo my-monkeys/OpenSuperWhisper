@@ -104,8 +104,10 @@ submodule_state() {
 
 toolchain() { xcodebuild -version; cmake --version; }
 
+# Contents only, never paths: a moved checkout or outputs restored from a cache still match.
 stamp_inputs() {
-  shasum -a 256 "$SCRIPT" "$SRC/CMakeLists.txt"
+  shasum -a 256 <"$SCRIPT"
+  shasum -a 256 <"$SRC/CMakeLists.txt"
   submodule_state "$SRC/whisper.cpp"
   submodule_state "$SRC/llama.cpp"
   toolchain
