@@ -1,6 +1,5 @@
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// Folding rules that write the same thing into one badge.
@@ -8,7 +7,7 @@ import XCTest
 /// Before rules could hold several phrasings, saying a thing three ways meant three rows all
 /// writing "My Monkey". The merge has to be lossless: every phrasing that used to work must
 /// still work afterwards, or the user silently loses replacements they rely on.
-final class DictionaryMergeTests: XCTestCase {
+final class DictionaryMergeTests: CoreTestCase {
 
     func testRulesWritingTheSameThingBecomeOne() {
         let merged = CustomDictionary.merged([

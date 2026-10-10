@@ -1,12 +1,11 @@
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// Editing the phrasings behind one rule. The badge editor shows them as a flat list, so the
 /// primary and its alternates have to behave like one list even though only the primary is
 /// stored as `original`.
-final class DictionaryTriggerEditingTests: XCTestCase {
+final class DictionaryTriggerEditingTests: CoreTestCase {
 
     private func rule() -> CustomDictionaryEntry {
         CustomDictionaryEntry(original: "open quote", replacement: "\"",

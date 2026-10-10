@@ -1,6 +1,5 @@
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// Dictionary rules that match with a regular expression and put capture groups back.
@@ -9,7 +8,7 @@ import XCTest
 /// fiction gets her words back with no quotation marks, because a quotation mark is not a sound,
 /// and what she needs is one substitution: whatever precedes "said Frank" was spoken. Expressed
 /// as a rule she can paste, it is also every rule nobody has asked for yet.
-final class DictionaryRegexTests: XCTestCase {
+final class DictionaryRegexTests: CoreTestCase {
 
     /// The rule this was built for, verbatim.
     private func dialogueRule() -> CustomDictionaryEntry {

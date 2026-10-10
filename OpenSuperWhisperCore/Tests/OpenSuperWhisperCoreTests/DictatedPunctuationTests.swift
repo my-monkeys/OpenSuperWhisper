@@ -1,6 +1,5 @@
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// Dictionary rules that turn spoken punctuation into characters.
@@ -9,7 +8,7 @@ import XCTest
 /// `he said " hello "`, with the spaces that separated the words still sitting either side of
 /// the mark. For someone dictating dialogue all day that is worse than the problem. A rule
 /// therefore says which side its replacement glues to.
-final class DictatedPunctuationTests: XCTestCase {
+final class DictatedPunctuationTests: CoreTestCase {
 
     private func openQuote() -> CustomDictionaryEntry {
         CustomDictionaryEntry(original: "open quote", replacement: "\"",

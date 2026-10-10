@@ -1,11 +1,10 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// Covers the pure logic behind app-aware LLM formatting: profile lookup by bundle id, system
 /// prompt assembly from the two independent contributors (general cleanup + per-app rules), and
 /// the output length guard. The LLM call itself is I/O and is verified manually.
-final class AppContextFormattingTests: XCTestCase {
+final class AppContextFormattingTests: CoreTestCase {
 
     private let slack = AppContextProfile(
         bundleIdentifier: "com.tinyspeck.slackmacgap",

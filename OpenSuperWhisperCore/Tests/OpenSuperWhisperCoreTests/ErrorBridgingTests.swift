@@ -1,5 +1,4 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// A Swift error that reaches the user as an `NSError` carries its type's module in the domain:
@@ -7,7 +6,7 @@ import XCTest
 /// show "(OpenSuperWhisper.TranscriptionError error 2.)". Moving the type into another module
 /// must not change that text. Only the domain and the code are pinned, because the rest of
 /// `localizedDescription` follows the Mac's language.
-final class ErrorBridgingTests: XCTestCase {
+final class ErrorBridgingTests: CoreTestCase {
 
     func testTranscriptionErrorKeepsItsDomainAndCodes() {
         let errors: [TranscriptionError] = [

@@ -1,13 +1,12 @@
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// The Apple Speech model rows ask "are this language's assets on this Mac", and the answer
 /// is matched against the locale list Speech returns. Identifier formatting differs between
 /// call sites ("fr_FR" vs "fr-FR"), so the comparison has to go through language + region
 /// rather than string equality, or an installed model renders a Download button (#46).
-final class AppleModelInstalledStateTests: XCTestCase {
+final class AppleModelInstalledStateTests: CoreTestCase {
 
     func testMatchesAcrossIdentifierSeparators() {
         let installed = [Locale(identifier: "fr-FR"), Locale(identifier: "en_US")]

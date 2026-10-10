@@ -1,13 +1,12 @@
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// The Whisper language list is read from the library rather than hand-maintained, because the
 /// hand-written one kept omitting languages Whisper supported. Ukrainian, Vietnamese and Czech
 /// each reached us as a user report before anyone could select them. These pin that the list
 /// really does come from the transcriber.
-final class LanguageCatalogTests: XCTestCase {
+final class LanguageCatalogTests: CoreTestCase {
 
     func testCoversWhatWhisperActuallySupports() {
         // Whisper ships ~99 languages; the old hand-written list held 22.

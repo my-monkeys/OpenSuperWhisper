@@ -8,10 +8,9 @@
 //
 
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
-final class DictionaryLineBreakTests: XCTestCase {
+final class DictionaryLineBreakTests: CoreTestCase {
 
     private func rule(_ trigger: String, _ replacement: String,
                       regex: Bool = false) -> CustomDictionaryEntry {

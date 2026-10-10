@@ -1,11 +1,10 @@
 import XCTest
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// `boostTerms` is the single source of the words boosted on BOTH engines
 /// (Whisper prompt-boost + Parakeet decode vocabulary), so its contract is
 /// covered directly here.
-final class CustomDictionaryBoostTermsTests: XCTestCase {
+final class CustomDictionaryBoostTermsTests: CoreTestCase {
 
     private func entry(_ original: String, _ replacement: String) -> CustomDictionaryEntry {
         CustomDictionaryEntry(original: original, replacement: replacement)
