@@ -65,33 +65,34 @@ class TranscriptionService: ObservableObject {
         engineError = nil
         print("Loading engine: \(selectedEngine)")
 
+        let kind = Self.engineKind(forSelectedEngine: selectedEngine)
         let result = await Task.detached(priority: .userInitiated) { () -> Result<TranscriptionEngine?, Error> in
             let engine: TranscriptionEngine?
 
-            if selectedEngine == "fluidaudio" {
+            switch kind {
+            case .fluidAudio:
                 engine = await FluidAudioEngine()
-            } else if selectedEngine == "sensevoice" {
+            case .senseVoice:
 #if arch(arm64)
                 engine = SenseVoiceEngine()
 #else
-                // SenseVoice (sherpa-onnx/onnxruntime) ships arm64-only; fall back on Intel.
+                // Unreachable: engineKind never answers .senseVoice where it isn't compiled.
                 engine = await WhisperEngine()
 #endif
-            } else if selectedEngine == "remote" {
+            case .remote:
                 engine = RemoteEngine()
-            } else if selectedEngine == "apple" {
+            case .appleSpeech:
 #if canImport(FoundationModels)
                 if #available(macOS 26.0, *) {
                     engine = AppleSpeechEngine()
                 } else {
-                    // A pref synced from a newer machine; the catalog never offers
-                    // "apple" here, so quietly fall back.
+                    // Unreachable: engineKind never answers .appleSpeech below macOS 26.
                     engine = await WhisperEngine()
                 }
 #else
                 engine = await WhisperEngine()
 #endif
-            } else {
+            case .whisper:
                 engine = await WhisperEngine()
             }
 
@@ -115,6 +116,56 @@ class TranscriptionService: ObservableObject {
             print("Failed to load engine: \(error)")
         }
         isLoading = false
+    }
+
+    /// The engines `ensureEngineLoaded` can build. Named apart from the classes so the choice can
+    /// be made, and tested, without instantiating anything (an engine's init may load a model).
+    enum EngineKind: Equatable {
+        case whisper, fluidAudio, senseVoice, remote, appleSpeech
+    }
+
+    /// Which engine a stored `selectedEngine` id gets. Every id the app does not know lands on
+    /// Whisper rather than failing, including an empty one and the legacy "groq", which
+    /// AppPreferences rewrites to "remote" when it is first built, so it only gets here when it
+    /// was written after that.
+    ///
+    /// The two gates are parameters so the fallbacks can be tested on any machine; the defaults
+    /// are the checks the app makes.
+    nonisolated static func engineKind(
+        forSelectedEngine id: String,
+        senseVoiceAvailable: Bool = isSenseVoiceCompiled,
+        appleSpeechAvailable: Bool = isAppleSpeechAvailable
+    ) -> EngineKind {
+        switch id {
+        case "fluidaudio":
+            return .fluidAudio
+        case "sensevoice":
+            // SenseVoice (sherpa-onnx/onnxruntime) ships arm64-only; fall back on Intel.
+            return senseVoiceAvailable ? .senseVoice : .whisper
+        case "remote":
+            return .remote
+        case "apple":
+            // A pref synced from a newer machine; the catalog never offers "apple" there, so
+            // quietly fall back.
+            return appleSpeechAvailable ? .appleSpeech : .whisper
+        default:
+            return .whisper
+        }
+    }
+
+    nonisolated static var isSenseVoiceCompiled: Bool {
+#if arch(arm64)
+        return true
+#else
+        return false
+#endif
+    }
+
+    nonisolated static var isAppleSpeechAvailable: Bool {
+#if canImport(FoundationModels)
+        if #available(macOS 26.0, *) { return true }
+#endif
+        return false
     }
 
     /// Invalidate the active engine so the next transcription re-initializes it
