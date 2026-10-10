@@ -1,6 +1,6 @@
 import Foundation
 
-public enum TranscriptionError: Error {
+enum TranscriptionError: Error {
     case contextInitializationFailed
     case audioConversionFailed
     case processingFailed
@@ -11,5 +11,5 @@ public enum TranscriptionError: Error {
 /// "(OpenSuperWhisper.TranscriptionError error 2.)" into another text in the engine error label,
 /// the failed-recording text in the database, the CLI and onboarding.
 extension TranscriptionError: CustomNSError {
-    public static var errorDomain: String { "OpenSuperWhisper.TranscriptionError" }
+    static var errorDomain: String { "OpenSuperWhisper.TranscriptionError" }
 }

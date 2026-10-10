@@ -22,7 +22,7 @@ private class ProgressContext {
 }
 
 public class WhisperEngine: TranscriptionEngine {
-    public var engineName: String { "Whisper" }
+    var engineName: String { "Whisper" }
     
     /// Silero VAD, shipped in the app bundle (~0.9 MB). Used to cut non-speech audio out
     /// before the encoder sees it: long pauses aren't decoded at all, and silence can't be
@@ -80,9 +80,9 @@ public class WhisperEngine: TranscriptionEngine {
         }
     }
     
-    public var onProgressUpdate: ((Float) -> Void)?
+    var onProgressUpdate: ((Float) -> Void)?
     
-    public var isModelLoaded: Bool {
+    var isModelLoaded: Bool {
         context != nil
     }
     
@@ -277,14 +277,14 @@ public class WhisperEngine: TranscriptionEngine {
         return TranscriptionPostProcessing.finish(cleanedText, settings: settings)
     }
     
-    public func cancelTranscription() {
+    func cancelTranscription() {
         isCancelled = true
         if let abortFlag = abortFlag {
             abortFlag.pointee = true
         }
     }
     
-    public func getSupportedLanguages() -> [String] {
+    func getSupportedLanguages() -> [String] {
         return LanguageUtil.availableLanguages
     }
 

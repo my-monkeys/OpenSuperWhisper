@@ -5,7 +5,7 @@
 import Foundation
 internal import OSWNative
 
-public struct WhisperContextParams {
+struct WhisperContextParams {
     var useGPU: Bool = true
     var flashAttention: Bool = true
     var gpuDevice: Int32 = 0
@@ -15,7 +15,7 @@ public struct WhisperContextParams {
     var dtwAheads: WhisperAheads = .init(heads: [])
     var dtwMemSize: Int = 0 // remove
 
-    public init() {}
+    init() {}
 
     func toC() -> whisper_context_params {
         var cParams = whisper_context_params()

@@ -2,8 +2,8 @@ import Foundation
 import AVFoundation
 import FluidAudio
 
-public class FluidAudioEngine: TranscriptionEngine {
-    public var engineName: String { "FluidAudio" }
+class FluidAudioEngine: TranscriptionEngine {
+    var engineName: String { "FluidAudio" }
     
     private var asrManager: AsrManager?
     private var asrModels: AsrModels?
@@ -16,17 +16,17 @@ public class FluidAudioEngine: TranscriptionEngine {
     /// global prefs. Readable so a test can check what the fallback factory passed.
     let versionOverride: String?
 
-    public init(versionOverride: String? = nil) {
+    init(versionOverride: String? = nil) {
         self.versionOverride = versionOverride
     }
     
-    public var onProgressUpdate: ((Float) -> Void)?
+    var onProgressUpdate: ((Float) -> Void)?
     
-    public var isModelLoaded: Bool {
+    var isModelLoaded: Bool {
         asrManager != nil
     }
     
-    public func initialize() async throws {
+    func initialize() async throws {
         let versionString = versionOverride ?? CoreAccess.preferences.fluidAudioModelVersion
         let version = AsrModelVersion(preference: versionString)
 
@@ -38,7 +38,7 @@ public class FluidAudioEngine: TranscriptionEngine {
         asrModels = models
     }
     
-    public func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         guard let asrManager = asrManager else {
             throw TranscriptionError.contextInitializationFailed
         }
@@ -117,7 +117,7 @@ public class FluidAudioEngine: TranscriptionEngine {
         return processedText
     }
     
-    public func cancelTranscription() {
+    func cancelTranscription() {
         isCancelled = true
         progressTask?.cancel()
         progressTask = nil
@@ -125,7 +125,7 @@ public class FluidAudioEngine: TranscriptionEngine {
         transcriptionTask = nil
     }
     
-    public func getSupportedLanguages() -> [String] {
+    func getSupportedLanguages() -> [String] {
         EngineCapabilities.supportedLanguages(
             engine: "fluidaudio", fluidAudioModelVersion: CoreAccess.preferences.fluidAudioModelVersion)
     }

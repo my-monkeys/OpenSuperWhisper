@@ -9,14 +9,14 @@ import Foundation
 ///
 /// Having one implementation does not by itself stop a sixth engine from forgetting to call it,
 /// so `EveryEngineFinishesTests` checks that they all do.
-public enum TranscriptionPostProcessing {
+enum TranscriptionPostProcessing {
 
     /// Trims, applies Asian autocorrect and the custom dictionary, and reports silence.
     ///
     /// The order is not arbitrary: autocorrect rewrites spacing inside CJK text, and dictionary
     /// rules match on word boundaries, so running the dictionary first would have it matching
     /// against spacing that is about to change.
-    public static func finish(_ text: String, settings: TranscriptionSettings) -> String {
+    static func finish(_ text: String, settings: TranscriptionSettings) -> String {
         finish(text, settings: settings, formatText: CoreAccess.formatText)
     }
 

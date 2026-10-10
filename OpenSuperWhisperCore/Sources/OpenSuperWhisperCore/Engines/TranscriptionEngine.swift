@@ -1,7 +1,7 @@
 import Foundation
 import AVFoundation
 
-public protocol TranscriptionEngine: AnyObject {
+protocol TranscriptionEngine: AnyObject {
     var isModelLoaded: Bool { get }
     var engineName: String { get }
 

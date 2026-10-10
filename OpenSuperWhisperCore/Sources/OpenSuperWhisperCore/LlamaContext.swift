@@ -65,7 +65,7 @@ internal import OSWNative
 /// NOT thread-safe: `llama_context` holds the KV cache and must be used by one caller at a
 /// time. Every access goes through `BuiltInLlamaBackend`'s serial inference queue, which is
 /// also what owns this object's lifetime.
-public final class LlamaContext {
+final class LlamaContext {
 
     typealias LlamaToken = Int32
 
@@ -87,7 +87,7 @@ public final class LlamaContext {
 
     /// Loads a GGUF model from disk and creates an inference context.
     /// GPU offload is enabled (all layers) so Metal is used, matching the whisper path.
-    public init?(modelPath: String, contextLength: UInt32 = 4096, gpuLayers: Int32 = 999) {
+    init?(modelPath: String, contextLength: UInt32 = 4096, gpuLayers: Int32 = 999) {
         _ = LlamaContext.backendInit
 
         // --- Load the model ---
@@ -262,7 +262,7 @@ public final class LlamaContext {
 
     /// Runs a single-shot chat completion: formats the prompt, decodes the prompt
     /// tokens, then greedily samples up to `maxTokens` tokens, stopping at EOG.
-    public func generate(system: String, user: String, maxTokens: Int = 512) -> String {
+    func generate(system: String, user: String, maxTokens: Int = 512) -> String {
         guard let ctx, let sampler else { return "" }
 
         // Every call is an independent completion, so start from an empty KV cache. This is not

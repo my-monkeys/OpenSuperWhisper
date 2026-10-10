@@ -8,7 +8,7 @@ import CoreAudioTypes
 /// AVAudioConverter downmix instead goes wrong on interfaces that expose several unlabeled
 /// inputs with speech on one (an Audient EVO 4 records 2 mics + 2 loopback): the result is
 /// silence, and the engine reports "No speech detected".
-public enum AudioPCMConverter {
+enum AudioPCMConverter {
     private static func resolveFileURL(_ fileURL: URL) throws -> (URL, Bool) {
         let data = try Data(contentsOf: fileURL, options: [.mappedIfSafe])
         guard data.count >= 12 else { return (fileURL, false) }
@@ -27,7 +27,7 @@ public enum AudioPCMConverter {
         return (fileURL, false)
     }
 
-    public static func convertAudioToPCM(fileURL: URL) async throws -> [Float]? {
+    static func convertAudioToPCM(fileURL: URL) async throws -> [Float]? {
         return try await Task.detached(priority: .userInitiated) {
             let (resolvedURL, isTempFile) = try resolveFileURL(fileURL)
             defer {
@@ -296,7 +296,7 @@ public enum AudioPCMConverter {
     /// For engines that only take a file: a temporary 16 kHz mono WAV holding the
     /// active-channel mix of a multi-channel `fileURL`, or nil when the file is already mono.
     /// The caller removes the returned file.
-    public static func monoFileIfMultiChannel(_ fileURL: URL) async throws -> URL? {
+    static func monoFileIfMultiChannel(_ fileURL: URL) async throws -> URL? {
         guard try AVAudioFile(forReading: fileURL).processingFormat.channelCount > 1 else { return nil }
         guard let samples = try await convertAudioToPCM(fileURL: fileURL), !samples.isEmpty,
               let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000,

@@ -145,21 +145,21 @@ public enum AppleSpeechSupport {
 /// initialize() is instant, and missing locale assets are fetched through
 /// AssetInventory on first use.
 @available(macOS 26.0, iOS 26.0, *)
-public final class AppleSpeechEngine: TranscriptionEngine {
-    public var engineName: String { "Apple Speech" }
-    public private(set) var isModelLoaded = false
+final class AppleSpeechEngine: TranscriptionEngine {
+    var engineName: String { "Apple Speech" }
+    private(set) var isModelLoaded = false
     private var currentAnalyzer: SpeechAnalyzer?
 
-    public init() {}
+    init() {}
 
-    public func initialize() async throws {
+    func initialize() async throws {
         guard SpeechTranscriber.isAvailable else {
             throw TranscriptionError.contextInitializationFailed
         }
         isModelLoaded = true
     }
 
-    public func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         let locale = await AppleSpeechSupport.resolveLocale(language: settings.selectedLanguage)
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
 
@@ -194,12 +194,12 @@ public final class AppleSpeechEngine: TranscriptionEngine {
         return out
     }
 
-    public func cancelTranscription() {
+    func cancelTranscription() {
         guard let analyzer = currentAnalyzer else { return }
         Task { await analyzer.cancelAndFinishNow() }
     }
 
-    public func getSupportedLanguages() -> [String] {
+    func getSupportedLanguages() -> [String] {
         EngineCapabilities.supportedLanguages(engine: "apple", fluidAudioModelVersion: "")
     }
 }

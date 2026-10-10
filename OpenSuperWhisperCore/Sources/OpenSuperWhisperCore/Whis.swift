@@ -17,9 +17,9 @@ typealias WhisperSeqId = Int32
 // MARK: - VAD (Silero)
 
 /// A stretch of speech found by the VAD, in centiseconds of the original audio.
-public struct WhisperVadSegment: Equatable {
-    public let startCs: Int64
-    public let endCs: Int64
+struct WhisperVadSegment: Equatable {
+    let startCs: Int64
+    let endCs: Int64
 
     init(startCs: Int64, endCs: Int64) {
         self.startCs = startCs
@@ -27,10 +27,10 @@ public struct WhisperVadSegment: Equatable {
     }
 }
 
-public class MyWhisperVadContext {
+class MyWhisperVadContext {
     private var vctx: OpaquePointer?
 
-    public init?(modelPath: String) {
+    init?(modelPath: String) {
         let params = whisper_vad_default_context_params()
         vctx = modelPath.withCString { whisper_vad_init_from_file_with_params($0, params) }
         guard vctx != nil else { return nil }
@@ -45,7 +45,7 @@ public class MyWhisperVadContext {
     /// `minSpeechMs` and `padMs` default to whisper.cpp's own values, which are tuned for
     /// transcribing long recordings. Callers doing dictation should widen them: there, a
     /// dropped word costs more than a kept moment of silence.
-    public func speechSegments(
+    func speechSegments(
         in samples: [Float], minSpeechMs: Int32? = nil, padMs: Int32? = nil
     ) -> [WhisperVadSegment]? {
         guard let vctx = vctx else { return nil }
@@ -75,7 +75,7 @@ public class MyWhisperVadContext {
 
 // MARK: - Wrapper Class
 
-public class MyWhisperContext {
+class MyWhisperContext {
     
     private var ctx: OpaquePointer?
     private var state: OpaquePointer?
@@ -95,7 +95,7 @@ public class MyWhisperContext {
     
     // MARK: - Initialization
     
-    public static func initFromFile(path: String, params: WhisperContextParams) -> MyWhisperContext? {
+    static func initFromFile(path: String, params: WhisperContextParams) -> MyWhisperContext? {
         let cParams = params.toC()
         let context = path.withCString { whisper_init_from_file_with_params($0, cParams) }
         guard let context = context else { return nil }
@@ -232,20 +232,20 @@ public class MyWhisperContext {
     
     // MARK: - Language Handling
 
-    public static func langMaxId() -> Int {
+    static func langMaxId() -> Int {
         return Int(whisper_lang_max_id())
     }
     
-    public static func langId(lang: String) -> Int {
+    static func langId(lang: String) -> Int {
         return Int(lang.withCString { whisper_lang_id($0) })
     }
     
-    public static func langStr(id: Int) -> String? {
+    static func langStr(id: Int) -> String? {
         guard let cStr = whisper_lang_str(Int32(id)) else { return nil }
         return String(cString: cStr)
     }
     
-    public static func langStrFull(id: Int) -> String? {
+    static func langStrFull(id: Int) -> String? {
         guard let cStr = whisper_lang_str_full(Int32(id)) else { return nil }
         return String(cString: cStr)
     }
@@ -711,7 +711,7 @@ public class MyWhisperContext {
         return result == 0
     }
 
-    public func full(samples: [Float], params: inout WhisperFullParams) -> Bool {
+    func full(samples: [Float], params: inout WhisperFullParams) -> Bool {
         var cParams = params.toC()
         return full(samples: samples, params: &cParams)
     }
@@ -741,7 +741,7 @@ public class MyWhisperContext {
     
     // MARK: - Segment Info
     
-    public var fullNSegments: Int {
+    var fullNSegments: Int {
         guard let ctx = ctx else { return 0 }
         if let state = state {
             return Int(whisper_full_n_segments_from_state(state))
@@ -757,7 +757,7 @@ public class MyWhisperContext {
         return Int(whisper_full_lang_id(ctx))
     }
     
-    public func fullGetSegmentT0(iSegment: Int) -> Int64 {
+    func fullGetSegmentT0(iSegment: Int) -> Int64 {
         guard let ctx = ctx else { return 0 }
         if let state = state {
             return whisper_full_get_segment_t0_from_state(state, Int32(iSegment))
@@ -765,7 +765,7 @@ public class MyWhisperContext {
         return whisper_full_get_segment_t0(ctx, Int32(iSegment))
     }
     
-    public func fullGetSegmentT1(iSegment: Int) -> Int64 {
+    func fullGetSegmentT1(iSegment: Int) -> Int64 {
         guard let ctx = ctx else { return 0 }
         if let state = state {
             return whisper_full_get_segment_t1_from_state(state, Int32(iSegment))
@@ -781,7 +781,7 @@ public class MyWhisperContext {
         return whisper_full_get_segment_speaker_turn_next(ctx, Int32(iSegment))
     }
     
-    public func fullGetSegmentText(iSegment: Int) -> String? {
+    func fullGetSegmentText(iSegment: Int) -> String? {
         guard let ctx = ctx else { return nil }
         let cStr: UnsafePointer<CChar>?
         if let state = state {

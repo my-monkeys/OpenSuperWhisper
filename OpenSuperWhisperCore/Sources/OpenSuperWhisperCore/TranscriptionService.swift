@@ -13,7 +13,7 @@ public class TranscriptionService: ObservableObject {
     @Published private(set) var transcribedText = ""
     @Published private(set) var currentSegment = ""
     @Published public private(set) var isLoading = false
-    @Published public private(set) var progress: Float = 0.0
+    @Published private(set) var progress: Float = 0.0
     @Published private(set) var isConverting = false
     @Published private(set) var conversionProgress: Float = 0.0
     @Published public private(set) var engineError: String?

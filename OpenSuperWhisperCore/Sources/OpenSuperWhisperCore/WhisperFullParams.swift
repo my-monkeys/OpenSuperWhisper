@@ -5,63 +5,63 @@
 import Foundation
 internal import OSWNative
 
-public struct WhisperFullParams {
-    public var strategy: WhisperSamplingStrategy = .greedy
-    public var nThreads: Int32 = 1
+struct WhisperFullParams {
+    var strategy: WhisperSamplingStrategy = .greedy
+    var nThreads: Int32 = 1
     var nMaxTextCtx: Int32 = 16384
     var offsetMs: Int32 = 0
     var durationMs: Int32 = 0
-    public var translate: Bool = false
+    var translate: Bool = false
     var noContext: Bool = true
-    public var noTimestamps: Bool = false
+    var noTimestamps: Bool = false
     var singleSegment: Bool = false
     var printSpecial: Bool = false
     var printProgress: Bool = false
-    public var printRealtime: Bool = false
+    var printRealtime: Bool = false
     var printTimestamps: Bool = true
     var tokenTimestamps: Bool = false
     var tholdPt: Float = 0.01
     var tholdPtsum: Float = 0.01
     var maxLen: Int32 = 0
     var splitOnWord: Bool = false
-    public var print_realtime: Bool = false
+    var print_realtime: Bool = false
     var maxTokens: Int32 = 0
     var debugMode: Bool = false
     var audioCtx: Int32 = 0
     var tdrzEnable: Bool = false
     var suppressRegex: String?
-    public var initialPrompt: String?
-    public var carryInitialPrompt: Bool = false
+    var initialPrompt: String?
+    var carryInitialPrompt: Bool = false
     var promptTokens: [WhisperToken]?
-    public var language: String?
-    public var detectLanguage: Bool = false
-    public var suppressBlank: Bool = true
+    var language: String?
+    var detectLanguage: Bool = false
+    var suppressBlank: Bool = true
     var suppressNst: Bool = false
-    public var temperature: Float = 0.0
+    var temperature: Float = 0.0
     var maxInitialTs: Float = 1.0
     var lengthPenalty: Float = -1.0
     var temperatureInc: Float = 0.2
     var entropyThold: Float = 2.4
     var logprobThold: Float = -1.0
-    public var noSpeechThold: Float = 0.6
+    var noSpeechThold: Float = 0.6
     var greedyBestOf: Int32 = 1
-    public var beamSearchBeamSize: Int32 = 1
+    var beamSearchBeamSize: Int32 = 1
     var beamSearchPatience: Float = 0.0
     var newSegmentCallback: (@convention(c) (OpaquePointer?, OpaquePointer?, Int32, UnsafeMutableRawPointer?) -> Void)?
     var newSegmentCallbackUserData: UnsafeMutableRawPointer?
-    public var progressCallback: (@convention(c) (OpaquePointer?, OpaquePointer?, Int32, UnsafeMutableRawPointer?) -> Void)?
-    public var progressCallbackUserData: UnsafeMutableRawPointer?
+    var progressCallback: (@convention(c) (OpaquePointer?, OpaquePointer?, Int32, UnsafeMutableRawPointer?) -> Void)?
+    var progressCallbackUserData: UnsafeMutableRawPointer?
     var encoderBeginCallback: (@convention(c) (OpaquePointer?, OpaquePointer?, UnsafeMutableRawPointer?) -> Bool)?
     var encoderBeginCallbackUserData: UnsafeMutableRawPointer?
-    public var abortCallback: (@convention(c) (UnsafeMutableRawPointer?) -> Bool)?
-    public var abortCallbackUserData: UnsafeMutableRawPointer?
+    var abortCallback: (@convention(c) (UnsafeMutableRawPointer?) -> Bool)?
+    var abortCallbackUserData: UnsafeMutableRawPointer?
     var logitsFilterCallback: (@convention(c) (OpaquePointer?, OpaquePointer?, UnsafePointer<whisper_token_data>?, Int32, UnsafeMutablePointer<Float>?, UnsafeMutableRawPointer?) -> Void)?
     var logitsFilterCallbackUserData: UnsafeMutableRawPointer?
     var grammarRules: [UnsafePointer<whisper_grammar_element>?]?
     var iStartRule: Int = 0
     var grammarPenalty: Float = 0.0
 
-    public init() {}
+    init() {}
 
     mutating func toC() -> whisper_full_params {
         var cParams = whisper_full_params()
