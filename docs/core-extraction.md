@@ -13,12 +13,13 @@ differ today:
 | Reference | How it is built | Used for |
 |---|---|---|
 | Test suite | `xcodebuild test` with `-derivedDataPath build -clonedSourcePackagesDirPath SourcePackages` (patched FluidAudio) | Every slice: the per-test pass/skip list of master (710 passed, 9 skipped on 47fe26b) must be reproduced, plus the new tests |
-| Shipped app | `notarize_app.sh` (whisper, llama and ggml from `FORCE=1 Scripts/build-native.sh`, `GGML_NATIVE=OFF`, so generic ggml CPU kernels, as the universal libwhisper configure it replaced in slice 2; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to the pre-swap references (below) |
+| Shipped app | `notarize_app.sh` (whisper, llama and ggml from `FORCE=1 Scripts/build-native.sh`, `GGML_NATIVE=OFF`, so generic ggml CPU kernels, as the universal libwhisper configure it replaced in slice 2; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to the current references, `docs/smoke/post-swap-<arch>.txt` since slice 2 (below) |
 
 The release smoke check is `Scripts/build-release-unsigned.sh <arch>` (`notarize_app.sh` up to
-signing) followed by `Scripts/smoke-release.sh <app> --expect docs/smoke/pre-swap-<arch>.txt`,
-for arm64 and for x86_64 (under Rosetta). 0.13.3 cannot be the reference, because its CLI has no
-`--model` and `--raw`, so the references were recorded from slice 0 (f7444b0) on an Apple M5 Pro
+signing) followed by `Scripts/smoke-release.sh <app> --expect docs/smoke/post-swap-<arch>.txt`,
+for arm64 and for x86_64 (under Rosetta). The `pre-swap-<arch>.txt` files were slice 2's
+baseline. 0.13.3 cannot be the reference, because its CLI has no `--model` and `--raw`, so the
+first references were recorded from slice 0 (f7444b0) on an Apple M5 Pro
 with Xcode 27.0 (27A266a). Their transcripts and VAD segments only hold on that Mac; the load
 commands, rpaths, frameworks, symbol counts and resources hold on any Mac with that Xcode. The
 one difference allowed is slice 2's: libomp goes, so the `@rpath/libomp.dylib` load command and
