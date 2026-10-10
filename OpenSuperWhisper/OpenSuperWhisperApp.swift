@@ -30,7 +30,7 @@ struct OpenSuperWhisperApp: App {
     /// Same key as `AppPreferences.textScale`, read through @AppStorage so the window redraws
     /// when the slider moves. Reading the preference directly would not: that is what made the
     /// slider appear to do nothing in 0.10.1 (#82).
-    @AppStorage("textScale") private var textScale: Double = TextScale.default
+    @AppStorage("textScale", store: DefaultsStore.current) private var textScale: Double = TextScale.default
 
     var body: some Scene {
         WindowGroup {
