@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// A swappable backend that turns a (system, user) prompt pair into cleaned text.
 /// Implementations: `OllamaBackend` (external server), `BuiltInLlamaBackend` (embedded

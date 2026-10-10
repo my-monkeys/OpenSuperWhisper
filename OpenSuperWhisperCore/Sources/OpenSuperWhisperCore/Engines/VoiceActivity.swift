@@ -3,24 +3,26 @@ import os
 
 /// Remembers when the microphone last carried speech, by loudness alone. Fed from the audio
 /// tap's thread and read on the main actor, hence the lock.
-final class VoiceActivity: @unchecked Sendable {
+public final class VoiceActivity: @unchecked Sendable {
     /// RMS above this counts as speech: about -36 dBFS, well over a quiet room's floor and
     /// under a normal speaking voice at laptop-mic distance.
     static let speechRMS: Float = 0.016
 
     private let lock = OSAllocatedUnfairLock(initialState: ProcessInfo.processInfo.systemUptime)
 
-    func reset() {
+    public init() {}
+
+    public func reset() {
         lock.withLock { $0 = ProcessInfo.processInfo.systemUptime }
     }
 
-    func observe(_ buffer: AVAudioPCMBuffer) {
+    public func observe(_ buffer: AVAudioPCMBuffer) {
         guard Self.rms(of: buffer) >= Self.speechRMS else { return }
         lock.withLock { $0 = ProcessInfo.processInfo.systemUptime }
     }
 
     /// Seconds since the last buffer loud enough to be speech.
-    var silenceDuration: TimeInterval {
+    public var silenceDuration: TimeInterval {
         ProcessInfo.processInfo.systemUptime - lock.withLock { $0 }
     }
 

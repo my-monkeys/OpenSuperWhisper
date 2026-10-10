@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenSuperWhisperCore
 
 /// Walks someone through reading a few sentences so the app learns how *they* say punctuation.
 ///

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import FluidAudio
+import OpenSuperWhisperCore
 
 enum OnboardingShortcutOption: String, CaseIterable {
     case keyCombination

@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import OpenSuperWhisperCore
 
 protocol TranscriptionEngine: AnyObject {
     var isModelLoaded: Bool { get }

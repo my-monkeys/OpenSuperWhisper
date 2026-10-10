@@ -1,16 +1,6 @@
 import FluidAudio
 import Foundation
-
-/// One selectable dictation model across all engines. Used by the menu-bar model
-/// picker and the per-app context rules.
-struct DictationModelOption: Codable, Equatable, Hashable {
-    /// "whisper" | "fluidaudio" | "sensevoice" | "remote" — matches AppPreferences.selectedEngine.
-    let engine: String
-    /// whisper: model file path; fluidaudio: version ("v2"/"v3"); sensevoice: "default";
-    /// remote: model id.
-    let identifier: String
-    let displayName: String
-}
+import OpenSuperWhisperCore
 
 /// Single source of truth for which models are actually usable right now
 /// (downloaded locally, or advertised by the configured remote server) and for

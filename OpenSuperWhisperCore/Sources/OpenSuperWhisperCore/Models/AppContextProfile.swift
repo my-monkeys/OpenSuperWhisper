@@ -7,13 +7,13 @@ import Foundation
 ///
 /// This is independent of the general "AI Cleanup" prose pass: either can contribute to a single
 /// LLM call (see `LLMPostProcessor.assembleSystemPrompt`).
-struct AppContextProfile: Codable, Identifiable, Equatable {
-    var id = UUID()
-    var bundleIdentifier: String   // e.g. "com.tinyspeck.slackmacgap"
-    var appName: String            // display label, e.g. "Slack"
-    var instructions: String       // natural-language formatting rules for the LLM
+public struct AppContextProfile: Codable, Identifiable, Equatable {
+    public var id = UUID()
+    public var bundleIdentifier: String   // e.g. "com.tinyspeck.slackmacgap"
+    public var appName: String            // display label, e.g. "Slack"
+    public var instructions: String       // natural-language formatting rules for the LLM
 
-    init(id: UUID = UUID(), bundleIdentifier: String = "", appName: String = "", instructions: String = "") {
+    public init(id: UUID = UUID(), bundleIdentifier: String = "", appName: String = "", instructions: String = "") {
         self.id = id
         self.bundleIdentifier = bundleIdentifier
         self.appName = appName
@@ -72,5 +72,5 @@ extension AppContextProfile {
         """)
 
     /// The presets seeded into a fresh install (one-time; see `AppPreferences.seedAppContextPresetsIfNeeded`).
-    static let defaultPresets: [AppContextProfile] = [slackPreset, terminalPreset]
+    public static let defaultPresets: [AppContextProfile] = [slackPreset, terminalPreset]
 }

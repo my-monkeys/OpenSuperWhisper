@@ -4,14 +4,14 @@ import Foundation
 /// transcription it is rewritten to `replacement`. Useful for fixing proper
 /// nouns, brand names and domain jargon that the speech models consistently
 /// mis-transcribe (e.g. "git hub" -> "GitHub").
-struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
+public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
 
     /// What the replacement does to the spaces around it.
     ///
     /// Dictating punctuation needs this. A rule turning the spoken "open quote" into `"` leaves
     /// `he said " hello "` if it only swaps the words, because the spaces that separated them
     /// are still there. Punctuation has to glue to the word it belongs to.
-    enum Spacing: String, Codable {
+    public enum Spacing: String, Codable {
         /// Replace the words and nothing else. Right for names and jargon.
         case standalone
         /// Also eat the space that follows, for an opening mark: `open quote hello` → `"hello`.
@@ -20,15 +20,15 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
         case attachesLeft
     }
 
-    var id: UUID
-    var original: String
-    var replacement: String
+    public var id: UUID
+    public var original: String
+    public var replacement: String
 
     /// Other things the user might say for the same result. Whisper is not consistent about
     /// "open quote" versus "opening quote" versus "quote", and making someone add a whole row
     /// per phrasing means retyping the replacement every time.
-    var alternates: [String]
-    var spacing: Spacing
+    public var alternates: [String]
+    public var spacing: Spacing
 
     /// Treat the triggers as regular expressions and the replacement as a template, so `$1` and
     /// friends work.
@@ -41,9 +41,9 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
     ///
     /// A regex rule owns its own boundaries: no `\b` is added around it and `spacing` does not
     /// apply, since the pattern already says what it wants to consume.
-    var isRegex: Bool
+    public var isRegex: Bool
 
-    init(id: UUID = UUID(), original: String = "", replacement: String = "",
+    public init(id: UUID = UUID(), original: String = "", replacement: String = "",
          alternates: [String] = [], spacing: Spacing = .standalone, isRegex: Bool = false) {
         self.id = id
         self.original = original
@@ -55,7 +55,7 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
 
     /// Hand-written so dictionaries saved before `alternates` and `spacing` existed still load;
     /// the synthesised decoder would throw on the missing keys and drop every entry.
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         original = try container.decode(String.self, forKey: .original)
@@ -66,7 +66,7 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
     }
 
     /// Every phrasing this rule matches, the primary one first.
-    var triggers: [String] {
+    public var triggers: [String] {
         ([original] + alternates)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -77,7 +77,7 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
     /// A rule needs both halves to do anything: something to hear and something to write. One
     /// without the other is a half-finished thought, not a rule, and it is what someone leaves
     /// behind when they open the editor and change their mind.
-    var isBlank: Bool {
+    public var isBlank: Bool {
         triggers.isEmpty
             && replacement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -87,7 +87,7 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
     /// Removing the primary promotes the next one instead of blanking it: an entry with no
     /// primary but surviving alternates matches nothing, so the rule would look present in the
     /// editor while having quietly stopped working.
-    mutating func removeTrigger(at position: Int) {
+    public mutating func removeTrigger(at position: Int) {
         if position == 0 {
             original = alternates.first ?? ""
             if !alternates.isEmpty { alternates.removeFirst() }
@@ -97,7 +97,7 @@ struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
     }
 }
 
-enum CustomDictionary {
+public enum CustomDictionary {
 
     /// Applies the user's dictionary replacements to a transcription.
     ///
@@ -105,7 +105,7 @@ enum CustomDictionary {
     /// substrings inside larger words are left untouched (e.g. a rule for "cat"
     /// will not touch "category"). The replacement string is inserted verbatim,
     /// preserving the casing the user typed.
-    static func apply(_ text: String, entries: [CustomDictionaryEntry]) -> String {
+    public static func apply(_ text: String, entries: [CustomDictionaryEntry]) -> String {
         guard !text.isEmpty, !entries.isEmpty else { return text }
 
         var result = text
@@ -213,7 +213,7 @@ enum CustomDictionary {
     /// Spacing is part of the key, since an opening and a closing quote write the same character
     /// while pulling opposite ways. Rules with no replacement yet are left alone: they are rows
     /// someone is still filling in, and collapsing them would delete work in progress.
-    static func merged(_ entries: [CustomDictionaryEntry]) -> [CustomDictionaryEntry] {
+    public static func merged(_ entries: [CustomDictionaryEntry]) -> [CustomDictionaryEntry] {
         struct Key: Hashable {
             let replacement: String
             let spacing: CustomDictionaryEntry.Spacing
@@ -255,7 +255,7 @@ enum CustomDictionary {
     /// the single source of the words we boost on both engines: Whisper via the
     /// initial prompt (`promptBoost`) and Parakeet via custom-vocabulary boosting
     /// (`FluidAudioEngine`). Order is preserved; de-duplication is case-insensitive.
-    static func boostTerms(entries: [CustomDictionaryEntry]) -> [String] {
+    public static func boostTerms(entries: [CustomDictionaryEntry]) -> [String] {
         var seen = Set<String>()
         return entries
             // A regex replacement is a template, not a word. Boosting "$1," would teach the
@@ -271,7 +271,7 @@ enum CustomDictionary {
     /// Builds an initial-prompt fragment from the dictionary's replacement terms
     /// so a prompt-conditioned model (Whisper) is biased toward producing the
     /// correct spelling in the first place.
-    static func promptBoost(entries: [CustomDictionaryEntry]) -> String {
+    public static func promptBoost(entries: [CustomDictionaryEntry]) -> String {
         boostTerms(entries: entries).joined(separator: ", ")
     }
 

@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// What `Settings()` resolves from preferences, the keyboard layout and the prompt file.
 ///

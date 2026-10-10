@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// `boostTerms` is the single source of the words boosted on BOTH engines
 /// (Whisper prompt-boost + Parakeet decode vocabulary), so its contract is

@@ -3,6 +3,7 @@ import Cocoa
 import Combine
 import LiquidGlass
 import SwiftUI
+import OpenSuperWhisperCore
 
 enum RecordingState: Equatable {
     case idle

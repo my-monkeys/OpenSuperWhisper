@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Answers requests to one reserved host from a canned response and records what was sent.
 /// Only that host is claimed, so registering it globally cannot catch another test's traffic.

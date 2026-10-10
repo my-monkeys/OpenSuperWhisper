@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The Whisper language list is read from the library rather than hand-maintained, because the
 /// hand-written one kept omitting languages Whisper supported. Ukrainian, Vietnamese and Czech

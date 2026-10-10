@@ -11,6 +11,7 @@ import Combine
 import KeyboardShortcuts
 import SwiftUI
 import UniformTypeIdentifiers
+import OpenSuperWhisperCore
 
 @MainActor
 class ContentViewModel: ObservableObject {

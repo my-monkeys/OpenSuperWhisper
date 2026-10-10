@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// Learns how someone says punctuation by having them read a sentence we chose.
 ///

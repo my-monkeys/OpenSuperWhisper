@@ -3,6 +3,7 @@ import Foundation
 import Metal
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Files tracked at the repository root that tests read in place.
 ///

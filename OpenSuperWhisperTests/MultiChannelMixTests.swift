@@ -1,6 +1,7 @@
 import AVFoundation
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Interfaces such as the Audient EVO 4 expose 4 inputs (2 mics + 2 loopback) with speech on
 /// the first only. The recorder writes all four, and every engine must hear the one that carries

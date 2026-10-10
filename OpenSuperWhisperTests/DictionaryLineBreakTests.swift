@@ -9,6 +9,7 @@
 
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 final class DictionaryLineBreakTests: XCTestCase {
 

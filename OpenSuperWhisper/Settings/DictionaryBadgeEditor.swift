@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenSuperWhisperCore
 
 /// The custom dictionary as a row of badges, one per result.
 ///

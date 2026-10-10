@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import AppKit
 import Combine
+import OpenSuperWhisperCore
 
 @MainActor
 class TranscriptionQueue: ObservableObject {

@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Which engine `TranscriptionService` builds for each stored engine id, and for the model the
 /// remote engine falls back to.

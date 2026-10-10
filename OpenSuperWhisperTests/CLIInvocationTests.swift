@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The `transcribe` and `bench` command lines, and the settings they hand the engine.
 ///

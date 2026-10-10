@@ -1,6 +1,5 @@
 import Foundation
-import OpenSuperWhisperCore
-class LanguageUtil {
+public class LanguageUtil {
 
     /// Every language the bundled Whisper build can transcribe, read from the library instead of
     /// hand-listed.
@@ -9,11 +8,11 @@ class LanguageUtil {
     /// surfaced as user reports: Ukrainian, then Vietnamese (#74), then Czech. Each was a
     /// language Whisper had handled all along that nobody could select. Reading the table the
     /// transcriber actually uses ends that class of bug rather than its latest instance.
-    static let availableLanguages: [String] = {
+    public static let availableLanguages: [String] = {
         ["auto"] + whisperCodes.sorted { displayName(for: $0) < displayName(for: $1) }
     }()
 
-    static let languageNames: [String: String] = {
+    public static let languageNames: [String: String] = {
         var names = curatedNames
         for code in whisperCodes {
             names[code] = displayName(for: code)
@@ -22,7 +21,7 @@ class LanguageUtil {
     }()
 
     /// Whisper's own names are lowercase and occasionally terse, so ours win where we have one.
-    static func displayName(for code: String) -> String {
+    public static func displayName(for code: String) -> String {
         curatedNames[code] ?? whisperName(for: code) ?? code
     }
 
@@ -63,7 +62,7 @@ class LanguageUtil {
         "vi": "Vietnamese",
     ]
 
-    static func getSystemLanguage() -> String {
+    public static func getSystemLanguage() -> String {
         if let preferredLanguage = Locale.preferredLanguages.first {
             let preferredLanguage = preferredLanguage.prefix(2).lowercased()
             return availableLanguages.contains(preferredLanguage) ? preferredLanguage : "en"
@@ -76,7 +75,7 @@ class LanguageUtil {
     /// identifiers. Speech hands the same locale back as "fr_FR" or "fr-FR" depending on the
     /// call, so a string compare reports a downloaded model as missing. A region-less locale
     /// ("fr") matches any region of that language, which is what the language rows ask about.
-    static func isInstalled(_ locale: Locale, in installed: [Locale]) -> Bool {
+    public static func isInstalled(_ locale: Locale, in installed: [Locale]) -> Bool {
         installed.contains { matches($0, locale) }
     }
 
