@@ -419,7 +419,12 @@ class ShortcutManager {
         Task { @MainActor in
             // A latched recording ignores the trigger key coming back up — that is the whole point
             // — and waits for Space (or the trigger) to stop it.
-            if holdToRecordEnabled && self.holdMode && !self.latched {
+            //
+            // Only a take that is still running can be stopped here. The press that stops a
+            // toggled take also arms the hold timer, so holding it past the threshold used to
+            // send a second stop on release, which found no audio and reported the dictation
+            // as lost while the first stop was already pasting it.
+            if holdToRecordEnabled && self.holdMode && !self.latched && self.activeVm != nil {
                 Diag.mark("keyUp → stop recording (hold)")
                 IndicatorWindowManager.shared.stopRecording()
                 self.activeVm = nil
