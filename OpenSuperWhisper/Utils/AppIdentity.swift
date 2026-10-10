@@ -58,7 +58,7 @@ enum AppIdentity {
     /// This is the formula alone, whatever process runs it, so a test can pin it: whisper model
     /// paths are persisted as absolute strings, and a different spelling of this directory would
     /// orphan every model the user picked. Code that reads or writes files asks `storageRoot()`.
-    static func applicationSupportDirectory(bundleID: String = AppIdentity.bundleID) -> URL? {
+    static func applicationSupportDirectory() -> URL? {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
             .appendingPathComponent(bundleID)

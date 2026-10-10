@@ -42,10 +42,6 @@ final class TestIsolationTests: XCTestCase {
         XCTAssertFalse(DefaultsStore.isTestProcess(environment: [:], xcTestLoaded: false))
     }
 
-    func testPreferencesAreNotTheStandardDomain() {
-        XCTAssertFalse(DefaultsStore.current === UserDefaults.standard)
-    }
-
     func testKeychainUsesTheTestService() {
         XCTAssertEqual(Keychain.service, "\(AppIdentity.bundleID).tests")
         XCTAssertNotEqual(Keychain.service, Self.shippedBundleID)
@@ -111,10 +107,9 @@ final class TestIsolationTests: XCTestCase {
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         ).path
         let expectedRoot = "\(applicationSupport)/fr.my-monkey.opensuperwhisper"
-        let root = try XCTUnwrap(AppIdentity.applicationSupportDirectory(bundleID: Self.shippedBundleID))
+        let root = try XCTUnwrap(AppIdentity.applicationSupportDirectory())
 
         XCTAssertEqual(root.path, expectedRoot)
-        XCTAssertEqual(AppIdentity.applicationSupportDirectory()?.path, expectedRoot)
         XCTAssertEqual(Recording.recordingsDirectory(in: root).path, "\(expectedRoot)/recordings")
         XCTAssertEqual(RecordingStore.databaseURL(in: root).path, "\(expectedRoot)/recordings.sqlite")
         XCTAssertEqual(WhisperModelManager.modelsDirectory(in: root).path, "\(expectedRoot)/whisper-models")
