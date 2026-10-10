@@ -90,6 +90,7 @@ class TranscriptionService: ObservableObject {
                     engine = await WhisperEngine()
                 }
 #else
+                // Unreachable: engineKind never answers .appleSpeech without FoundationModels.
                 engine = await WhisperEngine()
 #endif
             case .whisper:
