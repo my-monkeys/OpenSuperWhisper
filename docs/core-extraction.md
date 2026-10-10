@@ -218,6 +218,9 @@ passes the full suite, and goes through an adversarial review before the next on
      and `--raw` for a deterministic smoke check; `Scripts/smoke-release.sh` (both
      architectures, app path and Homebrew-style symlink, VAD load line, Metal init, exit
      code with a model loaded, one ggml, libomp and onnxruntime per architecture, signature).
+     The signature is only verified on a signed app, that is `notarize_app.sh`'s output: the
+     unsigned builds of `build-release-unsigned.sh`, the references included, skip it, so the
+     check runs once on a signed build before slice 2 merges.
      CI runs the unit tests serially and an unsigned x86_64 Release build. It skips only the
      tests that switch the system keyboard layout; the Bluetooth microphone and notch tests
      skip themselves without the hardware. Changed from the first plan, which also skipped the
@@ -232,8 +235,8 @@ passes the full suite, and goes through an adversarial review before the next on
      `TEST_RUNNER_OSW_GOLDEN_MACHINE=0` is set, which CI sets unless its runner is known to
      match. That skips every test that runs Whisper (the context lifecycle included), so CI
      does not exercise Whisper inference. The llama lifecycle test reads its model only from
-     `TEST_RUNNER_OSW_TEST_GGUF` and skips without it; the required-tests check sets it, so the
-     llama half cannot drop out unnoticed.
+     `TEST_RUNNER_OSW_TEST_GGUF` and skips without it: the llama half runs only when a
+     developer sets it locally, and CI lists it among the skipped tests in its job summary.
 1. Native build script and an empty core package wired into the app (Debug, Release,
    x86_64, iOS Simulator), proving module lookup without linking any native symbol from it,
    hosted `@testable` access, and no duplicate copy in the test bundle.
