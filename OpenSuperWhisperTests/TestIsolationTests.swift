@@ -3,8 +3,8 @@ import XCTest
 @testable import OpenSuperWhisper
 
 /// The test host is the app, so it runs the app's launch code and reaches the app's storage.
-/// Files must resolve somewhere private to the test process, and the formula the shipped app
-/// uses for its files must not move while they do.
+/// Preferences, Keychain items and files must all resolve somewhere private to the test process,
+/// and the formula the shipped app uses for its files must not move while they do.
 final class TestIsolationTests: XCTestCase {
 
     private static let shippedBundleID = "fr.my-monkey.opensuperwhisper"
@@ -23,6 +23,24 @@ final class TestIsolationTests: XCTestCase {
                       "\(what) is outside the test storage root: \(path)", file: file, line: line)
         XCTAssertFalse(path.hasPrefix(realDirectory + "/"),
                        "\(what) points into the user's real data: \(path)", file: file, line: line)
+    }
+
+    // MARK: - Detection
+
+    /// Both signals hold in the host, so losing either one alone still leaves the switch on.
+    func testBothTestSignalsArePresent() {
+        XCTAssertNotNil(ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"])
+        XCTAssertNotNil(NSClassFromString("XCTestCase"))
+        XCTAssertTrue(DefaultsStore.isRunningTests)
+    }
+
+    func testPreferencesAreNotTheStandardDomain() {
+        XCTAssertFalse(DefaultsStore.current === UserDefaults.standard)
+    }
+
+    func testKeychainUsesTheTestService() {
+        XCTAssertEqual(Keychain.service, "\(AppIdentity.bundleID).tests")
+        XCTAssertNotEqual(Keychain.service, Self.shippedBundleID)
     }
 
     // MARK: - Storage root

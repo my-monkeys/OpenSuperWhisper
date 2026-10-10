@@ -37,8 +37,17 @@ enum DefaultsStore {
 
     /// True while the process is hosting XCTest. `XCTestConfigurationFilePath` is set by the
     /// test runner and absent in a normal launch, including a Debug build the user runs.
+    ///
+    /// The class lookup is a second, independent signal: the environment variable is the
+    /// runner's to set, and a host that started without it would otherwise fall through to the
+    /// user's preferences, Keychain items and recordings. The app never links XCTest, so the
+    /// class only exists once the runner has loaded it into the process.
+    ///
+    /// Keychain and `AppIdentity.storageRoot()` key on this too, so all three isolations switch
+    /// together.
     static var isRunningTests: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
     }
 
     static var testSuitePrefix: String {

@@ -8,7 +8,7 @@ enum Keychain {
     /// The test host is not the binary that created the user's items, so reading one raised a
     /// Keychain prompt that nobody was there to answer and the test hung; and a write, which
     /// deletes before it adds, would have replaced the user's real API key.
-    private static let service = DefaultsStore.isRunningTests
+    static let service = DefaultsStore.isRunningTests
         ? "\(AppIdentity.bundleID).tests"
         : "fr.my-monkey.opensuperwhisper"
 
