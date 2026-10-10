@@ -82,12 +82,12 @@ jobs:
               | "- passed only on retry: \(.nodeIdentifier): \([.. | objects | select(.nodeType? == "Failure Message") | .name][0])"' <<< "$tests"
             jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"' <<< "$tests"
           } | tee -a "$GITHUB_STEP_SUMMARY"
-      # Every test of the slice 4 reference is still hosted unless the map says it moved to the
-      # core (docs/test-moves-slice5.txt), and no moved test came back. Not strict: the goldens
-      # skip here, so statuses differ from the reference.
+      # No test the map moved to the core (docs/test-moves-slice5.txt) came back to the hosted
+      # suite. The comparison with the frozen slice-4 reference (--slice5) is local only, since a
+      # PR that adds, renames or removes a hosted test differs from it by design.
       - name: Check the hosted tests against the moves to the core
         if: ${{ !cancelled() && hashFiles('build/TestResults.xcresult/Info.plist') != '' }}
-        run: Scripts/check-test-moves.sh --hosted build/TestResults.xcresult --allow-absent KeyboardLayoutProviderTests
+        run: Scripts/check-test-moves.sh --hosted build/TestResults.xcresult
 
   # The core package's own tests (docs/core-extraction.md, slice 5), on macOS and on the iOS
   # Simulator, through Scripts/test-core.sh like a local run. Its native cache holds the iOS

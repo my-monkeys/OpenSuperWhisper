@@ -1,26 +1,28 @@
 #!/bin/zsh
 #
 # Checks the tests moved from the app-hosted suite to the core package (docs/core-extraction.md,
-# slice 5) against the slice-4 reference and the committed map, so no test is lost on the way.
+# slice 5) against the committed map, and optionally against the slice-4 reference.
 #
-# Usage: Scripts/check-test-moves.sh [--strict] [--hosted <run-tests list | xcresult>]
+# Usage: Scripts/check-test-moves.sh [--slice5] [--strict] [--hosted <run-tests list | xcresult>]
 #            [--core-macos <xcresult>] [--core-ios <xcresult>] [--allow-absent <Class>]...
 #
 #   --hosted        results of the hosted suite: an .xcresult, or a list of
 #                   "Test case 'Class.method()' status" lines
 #   --core-macos    the .xcresult of `Scripts/test-core.sh macos`
 #   --core-ios      the .xcresult of `Scripts/test-core.sh ios`
-#   --allow-absent  a hosted class that may be missing from --hosted (CI skips
-#                   KeyboardLayoutProviderTests)
-#   --strict        hosted statuses must equal the reference's (local gates); without it a
-#                   different status is accepted (CI skips the goldens)
+#   --slice5        also compare with the frozen slice-4 reference: every unmoved reference test
+#                   still hosted, nothing hosted outside it, and the floors. Local only: the
+#                   reference is a record of slice 4, so any later hosted test added, renamed or
+#                   removed differs from it
+#   --allow-absent  with --slice5, a hosted class that may be missing from --hosted
+#   --strict        implies --slice5; hosted statuses must also equal the reference's
 #
-# Moved tests must pass in every core input, strict or not: none of them skips, in CI mode
-# included. A core macOS run must also hold at least the floor minus the reference's unmoved
-# tests, so the tests the core added cannot go even when the hosted results are checked apart.
-#
-# The map and the static rules on OpenSuperWhisperCore/Tests are always checked. Every violation
-# is printed, then a tally per input; the exit status is non-zero if there was any.
+# Always checked, in CI too, because they hold whatever tests are added later: the map's shape,
+# no failure in any input, no mapped old id back in the hosted suite, and every mapped new id
+# present and passed (not skipped) in every core input. Renaming a moved core test means
+# updating its new id in the map. The static rules on OpenSuperWhisperCore/Tests are always
+# checked too. Every violation is printed, then a tally per input; the exit status is non-zero
+# if there was any.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -34,16 +36,17 @@ CORE_TESTS=OpenSuperWhisperCore/Tests
 # XCTest classes in the core target that may derive from XCTestCase directly: the base class.
 DIRECT_XCTESTCASE=(CoreTestCase)
 
-strict=0 hosted="" core_macos="" core_ios=""
+strict=0 slice5=0 hosted="" core_macos="" core_ios=""
 allow_absent=()
 while (( $# )); do
   case "$1" in
-    --strict) strict=1 ;;
+    --strict) strict=1; slice5=1 ;;
+    --slice5) slice5=1 ;;
     --hosted) hosted="$2"; shift ;;
     --core-macos) core_macos="$2"; shift ;;
     --core-ios) core_ios="$2"; shift ;;
     --allow-absent) allow_absent+=("$2"); shift ;;
-    *) echo "usage: $0 [--strict] [--hosted X] [--core-macos X] [--core-ios X] [--allow-absent Class]..." >&2; exit 2 ;;
+    *) echo "usage: $0 [--slice5] [--strict] [--hosted X] [--core-macos X] [--core-ios X] [--allow-absent Class]..." >&2; exit 2 ;;
   esac
   shift
 done
@@ -117,7 +120,8 @@ for new in $(cat "$WORK/map-new"); do
   [[ $new == $CORE_TARGET/* ]] || violation "map: new id outside $CORE_TARGET: $new"
 done
 
-# 2. to 4. The hosted results against the reference minus the map.
+# 2. to 4. No failure, no moved test back in the hosted suite, and with --slice5 the hosted
+# results against the reference minus the map.
 [[ -n $hosted ]] && load hosted "$hosted" "$HOSTED_TARGET"
 [[ -n $core_macos ]] && load core-macos "$core_macos" "$CORE_TARGET"
 [[ -n $core_ios ]] && load core-ios "$core_ios" "$CORE_TARGET"
@@ -128,11 +132,14 @@ for input in hosted core-macos core-ios; do
 done
 
 if [[ -n $hosted ]]; then
+  for old in $(cat "$WORK/map-old"); do
+    grep -q "^$old " "$WORK/hosted" && violation "hosted: moved test still in the hosted suite: $old"
+  done
+fi
+
+if [[ -n $hosted ]] && (( slice5 )); then
   while read -r id expected; do
-    if grep -qxF "$id" "$WORK/map-old"; then
-      grep -q "^$id " "$WORK/hosted" && violation "hosted: moved test still in the hosted suite: $id"
-      continue
-    fi
+    grep -qxF "$id" "$WORK/map-old" && continue
     actual="$(awk -v id="$id" '$1 == id { print $2 }' "$WORK/hosted")"
     if [[ -z $actual ]]; then
       class="$(echo "$id" | cut -d/ -f2)"
@@ -159,15 +166,16 @@ for input in core-macos core-ios; do
   done
 done
 
-# 6. The total only grows, and the core macOS run on its own keeps what the core added.
+# 6. With --slice5: the total only grows, and the core macOS run on its own keeps what the core
+# added.
 map_count=$(wc -l < "$WORK/map" | tr -d ' ')
 core_floor=$(( floor - (reference_count - map_count) ))
-if [[ -n $core_macos ]]; then
+if [[ -n $core_macos ]] && (( slice5 )); then
   core_count=$(wc -l < "$WORK/core-macos" | tr -d ' ')
   (( core_count >= core_floor )) \
     || violation "core macOS = $core_count results, below the core floor of $core_floor (floor $floor - $(( reference_count - map_count )) unmoved)"
 fi
-if [[ -n $hosted && -n $core_macos ]]; then
+if [[ -n $hosted && -n $core_macos ]] && (( slice5 )); then
   total=$(( $(wc -l < "$WORK/hosted") + $(wc -l < "$WORK/core-macos") ))
   (( total >= floor )) || violation "hosted + core macOS = $total results, below the floor of $floor"
   (( total >= reference_count )) || violation "hosted + core macOS = $total results, below the reference's $reference_count"
@@ -188,7 +196,11 @@ for file in $(find "$CORE_TESTS" -name '*.swift'); do
   done
 done
 
-echo "reference   $reference_count results; map: $map_count moved tests; floor $floor, core floor $core_floor"
+if (( slice5 )); then
+  echo "reference   $reference_count results; map: $map_count moved tests; floor $floor, core floor $core_floor"
+else
+  echo "map: $map_count moved tests (no comparison with the slice-4 reference without --slice5)"
+fi
 for input in hosted core-macos core-ios; do [[ -f $WORK/$input ]] && tally $input; done
 for input in core-macos core-ios; do
   [[ -f $WORK/$input ]] || continue

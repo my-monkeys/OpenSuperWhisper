@@ -385,11 +385,15 @@ passes the full suite, and goes through an adversarial review before the next on
    (`docs/test-moves-slice5.txt`, old id to new id), each with only the app import dropped,
    `CoreTestCase` as base class and, in `RecordingMigrationTests`, the fixture found through
    `Bundle.module`. `Scripts/check-test-moves.sh` checks the hosted and core results against
-   `docs/tests/hosted-slice4.txt` (the slice-4 reference, verbatim) and the map: every unmoved test
-   still hosted, every moved one gone from there and passed on both destinations (a skip fails even
-   without `--strict`), no failure, at least 184 results in a core macOS run (the floor less the 718
-   unmoved reference tests, so CI, which checks the hosted and the core results in separate jobs,
-   still guards the new core tests) and at least 902 results in all. CI gained a `core-tests` job
+   the map, and with `--slice5` against `docs/tests/hosted-slice4.txt` too. Always checked, CI
+   included: no failure, no moved test back in the hosted suite, every moved one present and passed
+   on both core destinations (a skip fails). With `--slice5`, a local gate of this slice: every
+   unmoved reference test still hosted, no hosted test outside the reference, at least 184 results
+   in a core macOS run (the floor less the 718 unmoved reference tests) and at least 902 results in
+   all; `--strict` adds equal statuses. The reference is frozen at slice 4: it records the suite
+   this slice started from and is not a standing CI gate, since any later PR that adds, renames or
+   removes a hosted test differs from it. Renaming a moved core test means updating its new id in
+   the map. CI gained a `core-tests` job
    (macOS, then the iOS Simulator even after a macOS failure, with the native cache saved as soon as
    it is built), and the build job checks its hosted results against the map. Measured (M5 Pro,
    Xcode 27.0, `TEST_RUNNER_OSW_TEST_GGUF` set): the hosted suite has 718 results and the core 184
