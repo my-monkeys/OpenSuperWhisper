@@ -93,8 +93,9 @@ final class SettingsResolutionTests: XCTestCase {
 
     /// "keyboard" is a way of choosing a language, never a language. It resolves to the active
     /// layout's language if the engine supports it, else "auto". The layout is this machine's,
-    /// so the test pins the property (never "keyboard", always "auto" or a supported code) and
-    /// the formula, not a particular language.
+    /// and other tests switch the system-wide input source while this one may be running, so
+    /// only the property is pinned here (never "keyboard", always "auto" or a supported code).
+    /// The formula itself is pinned with pure calls in `KeyboardLanguageTests`.
     func testKeyboardPseudoLanguageNeverLeaks() {
         prefs.whisperLanguage = KeyboardLanguage.selectionCode
         let engines = [("whisper", "v3"), ("fluidaudio", "v2"), ("fluidaudio", "v3"),
@@ -108,9 +109,6 @@ final class SettingsResolutionTests: XCTestCase {
             XCTAssertNotEqual(language, "keyboard", engine)
             let supported = EngineCapabilities.supportedLanguages(engine: engine, fluidAudioModelVersion: version)
             XCTAssertTrue(language == "auto" || supported.contains(language), "\(engine): \(language)")
-            XCTAssertEqual(language,
-                           KeyboardLanguage.current(engine: engine, fluidAudioModelVersion: version) ?? "auto",
-                           engine)
         }
         XCTAssertEqual(KeyboardLanguage.selectionCode, "keyboard", "stored in whisperLanguage")
     }
