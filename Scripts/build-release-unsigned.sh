@@ -4,7 +4,8 @@
 # change can go through Scripts/smoke-release.sh before a release and CI can build the Intel lane.
 #
 # Usage: Scripts/build-release-unsigned.sh <arm64|x86_64> [derived-data-dir]
-#   derived-data-dir defaults to build-release/<arch>. The app lands in
+#   derived-data-dir defaults to build-release/<arch>, and is deleted first so every run is a
+#   clean build, as notarize_app.sh's is. The app lands in
 #   <derived-data-dir>/Build/Products/Release/OpenSuperWhisper.app.
 #
 # Copied from notarize_app.sh, and to be kept in step with it: the libwhisper configure, the
@@ -79,6 +80,7 @@ cp vendor/onnxruntime/libonnxruntime.1.24.4.dylib ./build/libonnxruntime.1.24.4.
 ln -sf libonnxruntime.1.24.4.dylib ./build/libonnxruntime.dylib
 codesign --force --sign - ./build/libonnxruntime.1.24.4.dylib
 
+rm -rf "$DERIVED"
 # The two -skip flags only stop xcodebuild from asking to trust package plugins and macros, which
 # a machine that never opened the project in Xcode (CI) cannot answer.
 xcodebuild \
