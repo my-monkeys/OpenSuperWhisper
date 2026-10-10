@@ -47,7 +47,7 @@ struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equ
     }
 
     static var recordingsDirectory: URL {
-        recordingsDirectory(in: AppIdentity.storageRoot()!)
+        recordingsDirectory(in: CoreAccess.storageRoot)
     }
 
     static func recordingsDirectory(in root: URL) -> URL {
@@ -88,14 +88,13 @@ struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equ
 
 @MainActor
 class RecordingStore: ObservableObject {
-    static let shared = RecordingStore()
+    static let shared = RecordingStore(storageRoot: CoreAccess.storageRoot)
 
     @Published private(set) var recordings: [Recording] = []
     private let dbQueue: DatabaseQueue
     private var retentionTimer: Timer?
 
-    private init() {
-        let appDirectory = AppIdentity.storageRoot()!
+    init(storageRoot appDirectory: URL) {
         let dbPath = Self.databaseURL(in: appDirectory)
 
         do {
@@ -516,7 +515,7 @@ class RecordingStore: ObservableObject {
         retentionTimer?.invalidate()
         let timer = Timer.scheduledTimer(withTimeInterval: Self.retentionCheckInterval, repeats: true) { _ in
             Task { @MainActor in
-                guard AppPreferences.shared.retentionMaxAgeEnabled else { return }
+                guard CoreAccess.preferences.retentionMaxAgeEnabled else { return }
                 await RecordingStore.shared.enforceRetentionPolicy()
             }
         }

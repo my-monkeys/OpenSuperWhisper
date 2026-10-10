@@ -43,7 +43,7 @@ final class RemoteEngine: TranscriptionEngine {
     }
 
     func initialize() async throws {
-        let prefs = AppPreferences.shared
+        let prefs = CoreAccess.preferences
         serverURL = prefs.remoteServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
         modelName = prefs.remoteServerModel.trimmingCharacters(in: .whitespacesAndNewlines)
         apiKey = (prefs.remoteServerAPIKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -66,7 +66,7 @@ final class RemoteEngine: TranscriptionEngine {
         []
     }
 
-    func transcribeAudio(url: URL, settings: Settings) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         let clip = Self.clipParameters(for: settings)
         guard let endpoint = endpoint(for: clip.action) else {
             throw TranscriptionError.contextInitializationFailed
@@ -162,7 +162,7 @@ final class RemoteEngine: TranscriptionEngine {
     /// What `transcribeAudio` takes from the settings for one request. Pure, so the mapping can
     /// be pinned without a server: the remote engine sends the user's prompt only, never the
     /// dictionary boost or the field's text that Whisper combines into its own (#89).
-    static func clipParameters(for settings: Settings)
+    static func clipParameters(for settings: TranscriptionSettings)
         -> (action: String, language: String, temperature: Double, prompt: String) {
         // OpenAI splits transcribe vs translate into two endpoints; the translations
         // endpoint always outputs English and ignores `language`.

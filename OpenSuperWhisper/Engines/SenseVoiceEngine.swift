@@ -1,4 +1,4 @@
-#if arch(arm64)
+#if os(macOS) && arch(arm64)
 import AVFoundation
 import Foundation
 import OSWSenseVoice
@@ -21,7 +21,7 @@ final class SenseVoiceEngine: TranscriptionEngine {
         recognizer = SenseVoiceRecognizer(modelPath: mgr.modelPath.path, tokensPath: mgr.tokensPath.path)
     }
 
-    func transcribeAudio(url: URL, settings: Settings) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         guard let recognizer else { throw TranscriptionError.contextInitializationFailed }
         isCancelled = false
 

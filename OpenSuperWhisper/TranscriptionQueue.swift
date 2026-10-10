@@ -1,12 +1,13 @@
 import Foundation
 import AVFoundation
-import AppKit
 import Combine
 import OpenSuperWhisperCore
 
 @MainActor
 class TranscriptionQueue: ObservableObject {
-    static let shared = TranscriptionQueue()
+    static let shared = TranscriptionQueue(transcriptionService: .shared, recordingStore: .shared,
+                                           makeSettings: CoreAccess.makeSettings,
+                                           confirmEnableHistory: CoreAccess.confirmEnableHistory)
 
     @Published private(set) var isProcessing = false
     @Published private(set) var currentRecordingId: UUID?
@@ -17,6 +18,8 @@ class TranscriptionQueue: ObservableObject {
 
     private let transcriptionService: TranscriptionService
     private let recordingStore: RecordingStore
+    private let makeSettings: @MainActor @Sendable () -> TranscriptionSettings
+    private let confirmEnableHistory: @MainActor @Sendable () async -> Bool
     private var processingTask: Task<Void, Never>?
     private var currentTranscriptionTask: Task<Void, Never>?
     private var cancelledRecordingIds: Set<UUID> = []
@@ -25,9 +28,13 @@ class TranscriptionQueue: ObservableObject {
     // that transcription only, then the system default is restored. (F3)
     private var modelOverrides: [UUID: DictationModelOption] = [:]
 
-    private init() {
-        self.transcriptionService = TranscriptionService.shared
-        self.recordingStore = RecordingStore.shared
+    init(transcriptionService: TranscriptionService, recordingStore: RecordingStore,
+         makeSettings: @escaping @MainActor @Sendable () -> TranscriptionSettings,
+         confirmEnableHistory: @escaping @MainActor @Sendable () async -> Bool) {
+        self.transcriptionService = transcriptionService
+        self.recordingStore = recordingStore
+        self.makeSettings = makeSettings
+        self.confirmEnableHistory = confirmEnableHistory
         setupProgressObserver()
     }
     
@@ -106,11 +113,11 @@ class TranscriptionQueue: ObservableObject {
     }
 
     func addFileToQueue(url: URL) async {
-        if !AppPreferences.shared.saveTranscriptionHistory {
-            guard AppCore.confirmEnableHistory() else {
+        if !CoreAccess.preferences.saveTranscriptionHistory {
+            guard await confirmEnableHistory() else {
                 return
             }
-            AppPreferences.shared.saveTranscriptionHistory = true
+            CoreAccess.preferences.saveTranscriptionHistory = true
         }
 
         do {
@@ -269,7 +276,7 @@ class TranscriptionQueue: ObservableObject {
                     return
                 }
 
-                let settings = Settings()
+                let settings = makeSettings()
                 let text = try await transcriptionService.transcribeAudio(url: sourceURL, settings: settings, modelOverride: overrideOption)
 
                 if isRecordingCancelled(recording.id) || Task.isCancelled {

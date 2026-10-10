@@ -59,7 +59,7 @@ class TranscriptionService: ObservableObject {
     /// Settings only records the choice — the model isn't downloaded/loaded until
     /// you actually transcribe with it. Heavy work runs off the main actor.
     private func ensureEngineLoaded() async {
-        let selectedEngine = AppPreferences.shared.selectedEngine
+        let selectedEngine = CoreAccess.preferences.selectedEngine
         if currentEngine != nil, loadedEngineKind == selectedEngine { return }
 
         isLoading = true
@@ -134,7 +134,7 @@ class TranscriptionService: ObservableObject {
         case .fluidAudio:
             return await FluidAudioEngine()
         case .senseVoice:
-#if arch(arm64)
+#if os(macOS) && arch(arm64)
             return SenseVoiceEngine()
 #else
             // Unreachable: engineKind never answers .senseVoice where it isn't compiled.
@@ -144,7 +144,7 @@ class TranscriptionService: ObservableObject {
             return RemoteEngine()
         case .appleSpeech:
 #if canImport(FoundationModels)
-            if #available(macOS 26.0, *) {
+            if #available(macOS 26.0, iOS 26.0, *) {
                 return AppleSpeechEngine()
             } else {
                 // Unreachable: engineKind never answers .appleSpeech below macOS 26.
@@ -160,7 +160,7 @@ class TranscriptionService: ObservableObject {
     }
 
     nonisolated static var isSenseVoiceCompiled: Bool {
-#if arch(arm64)
+#if os(macOS) && arch(arm64)
         return true
 #else
         return false
@@ -169,7 +169,7 @@ class TranscriptionService: ObservableObject {
 
     nonisolated static var isAppleSpeechAvailable: Bool {
 #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) { return true }
+        if #available(macOS 26.0, iOS 26.0, *) { return true }
 #endif
         return false
     }
@@ -185,8 +185,8 @@ class TranscriptionService: ObservableObject {
     }
     
     func reloadModel(with path: String) {
-        if AppPreferences.shared.selectedEngine == "whisper" {
-            AppPreferences.shared.selectedWhisperModelPath = path
+        if CoreAccess.preferences.selectedEngine == "whisper" {
+            CoreAccess.preferences.selectedWhisperModelPath = path
             reloadEngine()
         }
     }
@@ -201,7 +201,7 @@ class TranscriptionService: ObservableObject {
         let current = ModelCatalog.activeOption()
         if current?.engine == option.engine && current?.identifier == option.identifier { return {} }
 
-        let prefs = AppPreferences.shared
+        let prefs = CoreAccess.preferences
         let previousEngine = prefs.selectedEngine
         let previousWhisper = prefs.selectedWhisperModelPath
         let previousFluid = prefs.fluidAudioModelVersion
@@ -225,7 +225,7 @@ class TranscriptionService: ObservableObject {
         }
     }
     
-    func transcribeAudio(url: URL, settings: Settings, modelOverride: DictationModelOption? = nil) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings, modelOverride: DictationModelOption? = nil) async throws -> String {
         // Serialize every transcription across the app (dictation pipeline, file-drop queue,
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
@@ -279,7 +279,7 @@ class TranscriptionService: ObservableObject {
     /// (server unreachable / 5xx after retries), re-runs once with the configured local
     /// fallback model. Recursive by design: the `fallbackModel != nil` attempt is
     /// guarded out of the catch (`fallbackModel == nil`), so it can never loop.
-    private func transcribe(url: URL, settings: Settings, fallbackModel: DictationModelOption?) async throws -> String {
+    private func transcribe(url: URL, settings: TranscriptionSettings, fallbackModel: DictationModelOption?) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
             engine = try await makeEngine(for: fallbackModel)
@@ -300,9 +300,9 @@ class TranscriptionService: ObservableObject {
         do {
             return try await runOnEngine(engine, url: url, settings: settings)
         } catch let error where fallbackModel == nil && Self.shouldUseFallback(for: error) {
-            guard AppPreferences.shared.remoteFallbackEnabled,
-                  AppPreferences.shared.selectedEngine == "remote",
-                  let fallback = AppPreferences.shared.remoteFallbackModel else {
+            guard CoreAccess.preferences.remoteFallbackEnabled,
+                  CoreAccess.preferences.selectedEngine == "remote",
+                  let fallback = CoreAccess.preferences.remoteFallbackModel else {
                 throw error
             }
             print("Remote transcription failed (\(error)); falling back to local model \(fallback.displayName)")
@@ -313,7 +313,7 @@ class TranscriptionService: ObservableObject {
     /// Run one transcription on a specific engine: wire its progress callback, run it
     /// off the main actor, and honor cancellation. Any engine error propagates so the
     /// caller (`transcribe`) can decide whether to fall back.
-    private func runOnEngine(_ engine: TranscriptionEngine, url: URL, settings: Settings) async throws -> String {
+    private func runOnEngine(_ engine: TranscriptionEngine, url: URL, settings: TranscriptionSettings) async throws -> String {
         if let whisperEngine = engine as? WhisperEngine {
             whisperEngine.onProgressUpdate = { [weak self] newProgress in
                 Task { @MainActor in
@@ -434,7 +434,7 @@ class TranscriptionService: ObservableObject {
             return await FluidAudioEngine(versionOverride: version)
         case .appleSpeech:
 #if canImport(FoundationModels)
-            if #available(macOS 26.0, *) {
+            if #available(macOS 26.0, iOS 26.0, *) {
                 return AppleSpeechEngine()
             } else {
                 // Unreachable: fallbackEngineChoice never answers .appleSpeech below macOS 26.
@@ -445,7 +445,7 @@ class TranscriptionService: ObservableObject {
             return await WhisperEngine()
 #endif
         case .senseVoice:
-#if arch(arm64)
+#if os(macOS) && arch(arm64)
             return SenseVoiceEngine()
 #else
             // Unreachable: fallbackEngineChoice never answers .senseVoice where it isn't compiled.

@@ -28,7 +28,7 @@ class FluidAudioEngine: TranscriptionEngine {
     }
     
     func initialize() async throws {
-        let versionString = versionOverride ?? AppPreferences.shared.fluidAudioModelVersion
+        let versionString = versionOverride ?? CoreAccess.preferences.fluidAudioModelVersion
         let version = AsrModelVersion(preference: versionString)
 
         let models = try await AsrModels.downloadAndLoad(version: version)
@@ -39,7 +39,7 @@ class FluidAudioEngine: TranscriptionEngine {
         asrModels = models
     }
     
-    func transcribeAudio(url: URL, settings: Settings) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         guard let asrManager = asrManager else {
             throw TranscriptionError.contextInitializationFailed
         }
@@ -128,14 +128,14 @@ class FluidAudioEngine: TranscriptionEngine {
     
     func getSupportedLanguages() -> [String] {
         EngineCapabilities.supportedLanguages(
-            engine: "fluidaudio", fluidAudioModelVersion: AppPreferences.shared.fluidAudioModelVersion)
+            engine: "fluidaudio", fluidAudioModelVersion: CoreAccess.preferences.fluidAudioModelVersion)
     }
 
     /// The custom-dictionary terms to bias recognition toward, or `[]` when the dictionary
     /// is disabled/empty. Single source shared with Whisper's prompt boost and the live
     /// streaming preview (`CustomDictionary.boostTerms`).
     private func activeBoostTerms() -> [String] {
-        let prefs = AppPreferences.shared
+        let prefs = CoreAccess.preferences
         // Boosting is opt-in (separate from the always-on text replacement): only bias the
         // decoder when the user explicitly enabled it for rare/distinctive terms (#over-boost).
         guard prefs.customDictionaryEnabled, prefs.customDictionaryBoostEnabled else { return [] }
@@ -152,7 +152,7 @@ class FluidAudioEngine: TranscriptionEngine {
     /// no input device. `finish()` returns the merged transcript.
     private func transcribeFileWithBoosting(url: URL, mixedSamples: [Float]?,
                                             boostTerms: [String]) async throws -> String {
-        let versionString = AppPreferences.shared.fluidAudioModelVersion
+        let versionString = CoreAccess.preferences.fluidAudioModelVersion
         let version = AsrModelVersion(preference: versionString)
         let models = try await AsrModels.downloadAndLoad(version: version)
 

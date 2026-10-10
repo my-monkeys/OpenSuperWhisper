@@ -35,7 +35,7 @@ final class BuiltInLlamaBackend: LLMCleanupBackend {
 
     /// The model the user picked in Settings.
     private var selectedModel: LLMModelDescriptor {
-        LLMModelManager.model(fileName: AppPreferences.shared.builtInModelFileName)
+        LLMModelManager.model(fileName: CoreAccess.preferences.builtInModelFileName)
     }
 
     /// Ready once the selected model is on disk. The context itself loads on first `generate`.

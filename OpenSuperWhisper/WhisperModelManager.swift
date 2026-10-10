@@ -42,21 +42,23 @@ class WhisperDownloadDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownl
 }
 
 class WhisperModelManager {
-    static let shared = WhisperModelManager()
+    static let shared = WhisperModelManager(storageRoot: CoreAccess.storageRoot)
     
     private static let modelsDirectoryName = "whisper-models"
     private var activeDownloadTasks: [String: URLSessionDownloadTask] = [:]
     private let downloadTasksLock = NSLock()
+    private let storageRoot: URL
     
     var modelsDirectory: URL {
-        Self.modelsDirectory(in: AppIdentity.storageRoot()!)
+        Self.modelsDirectory(in: storageRoot)
     }
 
     static func modelsDirectory(in root: URL) -> URL {
         root.appendingPathComponent(modelsDirectoryName)
     }
     
-    private init() {
+    init(storageRoot: URL) {
+        self.storageRoot = storageRoot
         createModelsDirectoryIfNeeded()
     }
     

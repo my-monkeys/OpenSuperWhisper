@@ -40,7 +40,7 @@ enum LLMStatus: Equatable {
 enum LLMPostProcessor {
     /// Selects the configured backend. Falls back to Ollama for any unknown value.
     static func currentBackend() -> LLMCleanupBackend {
-        let prefs = AppPreferences.shared
+        let prefs = CoreAccess.preferences
         switch prefs.aiBackend {
         case "builtin":
             return BuiltInLlamaBackend.shared
@@ -56,7 +56,7 @@ enum LLMPostProcessor {
     /// independent capabilities feed one LLM pass: general prose cleanup (`aiPostProcessingEnabled`)
     /// and app-aware formatting (`appContextFormattingEnabled`). Either, both, or neither may run.
     static func process(_ text: String, bundleID: String?, translating: Bool = false) async -> String {
-        let prefs = AppPreferences.shared
+        let prefs = CoreAccess.preferences
         let general = prefs.aiPostProcessingEnabled
         let formatting = prefs.appContextFormattingEnabled
 

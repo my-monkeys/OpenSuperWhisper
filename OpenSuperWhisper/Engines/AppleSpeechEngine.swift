@@ -20,7 +20,7 @@ import OpenSuperWhisperCore
 enum AppleSpeechSupport {
     /// True when the OS ships the new Speech stack and it reports availability.
     static var isSupported: Bool {
-        if #available(macOS 26.0, *) { return SpeechTranscriber.isAvailable }
+        if #available(macOS 26.0, iOS 26.0, *) { return SpeechTranscriber.isAvailable }
         return false
     }
 
@@ -41,7 +41,7 @@ enum AppleSpeechSupport {
     /// listing a model in the menu must never start one).
     static var hasInstalledModel: Bool { !cachedInstalledLanguages.isEmpty }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     static func refreshCaches() async {
         let supported = languageCodes(from: await SpeechTranscriber.supportedLocales)
         let installed = languageCodes(from: await SpeechTranscriber.installedLocales)
@@ -62,7 +62,7 @@ enum AppleSpeechSupport {
     /// locales ("Too many allocated locales, 5 maximum") — when the quota is full,
     /// release one we're not about to use and retry once. `onProgress` exposes the
     /// system download's Progress for UI.
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     static func installAssetsIfNeeded(supporting transcriber: SpeechTranscriber, locale: Locale,
                                       onProgress: ((Foundation.Progress) -> Void)? = nil) async throws {
         do {
@@ -78,7 +78,7 @@ enum AppleSpeechSupport {
         await refreshCaches()
     }
 
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     private static func installOnce(_ transcriber: SpeechTranscriber,
                                     onProgress: ((Foundation.Progress) -> Void)?) async throws {
         guard let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else {
@@ -105,7 +105,7 @@ enum AppleSpeechSupport {
 
     /// All supported regional variants of one language (fr → fr_FR, fr_CH, fr_CA, fr_BE),
     /// for the Models pane's variant picker.
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     static func supportedVariants(for language: String) async -> [Locale] {
         let code = effectiveLanguageCode(for: language)
         return await SpeechTranscriber.supportedLocales
@@ -116,7 +116,7 @@ enum AppleSpeechSupport {
     /// The Locale to transcribe with for the app's language setting.
     /// "auto" means the user's system language (per-transcriber locale is fixed —
     /// the system model has no cross-language auto-detect).
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     static func resolveLocale(language: String) async -> Locale {
         // A user-chosen regional variant wins (Models → Apple → Regional variant).
         if let overrideID = localeOverrides[effectiveLanguageCode(for: language)],
@@ -145,7 +145,7 @@ enum AppleSpeechSupport {
 /// On-device transcription through the system speech model. No app-side model files:
 /// initialize() is instant, and missing locale assets are fetched through
 /// AssetInventory on first use.
-@available(macOS 26.0, *)
+@available(macOS 26.0, iOS 26.0, *)
 final class AppleSpeechEngine: TranscriptionEngine {
     var engineName: String { "Apple Speech" }
     private(set) var isModelLoaded = false
@@ -158,7 +158,7 @@ final class AppleSpeechEngine: TranscriptionEngine {
         isModelLoaded = true
     }
 
-    func transcribeAudio(url: URL, settings: Settings) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         let locale = await AppleSpeechSupport.resolveLocale(language: settings.selectedLanguage)
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
 

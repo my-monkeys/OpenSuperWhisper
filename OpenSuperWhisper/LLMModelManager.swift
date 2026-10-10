@@ -64,7 +64,7 @@ struct LLMModelDescriptor {
 }
 
 class LLMModelManager {
-    static let shared = LLMModelManager()
+    static let shared = LLMModelManager(storageRoot: CoreAccess.storageRoot)
 
     /// Default built-in cleanup model: Qwen2.5-1.5B-Instruct, GGUF Q4_K_M.
     /// Qwen2.5 is licensed Apache-2.0 (https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct/blob/main/LICENSE),
@@ -109,16 +109,18 @@ class LLMModelManager {
     private static let modelsDirectoryName = "llm-models"
     private var activeDownloadTasks: [String: URLSessionDownloadTask] = [:]
     private let downloadTasksLock = NSLock()
+    private let storageRoot: URL
 
     var modelsDirectory: URL {
-        Self.modelsDirectory(in: AppIdentity.storageRoot()!)
+        Self.modelsDirectory(in: storageRoot)
     }
 
     static func modelsDirectory(in root: URL) -> URL {
         root.appendingPathComponent(modelsDirectoryName)
     }
 
-    private init() {
+    init(storageRoot: URL) {
+        self.storageRoot = storageRoot
         createModelsDirectoryIfNeeded()
     }
 

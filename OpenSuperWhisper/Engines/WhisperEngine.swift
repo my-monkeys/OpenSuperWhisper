@@ -28,8 +28,7 @@ class WhisperEngine: TranscriptionEngine {
     /// Silero VAD, shipped in the app bundle (~0.9 MB). Used to cut non-speech audio out
     /// before the encoder sees it: long pauses aren't decoded at all, and silence can't be
     /// turned into invented text.
-    static let vadModelPath = Bundle(for: WhisperEngine.self)
-        .path(forResource: "ggml-silero-v5.1.2", ofType: "bin")
+    static let vadModelPath: String? = CoreAccess.vadModelPath
 
     private var context: MyWhisperContext?
     private var vadContext: MyWhisperVadContext?
@@ -42,9 +41,15 @@ class WhisperEngine: TranscriptionEngine {
     /// build an engine for a specific model without mutating global prefs. Readable so a test
     /// can check what the fallback factory passed.
     let modelPathOverride: String?
+    private let vadModelFile: String?
 
-    init(modelPathOverride: String? = nil) {
+    init(modelPathOverride: String?, vadModelPath: String?) {
         self.modelPathOverride = modelPathOverride
+        self.vadModelFile = vadModelPath
+    }
+
+    convenience init(modelPathOverride: String? = nil) {
+        self.init(modelPathOverride: modelPathOverride, vadModelPath: WhisperEngine.vadModelPath)
     }
     
     private var isCancelled: Bool {
@@ -83,13 +88,13 @@ class WhisperEngine: TranscriptionEngine {
         try loadModel()
         // Opt-in RAM saver (#171): the model just validated, so free it (~1GB) until a
         // dictation actually needs it. Off by default — the model normally stays hot.
-        if AppPreferences.shared.unloadWhisperModelWhenIdle {
+        if CoreAccess.preferences.unloadWhisperModelWhenIdle {
             unloadModel()
         }
     }
 
     private func loadModel() throws {
-        let modelPath = modelPathOverride ?? AppPreferences.shared.selectedWhisperModelPath ?? AppPreferences.shared.selectedModelPath
+        let modelPath = modelPathOverride ?? CoreAccess.preferences.selectedWhisperModelPath ?? CoreAccess.preferences.selectedModelPath
         guard let modelPath = modelPath else {
             throw TranscriptionError.contextInitializationFailed
         }
@@ -106,10 +111,10 @@ class WhisperEngine: TranscriptionEngine {
         context = nil
     }
 
-    func transcribeAudio(url: URL, settings: Settings) async throws -> String {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         // With idle-unloading on, the model isn't held between dictations: load it on
         // demand here and release it again once this transcription finishes (#171).
-        let unloadWhenIdle = AppPreferences.shared.unloadWhisperModelWhenIdle
+        let unloadWhenIdle = CoreAccess.preferences.unloadWhisperModelWhenIdle
         if unloadWhenIdle && context == nil {
             try loadModel()
         }
@@ -290,7 +295,7 @@ class WhisperEngine: TranscriptionEngine {
     /// the transcript alone cannot show it, because a VAD that never loaded falls back silently.
     func detectSpeech(in samples: [Float]) -> [WhisperVadSegment] {
         if vadContext == nil {
-            guard let path = Self.vadModelPath,
+            guard let path = vadModelFile,
                   let vad = MyWhisperVadContext(modelPath: path) else {
                 return []
             }

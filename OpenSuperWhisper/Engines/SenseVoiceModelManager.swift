@@ -5,15 +5,19 @@ import OpenSuperWhisperCore
 /// Two files are fetched directly from Hugging Face into Application Support:
 /// `model.int8.onnx` (~239 MB) and `tokens.txt`.
 final class SenseVoiceModelManager {
-    static let shared = SenseVoiceModelManager()
-    private init() {}
+    static let shared = SenseVoiceModelManager(storageRoot: CoreAccess.storageRoot)
+    private let storageRoot: URL
+
+    init(storageRoot: URL) {
+        self.storageRoot = storageRoot
+    }
 
     private static let dirName = "sensevoice-model"
     private let modelURL = URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.int8.onnx?download=true")!
     private let tokensURL = URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/tokens.txt?download=true")!
 
     var modelDirectory: URL {
-        Self.modelDirectory(in: AppIdentity.storageRoot()!)
+        Self.modelDirectory(in: storageRoot)
     }
 
     static func modelDirectory(in root: URL) -> URL {

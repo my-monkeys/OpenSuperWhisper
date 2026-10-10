@@ -35,7 +35,7 @@ enum ModelCatalog {
 
     /// SenseVoice — a single (int8) model, arm64-only and only when downloaded.
     static func senseVoiceModels() -> [DictationModelOption] {
-#if arch(arm64)
+#if os(macOS) && arch(arm64)
         guard SenseVoiceModelManager.shared.isDownloaded else { return [] }
         return [DictationModelOption(engine: "sensevoice", identifier: "default", displayName: "SenseVoice")]
 #else
@@ -48,8 +48,8 @@ enum ModelCatalog {
     /// always included even if the cache is empty/stale, so the active choice is
     /// never missing from the list.
     static func remoteModels() -> [DictationModelOption] {
-        var ids = AppPreferences.shared.cachedRemoteModels
-        let current = AppPreferences.shared.remoteServerModel
+        var ids = CoreAccess.preferences.cachedRemoteModels
+        let current = CoreAccess.preferences.remoteServerModel
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if !current.isEmpty, !ids.contains(current) {
             ids.insert(current, at: 0)
@@ -75,7 +75,7 @@ enum ModelCatalog {
 
     /// The model currently in effect (active engine + its selected model).
     static func activeOption() -> DictationModelOption? {
-        let prefs = AppPreferences.shared
+        let prefs = CoreAccess.preferences
         switch prefs.selectedEngine {
         case "whisper":
             guard let path = prefs.selectedWhisperModelPath else { return nil }
@@ -107,7 +107,7 @@ enum ModelCatalog {
     /// Switch the active engine + model, then invalidate the engine so the next
     /// recording re-initializes with the new choice. Mirrors the Settings UI.
     static func activate(_ option: DictationModelOption) {
-        let prefs = AppPreferences.shared
+        let prefs = CoreAccess.preferences
         prefs.selectedEngine = option.engine
         switch option.engine {
         case "whisper":

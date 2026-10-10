@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// Time unit used by the age-based retention policy.
 enum RetentionUnit: String, CaseIterable, Identifiable {
@@ -38,7 +39,7 @@ struct RetentionPolicy {
     var maxAgeValue: Int
     var maxAgeUnit: RetentionUnit
 
-    init(from prefs: AppPreferences = .shared) {
+    init(from prefs: any CorePreferences = CoreAccess.preferences) {
         self.maxCountEnabled = prefs.retentionMaxCountEnabled
         self.maxCount = prefs.retentionMaxCount
         self.maxAgeEnabled = prefs.retentionMaxAgeEnabled
