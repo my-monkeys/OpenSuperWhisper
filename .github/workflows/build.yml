@@ -130,18 +130,8 @@ jobs:
         run: |
           Scripts/test-core.sh macos -resultBundlePath build-core/macos.xcresult \
             -test-timeouts-enabled YES -default-test-execution-time-allowance 300
-      - name: Pick an iOS Simulator
-        run: |
-          udid=$(xcrun simctl list devices available -j | jq -r '
-            .devices | to_entries
-            | map(select(.key | test("SimRuntime\\.iOS-")))
-            | map(.key as $k | {version: ($k | capture("iOS-(?<v>[0-9-]+)$").v | split("-") | map(tonumber)),
-                                iphones: (.value | map(select(.name | startswith("iPhone"))))})
-            | map(select(.iphones | length > 0))
-            | sort_by(.version) | last | .iphones[0].udid // empty')
-          if [ -z "$udid" ]; then echo "::error::no available iPhone simulator on this runner"; exit 1; fi
-          xcrun simctl list devices available | grep "$udid"
-          echo "OSW_SIM_DESTINATION=platform=iOS Simulator,id=$udid" >> "$GITHUB_ENV"
+      # test-core.sh picks the newest iPhone simulator the selected Xcode can target, since
+      # macos-26 images carry several Xcodes and simctl lists the runtimes of all of them.
       - name: Run the core tests on the iOS Simulator
         timeout-minutes: 30
         run: |

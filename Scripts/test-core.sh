@@ -7,7 +7,8 @@
 # Usage: Scripts/test-core.sh macos|ios [extra xcodebuild args]
 #   macos  this Mac, arm64
 #   ios    an iOS Simulator: OSW_SIM_DESTINATION when set (an xcodebuild -destination value),
-#          otherwise the first iPhone of the newest installed iOS runtime
+#          otherwise the first iPhone of the newest installed iOS runtime that the active
+#          Xcode's simulator SDK can target
 #
 # Run ./run.sh build first: it fetches sherpa and onnxruntime, builds the macOS native slices,
 # resolves SourcePackages and patches FluidAudio. The iOS slices are built here when missing.
@@ -44,13 +45,18 @@ COMMON=(-project OpenSuperWhisper.xcodeproj -scheme OpenSuperWhisperCoreTests
         -derivedDataPath build-core -clonedSourcePackagesDirPath SourcePackages
         -skipPackagePluginValidation -skipMacroValidation -parallel-testing-enabled NO)
 
+# simctl lists every runtime CoreSimulator knows, whichever Xcode is selected; xcodebuild
+# refuses a runtime newer than its own SDK (a runner with several Xcodes installed).
 newest_iphone() {
-  xcrun simctl list devices available -j | jq -r '
-    .devices | to_entries
+  local sdk
+  sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)" || return
+  xcrun simctl list devices available -j | jq -r --arg sdk "$sdk" '
+    ($sdk | split(".") | map(tonumber)) as $max
+    | .devices | to_entries
     | map(select(.key | test("SimRuntime\\.iOS-")))
     | map(.key as $k | {version: ($k | capture("iOS-(?<v>[0-9-]+)$").v | split("-") | map(tonumber)),
                         iphones: (.value | map(select(.name | startswith("iPhone"))))})
-    | map(select(.iphones | length > 0))
+    | map(select((.iphones | length > 0) and .version <= $max))
     | sort_by(.version) | last | .iphones[0].udid // empty'
 }
 
@@ -66,7 +72,8 @@ case "$PLATFORM" in
     DESTINATION="${OSW_SIM_DESTINATION:-}"
     if [[ -z $DESTINATION ]]; then
       udid="$(newest_iphone)"
-      [[ -n $udid ]] || fail "no available iPhone simulator; set OSW_SIM_DESTINATION"
+      [[ -n $udid ]] || fail "no available iPhone simulator the active Xcode supports; set OSW_SIM_DESTINATION"
+      xcrun simctl list devices available | grep -F "$udid"
       DESTINATION="platform=iOS Simulator,id=$udid"
     fi
     echo "test-core: destination $DESTINATION"
