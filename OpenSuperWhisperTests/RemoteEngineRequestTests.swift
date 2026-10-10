@@ -15,9 +15,13 @@ final class RemoteEngineRequestTests: XCTestCase {
                                        "remoteServerTimeoutEnabled", "remoteServerTimeoutSeconds"]
     private var savedDefaults: [String: Any] = [:]
     private var savedAPIKey: String?
+    /// The API key lives in the test Keychain service, which the scheme's parallel test
+    /// processes share: without the lock the account tests in another process read this key.
+    private var keychainLock: KeychainLock?
 
     override func setUp() {
         super.setUp()
+        keychainLock = KeychainLock()
         for key in Self.defaultsKeys {
             savedDefaults[key] = DefaultsStore.current.object(forKey: key)
         }
@@ -42,6 +46,8 @@ final class RemoteEngineRequestTests: XCTestCase {
         tempDirectories = []
         StubServer.reset()
         restoreDefaults()
+        keychainLock?.release()
+        keychainLock = nil
         super.tearDown()
     }
 

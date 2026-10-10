@@ -57,7 +57,7 @@ final class ScratchPreferences {
 /// Re-entrant within a process: a `flock` belongs to the open file description, so a second
 /// scratch opening the file again while the first still holds it would wait on itself forever.
 /// The first holder takes the lock, nested ones only count, and the last release drops it.
-private final class KeychainLock {
+final class KeychainLock {
     private static let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("\(AppIdentity.bundleID)-tests-keychain.lock").path
 
