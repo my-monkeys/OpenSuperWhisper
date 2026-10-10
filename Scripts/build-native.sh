@@ -74,7 +74,16 @@ require_pinned_submodules() {
       -) problems+=$'\n'"  $path: not initialised"; continue ;;
       U) problems+=$'\n'"  $path: merge conflict"; continue ;;
     esac
-    pinned="$(git -C "$ROOT" rev-parse "HEAD:$path" 2>/dev/null || echo none)"
+    # The pin lives in the repository that contains the gitlink, which for a nested submodule
+    # is its parent submodule, not the top level.
+    local parent="$ROOT" relative="$path"
+    while [[ "$(dirname "$relative")" != "." ]] \
+      && ! git -C "$parent" rev-parse --verify --quiet "HEAD:$relative" >/dev/null; do
+      local outer="${relative%%/*}"
+      [[ -d "$parent/$outer/.git" || -f "$parent/$outer/.git" ]] || break
+      parent="$parent/$outer"; relative="${relative#*/}"
+    done
+    pinned="$(git -C "$parent" rev-parse "HEAD:$relative" 2>/dev/null || echo none)"
     actual="$(git -C "$ROOT/$path" rev-parse HEAD)"
     [[ "$actual" == "$pinned" ]] || problems+=$'\n'"  $path: at $actual, HEAD pins $pinned"
     [[ -z "$(git -C "$ROOT/$path" status --porcelain)" ]] \
