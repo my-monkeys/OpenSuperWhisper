@@ -207,7 +207,10 @@ Each is a behaviour change and gets its own PR with a test: the FluidAudio boost
 ignored when boosting (`FluidAudioEngine` L130, L154); `applyOneOffModel` writing persisted
 preferences; the main-window recorder bypassing `DictationPipeline`; shipping the FluidAudio
 patch in releases (ideally via a fork tag); native ARM kernels in releases; integrity checks
-on model downloads; API keys sent over plain http.
+on model downloads; API keys sent over plain http; the remote local-fallback factory
+(`fallbackEngineChoice`) handing an option's identifier to Whisper as a model path for
+SenseVoice on Intel (`"default"`) and for any engine it does not know (`"remote"` included),
+and building the selected Whisper model for `"apple"` below macOS 26.
 
 Credit: the module maps, the iOS xcframework flags, the consent seam and several tests come
 from PR #57 by @michael-wojcik.
