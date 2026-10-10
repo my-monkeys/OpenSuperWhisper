@@ -51,17 +51,24 @@ final class AgentProjectSwitchTests: XCTestCase {
         XCTAssertEqual(turnedOff("/code/site/", ["/code/site"]), "/code/site")
     }
 
-    func testTheHookAgreesWithTheSwitches() {
+    /// The hook's answers, written out: the rule it has always followed (a folder covers
+    /// itself and everything below it), so a change to the shared lookup cannot move it.
+    func testTheHookKeepsItsRule() {
         let prefs = AppPreferences.shared
         let saved = prefs.agentDisabledProjects
         defer { prefs.agentDisabledProjects = saved }
-        let disabled = ["/a/foo", "/Users/me", "/Users/me/code/site", "/code/site/"]
-        prefs.agentDisabledProjects = disabled
+        prefs.agentDisabledProjects = ["/a/foo", "/Users/me", "/Users/me/code/site", "/code/site/", "/"]
 
-        let paths = ["/a/foo", "/a/foo/src", "/a/foobar", "/Users/me/code/site/docs", "/Users/me",
-                     "/Users/other", "/code/site", "/code/site/", "/code/site/docs", "/"]
-        for path in paths {
-            XCTAssertEqual(prefs.agentProjectEnabled(path), turnedOff(path, disabled) == nil, path)
+        let expected: [(String, Bool)] = [
+            ("/a/foo", false), ("/a/foo/src", false), ("/a/foobar", true),
+            ("/Users/me", false), ("/Users/me/x", false), ("/Users/me/code/site/docs", false),
+            ("/Users/meow", true), ("/Users/other", true),
+            ("/code/site/", false), ("/code/site", true), ("/code/site/docs", true),
+            // "/" plus "/" is "//", which no real path starts with: "/" turns off only itself.
+            ("/", false), ("/tmp", true),
+        ]
+        for (path, enabled) in expected {
+            XCTAssertEqual(prefs.agentProjectEnabled(path), enabled, path)
         }
     }
 
