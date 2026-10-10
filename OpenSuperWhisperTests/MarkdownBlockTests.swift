@@ -97,6 +97,10 @@ final class MarkdownBlockTests: XCTestCase {
         XCTAssertEqual(MarkdownBlock.parse("> - a\n>   wrapped\n> - b"), [.quote([.bullet(items: ["a wrapped", "b"])])])
     }
 
+    func testEmptyQuoteIsDropped() {
+        XCTAssertEqual(MarkdownBlock.parse("before\n\n>\n> \n\nafter"), [.paragraph("before"), .paragraph("after")])
+    }
+
     func testTextAroundAQuoteIsUntouched() {
         let blocks = MarkdownBlock.parse("""
         Before.

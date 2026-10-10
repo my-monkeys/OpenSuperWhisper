@@ -109,7 +109,9 @@ enum MarkdownBlock: Equatable {
                     quoted.append(String(body))
                     index += 1
                 }
-                blocks.append(.quote(parse(quoted.joined(separator: "\n"))))
+                // A bare ">" has nothing to show, and an empty quote would draw a stray accent bar.
+                let inner = parse(quoted.joined(separator: "\n"))
+                if !inner.isEmpty { blocks.append(.quote(inner)) }
                 continue
             }
 
