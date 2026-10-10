@@ -84,11 +84,6 @@ fi
 echo "=== Building ${APP_NAME} for ${ARCH} (toolchain: ${XCODE_DIR}) ==="
 
 ./Scripts/fetch-sherpa.sh
-./Scripts/fetch-libomp-universal.sh
-
-# libwhisper: generic CPU flags (no -mcpu=native) + both arches so either slice can be linked.
-rm -rf libwhisper/build
-cmake -G Xcode -B libwhisper/build -S libwhisper -DGGML_NATIVE=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
 rm -rf build
 mkdir -p build
@@ -123,11 +118,6 @@ else
   install_name_tool -id "@rpath/libautocorrect_swift.dylib" ./build/libautocorrect_swift.dylib
 fi
 codesign --force --sign "${CODE_SIGN_IDENTITY}" --timestamp ./build/libautocorrect_swift.dylib
-
-echo "Copying libomp.dylib (universal)..."
-cp vendor/libomp-universal.dylib ./build/libomp.dylib
-install_name_tool -id "@rpath/libomp.dylib" ./build/libomp.dylib
-codesign --force --sign "${CODE_SIGN_IDENTITY}" --timestamp ./build/libomp.dylib
 
 # onnxruntime is arm64-only and only the arm64 build links it (OTHER_LDFLAGS[arch=arm64]); the
 # x86_64 build still needs the file present for the embed phase, then strips it post-build.

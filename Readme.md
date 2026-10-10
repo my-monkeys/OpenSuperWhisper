@@ -150,7 +150,7 @@ OpenSuperWhisper is free forever — no Pro tier, no paywall. If it saves you ti
 git clone git@github.com:my-monkeys/OpenSuperWhisper.git
 cd OpenSuperWhisper
 git submodule update --init --recursive
-brew install cmake libomp rust ruby
+brew install cmake rust ruby
 gem install xcpretty
 ./run.sh build
 ```

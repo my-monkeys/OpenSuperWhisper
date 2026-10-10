@@ -20,7 +20,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install dependencies
-        run: brew install cmake libomp rust
+        run: brew install cmake rust
       - name: Set up Ruby (for xcpretty)
         uses: ruby/setup-ruby@v1
         with:

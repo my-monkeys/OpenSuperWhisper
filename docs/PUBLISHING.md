@@ -41,8 +41,8 @@ behind `#if arch(arm64)`; the x86_64 build strips the onnxruntime dylib post-bui
 
 `notarize_app.sh` builds the universal native deps so either slice can link:
 - **autocorrect** (Rust) → universal, pinned to deployment target 14.0.
-- **libomp** → fat dylib from `vendor/libomp-universal.dylib`.
-- **libwhisper** → built with generic CPU flags (`GGML_NATIVE=OFF`) for both arches.
+- **whisper, llama and ggml** → `OSWNative.xcframework` from `Scripts/build-native.sh`, generic CPU
+  flags (`GGML_NATIVE=OFF`), both arches, always rebuilt for a release.
 - **onnxruntime** → arm64-only; copied in for the embed phase, stripped from the x86_64 app after build.
 
 ---
@@ -119,8 +119,8 @@ xcrun notarytool store-credentials osw-notary \
   prebuilt `vendor/libautocorrect_swift.dylib` is vendored; `notarize_app.sh` uses it automatically
   when present (`if [ -f vendor/libautocorrect_swift.dylib ]`). **Delete that vendored file once the
   toolchain is fixed** so the build goes back to compiling autocorrect from source.
-- **Build deps** (already installed): `cmake`, `libomp`, `rust`/`cargo`, and `xcpretty`
-  (`gem install xcpretty`). CI installs them via `brew install cmake libomp rust`.
+- **Build deps** (already installed): `cmake`, `rust`/`cargo`, and `xcpretty`
+  (`gem install xcpretty`). CI installs them via `brew install cmake rust`.
 - **`log` is shadowed by a zsh function** in this shell — use `/usr/bin/log` if you need unified
   logging while diagnosing.
 
@@ -134,9 +134,9 @@ xcrun notarytool store-credentials osw-notary \
 ```
 
 One invocation, per arch (~12 min each), runs end to end:
-1. `Scripts/fetch-sherpa.sh` + `Scripts/fetch-libomp-universal.sh` (native deps).
-2. Build libwhisper (both arches, generic CPU), autocorrect (universal or vendored), copy
-   libomp/onnxruntime, codesign each dylib with `--timestamp`.
+1. `Scripts/fetch-sherpa.sh` (native deps).
+2. Build the core's native xcframeworks (`Scripts/build-native.sh`: both arches, generic CPU),
+   autocorrect (universal or vendored), copy onnxruntime, codesign each dylib with `--timestamp`.
 3. `xcodebuild -scheme OpenSuperWhisper -configuration Release` for the requested `ARCHS`, manual
    signing, hardened runtime.
 4. **x86_64 only:** strip `libonnxruntime*.dylib` from the app, rewrite `SUFeedURL` → Intel feed.
@@ -371,7 +371,7 @@ marketing. A 🍌 at the end is on-brand but optional.
 | `appcast.xml` / `appcast-x86_64.xml` | Sparkle feeds (arm64 / Intel), served raw from `master` |
 | `OpenSuperWhisper/OpenSuperWhisper-Info.plist` | `SUFeedURL`, `SUPublicEDKey`, `CFBundleVersion`, etc. |
 | `vendor/libautocorrect_swift.dylib` | beta-toolchain workaround (delete when ld is fixed) |
-| `vendor/libomp-universal.dylib`, `vendor/onnxruntime/` | native deps |
+| `vendor/onnxruntime/` | native deps |
 | `.github/workflows/build.yml` | CI **build check only** (push/PR/manual) — does NOT notarize or release |
 | `~/.osw-signing/` | App Store Connect API key material (chmod 700) |
 | `SourcePackages/artifacts/sparkle/Sparkle/bin/` | `sign_update`, `generate_keys`, `generate_appcast` |
