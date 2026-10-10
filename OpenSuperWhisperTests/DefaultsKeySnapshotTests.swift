@@ -391,9 +391,11 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         // A file name on disk: a different default would point existing installs at a model
         // they never downloaded.
         XCTAssertEqual(prefs.builtInModelFileName, "qwen2.5-1.5b-instruct-q4_k_m.gguf")
-        XCTAssertEqual(prefs.aiPostProcessingPrompt, LLMPostProcessor.defaultInstruction)
-        XCTAssertEqual(prefs.aiPostProcessingClosing, LLMPostProcessor.defaultClosingInstruction)
-        XCTAssertEqual(prefs.aiPostProcessingTranslation, LLMPostProcessor.defaultTranslationInstruction)
+        // Hand-copied literals (see `ShippedCleanupPrompts`), not the LLMPostProcessor constants
+        // the defaults are built from.
+        XCTAssertEqual(prefs.aiPostProcessingPrompt, ShippedCleanupPrompts.opening)
+        XCTAssertEqual(prefs.aiPostProcessingClosing, ShippedCleanupPrompts.closing)
+        XCTAssertEqual(prefs.aiPostProcessingTranslation, ShippedCleanupPrompts.translation)
         XCTAssertEqual(prefs.appContextFormattingEnabled, false)
         XCTAssertEqual(prefs.typingPaceMilliseconds, 2)
         XCTAssertEqual(prefs.appInsertionRules, [])
