@@ -189,7 +189,7 @@ struct AgentsSettingsPane: View {
 
     private func projectRow(_ path: String) -> some View {
         let parent = Self.folderTurningOff(path, disabled: disabledProjects)
-        let coveredBelow = Self.projectsOnlyTurnedOff(by: path, among: projects, disabled: disabledProjects)
+        let coveredInside = Self.projectsOnlyTurnedOff(by: path, among: projects, disabled: disabledProjects)
         return VStack(alignment: .leading, spacing: 2) {
             SRow(title: LocalizedStringKey(URL(fileURLWithPath: path).lastPathComponent),
                  hint: LocalizedStringKey(Self.abbreviated(path))) {
@@ -200,12 +200,12 @@ struct AgentsSettingsPane: View {
                 SToggle(isOn: projectBinding(path), disabled: !enabled || parent != nil)
             }
             if let parent {
-                caption("Off because \(Self.abbreviated(parent)) is off. Turn that folder back on to use the panel here.",
+                caption("Off because it is inside \(Self.abbreviated(parent)), which is off. Turn that folder back on to use the panel here.",
                         color: STheme.warn)
-            } else if coveredBelow > 0 {
-                caption(coveredBelow == 1
-                        ? "Also keeps 1 project below in the terminal."
-                        : "Also keeps \(coveredBelow) projects below in the terminal.",
+            } else if coveredInside > 0 {
+                caption(coveredInside == 1
+                        ? "Also turns off 1 project inside it."
+                        : "Also turns off \(coveredInside) projects inside it.",
                         color: STheme.hint)
             }
         }
