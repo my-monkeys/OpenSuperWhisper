@@ -21,7 +21,7 @@ public struct WhisperVadSegment: Equatable {
     public let startCs: Int64
     public let endCs: Int64
 
-    public init(startCs: Int64, endCs: Int64) {
+    init(startCs: Int64, endCs: Int64) {
         self.startCs = startCs
         self.endCs = endCs
     }
