@@ -68,15 +68,21 @@ slice_args() {
     ios|iossim)
       local sdk=iphoneos
       [[ "$1" == iossim ]] && sdk=iphonesimulator
-      # The iOS compiler defaults to baseline arm64; every iOS 17 device is A12 or newer.
+      # No GGML_CPU_ARM_ARCH: ggml picks its CPU kernels at compile time, and the oldest iOS 17
+      # devices lack dot product (A12) and fp16 vector arithmetic (the A10 iPads of iPadOS 17).
       # Static try-compiles because an iOS executable cannot be linked without signing.
       ARGS+=(-DCMAKE_SYSTEM_NAME=iOS "-DCMAKE_OSX_SYSROOT=$sdk" -DCMAKE_OSX_ARCHITECTURES=arm64
-             -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 "-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16"
-             -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+             -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
              "-DCMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS=$sdk"
              -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO) ;;
   esac
 }
+
+# Dot product, int8 matrix multiply and fp16 vector arithmetic in otool's Apple syntax (`sdot.4s`,
+# `fmla.8h`); fcvtn to half precision is baseline. None may appear in the iOS device slice
+# (slice_args). The simulator compiler targets Apple silicon Macs, which all have them.
+BEYOND_ARMV8_0='[[:space:]]((s|u|us)(dot|mmla)[.[:space:]]|f[a-z0-9]+\.[48]h[[:space:]])'
+ARMV8_0_HALF='[[:space:]]fcvtn2?\.[48]h[[:space:]]'
 
 # Expected architectures, LC_BUILD_VERSION platform and minimum OS of a slice.
 slice_expect() {
@@ -200,6 +206,14 @@ verify_slice() {
     grep -q ') private external _whisper_full$' <<<"$symbols" || fail "$slice/$arch: _whisper_full missing"
     grep -q ') private external _llama_backend_init$' <<<"$symbols" || fail "$slice/$arch: _llama_backend_init missing"
     if grep -qE ' (___kmpc_|_omp_)' <<<"$symbols"; then fail "$slice/$arch: OpenMP symbols present"; fi
+    if [[ "$slice" == ios ]]; then
+      otool -arch "$arch" -tv "$lib" >"$WORK/$slice.s"
+      grep -E "$BEYOND_ARMV8_0" "$WORK/$slice.s" | grep -vE "$ARMV8_0_HALF" >"$WORK/$slice.beyond-armv8" || true
+      if [[ -s "$WORK/$slice.beyond-armv8" ]]; then
+        head -5 "$WORK/$slice.beyond-armv8" >&2
+        fail "$slice/$arch: instructions that some iOS 17 devices lack (all: build-native/$slice.beyond-armv8)"
+      fi
+    fi
     log "$slice/$arch: ok (platform $EXPECT_PLATFORM, minos $EXPECT_MINOS, Metal library embedded, no OpenMP)"
   done
 }

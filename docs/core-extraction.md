@@ -56,6 +56,12 @@ delete):
   iOS arm64 and iOS Simulator arm64 at 17.0 (`CMakeLists.txt` must stop forcing 14.0). Headers
   and module map live under `Headers/OSWNative/` (module `OSWNative`, links c++, Accelerate,
   Metal, Foundation), so nothing lands flat in the shared `include/`.
+- The iOS slices get baseline arm64 CPU kernels (no `GGML_CPU_ARM_ARCH`). ggml chooses them at
+  compile time with no runtime dispatch, and iOS 17 still runs on the A12 (no dot product)
+  and iPadOS 17 on the A10 (no fp16 vector arithmetic), where an iPhone app also runs. The
+  script fails if such instructions show up in the iOS device slice. Faster kernels need a
+  device floor that rules those chips out (dot product starts with the A13, and iPadOS 26 still
+  runs on A12 iPads), decided with the iPhone app.
 - `SherpaOnnx.xcframework`: the existing macOS static library, module map moved to
   `Headers/sherpa_onnx/`. macOS only for now. onnxruntime stays linked by the app
   (`OTHER_LDFLAGS[arch=arm64]`), never by the package: SwiftPM cannot condition a link on the
