@@ -58,4 +58,13 @@ final class AgentInboxTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: requests.appendingPathComponent("\(orphan.id).json").path))
     }
+
+    func testAnAnswerWhoseHookIsGoneIsDeletedWithItsRequest() throws {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let orphan = try writeRequest(createdAt: now, hookPID: 0)
+        let response = responses.appendingPathComponent("\(orphan.id).json")
+        try AgentBridge.write(AgentResponse(action: .reply, text: "Deploy it."), to: response)
+        XCTAssertTrue(load(now: now).isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: response.path))
+    }
 }

@@ -79,16 +79,17 @@ final class AgentInbox: ObservableObject {
         var live: [AgentRequest] = []
         for file in files where file.pathExtension == "json" {
             guard let request = AgentBridge.read(AgentRequest.self, from: file) else { continue }
+            let response = responses.appendingPathComponent("\(request.id).json")
             guard request.expiresAt > now && AgentBridge.isAlive(pid: request.hookPID) else {
                 // Its hook was cancelled (Esc in the terminal) or killed, so nothing will
-                // clean up after it.
+                // clean up after it, including an answer it never got to read.
                 try? FileManager.default.removeItem(at: file)
+                try? FileManager.default.removeItem(at: response)
                 continue
             }
             // Answered: the request file stays until the hook's next poll reads the answer and
             // deletes both. Listing it in that gap would bring the panel back for a moment
             // after the user sent.
-            let response = responses.appendingPathComponent("\(request.id).json")
             if !FileManager.default.fileExists(atPath: response.path) {
                 live.append(request)
             }
