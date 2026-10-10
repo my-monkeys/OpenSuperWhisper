@@ -1,5 +1,4 @@
 import Foundation
-import OpenSuperWhisperCore
 
 /// Built-in LLM cleanup backend: a small GGUF model run locally via llama.cpp (`LlamaContext`),
 /// with no external server. The model downloads on first use (`LLMModelManager`); the inference
@@ -10,8 +9,8 @@ import OpenSuperWhisperCore
 /// dictation and a file-drop/rerun pass run on different queues), so every touch of `context` —
 /// loading, inference and the idle release — happens on `inferenceQueue`, a serial queue. That
 /// also keeps ~1s–minutes of synchronous inference off Swift concurrency's cooperative pool.
-final class BuiltInLlamaBackend: LLMCleanupBackend {
-    static let shared = BuiltInLlamaBackend()
+public final class BuiltInLlamaBackend: LLMCleanupBackend {
+    public static let shared = BuiltInLlamaBackend()
 
     enum BuiltInLlamaError: Error { case modelNotReady }
 
@@ -39,16 +38,16 @@ final class BuiltInLlamaBackend: LLMCleanupBackend {
     }
 
     /// Ready once the selected model is on disk. The context itself loads on first `generate`.
-    var isReady: Bool { manager.isModelDownloaded(name: selectedModel.fileName) }
+    public var isReady: Bool { manager.isModelDownloaded(name: selectedModel.fileName) }
 
     /// Even the larger built-in model is small next to a hosted one, so this backend keeps the
     /// length-ratio sanity check on its output.
-    var enforcesLengthRatio: Bool { true }
+    public var enforcesLengthRatio: Bool { true }
 
     /// Loads the model ahead of first use, so the first cleanup doesn't pay the multi-second load.
     /// Called from Settings when the built-in backend is selected or its model finishes
     /// downloading — the user is right there, and the idle release reclaims the RAM if they leave.
-    func preload() {
+    public func preload() {
         guard isReady else { return }
         inferenceQueue.async { [weak self] in
             guard let self else { return }
@@ -57,7 +56,7 @@ final class BuiltInLlamaBackend: LLMCleanupBackend {
         }
     }
 
-    func generate(system: String, user: String) async throws -> String {
+    public func generate(system: String, user: String) async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
             inferenceQueue.async { [weak self] in
                 guard let self, let ctx = self.loadContextOnQueue() else {

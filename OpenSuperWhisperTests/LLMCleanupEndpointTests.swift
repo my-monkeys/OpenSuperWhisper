@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The Remote (OpenAI-compatible) cleanup backend builds `<base>/v1/chat/completions`
 /// and `<base>/v1/models` from a user-typed server URL that may omit the scheme, carry a
