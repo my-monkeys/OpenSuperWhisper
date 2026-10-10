@@ -86,6 +86,23 @@ final class ClipboardRestoreTests: XCTestCase {
         }
     }
 
+    /// The delay comes from Settings, and a value written out of range (by hand, or by an older
+    /// build) is held to what the slider allows rather than restoring instantly or never.
+    func testRestoreDelayFollowsTheSettingWithinItsRange() {
+        let prefs = AppPreferences.shared
+        let saved = prefs.clipboardRestoreDelayMs
+        defer { prefs.clipboardRestoreDelayMs = saved }
+
+        prefs.clipboardRestoreDelayMs = 300
+        XCTAssertEqual(ClipboardUtil.borrowRestoreDelay, 0.3, accuracy: 0.0001)
+        prefs.clipboardRestoreDelayMs = 0
+        XCTAssertEqual(ClipboardUtil.borrowRestoreDelay,
+                       Double(AppPreferences.clipboardRestoreDelayRange.lowerBound) / 1000, accuracy: 0.0001)
+        prefs.clipboardRestoreDelayMs = 60_000
+        XCTAssertEqual(ClipboardUtil.borrowRestoreDelay,
+                       Double(AppPreferences.clipboardRestoreDelayRange.upperBound) / 1000, accuracy: 0.0001)
+    }
+
     func testBorrowForPasteRestoresPreviousContentsAfterDelay() {
         ClipboardUtil.copyToClipboard("original", to: pasteboard)
 

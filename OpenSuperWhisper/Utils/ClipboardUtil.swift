@@ -53,10 +53,14 @@ enum ClipboardUtil {
     }
 
     /// How long the borrowed pasteboard keeps the transcription before the previous contents come
-    /// back: long enough for the frontmost app to service the synthetic ⌘V even under post-
-    /// transcription CPU load (the pre-0.9.0 restore logic topped out at 0.5s under load — this
-    /// adds margin, and being generous costs nothing now that the wait no longer blocks a thread).
-    static let borrowRestoreDelay: TimeInterval = 1.0
+    /// back, set in Settings › Output (`clipboardRestoreDelayMs`, 0.5 s by default). Long enough for
+    /// the frontmost app to service the synthetic ⌘V even under post-transcription CPU load (the
+    /// pre-0.9.0 restore logic topped out at 0.5 s under load); the user can trade margin for speed.
+    static var borrowRestoreDelay: TimeInterval {
+        let range = AppPreferences.clipboardRestoreDelayRange
+        let ms = min(max(AppPreferences.shared.clipboardRestoreDelayMs, range.lowerBound), range.upperBound)
+        return TimeInterval(ms) / 1000
+    }
 
     /// Borrows whose restore hasn't fired yet, keyed by pasteboard name. A borrow that lands while
     /// another is still pending must NOT snapshot — the pasteboard currently holds the previous
