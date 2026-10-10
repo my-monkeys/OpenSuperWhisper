@@ -65,7 +65,17 @@ delete):
   platform set. `FORCE=1` rebuilds. Release builds always force.
 - Gate for the swap: symbol lists and sizes of the new macOS slice match the Release archives
   of today's subproject for both architectures; `nm -m` on the app shows a single
-  `_whisper_full` and `_ggml_backend_metal_init`.
+  `_whisper_full` and `_ggml_backend_metal_reg` (`_ggml_backend_metal_init` is dead-stripped
+  from today's app already, so it cannot be the marker).
+- Measured in slice 1 (Xcode 27.0 27A266a, CMake 4.3.2, whisper.cpp 580b3c5, llama.cpp
+  2da6686): the macOS slice was compared with a reference built the way `notarize_app.sh` does
+  (`cmake -G Xcode -DGGML_NATIVE=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`, then
+  `xcodebuild -configuration Release` on the seven targets). Per architecture, all 197 archive
+  members are byte-identical (24375 defined symbols on arm64, 15123 on x86_64, private externs
+  included), the generated Xcode projects are identical apart from object IDs and the build
+  directory, and ggml-cpu is compiled with `-DGGML_CPU_GENERIC` in both. The only configure
+  difference is `GGML_OPENMP=OFF` instead of a NOTFOUND OpenMP; neither build has an OpenMP
+  symbol.
 
 Consequence, accepted on purpose: Debug builds and the test suite switch from native-kernel,
 -O0 ggml to the shipped configuration (generic kernels, Release). This closes a divergence
