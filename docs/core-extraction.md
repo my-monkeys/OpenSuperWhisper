@@ -117,8 +117,9 @@ lazily from it.
   storage. Keychain-backed members stay computed on `AppPreferences`.
 - `textFormatter`: the app installs the Rust autocorrect; a host without one gets the text
   unchanged.
-- `storageRoot`: the macOS app passes `AppIdentity.applicationSupportDirectory()`, the
-  formula pinned by test (whisper model paths are persisted as absolute strings). The iPhone
+- `storageRoot`: the macOS app passes `AppIdentity.storageRoot()`, which is the pinned
+  `applicationSupportDirectory()` formula in a normal launch (whisper model paths are persisted
+  as absolute strings) and a per-process temp directory under XCTest. The iPhone
   app will store file names and resolve them against its root, because its container path
   changes across updates.
 - `vadModelURL`: the macOS app passes today's `Bundle(for: WhisperEngine.self)` lookup, which
@@ -165,7 +166,12 @@ passes the full suite, and goes through an adversarial review before the next on
      tests the storage root (recordings DB and folder, model folders) moves to a per-process
      temp directory like the defaults suite already does; the queue, the retention scheduler
      and hotkey registration do not start in the test host; the two tests that write the real
-     defaults domain use `DefaultsStore.current`.
+     defaults domain use `DefaultsStore.current`; the Whisper prompt file resolves inside the
+     test storage root. Known residual: KeyboardShortcuts can only use `UserDefaults.standard`,
+     so the trigger views (`TriggerRecorderField`, `ContentView`, `AgentPanel`) still read the
+     user's real bindings when tests render them. The only write there is the library filling
+     in a declared default when its key is absent, and the trigger migration no longer copies
+     the real bindings into the test suite.
    - Characterization tests: Whisper golden on `jfk.wav` with `ggml-tiny.en.bin` (and with
      timestamps), recorded under both ggml configurations; VAD actually used on the engine
      path (padded clip is trimmed) and resolved from the app bundle; no-speech on silence;
