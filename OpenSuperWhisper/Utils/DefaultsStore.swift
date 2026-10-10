@@ -43,12 +43,13 @@ enum DefaultsStore {
     /// user's preferences, Keychain items and recordings. The app never links XCTest, so the
     /// class only exists once the runner has loaded it into the process.
     ///
-    /// Keychain and `AppIdentity.storageRoot()` key on this too, so all three isolations switch
-    /// together.
-    static var isRunningTests: Bool {
+    /// Decided once per process. Keychain and `AppIdentity.storageRoot()` key on this too, so a
+    /// value that could change later would let files move while preferences and Keychain items
+    /// stayed put. Both signals already exist before `main`: the runner sets the variable and
+    /// its injected library links XCTest.
+    static let isRunningTests: Bool =
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             || NSClassFromString("XCTestCase") != nil
-    }
 
     static var testSuitePrefix: String {
         "\(AppIdentity.bundleID).tests."
