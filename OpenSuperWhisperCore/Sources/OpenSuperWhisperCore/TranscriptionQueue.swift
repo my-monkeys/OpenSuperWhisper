@@ -1,20 +1,19 @@
 import Foundation
 import AVFoundation
 import Combine
-import OpenSuperWhisperCore
 
 @MainActor
-class TranscriptionQueue: ObservableObject {
-    static let shared = TranscriptionQueue(transcriptionService: .shared, recordingStore: .shared,
+public class TranscriptionQueue: ObservableObject {
+    public static let shared = TranscriptionQueue(transcriptionService: .shared, recordingStore: .shared,
                                            makeSettings: CoreAccess.makeSettings,
                                            confirmEnableHistory: CoreAccess.confirmEnableHistory)
 
-    @Published private(set) var isProcessing = false
-    @Published private(set) var currentRecordingId: UUID?
+    @Published public private(set) var isProcessing = false
+    @Published public private(set) var currentRecordingId: UUID?
     // When the current recording began processing, for the row's elapsed-time readout.
     // Useful on long dropped files, especially with engines that don't report granular
     // progress (Apple Speech, SenseVoice) where the percentage bar can't move (#87).
-    @Published private(set) var processingStartedAt: Date?
+    @Published public private(set) var processingStartedAt: Date?
 
     private let transcriptionService: TranscriptionService
     private let recordingStore: RecordingStore
@@ -74,7 +73,7 @@ class TranscriptionQueue: ObservableObject {
         cancelledRecordingIds.remove(recordingId)
     }
 
-    func startProcessingQueue() {
+    public func startProcessingQueue() {
         guard !isProcessing else { return }
 
         isProcessing = true
@@ -112,7 +111,7 @@ class TranscriptionQueue: ObservableObject {
         }
     }
 
-    func addFileToQueue(url: URL) async {
+    public func addFileToQueue(url: URL) async {
         if !CoreAccess.preferences.saveTranscriptionHistory {
             guard await confirmEnableHistory() else {
                 return
@@ -150,7 +149,7 @@ class TranscriptionQueue: ObservableObject {
         }
     }
 
-    func requeueRecording(_ recording: Recording, model: DictationModelOption? = nil) async {
+    public func requeueRecording(_ recording: Recording, model: DictationModelOption? = nil) async {
         if let model {
             modelOverrides[recording.id] = model
         }

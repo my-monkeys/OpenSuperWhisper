@@ -2,6 +2,7 @@ import GRDB
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The rows inside `Fixtures/recordings-0.13.3.sqlite`. The file was written once, before any
 /// code moved, by `RecordingStore(databaseQueue:)` on a new file (0.13.3's migrations) followed

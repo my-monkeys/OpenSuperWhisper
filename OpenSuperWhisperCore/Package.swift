@@ -20,6 +20,7 @@ let package = Package(
         // Same URL and requirement as the app's project, so the workspace resolves one checkout
         // and run.sh keeps patching it.
         .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.5"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.5.0"),
     ],
     targets: [
         .binaryTarget(name: "OSWNative", path: "Binaries/OSWNative.xcframework"),
@@ -36,7 +37,8 @@ let package = Package(
         .target(
             name: "OpenSuperWhisperCore",
             dependencies: ["OSWNative", "OSWSenseVoice",
-                           .product(name: "FluidAudio", package: "FluidAudio")]
+                           .product(name: "FluidAudio", package: "FluidAudio"),
+                           .product(name: "GRDB", package: "GRDB.swift")]
         ),
     ],
     swiftLanguageModes: [.v5]

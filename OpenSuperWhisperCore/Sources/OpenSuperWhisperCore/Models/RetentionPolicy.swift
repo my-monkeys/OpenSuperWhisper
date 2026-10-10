@@ -1,15 +1,14 @@
 import Foundation
-import OpenSuperWhisperCore
 
 /// Time unit used by the age-based retention policy.
-enum RetentionUnit: String, CaseIterable, Identifiable {
+public enum RetentionUnit: String, CaseIterable, Identifiable, Sendable {
     case minutes
     case hours
     case days
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .minutes: return "Minutes"
         case .hours: return "Hours"

@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Covers what the status bar's "Recent" submenu offers and how it labels it. The rows are the
 /// same "worth re-inserting" set the paste-last shortcut uses, so a failed or in-flight clip

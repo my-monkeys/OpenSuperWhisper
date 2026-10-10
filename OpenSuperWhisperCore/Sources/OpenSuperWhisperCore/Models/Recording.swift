@@ -1,8 +1,7 @@
 import Foundation
 import GRDB
-import OpenSuperWhisperCore
 
-enum RecordingStatus: String, Codable {
+public enum RecordingStatus: String, Codable, Sendable {
     case pending
     case converting
     case transcribing
@@ -10,35 +9,56 @@ enum RecordingStatus: String, Codable {
     case failed
 }
 
-struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equatable {
-    let id: UUID
-    let timestamp: Date
-    let fileName: String
-    var transcription: String
-    let duration: TimeInterval
-    var status: RecordingStatus
-    var progress: Float
-    var sourceFileURL: String?
+public struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equatable, Sendable {
+    public let id: UUID
+    public let timestamp: Date
+    public let fileName: String
+    public var transcription: String
+    public let duration: TimeInterval
+    public var status: RecordingStatus
+    public var progress: Float
+    public var sourceFileURL: String?
     // Where the dictation happened (captured at record-start). All optional with
     // nil defaults so existing Recording(...) call sites (file imports, etc.) and
     // older recordings keep working.
-    var sourceAppName: String? = nil
-    var sourceWindowTitle: String? = nil
-    var sourceURL: String? = nil
+    public var sourceAppName: String? = nil
+    public var sourceWindowTitle: String? = nil
+    public var sourceURL: String? = nil
     /// Display name of the model used for this transcription (e.g. "whisper-large-v3").
-    var modelUsed: String? = nil
+    public var modelUsed: String? = nil
     /// True when this transcription came from the remote engine's local fallback (the
     /// server was unreachable). The history row tints the model label to flag it.
-    var wasFallback: Bool = false
+    public var wasFallback: Bool = false
 
-    var isRegeneration: Bool = false
+    public var isRegeneration: Bool = false
+
+    public init(id: UUID, timestamp: Date, fileName: String, transcription: String,
+                duration: TimeInterval, status: RecordingStatus, progress: Float,
+                sourceFileURL: String? = nil, sourceAppName: String? = nil,
+                sourceWindowTitle: String? = nil, sourceURL: String? = nil,
+                modelUsed: String? = nil, wasFallback: Bool = false, isRegeneration: Bool = false) {
+        self.id = id
+        self.timestamp = timestamp
+        self.fileName = fileName
+        self.transcription = transcription
+        self.duration = duration
+        self.status = status
+        self.progress = progress
+        self.sourceFileURL = sourceFileURL
+        self.sourceAppName = sourceAppName
+        self.sourceWindowTitle = sourceWindowTitle
+        self.sourceURL = sourceURL
+        self.modelUsed = modelUsed
+        self.wasFallback = wasFallback
+        self.isRegeneration = isRegeneration
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, timestamp, fileName, transcription, duration, status, progress, sourceFileURL
         case sourceAppName, sourceWindowTitle, sourceURL, modelUsed, wasFallback
     }
 
-    static func == (lhs: Recording, rhs: Recording) -> Bool {
+    public static func == (lhs: Recording, rhs: Recording) -> Bool {
         return lhs.id == rhs.id &&
                lhs.status == rhs.status &&
                lhs.progress == rhs.progress &&
@@ -46,7 +66,7 @@ struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equ
                lhs.isRegeneration == rhs.isRegeneration
     }
 
-    static var recordingsDirectory: URL {
+    public static var recordingsDirectory: URL {
         recordingsDirectory(in: CoreAccess.storageRoot)
     }
 
@@ -54,22 +74,22 @@ struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equ
         root.appendingPathComponent("recordings")
     }
 
-    var url: URL {
+    public var url: URL {
         Self.recordingsDirectory.appendingPathComponent(fileName)
     }
     
-    var isPending: Bool {
+    public var isPending: Bool {
         status == .pending || status == .converting || status == .transcribing
     }
     
-    var sourceFileName: String? {
+    public var sourceFileName: String? {
         guard let sourceFileURL = sourceFileURL else { return nil }
         return URL(fileURLWithPath: sourceFileURL).lastPathComponent
     }
 
-    static let databaseTableName = "recordings"
+    public static let databaseTableName = "recordings"
 
-    enum Columns {
+    public enum Columns {
         static let id = Column(CodingKeys.id)
         static let timestamp = Column(CodingKeys.timestamp)
         static let fileName = Column(CodingKeys.fileName)
@@ -87,8 +107,8 @@ struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equ
 }
 
 @MainActor
-class RecordingStore: ObservableObject {
-    static let shared = RecordingStore(storageRoot: CoreAccess.storageRoot)
+public class RecordingStore: ObservableObject {
+    public static let shared = RecordingStore(storageRoot: CoreAccess.storageRoot)
 
     @Published private(set) var recordings: [Recording] = []
     private let dbQueue: DatabaseQueue
@@ -206,7 +226,7 @@ class RecordingStore: ObservableObject {
         }
     }
     
-    nonisolated func fetchRecordings(limit: Int, offset: Int) async throws -> [Recording] {
+    public nonisolated func fetchRecordings(limit: Int, offset: Int) async throws -> [Recording] {
         try await dbQueue.read { db in
             try Recording
                 .order(Recording.Columns.timestamp.desc)
@@ -244,9 +264,9 @@ class RecordingStore: ObservableObject {
         }
     }
 
-    static let recordingsDidUpdateNotification = Notification.Name("RecordingStore.recordingsDidUpdate")
+    public static let recordingsDidUpdateNotification = Notification.Name("RecordingStore.recordingsDidUpdate")
 
-    func addRecording(_ recording: Recording) {
+    public func addRecording(_ recording: Recording) {
         Task {
             do {
                 try await insertRecording(recording)
@@ -302,7 +322,7 @@ class RecordingStore: ObservableObject {
         }
     }
     
-    static let recordingProgressDidUpdateNotification = Notification.Name("RecordingStore.recordingProgressDidUpdate")
+    public static let recordingProgressDidUpdateNotification = Notification.Name("RecordingStore.recordingProgressDidUpdate")
     
     func updateRecordingProgressOnlySync(_ id: UUID, transcription: String, progress: Float, status: RecordingStatus, isRegeneration: Bool? = nil, modelUsed: String? = nil, wasFallback: Bool? = nil) async {
         do {
@@ -416,7 +436,7 @@ class RecordingStore: ObservableObject {
         }
     }
 
-    func deleteRecording(_ recording: Recording) {
+    public func deleteRecording(_ recording: Recording) {
         if recording.isPending {
             TranscriptionQueue.shared.cancelRecording(recording.id)
         }
@@ -440,7 +460,7 @@ class RecordingStore: ObservableObject {
         }
     }
 
-    func deleteAllRecordings() {
+    public func deleteAllRecordings() {
         Task {
             do {
                 let allRecordings = try await fetchAllRecordings()
@@ -470,7 +490,7 @@ class RecordingStore: ObservableObject {
     /// In-progress recordings (pending / converting / transcribing) are never
     /// removed. Returns the number of recordings that were deleted.
     @discardableResult
-    func enforceRetentionPolicy() async -> Int {
+    public func enforceRetentionPolicy() async -> Int {
         let policy = RetentionPolicy()
         guard policy.isActive else { return 0 }
 
@@ -508,7 +528,7 @@ class RecordingStore: ObservableObject {
     /// not need this — it is enforced whenever recordings are added (when the
     /// transcription queue drains). The periodic check therefore only does work
     /// while the age policy is enabled.
-    func startRetentionScheduler() {
+    public func startRetentionScheduler() {
         // Run once immediately so expired recordings are cleaned up on launch.
         Task { await enforceRetentionPolicy() }
 
@@ -580,7 +600,7 @@ class RecordingStore: ObservableObject {
         }
     }
     
-    nonisolated func searchRecordingsAsync(query: String, limit: Int = 100, offset: Int = 0) async -> [Recording] {
+    public nonisolated func searchRecordingsAsync(query: String, limit: Int = 100, offset: Int = 0) async -> [Recording] {
         do {
             return try await dbQueue.read { db in
                 try Recording

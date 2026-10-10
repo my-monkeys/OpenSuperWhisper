@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// Picks and labels the transcriptions offered in the status bar's "Recent" submenu.
 ///
