@@ -295,7 +295,17 @@ passes the full suite, and goes through an adversarial review before the next on
    rpaths, onnxruntime per architecture, the single `_whisper_full` and
    `_ggml_backend_metal_reg`, and the VAD resource are unchanged. The new reports are
    `docs/smoke/post-swap-<arch>.txt`. Still to do on a signed build: the signature check,
-   which the unsigned builds skip.
+   which the unsigned builds skip. Steps, in the OpenSuperWhisper-core checkout, never the
+   main one, and never with `make_release.sh`, which bumps the version, tags and pushes:
+   1. `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./notarize_app.sh "$IDENTITY" arm64`
+      (signs, notarizes and builds `OpenSuperWhisper-arm64.dmg`, which is not uploaded).
+   2. Before the next architecture overwrites `build/`, which both write:
+      `Scripts/smoke-release.sh build/Build/Products/Release/OpenSuperWhisper.app --expect docs/smoke/post-swap-arm64.txt`.
+      It must print "smoke-release: signature valid" and "smoke-release: OK", and not the
+      "not signed" note.
+   3. The same two steps with `x86_64` and `post-swap-x86_64.txt`.
+   4. `Scripts/build-native.sh all` to rebuild the iOS slices the release build dropped, and
+      `./run.sh build` for the dev derived data that `notarize_app.sh`'s `rm -rf build` deleted.
 3. `CoreConfiguration`, `TranscriptionSettings`, and the pure models and helpers.
 4. Engines, LLM cleanup, model managers and catalogs, the transcription service, recording
    storage and the queue.
