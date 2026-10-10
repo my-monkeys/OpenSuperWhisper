@@ -74,6 +74,18 @@ final class ClipboardRestoreTests: XCTestCase {
         XCTAssertEqual(textDuringPaste, "transcription")
     }
 
+    /// Clipboard histories (Raycast, Paste, Maccy…) skip entries carrying these markers, so a
+    /// dictation borrowed for one ⌘V does not pile up in them.
+    func testBorrowedTextIsMarkedTransientForClipboardHistories() {
+        var types: [NSPasteboard.PasteboardType] = []
+        ClipboardUtil.borrowForPaste("transcription", on: pasteboard, restoreAfter: 0.05) {
+            types = pasteboard.types ?? []
+        }
+        for marker in ClipboardUtil.transientTypes {
+            XCTAssertTrue(types.contains(marker), "missing \(marker.rawValue)")
+        }
+    }
+
     func testBorrowForPasteRestoresPreviousContentsAfterDelay() {
         ClipboardUtil.copyToClipboard("original", to: pasteboard)
 
