@@ -122,9 +122,11 @@ the transcription queue (its NSAlert becomes an injected consent closure, which 
 `RecordingStore`'s call into the queue); `DefaultsStore`, the `UserDefault` wrappers,
 `Keychain`, `AppIdentity`, `TranscriptionResult`, `TranscriptionError`.
 
-A separate macOS-only target `OSWSenseVoice` holds sherpa-onnx and the SenseVoice engine and
-model manager; the core depends on it with `.when(platforms: [.macOS])`, and the
-`#if arch(arm64)` gates become `#if os(macOS) && arch(arm64)` (identical on macOS).
+A separate target `OSWSenseVoice` holds sherpa-onnx and the SenseVoice engine and model
+manager. It links the sherpa binary target with `.when(platforms: [.macOS])` and its sources sit
+behind `#if os(macOS) && arch(arm64)` (identical to today's `#if arch(arm64)` on macOS), so it
+compiles to an empty module elsewhere and the core depends on it unconditionally while still
+building for iOS.
 
 Stays in the app: everything AppKit, audio capture and device handling (including
 `StreamingTranscriptionController`, which owns the mic tap and its ObjCException guard), text
@@ -243,6 +245,21 @@ passes the full suite, and goes through an adversarial review before the next on
 2. One atomic swap: the whisper, llama and sherpa wrappers move to the core, the app drops
    the libwhisper subproject, its seven proxies, the direct sherpa link, the native header
    paths and libomp; `Bridge.h` keeps autocorrect and ObjCException.
+   Done: the wrappers are public only where the app's remaining code calls them, and no C type
+   reaches the public API, so every C module stays an `internal import` (no transitional
+   `public import`). Two small seams made that possible: `MyWhisperContext.full(samples:params:)`
+   takes the Swift `WhisperFullParams`, abort callback included, and `SenseVoiceRecognizer` in
+   `OSWSenseVoice` builds the sherpa configuration the engine used to build. `LanguageUtil`
+   stays in the app and reads the language table through `MyWhisperContext`'s existing static
+   wrappers. Measured against a Release build of the slice-1 commit, arm64 and x86_64: the load
+   commands and the `Frameworks`/`Resources` listings differ only by libomp, the app defines
+   `_whisper_full`, `_llama_backend_init` and `_ggml_backend_metal_reg` once, onnxruntime is
+   loaded on arm64 only, and the binary is about 4 MB smaller. Part of that is wrapper methods
+   nobody calls, now internal and dead-stripped with the C functions they referenced. The rest
+   is ggml code generation: the subproject as the app's own build drove it inlined more (for
+   instance `ggml_add_impl` into `ggml_add`) than the same targets built on their own, which is
+   how `build-native.sh` and slice 1's reference build them, although the compile command lines
+   match. Not explained yet; the goldens and VAD pins are unchanged.
 3. `CoreConfiguration`, `TranscriptionSettings`, and the pure models and helpers.
 4. Engines, LLM cleanup, model managers and catalogs, the transcription service, recording
    storage and the queue.
