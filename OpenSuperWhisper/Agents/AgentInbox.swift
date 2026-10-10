@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import OpenSuperWhisperCore
 
 /// The agents waiting on the user, as the app sees them. Fed by the hook's request files, it
 /// drives the floating panel and writes the user's answers back.

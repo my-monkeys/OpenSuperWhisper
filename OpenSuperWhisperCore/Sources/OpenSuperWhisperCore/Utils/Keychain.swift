@@ -3,7 +3,7 @@ import Security
 
 /// Minimal Keychain wrapper for small secrets (e.g. the Groq API key). Stored as generic passwords
 /// under the app's bundle id so they don't sit in plain-text UserDefaults.
-enum Keychain {
+public enum Keychain {
     /// Under XCTest, a service of its own, for the same reason `DefaultsStore` swaps its suite.
     /// The test host is not the binary that created the user's items, so reading one raised a
     /// Keychain prompt that nobody was there to answer and the test hung; and a write, which
@@ -16,7 +16,7 @@ enum Keychain {
     /// pin it while `service` points elsewhere: a different spelling would lose every saved key.
     static let productionService = "fr.my-monkey.opensuperwhisper"
 
-    static func read(_ account: String) -> String? {
+    public static func read(_ account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -32,7 +32,7 @@ enum Keychain {
         return value
     }
 
-    static func set(_ value: String?, for account: String) {
+    public static func set(_ value: String?, for account: String) {
         SecItemDelete(itemQuery(for: account) as CFDictionary)
         guard let value, !value.isEmpty, let data = value.data(using: .utf8) else { return }
         SecItemAdd(addQuery(for: account, data: data) as CFDictionary, nil)

@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// Downloads and locates the SenseVoice (int8) model used by the sherpa-onnx engine.
 /// Two files are fetched directly from Hugging Face into Application Support:

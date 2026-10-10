@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import CoreAudioTypes
+import OpenSuperWhisperCore
 
 /// Reads any audio file into 16 kHz mono float samples, the input every local engine wants.
 ///

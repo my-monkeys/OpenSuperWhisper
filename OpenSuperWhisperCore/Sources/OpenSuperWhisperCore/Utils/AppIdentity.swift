@@ -9,7 +9,7 @@ import Foundation
 /// back nil, and everything keyed on it goes somewhere else: the preferences domain, the model
 /// directory, the recordings directory. The CLI reported loading an engine nobody had selected
 /// because it was reading an empty set of preferences (#88).
-enum AppIdentity {
+public enum AppIdentity {
 
     /// Last resort, used only when neither the main bundle nor the resolved executable can say.
     /// A fork that renames the bundle gets the right answer from the resolution above this.
@@ -71,7 +71,7 @@ enum AppIdentity {
     /// swaps its suite: the test host is the app, so it used to open the user's real recordings
     /// database at launch and create folders next to their models. FluidAudio keeps its models in
     /// its own cache outside this directory, which this does not move.
-    static func storageRoot() -> URL? {
+    public static func storageRoot() -> URL? {
         DefaultsStore.isRunningTests ? testStorageRoot : applicationSupportDirectory()
     }
 

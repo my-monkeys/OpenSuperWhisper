@@ -10,6 +10,7 @@ import SwiftUI
 import AppKit
 import Combine
 import UniformTypeIdentifiers
+import OpenSuperWhisperCore
 
 @main
 enum AppMain {

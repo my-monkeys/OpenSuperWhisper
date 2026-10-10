@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The exact HTTP request the remote engine sends, built from fixed preferences and settings,
 /// without touching the network: first through the builders, then through `transcribeAudio`

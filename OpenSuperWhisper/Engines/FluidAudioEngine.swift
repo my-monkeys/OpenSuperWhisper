@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import FluidAudio
+import OpenSuperWhisperCore
 
 class FluidAudioEngine: TranscriptionEngine {
     var engineName: String { "FluidAudio" }

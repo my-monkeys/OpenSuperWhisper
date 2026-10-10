@@ -3,6 +3,7 @@ import SwiftUI
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Every control in the Settings window has to sit inside the window, in every shipped language.
 ///

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import OpenSuperWhisperCore
 
 @MainActor
 class TranscriptionService: ObservableObject {
@@ -469,12 +470,6 @@ class TranscriptionService: ObservableObject {
             return false
         }
     }
-}
-
-enum TranscriptionError: Error {
-    case contextInitializationFailed
-    case audioConversionFailed
-    case processingFailed
 }
 
 /// Minimal async counting semaphore. Used as a 1-permit mutex to serialize transcriptions across

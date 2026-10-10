@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import OpenSuperWhisperCore
 
 class WhisperDownloadDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownloadDelegate {
     private let progressCallback: (Double) -> Void

@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The test host is the app, so it runs the app's launch code and reaches the app's storage.
 /// Preferences, Keychain items and files must all resolve somewhere private to the test process,

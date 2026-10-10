@@ -10,6 +10,7 @@
 
 import Combine
 import Foundation
+import OpenSuperWhisperCore
 
 /// Reuses the same URLSession download-delegate shape as WhisperDownloadDelegate.
 /// Kept separate so the two managers don't share mutable delegate state.

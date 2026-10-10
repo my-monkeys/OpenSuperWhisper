@@ -11,6 +11,7 @@ import ApplicationServices
 import AVFoundation
 import FluidAudio
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 final class OpenSuperWhisperTests: XCTestCase {
 

@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The custom dictionary now decouples two behaviors:
 /// - **Replacement** (`shouldApplyCustomDictionary`) — exact text fix, on whenever the dictionary

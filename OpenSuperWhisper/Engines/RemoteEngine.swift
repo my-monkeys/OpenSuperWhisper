@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// Transcription engine that delegates to a remote OpenAI-compatible server
 /// (Groq, speaches, a LiteLLM front door, a local Ollama-style endpoint, …)

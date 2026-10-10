@@ -5,6 +5,7 @@ import Foundation
 import KeyboardShortcuts
 import SwiftUI
 import FluidAudio
+import OpenSuperWhisperCore
 
 class SettingsViewModel: ObservableObject {
     /// True while re-syncing the @Published copies from AppPreferences (e.g. after the

@@ -2,6 +2,7 @@
 import AVFoundation
 import Foundation
 import OSWSenseVoice
+import OpenSuperWhisperCore
 
 /// Local SenseVoice engine (Chinese/Cantonese/English/Japanese/Korean) via sherpa-onnx.
 /// Non-autoregressive CTC model — fast, fully on-device.

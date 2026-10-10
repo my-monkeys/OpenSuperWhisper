@@ -12,8 +12,8 @@ import Foundation
 ///
 /// The switch is automatic rather than opt-in: a channel that has to be remembered will be
 /// forgotten by the next test that starts background work.
-enum DefaultsStore {
-    static let current: UserDefaults = {
+public enum DefaultsStore {
+    public static let current: UserDefaults = {
         guard isRunningTests else { return normalRunStore }
         let name = testSuiteName(for: ProcessInfo.processInfo.processIdentifier)
         guard let suite = UserDefaults(suiteName: name) else { return .standard }
@@ -47,7 +47,7 @@ enum DefaultsStore {
     /// value that could change later would let files move while preferences and Keychain items
     /// stayed put. Both signals already exist before `main`: the runner sets the variable and
     /// its injected library links XCTest.
-    static let isRunningTests = isTestProcess(
+    public static let isRunningTests = isTestProcess(
         environment: ProcessInfo.processInfo.environment,
         xcTestLoaded: NSClassFromString("XCTestCase") != nil)
 

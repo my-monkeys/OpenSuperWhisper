@@ -1,5 +1,6 @@
 import Foundation
 import os
+import OpenSuperWhisperCore
 
 /// Lightweight diagnostic tracing for the record-start / hotkey hot path.
 ///

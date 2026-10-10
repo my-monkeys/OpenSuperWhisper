@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Speech
+import OpenSuperWhisperCore
 
 // SpeechAnalyzer/SpeechTranscriber only exist in the macOS 26 SDK. `@available` guards
 // the runtime, not compilation — so the whole engine is gated on the SDK, keyed off

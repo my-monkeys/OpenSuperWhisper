@@ -1,6 +1,7 @@
 import Foundation
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Gives one test an empty preferences store and puts the previous contents back afterwards.
 ///

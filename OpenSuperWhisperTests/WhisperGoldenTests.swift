@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Byte-exact transcripts of `jfk.wav` through the real Whisper engine path (conversion, VAD,
 /// whisper.cpp, cleanup, post-processing) with the tiny English model tracked in the repo.

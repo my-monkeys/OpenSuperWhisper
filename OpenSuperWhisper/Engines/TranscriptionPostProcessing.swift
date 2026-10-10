@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// The steps every engine owes a transcription before it is handed back.
 ///

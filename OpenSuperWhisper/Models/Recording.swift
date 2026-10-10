@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import OpenSuperWhisperCore
 
 enum RecordingStatus: String, Codable {
     case pending

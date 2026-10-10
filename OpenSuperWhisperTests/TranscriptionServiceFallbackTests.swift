@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The remote local-fallback triggers only on "can't use the server" errors —
 /// unreachable / 5xx after retries — never on auth or a real client 4xx that a

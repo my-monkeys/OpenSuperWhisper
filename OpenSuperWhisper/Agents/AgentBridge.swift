@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import OpenSuperWhisperCore
 
 /// The meeting point between a coding agent's hook and the running app. The hook (this same
 /// binary, run as `OpenSuperWhisper agent-hook <event>` by the Claude Code plugin) drops a request

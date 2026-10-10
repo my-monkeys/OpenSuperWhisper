@@ -2,6 +2,7 @@ import KeyboardShortcuts
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// What `AppPreferences` does on first touch to preferences left by older builds.
 ///

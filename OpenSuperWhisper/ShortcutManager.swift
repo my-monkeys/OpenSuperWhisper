@@ -5,6 +5,7 @@ import Cocoa
 import Foundation
 import KeyboardShortcuts
 import SwiftUI
+import OpenSuperWhisperCore
 
 extension KeyboardShortcuts.Name {
     static let toggleRecord = Self("toggleRecord", default: .init(.backtick, modifiers: .option))

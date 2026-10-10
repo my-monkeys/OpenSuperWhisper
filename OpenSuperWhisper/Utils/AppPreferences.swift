@@ -1,32 +1,6 @@
 import Foundation
 import KeyboardShortcuts
-
-enum TranscriptionResult {
-    /// Returned by the engines when nothing intelligible was transcribed. It is shown to the
-    /// user as feedback but never pasted into the focused field.
-    static let noSpeech = "No speech detected in the audio"
-}
-
-@propertyWrapper
-struct UserDefault<T> {
-    let key: String
-    let defaultValue: T
-    
-    var wrappedValue: T {
-        get { DefaultsStore.current.object(forKey: key) as? T ?? defaultValue }
-        set { DefaultsStore.current.set(newValue, forKey: key) }
-    }
-}
-
-@propertyWrapper
-struct OptionalUserDefault<T> {
-    let key: String
-    
-    var wrappedValue: T? {
-        get { DefaultsStore.current.object(forKey: key) as? T }
-        set { DefaultsStore.current.set(newValue, forKey: key) }
-    }
-}
+import OpenSuperWhisperCore
 
 final class AppPreferences {
     static let shared = AppPreferences()

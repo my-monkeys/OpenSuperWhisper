@@ -4,6 +4,7 @@ import Security
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Strings that leave the process: stored in the user's preferences, Keychain, database or log,
 /// or read by another process. The compiler cannot see any of them, so moving the code that owns
