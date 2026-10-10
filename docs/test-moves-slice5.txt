@@ -1,0 +1,4 @@
+# Tests moved from the app-hosted suite to the core package in slice 5 (docs/core-extraction.md).
+# One line per test: <old id> -> <new id>; an id is <target>/<class>/<method>().
+# reference: docs/tests/hosted-slice4.txt (877 results: 868 passed, 9 skipped)
+# floor: 902
