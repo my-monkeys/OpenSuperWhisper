@@ -227,9 +227,11 @@ passes the full suite, and goes through an adversarial review before the next on
    storage and the queue.
 5. Core test target (macOS and iOS Simulator, run with the patched FluidAudio checkout);
    tests move with a committed rename map; the total may only grow.
-6. The first iPhone app: record in the foreground, transcribe on device (Parakeet, Apple
-   Speech on iOS 26) or remotely, clean up, copy and share, history. Models excluded from
-   backup. `make_release.sh` scoped to the macOS target first.
+The extraction stops there. The iPhone app itself (issue #52) is a later project; until then
+the core only has to keep building for iOS, which every slice checks. Notes for that
+project: record in the foreground, transcribe on device (Parakeet, Apple Speech on iOS 26)
+or remotely, exclude models from backup, and scope `make_release.sh` to the macOS target
+before an iOS target joins the project.
 
 ## Follow-ups kept out of the extraction
 
