@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The Remote engine retries only *transient* failures — a self-hosted endpoint
 /// behind a reverse proxy can briefly return 405/5xx while it redeploys, and a

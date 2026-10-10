@@ -1,5 +1,4 @@
 import Foundation
-import OpenSuperWhisperCore
 
 /// Transcription engine that delegates to a remote OpenAI-compatible server
 /// (Groq, speaches, a LiteLLM front door, a local Ollama-style endpoint, …)
@@ -12,8 +11,8 @@ import OpenSuperWhisperCore
 /// Translation uses OpenAI's separate `/v1/audio/translations` endpoint (which
 /// always outputs English and ignores `language`), matching the OpenAI spec;
 /// plain transcription uses `/v1/audio/transcriptions`.
-final class RemoteEngine: TranscriptionEngine {
-    var engineName: String { "Remote" }
+public final class RemoteEngine: TranscriptionEngine {
+    public var engineName: String { "Remote" }
 
     private var serverURL: String = ""
     private var modelName: String = ""
@@ -26,23 +25,23 @@ final class RemoteEngine: TranscriptionEngine {
     // than any transcription, without the edge cases of `.infinity`.
     private static let noTimeoutInterval: TimeInterval = 31_536_000
 
-    var onProgressUpdate: ((Float) -> Void)?
+    public var onProgressUpdate: ((Float) -> Void)?
 
     /// Where `makeSession` gets its configuration: a fresh `.default` in the app. A test passes
     /// one carrying a stub URLProtocol, which a session built here would otherwise never see.
     private let sessionConfiguration: () -> URLSessionConfiguration
 
-    init(sessionConfiguration: @escaping () -> URLSessionConfiguration = { .default }) {
+    public init(sessionConfiguration: @escaping () -> URLSessionConfiguration = { .default }) {
         self.sessionConfiguration = sessionConfiguration
     }
 
     /// Loaded once a server URL is configured. The remote model itself is not
     /// fetched locally, so "loaded" just means we have somewhere to call.
-    var isModelLoaded: Bool {
+    public var isModelLoaded: Bool {
         !serverURL.isEmpty
     }
 
-    func initialize() async throws {
+    public func initialize() async throws {
         let prefs = CoreAccess.preferences
         serverURL = prefs.remoteServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
         modelName = prefs.remoteServerModel.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -55,18 +54,18 @@ final class RemoteEngine: TranscriptionEngine {
         }
     }
 
-    func cancelTranscription() {
+    public func cancelTranscription() {
         currentTask?.cancel()
         currentTask = nil
     }
 
-    func getSupportedLanguages() -> [String] {
+    public func getSupportedLanguages() -> [String] {
         // The remote server decides language support; advertise none so the UI
         // offers the full list and we forward the user's choice verbatim.
         []
     }
 
-    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         let clip = Self.clipParameters(for: settings)
         guard let endpoint = endpoint(for: clip.action) else {
             throw TranscriptionError.contextInitializationFailed
@@ -320,13 +319,13 @@ final class RemoteEngine: TranscriptionEngine {
 /// User-facing remote-server failures. Mirrors the (now-folded-in) Groq engine's
 /// error style: cloud/remote failures are common and actionable, so they get
 /// descriptive messages instead of the bare on-device `TranscriptionError`.
-enum RemoteError: LocalizedError {
+public enum RemoteError: LocalizedError {
     case missingAPIKey
     case invalidAPIKey
     case network(Error?)
     case api(Int, String?)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .missingAPIKey:
             return "The server requires an API key. Add one in Settings → Engine & Model → Remote (lock icon)."

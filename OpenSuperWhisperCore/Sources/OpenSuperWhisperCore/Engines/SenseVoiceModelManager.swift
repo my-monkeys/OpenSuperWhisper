@@ -1,11 +1,10 @@
 import Foundation
-import OpenSuperWhisperCore
 
 /// Downloads and locates the SenseVoice (int8) model used by the sherpa-onnx engine.
 /// Two files are fetched directly from Hugging Face into Application Support:
 /// `model.int8.onnx` (~239 MB) and `tokens.txt`.
-final class SenseVoiceModelManager {
-    static let shared = SenseVoiceModelManager(storageRoot: CoreAccess.storageRoot)
+public final class SenseVoiceModelManager {
+    public static let shared = SenseVoiceModelManager(storageRoot: CoreAccess.storageRoot)
     private let storageRoot: URL
 
     init(storageRoot: URL) {
@@ -26,16 +25,16 @@ final class SenseVoiceModelManager {
     var modelPath: URL { modelDirectory.appendingPathComponent("model.int8.onnx") }
     var tokensPath: URL { modelDirectory.appendingPathComponent("tokens.txt") }
 
-    var isDownloaded: Bool {
+    public var isDownloaded: Bool {
         let fm = FileManager.default
         return fm.fileExists(atPath: modelPath.path) && fm.fileExists(atPath: tokensPath.path)
     }
 
     /// Approximate on-disk size, for display.
-    var downloadSizeString: String { "≈ 239 MB" }
+    public var downloadSizeString: String { "≈ 239 MB" }
 
     /// Download both files. `progress` reports 0…1 (model download dominates).
-    func download(progress: @escaping (Double) -> Void) async throws {
+    public func download(progress: @escaping (Double) -> Void) async throws {
         try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
         try await download(from: tokensURL, to: tokensPath) { _ in progress(0.01) }
         try await download(from: modelURL, to: modelPath) { p in progress(0.01 + p * 0.99) }

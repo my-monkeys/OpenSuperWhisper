@@ -16,6 +16,11 @@ let package = Package(
         .library(name: "OpenSuperWhisperCore", type: .static,
                  targets: ["OpenSuperWhisperCore", "OSWSenseVoice"]),
     ],
+    dependencies: [
+        // Same URL and requirement as the app's project, so the workspace resolves one checkout
+        // and run.sh keeps patching it.
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.5"),
+    ],
     targets: [
         .binaryTarget(name: "OSWNative", path: "Binaries/OSWNative.xcframework"),
         // macOS only: the vendored sherpa-onnx library has no iOS slice.
@@ -30,7 +35,8 @@ let package = Package(
         ),
         .target(
             name: "OpenSuperWhisperCore",
-            dependencies: ["OSWNative", "OSWSenseVoice"]
+            dependencies: ["OSWNative", "OSWSenseVoice",
+                           .product(name: "FluidAudio", package: "FluidAudio")]
         ),
     ],
     swiftLanguageModes: [.v5]

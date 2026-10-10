@@ -69,7 +69,7 @@ final class TranscriptionPostProcessingTests: XCTestCase {
         let engines = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()      // OpenSuperWhisperTests
             .deletingLastPathComponent()      // repo root
-            .appendingPathComponent("OpenSuperWhisper/Engines")
+            .appendingPathComponent("OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/Engines")
 
         let files = try FileManager.default.contentsOfDirectory(atPath: engines.path)
             .filter { $0.hasSuffix(".swift") }

@@ -1,7 +1,6 @@
 import Foundation
 import AVFoundation
 import CoreAudioTypes
-import OpenSuperWhisperCore
 
 private class ProgressContext {
     var onProgress: ((Float) -> Void)?
@@ -22,8 +21,8 @@ private class ProgressContext {
     }
 }
 
-class WhisperEngine: TranscriptionEngine {
-    var engineName: String { "Whisper" }
+public class WhisperEngine: TranscriptionEngine {
+    public var engineName: String { "Whisper" }
     
     /// Silero VAD, shipped in the app bundle (~0.9 MB). Used to cut non-speech audio out
     /// before the encoder sees it: long pauses aren't decoded at all, and silence can't be
@@ -48,7 +47,7 @@ class WhisperEngine: TranscriptionEngine {
         self.vadModelFile = vadModelPath
     }
 
-    convenience init(modelPathOverride: String? = nil) {
+    public convenience init(modelPathOverride: String? = nil) {
         self.init(modelPathOverride: modelPathOverride, vadModelPath: WhisperEngine.vadModelPath)
     }
     
@@ -78,13 +77,13 @@ class WhisperEngine: TranscriptionEngine {
         }
     }
     
-    var onProgressUpdate: ((Float) -> Void)?
+    public var onProgressUpdate: ((Float) -> Void)?
     
-    var isModelLoaded: Bool {
+    public var isModelLoaded: Bool {
         context != nil
     }
     
-    func initialize() async throws {
+    public func initialize() async throws {
         try loadModel()
         // Opt-in RAM saver (#171): the model just validated, so free it (~1GB) until a
         // dictation actually needs it. Off by default — the model normally stays hot.
@@ -111,7 +110,7 @@ class WhisperEngine: TranscriptionEngine {
         context = nil
     }
 
-    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         // With idle-unloading on, the model isn't held between dictations: load it on
         // demand here and release it again once this transcription finishes (#171).
         let unloadWhenIdle = CoreAccess.preferences.unloadWhisperModelWhenIdle
@@ -274,14 +273,14 @@ class WhisperEngine: TranscriptionEngine {
         return TranscriptionPostProcessing.finish(cleanedText, settings: settings)
     }
     
-    func cancelTranscription() {
+    public func cancelTranscription() {
         isCancelled = true
         if let abortFlag = abortFlag {
             abortFlag.pointee = true
         }
     }
     
-    func getSupportedLanguages() -> [String] {
+    public func getSupportedLanguages() -> [String] {
         return LanguageUtil.availableLanguages
     }
 

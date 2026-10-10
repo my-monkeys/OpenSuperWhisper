@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Parakeet Ultra end to end: download, load, transcribe. Gated like the other Parakeet tests
 /// because it fetches about 614 MB on first run.

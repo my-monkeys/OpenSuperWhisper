@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The Remote engine parses the server's success body for the transcript text
 /// (OpenAI `{"text":...}`, tolerating `{"result":...}` or a bare string), and on

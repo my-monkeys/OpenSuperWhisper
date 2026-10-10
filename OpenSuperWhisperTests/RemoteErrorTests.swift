@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Remote/cloud transcription failures are common and user-actionable — a wrong
 /// or missing API key, an unreachable server, or an HTTP error — so the Remote

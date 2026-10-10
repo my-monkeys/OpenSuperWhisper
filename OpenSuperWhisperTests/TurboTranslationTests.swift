@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Whisper translates, but its turbo builds do not, and they say nothing about it.
 ///

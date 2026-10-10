@@ -1,27 +1,28 @@
 #if os(macOS) && arch(arm64)
 import AVFoundation
 import Foundation
-import OSWSenseVoice
-import OpenSuperWhisperCore
+internal import OSWSenseVoice
 
 /// Local SenseVoice engine (Chinese/Cantonese/English/Japanese/Korean) via sherpa-onnx.
 /// Non-autoregressive CTC model — fast, fully on-device.
-final class SenseVoiceEngine: TranscriptionEngine {
-    var engineName: String { "SenseVoice" }
+public final class SenseVoiceEngine: TranscriptionEngine {
+    public var engineName: String { "SenseVoice" }
 
     private var recognizer: SenseVoiceRecognizer?
     private var isCancelled = false
 
-    var isModelLoaded: Bool { recognizer != nil }
+    public init() {}
 
-    func initialize() async throws {
+    public var isModelLoaded: Bool { recognizer != nil }
+
+    public func initialize() async throws {
         let mgr = SenseVoiceModelManager.shared
         guard mgr.isDownloaded else { throw TranscriptionError.contextInitializationFailed }
 
         recognizer = SenseVoiceRecognizer(modelPath: mgr.modelPath.path, tokensPath: mgr.tokensPath.path)
     }
 
-    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         guard let recognizer else { throw TranscriptionError.contextInitializationFailed }
         isCancelled = false
 
@@ -35,9 +36,9 @@ final class SenseVoiceEngine: TranscriptionEngine {
         return TranscriptionPostProcessing.finish(text, settings: settings)
     }
 
-    func cancelTranscription() { isCancelled = true }
+    public func cancelTranscription() { isCancelled = true }
 
-    func getSupportedLanguages() -> [String] {
+    public func getSupportedLanguages() -> [String] {
         EngineCapabilities.supportedLanguages(engine: "sensevoice", fluidAudioModelVersion: "")
     }
 

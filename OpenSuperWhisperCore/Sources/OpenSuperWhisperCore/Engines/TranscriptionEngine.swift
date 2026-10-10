@@ -1,8 +1,7 @@
 import Foundation
 import AVFoundation
-import OpenSuperWhisperCore
 
-protocol TranscriptionEngine: AnyObject {
+public protocol TranscriptionEngine: AnyObject {
     var isModelLoaded: Bool { get }
     var engineName: String { get }
 
@@ -14,15 +13,15 @@ protocol TranscriptionEngine: AnyObject {
 
 /// Static engine capabilities keyed by the stored engine id (`AppPreferences.selectedEngine`),
 /// so the UI can gate features without instantiating an engine.
-enum EngineCapabilities {
+public enum EngineCapabilities {
     /// Engines that can translate to English — the single source of truth for the
     /// translate toggle's gating AND the local-fallback picker. Add a provider here,
     /// never a new `case` elsewhere. Whisper translates locally; the remote engine
     /// forwards translation to the server's OpenAI `/audio/translations` endpoint.
     /// Parakeet (fluidaudio) / SenseVoice silently ignore `translateToEnglish` (#124).
-    static let translationCapableEngines: Set<String> = ["whisper", "remote"]
+    public static let translationCapableEngines: Set<String> = ["whisper", "remote"]
 
-    static func supportsTranslation(engine: String) -> Bool {
+    public static func supportsTranslation(engine: String) -> Bool {
         translationCapableEngines.contains(engine)
     }
 
@@ -34,7 +33,7 @@ enum EngineCapabilities {
     /// writing (#89).
     static let fieldContextCapableEngines: Set<String> = ["whisper"]
 
-    static func supportsFieldContext(engine: String) -> Bool {
+    public static func supportsFieldContext(engine: String) -> Bool {
         fieldContextCapableEngines.contains(engine)
     }
 
@@ -45,7 +44,7 @@ enum EngineCapabilities {
     /// untranslated run. Every Whisper model the setup screen offers is a turbo build, so a user
     /// who followed setup had no reachable configuration that could translate, and the toggle
     /// stayed enabled while doing nothing. Reported by a Czech user on 0.10.2.
-    static func supportsTranslation(engine: String, modelPath: String?) -> Bool {
+    public static func supportsTranslation(engine: String, modelPath: String?) -> Bool {
         guard supportsTranslation(engine: engine) else { return false }
         guard engine == "whisper", let modelPath else { return true }
         return !isTurboModel(modelPath)
@@ -59,7 +58,7 @@ enum EngineCapabilities {
     /// truth for both the engines' `getSupportedLanguages()` and the language picker, so the UI can
     /// filter without instantiating an engine and the two can't drift (#155). Whisper uses the full
     /// Whisper set; "auto" (where present) means let the model detect the language.
-    static func supportedLanguages(engine: String, fluidAudioModelVersion: String) -> [String] {
+    public static func supportedLanguages(engine: String, fluidAudioModelVersion: String) -> [String] {
         switch engine {
         case "remote":
             // The remote server decides language support; advertise the full Whisper set

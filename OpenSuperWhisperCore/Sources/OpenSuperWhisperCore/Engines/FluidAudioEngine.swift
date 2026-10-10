@@ -1,10 +1,9 @@
 import Foundation
 import AVFoundation
 import FluidAudio
-import OpenSuperWhisperCore
 
-class FluidAudioEngine: TranscriptionEngine {
-    var engineName: String { "FluidAudio" }
+public class FluidAudioEngine: TranscriptionEngine {
+    public var engineName: String { "FluidAudio" }
     
     private var asrManager: AsrManager?
     private var asrModels: AsrModels?
@@ -17,17 +16,17 @@ class FluidAudioEngine: TranscriptionEngine {
     /// global prefs. Readable so a test can check what the fallback factory passed.
     let versionOverride: String?
 
-    init(versionOverride: String? = nil) {
+    public init(versionOverride: String? = nil) {
         self.versionOverride = versionOverride
     }
     
-    var onProgressUpdate: ((Float) -> Void)?
+    public var onProgressUpdate: ((Float) -> Void)?
     
-    var isModelLoaded: Bool {
+    public var isModelLoaded: Bool {
         asrManager != nil
     }
     
-    func initialize() async throws {
+    public func initialize() async throws {
         let versionString = versionOverride ?? CoreAccess.preferences.fluidAudioModelVersion
         let version = AsrModelVersion(preference: versionString)
 
@@ -39,7 +38,7 @@ class FluidAudioEngine: TranscriptionEngine {
         asrModels = models
     }
     
-    func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
         guard let asrManager = asrManager else {
             throw TranscriptionError.contextInitializationFailed
         }
@@ -118,7 +117,7 @@ class FluidAudioEngine: TranscriptionEngine {
         return processedText
     }
     
-    func cancelTranscription() {
+    public func cancelTranscription() {
         isCancelled = true
         progressTask?.cancel()
         progressTask = nil
@@ -126,7 +125,7 @@ class FluidAudioEngine: TranscriptionEngine {
         transcriptionTask = nil
     }
     
-    func getSupportedLanguages() -> [String] {
+    public func getSupportedLanguages() -> [String] {
         EngineCapabilities.supportedLanguages(
             engine: "fluidaudio", fluidAudioModelVersion: CoreAccess.preferences.fluidAudioModelVersion)
     }
@@ -253,7 +252,7 @@ class FluidAudioEngine: TranscriptionEngine {
 extension AsrModelVersion {
     /// The model a stored `fluidAudioModelVersion` names. Anything unrecognised loads v3, the
     /// default, so a preference written by a newer build still finds a model rather than none.
-    init(preference: String) {
+    public init(preference: String) {
         switch preference {
         case "v2": self = .v2
         case "ultra": self = .ultra

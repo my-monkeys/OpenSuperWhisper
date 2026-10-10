@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The Remote engine builds `<base>/v1/audio/<action>` from a user-typed server
 /// URL that may omit the scheme, carry a trailing slash, or already include a
