@@ -337,6 +337,26 @@ passes the full suite, and goes through an adversarial review before the next on
    pins did not change.
 4. Engines, LLM cleanup, model managers and catalogs, the transcription service, recording
    storage and the queue.
+   Done, in seven code commits, one review follow-up and the records. The engines and the
+   SenseVoice model manager moved first, with FluidAudio as a core dependency, then the Whisper
+   and LLM model managers, LLM cleanup, the compute policy, the transcription service with the
+   model catalog and `Notification.Name.modelSelectionDidChange` (the app's declaration went),
+   and last recording storage, retention and the queue together, with GRDB as a core dependency
+   and the temporary app copy of `CoreAccess` deleted. Nothing in the app names `CoreAccess`
+   any more, and the app and the core share no top-level name. The last code commit took back
+   to internal every public the move needed on the way: the engine protocol and its witnesses,
+   four of the five engines, `TranscriptionError`, the audio, prompt and post-processing
+   helpers, the service's progress and the slice-2 native wrappers. The public surface is now
+   what the app's remaining code calls, plus the GRDB witness of deviation 18.
+   Measured: the hosted suite reproduces `reference-slice4.txt` exactly at every code commit
+   (868 passed, 9 skipped, the llama half of the lifecycle test run), and the package builds for
+   the iOS Simulator at every commit. The package pins did not move when FluidAudio and GRDB
+   became dependencies of the local package, not even `originHash`, and
+   `Localizable.xcstrings` did not change. The release smoke check gives reports identical to
+   the post-swap references on arm64 and on x86_64 under Rosetta. The test bundle still holds
+   no symbol, type descriptor or ObjC class of the core, GRDB, FluidAudio or OSWSenseVoice, and
+   no native sentinel; the Debug image now defines 94 core type descriptors (46 after slice 3)
+   and GRDB's.
 5. Core test target (macOS and iOS Simulator, run with the patched FluidAudio checkout);
    tests move with a committed rename map; the total may only grow.
 The extraction stops there. The iPhone app itself (issue #52) is a later project; until then
@@ -438,6 +458,18 @@ Recorded as the slices land, so the plan above keeps its original wording.
     side, the hosted suite never runs `BuiltInLlamaBackend.loadContextOnQueue`; its `.automatic`
     branch is the unchanged `LlamaContext(modelPath:)` call, which the lifecycle test exercises
     directly. `.cpuOnly` is first exercised by the core test target (slice 5).
+18. `Recording.Columns` is public. GRDB 7's `TableRecord` declares `associatedtype Columns`, and
+    the nested enum witnesses it, so the compiler refuses an internal one once `Recording` is
+    public. Its column constants stay internal. The spec's list of public `Recording` members
+    did not name it.
+19. `Sendable` (deviation 16) also goes on `RecordingStatus`, `Recording` and `RetentionUnit`,
+    in the commit that moves them (4.6).
+20. Gate G2 for rows 4.5 to 4.7 ran after the commits rather than before. A macOS privacy
+    prompt asking whether "OpenSuperWhisper" may read the Documents folder held every hosted
+    test host in its first file open, while the screen was locked, and answering it is the
+    user's decision. Each commit was meanwhile built with its test bundle
+    (`xcodebuild build-for-testing`, G2's arguments), and the full suite was run on each of them
+    once the prompt was answered, before this record. The lists match the reference exactly.
 
 ## Follow-ups kept out of the extraction
 
