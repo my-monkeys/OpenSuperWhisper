@@ -752,6 +752,12 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var clipboardRestoreDelayMs: Double {
+        didSet {
+            AppPreferences.shared.clipboardRestoreDelayMs = Int(clipboardRestoreDelayMs)
+        }
+    }
+
     @Published var autoPasteTranscription: Bool {
         didSet {
             AppPreferences.shared.autoPasteTranscription = autoPasteTranscription
@@ -982,6 +988,7 @@ class SettingsViewModel: ObservableObject {
         self.postRecordHookEnabled = prefs.postRecordHookEnabled
         self.postRecordHookCommand = prefs.postRecordHookCommand
         self.autoCopyToClipboard = prefs.autoCopyToClipboard
+        self.clipboardRestoreDelayMs = Double(prefs.clipboardRestoreDelayMs)
         self.autoPasteTranscription = prefs.autoPasteTranscription
         self.pasteInsteadOfTyping = prefs.pasteInsteadOfTyping
         self.notifyWhenNoPasteTarget = prefs.notifyWhenNoPasteTarget
@@ -2555,6 +2562,24 @@ struct SettingsView: View {
             SSection(title: "Delivery") {
                 SRow(title: "Copy to clipboard", hint: "Also place the transcription on the clipboard. When off, the previous clipboard contents are preserved") {
                     SToggle(isOn: $viewModel.autoCopyToClipboard)
+                }
+                if !viewModel.autoCopyToClipboard {
+                    SRow(title: "Give the previous contents back after",
+                         hint: "How long the dictation stays on the clipboard for the paste. Raise it if an app sometimes pastes your old item instead",
+                         indented: true) {
+                        HStack(spacing: 10) {
+                            Slider(value: $viewModel.clipboardRestoreDelayMs,
+                                   in: Double(AppPreferences.clipboardRestoreDelayRange.lowerBound)...Double(AppPreferences.clipboardRestoreDelayRange.upperBound),
+                                   step: 50)
+                                .controlSize(.small)
+                                .frame(width: 150)
+                                .tint(STheme.accent)
+                            Text("\(Int(viewModel.clipboardRestoreDelayMs)) ms")
+                                .scaledFont(size: 11, design: .monospaced)
+                                .foregroundColor(STheme.hint)
+                                .frame(width: 58, alignment: .trailing)
+                        }
+                    }
                 }
                 SRow(title: "Auto-paste transcription", hint: "Insert the transcription into the focused app") {
                     SToggle(isOn: $viewModel.autoPasteTranscription)

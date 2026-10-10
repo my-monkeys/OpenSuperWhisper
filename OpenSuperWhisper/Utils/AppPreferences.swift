@@ -628,6 +628,13 @@ final class AppPreferences {
     @UserDefault(key: "autoPasteTranscription", defaultValue: true)
     var autoPasteTranscription: Bool
 
+    /// With "Copy to clipboard" off, how long the dictation stays on the clipboard for the paste
+    /// before the previous contents come back. Shorter gives the old item back sooner; too short
+    /// and a slow app could paste the old item instead of the dictation.
+    @UserDefault(key: "clipboardRestoreDelayMs", defaultValue: 500)
+    var clipboardRestoreDelayMs: Int
+    static let clipboardRestoreDelayRange = 150...2000
+
     /// Insert by pasting (⌘V) — the default, because it's universal: it lands in any text field,
     /// including apps that ignore synthetic Unicode typing (Messages, Electron, …). Turn it off to
     /// type the transcription instead (preserves the clipboard, but fails in those apps).
