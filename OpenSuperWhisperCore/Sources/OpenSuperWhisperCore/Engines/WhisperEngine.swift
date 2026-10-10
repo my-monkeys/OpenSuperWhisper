@@ -41,14 +41,17 @@ public class WhisperEngine: TranscriptionEngine {
     /// can check what the fallback factory passed.
     let modelPathOverride: String?
     private let vadModelFile: String?
+    private let computePolicy: ComputePolicy
 
-    init(modelPathOverride: String?, vadModelPath: String?) {
+    init(modelPathOverride: String?, vadModelPath: String?, computePolicy: ComputePolicy) {
         self.modelPathOverride = modelPathOverride
         self.vadModelFile = vadModelPath
+        self.computePolicy = computePolicy
     }
 
     public convenience init(modelPathOverride: String? = nil) {
-        self.init(modelPathOverride: modelPathOverride, vadModelPath: WhisperEngine.vadModelPath)
+        self.init(modelPathOverride: modelPathOverride, vadModelPath: WhisperEngine.vadModelPath,
+                  computePolicy: CoreAccess.computePolicy)
     }
     
     private var isCancelled: Bool {
@@ -98,7 +101,8 @@ public class WhisperEngine: TranscriptionEngine {
             throw TranscriptionError.contextInitializationFailed
         }
 
-        let params = WhisperContextParams()
+        var params = WhisperContextParams()
+        if computePolicy == .cpuOnly { params.useGPU = false }
         context = MyWhisperContext.initFromFile(path: modelPath, params: params)
 
         guard context != nil else {

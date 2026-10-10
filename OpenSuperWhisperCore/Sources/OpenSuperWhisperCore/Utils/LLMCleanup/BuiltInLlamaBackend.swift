@@ -10,7 +10,7 @@ import Foundation
 /// loading, inference and the idle release — happens on `inferenceQueue`, a serial queue. That
 /// also keeps ~1s–minutes of synchronous inference off Swift concurrency's cooperative pool.
 public final class BuiltInLlamaBackend: LLMCleanupBackend {
-    public static let shared = BuiltInLlamaBackend()
+    public static let shared = BuiltInLlamaBackend(computePolicy: CoreAccess.computePolicy)
 
     enum BuiltInLlamaError: Error { case modelNotReady }
 
@@ -29,8 +29,11 @@ public final class BuiltInLlamaBackend: LLMCleanupBackend {
     /// Which GGUF `context` was loaded from, so a model switch can be noticed. Also
     /// `inferenceQueue`-confined.
     private var loadedFileName: String?
+    private let computePolicy: ComputePolicy
 
-    private init() {}
+    private init(computePolicy: ComputePolicy) {
+        self.computePolicy = computePolicy
+    }
 
     /// The model the user picked in Settings.
     private var selectedModel: LLMModelDescriptor {
@@ -83,7 +86,10 @@ public final class BuiltInLlamaBackend: LLMCleanupBackend {
         let model = selectedModel
         if let context, loadedFileName == model.fileName { return context }
         guard manager.isModelDownloaded(name: model.fileName) else { return nil }
-        context = LlamaContext(modelPath: manager.localURL(for: model.fileName).path)
+        let path = manager.localURL(for: model.fileName).path
+        context = computePolicy == .cpuOnly
+            ? LlamaContext(modelPath: path, gpuLayers: 0)
+            : LlamaContext(modelPath: path)
         loadedFileName = context == nil ? nil : model.fileName
         return context
     }
