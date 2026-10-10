@@ -28,5 +28,17 @@ jobs:
         run: gem install xcpretty
       - name: Make run.sh executable
         run: chmod +x ./run.sh
+      # Same inputs as the stamp of Scripts/build-native.sh, which restores its stamp with the
+      # outputs and skips the native build when nothing changed.
+      - name: Compute the native build cache key
+        id: native-key
+        run: |
+          inputs=$( (git submodule status libwhisper | awk '{print $1, $2}'; xcodebuild -version; cmake --version) | shasum -a 256 | cut -d' ' -f1)
+          echo "key=native-${inputs}" >> "$GITHUB_OUTPUT"
+      - name: Restore the native xcframeworks
+        uses: actions/cache@v4
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
       - name: Build with run.sh
         run: ./run.sh build 

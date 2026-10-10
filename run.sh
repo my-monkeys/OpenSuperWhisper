@@ -46,6 +46,13 @@ fi
 
 ./Scripts/fetch-sherpa.sh
 
+# The core package's binary targets must exist before Swift packages are resolved.
+./Scripts/build-native.sh
+if [[ $? -ne 0 ]]; then
+    echo "Native build failed!"
+    exit 1
+fi
+
 echo "Building autocorrect-swift..."
 mkdir -p build
 cargo build -p autocorrect-swift --release --target aarch64-apple-darwin --manifest-path=asian-autocorrect/Cargo.toml

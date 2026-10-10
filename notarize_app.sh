@@ -93,6 +93,10 @@ cmake -G Xcode -B libwhisper/build -S libwhisper -DGGML_NATIVE=OFF -DCMAKE_OSX_A
 rm -rf build
 mkdir -p build
 
+# The core package's xcframeworks, always rebuilt from scratch with this toolchain so a release
+# never ships a dev artifact.
+FORCE=1 ./Scripts/build-native.sh
+
 # autocorrect: universal, pinned to deployment target 14.0 (the SDK default is far higher).
 #
 # The macOS 26/27 beta toolchain links the Rust dylib with a mis-aligned LINKEDIT string pool
