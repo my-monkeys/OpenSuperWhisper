@@ -73,10 +73,7 @@ struct OpenSuperWhisperApp: App {
 
     init() {
         MainThreadWatchdog.shared.start()
-        // A test host would grab the hotkeys and rewrite the user's bindings in UserDefaults.standard.
-        if !DefaultsStore.isRunningTests {
-            _ = ShortcutManager.shared
-        }
+        _ = ShortcutManager.shared
         _ = MicrophoneService.shared
     }
 }
