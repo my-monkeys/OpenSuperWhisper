@@ -136,8 +136,10 @@ OpenSuperWhisperCore/Binaries/
 # Derived data of the iOS Simulator package build (gate G3 in docs/core-extraction.md)
 /build-ios/
 
-# The core package's own resolution files: the workspace pins (project.xcworkspace) are the ones
-# that count, and gate G3's fallback can leave these behind. Slice 5 decides whether to commit
-# Package.resolved.
+# Derived data of the core package's test runs (Scripts/test-core.sh)
+/build-core/
+
+# The core package's own resolution files: the workspace pins (project.xcworkspace) are the only
+# ones that count, since every core build and test goes through the project. Never committed.
 OpenSuperWhisperCore/Package.resolved
 OpenSuperWhisperCore/.swiftpm/

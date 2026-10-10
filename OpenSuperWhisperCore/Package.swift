@@ -40,6 +40,23 @@ let package = Package(
                            .product(name: "FluidAudio", package: "FluidAudio"),
                            .product(name: "GRDB", package: "GRDB.swift")]
         ),
+        // Core tests (docs/core-extraction.md, slice 5). Built and run only through the project's
+        // OpenSuperWhisperCoreTests scheme with -clonedSourcePackagesDirPath SourcePackages, so they
+        // use the workspace pins and run.sh's patched FluidAudio.
+        .testTarget(
+            name: "OpenSuperWhisperCoreTests",
+            dependencies: ["OpenSuperWhisperCore",
+                           .product(name: "GRDB", package: "GRDB.swift")],
+            linkerSettings: [
+                // sherpa (OSWSenseVoice) references OrtGetApiBase on Apple Silicon Macs. The app
+                // links onnxruntime itself and the library product never does; here the test
+                // bundle is the only image, so it links the vendored dylib and finds it by rpath.
+                .unsafeFlags(["-L\(Context.packageDirectory)/../vendor/onnxruntime", "-lonnxruntime",
+                              "-Xlinker", "-rpath",
+                              "-Xlinker", "\(Context.packageDirectory)/../vendor/onnxruntime"],
+                             .when(platforms: [.macOS])),
+            ]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

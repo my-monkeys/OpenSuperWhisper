@@ -67,6 +67,7 @@
 
 /* Begin PBXFileReference section */
 		5BB5E04B0000000000B1 /* libonnxruntime.1.24.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libonnxruntime.1.24.4.dylib; path = build/libonnxruntime.1.24.4.dylib; sourceTree = "<group>"; };
+		2C1D5E7A9B3F4A6C8E0D1F21 /* OpenSuperWhisperCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = OpenSuperWhisperCore; sourceTree = "<group>"; };
 		840156592D79EA1A00FB5FFE /* Bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Bridge.h; sourceTree = "<group>"; };
 		CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenSuperWhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE57B0392D52C7BC00929AF3 /* OpenSuperWhisperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenSuperWhisperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -161,6 +162,7 @@
 		CE57B01F2D52C7BB00929AF3 = {
 			isa = PBXGroup;
 			children = (
+				2C1D5E7A9B3F4A6C8E0D1F21 /* OpenSuperWhisperCore */,
 				840156592D79EA1A00FB5FFE /* Bridge.h */,
 				CE57B02A2D52C7BB00929AF3 /* OpenSuperWhisper */,
 				CE57B03C2D52C7BC00929AF3 /* OpenSuperWhisperTests */,
