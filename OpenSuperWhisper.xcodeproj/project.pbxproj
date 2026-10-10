@@ -71,41 +71,9 @@
 		CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenSuperWhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE57B0392D52C7BC00929AF3 /* OpenSuperWhisperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenSuperWhisperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE57B0432D52C7BC00929AF3 /* OpenSuperWhisperUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenSuperWhisperUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		CE84DF242D550BB400C54EA6 /* Entitlements.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Entitlements.plist; sourceTree = "<group>"; };
-		CE84DF262D550BB400C54EA6 /* 82b82416624d2658e5098eb0a28c15c5-common-args.resp */ = {isa = PBXFileReference; lastKnownFileType = text; path = "82b82416624d2658e5098eb0a28c15c5-common-args.resp"; sourceTree = "<group>"; };
-		CE84DF272D550BB400C54EA6 /* ggml.LinkFileList */ = {isa = PBXFileReference; lastKnownFileType = text; path = ggml.LinkFileList; sourceTree = "<group>"; };
-		CE84DF282D550BB400C54EA6 /* ggml_dependency_info.dat */ = {isa = PBXFileReference; lastKnownFileType = file; path = ggml_dependency_info.dat; sourceTree = "<group>"; };
-		CE84DF292D550BB400C54EA6 /* ggml-backend-reg.d */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.dtrace; path = "ggml-backend-reg.d"; sourceTree = "<group>"; };
-		CE84DF2A2D550BB400C54EA6 /* ggml-backend-reg.dia */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ggml-backend-reg.dia"; sourceTree = "<group>"; };
-		CE84DF2B2D550BB400C54EA6 /* ggml-backend-reg.o */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.objfile"; path = "ggml-backend-reg.o"; sourceTree = "<group>"; };
-		CE84DF2E2D550BB400C54EA6 /* ggml.DependencyMetadataFileList */ = {isa = PBXFileReference; lastKnownFileType = text; path = ggml.DependencyMetadataFileList; sourceTree = "<group>"; };
-		CE84DF2F2D550BB400C54EA6 /* libggml.dylib.xcent */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = libggml.dylib.xcent; sourceTree = "<group>"; };
-		CE84DF302D550BB400C54EA6 /* libggml.dylib.xcent.der */ = {isa = PBXFileReference; lastKnownFileType = text; path = libggml.dylib.xcent.der; sourceTree = "<group>"; };
-		CE84DF312D550BB400C54EA6 /* Script-8AD8A6185ECD87BB20995F11.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Script-8AD8A6185ECD87BB20995F11.sh"; sourceTree = "<group>"; };
-		CE84DF342D550BD500C54EA6 /* Entitlements.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Entitlements.plist; sourceTree = "<group>"; };
-		CE84DF362D550BD500C54EA6 /* 82b82416624d2658e5098eb0a28c15c5-common-args.resp */ = {isa = PBXFileReference; lastKnownFileType = text; path = "82b82416624d2658e5098eb0a28c15c5-common-args.resp"; sourceTree = "<group>"; };
-		CE84DF372D550BD500C54EA6 /* ggml.LinkFileList */ = {isa = PBXFileReference; lastKnownFileType = text; path = ggml.LinkFileList; sourceTree = "<group>"; };
-		CE84DF382D550BD500C54EA6 /* ggml_dependency_info.dat */ = {isa = PBXFileReference; lastKnownFileType = file; path = ggml_dependency_info.dat; sourceTree = "<group>"; };
-		CE84DF392D550BD500C54EA6 /* ggml-backend-reg.d */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.dtrace; path = "ggml-backend-reg.d"; sourceTree = "<group>"; };
-		CE84DF3A2D550BD500C54EA6 /* ggml-backend-reg.dia */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ggml-backend-reg.dia"; sourceTree = "<group>"; };
-		CE84DF3B2D550BD500C54EA6 /* ggml-backend-reg.o */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.objfile"; path = "ggml-backend-reg.o"; sourceTree = "<group>"; };
-		CE84DF3E2D550BD500C54EA6 /* ggml.DependencyMetadataFileList */ = {isa = PBXFileReference; lastKnownFileType = text; path = ggml.DependencyMetadataFileList; sourceTree = "<group>"; };
-		CE84DF3F2D550BD500C54EA6 /* libggml.dylib.xcent */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = libggml.dylib.xcent; sourceTree = "<group>"; };
-		CE84DF402D550BD500C54EA6 /* libggml.dylib.xcent.der */ = {isa = PBXFileReference; lastKnownFileType = text; path = libggml.dylib.xcent.der; sourceTree = "<group>"; };
-		CE84DF412D550BD500C54EA6 /* Script-8AD8A6185ECD87BB20995F11.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Script-8AD8A6185ECD87BB20995F11.sh"; sourceTree = "<group>"; };
-		CE84DF432D5557F600C54EA6 /* libwhisper.1.7.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libwhisper.1.7.4.dylib; path = ../../../../usr/local/lib/libwhisper.1.7.4.dylib; sourceTree = "<group>"; };
-		CE84DF462D5557FE00C54EA6 /* libggml-metal.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libggml-metal.dylib"; path = "../../../../usr/local/lib/libggml-metal.dylib"; sourceTree = "<group>"; };
-		CE84DF472D5557FE00C54EA6 /* libggml.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libggml.dylib; path = ../../../../usr/local/lib/libggml.dylib; sourceTree = "<group>"; };
-		CE84DF532D55615600C54EA6 /* libwhisper.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libwhisper.a; path = "../../Library/Developer/Xcode/DerivedData/OpenSuperWhisper-hahlbuibzstrsfgaftshbjlrlesk/SourcePackages/checkouts/whisper.cpp/build/src/libwhisper.a"; sourceTree = "<group>"; };
-		CE84DF632D55762200C54EA6 /* libggml.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libggml.a; sourceTree = "<group>"; };
-		CE84DF642D55762200C54EA6 /* libggml-cpu.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libggml-cpu.a"; sourceTree = "<group>"; };
-		CE84DF652D55762200C54EA6 /* libggml-metal.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libggml-metal.a"; sourceTree = "<group>"; };
-		CE84DF662D55762200C54EA6 /* libggml-base.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libggml-base.a"; sourceTree = "<group>"; };
-		CE84DF672D55762200C54EA6 /* libwhisper.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libwhisper.a; sourceTree = "<group>"; };
 		CE84DF6D2D55777800C54EA6 /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
 		CE84DF6F2D55778000C54EA6 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		CE84DF702D55778000C54EA6 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
-		CE84DF732D5577A700C54EA6 /* libggml-blas.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libggml-blas.a"; sourceTree = "<group>"; };
 		CE84DF752D5577D200C54EA6 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		CE84DF772D55789800C54EA6 /* ggml-tiny.en.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "ggml-tiny.en.bin"; sourceTree = "<group>"; };
 		CE84DF792D5578BE00C54EA6 /* jfk.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = jfk.wav; sourceTree = "<group>"; };
@@ -183,21 +151,9 @@
 			isa = PBXGroup;
 			children = (
 				CE84DF752D5577D200C54EA6 /* Accelerate.framework */,
-				CE84DF732D5577A700C54EA6 /* libggml-blas.a */,
 				CE84DF6F2D55778000C54EA6 /* Metal.framework */,
 				CE84DF702D55778000C54EA6 /* MetalKit.framework */,
 				CE84DF6D2D55777800C54EA6 /* libc++.tbd */,
-				CE84DF532D55615600C54EA6 /* libwhisper.a */,
-				CE84DF632D55762200C54EA6 /* libggml.a */,
-				CE84DF662D55762200C54EA6 /* libggml-base.a */,
-				CE84DF642D55762200C54EA6 /* libggml-cpu.a */,
-				CE84DF652D55762200C54EA6 /* libggml-metal.a */,
-				CE84DF672D55762200C54EA6 /* libwhisper.a */,
-				CE84DF472D5557FE00C54EA6 /* libggml.dylib */,
-				CE84DF462D5557FE00C54EA6 /* libggml-metal.dylib */,
-				CE84DF432D5557F600C54EA6 /* libwhisper.1.7.4.dylib */,
-				CE84DF422D550BD500C54EA6 /* Release-iphoneos */,
-				CE84DF332D550BB400C54EA6 /* ggml.build */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -225,100 +181,6 @@
 				CE57B0432D52C7BC00929AF3 /* OpenSuperWhisperUITests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		CE84DF252D550BB400C54EA6 /* DerivedSources */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF242D550BB400C54EA6 /* Entitlements.plist */,
-			);
-			path = DerivedSources;
-			sourceTree = "<group>";
-		};
-		CE84DF2C2D550BB400C54EA6 /* arm64 */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF262D550BB400C54EA6 /* 82b82416624d2658e5098eb0a28c15c5-common-args.resp */,
-				CE84DF272D550BB400C54EA6 /* ggml.LinkFileList */,
-				CE84DF282D550BB400C54EA6 /* ggml_dependency_info.dat */,
-				CE84DF292D550BB400C54EA6 /* ggml-backend-reg.d */,
-				CE84DF2A2D550BB400C54EA6 /* ggml-backend-reg.dia */,
-				CE84DF2B2D550BB400C54EA6 /* ggml-backend-reg.o */,
-			);
-			path = arm64;
-			sourceTree = "<group>";
-		};
-		CE84DF2D2D550BB400C54EA6 /* Objects-normal */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF2C2D550BB400C54EA6 /* arm64 */,
-			);
-			path = "Objects-normal";
-			sourceTree = "<group>";
-		};
-		CE84DF322D550BB400C54EA6 /* Release-iphoneos */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF252D550BB400C54EA6 /* DerivedSources */,
-				CE84DF2D2D550BB400C54EA6 /* Objects-normal */,
-				CE84DF2E2D550BB400C54EA6 /* ggml.DependencyMetadataFileList */,
-				CE84DF2F2D550BB400C54EA6 /* libggml.dylib.xcent */,
-				CE84DF302D550BB400C54EA6 /* libggml.dylib.xcent.der */,
-				CE84DF312D550BB400C54EA6 /* Script-8AD8A6185ECD87BB20995F11.sh */,
-			);
-			path = "Release-iphoneos";
-			sourceTree = "<group>";
-		};
-		CE84DF332D550BB400C54EA6 /* ggml.build */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF322D550BB400C54EA6 /* Release-iphoneos */,
-			);
-			name = ggml.build;
-			path = whisper.cpp/build/build/ggml.build;
-			sourceTree = "<group>";
-		};
-		CE84DF352D550BD500C54EA6 /* DerivedSources */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF342D550BD500C54EA6 /* Entitlements.plist */,
-			);
-			path = DerivedSources;
-			sourceTree = "<group>";
-		};
-		CE84DF3C2D550BD500C54EA6 /* arm64 */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF362D550BD500C54EA6 /* 82b82416624d2658e5098eb0a28c15c5-common-args.resp */,
-				CE84DF372D550BD500C54EA6 /* ggml.LinkFileList */,
-				CE84DF382D550BD500C54EA6 /* ggml_dependency_info.dat */,
-				CE84DF392D550BD500C54EA6 /* ggml-backend-reg.d */,
-				CE84DF3A2D550BD500C54EA6 /* ggml-backend-reg.dia */,
-				CE84DF3B2D550BD500C54EA6 /* ggml-backend-reg.o */,
-			);
-			path = arm64;
-			sourceTree = "<group>";
-		};
-		CE84DF3D2D550BD500C54EA6 /* Objects-normal */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF3C2D550BD500C54EA6 /* arm64 */,
-			);
-			path = "Objects-normal";
-			sourceTree = "<group>";
-		};
-		CE84DF422D550BD500C54EA6 /* Release-iphoneos */ = {
-			isa = PBXGroup;
-			children = (
-				CE84DF352D550BD500C54EA6 /* DerivedSources */,
-				CE84DF3D2D550BD500C54EA6 /* Objects-normal */,
-				CE84DF3E2D550BD500C54EA6 /* ggml.DependencyMetadataFileList */,
-				CE84DF3F2D550BD500C54EA6 /* libggml.dylib.xcent */,
-				CE84DF402D550BD500C54EA6 /* libggml.dylib.xcent.der */,
-				CE84DF412D550BD500C54EA6 /* Script-8AD8A6185ECD87BB20995F11.sh */,
-			);
-			name = "Release-iphoneos";
-			path = "whisper.cpp/build/build/ggml.build/Release-iphoneos";
 			sourceTree = "<group>";
 		};
 		CE9DA5672EA8DA4600EB417E /* Recovered References */ = {
