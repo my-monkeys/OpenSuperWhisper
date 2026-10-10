@@ -47,9 +47,14 @@ enum DefaultsStore {
     /// value that could change later would let files move while preferences and Keychain items
     /// stayed put. Both signals already exist before `main`: the runner sets the variable and
     /// its injected library links XCTest.
-    static let isRunningTests: Bool =
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-            || NSClassFromString("XCTestCase") != nil
+    static let isRunningTests = isTestProcess(
+        environment: ProcessInfo.processInfo.environment,
+        xcTestLoaded: NSClassFromString("XCTestCase") != nil)
+
+    /// Either signal alone is enough: the point of having two is that losing one still isolates.
+    static func isTestProcess(environment: [String: String], xcTestLoaded: Bool) -> Bool {
+        environment["XCTestConfigurationFilePath"] != nil || xcTestLoaded
+    }
 
     static var testSuitePrefix: String {
         "\(AppIdentity.bundleID).tests."

@@ -34,6 +34,14 @@ final class TestIsolationTests: XCTestCase {
         XCTAssertTrue(DefaultsStore.isRunningTests)
     }
 
+    func testEitherSignalAloneMeansTests() {
+        let runnerEnvironment = ["XCTestConfigurationFilePath": "/tmp/run.xctestconfiguration"]
+
+        XCTAssertTrue(DefaultsStore.isTestProcess(environment: runnerEnvironment, xcTestLoaded: false))
+        XCTAssertTrue(DefaultsStore.isTestProcess(environment: [:], xcTestLoaded: true))
+        XCTAssertFalse(DefaultsStore.isTestProcess(environment: [:], xcTestLoaded: false))
+    }
+
     func testPreferencesAreNotTheStandardDomain() {
         XCTAssertFalse(DefaultsStore.current === UserDefaults.standard)
     }
