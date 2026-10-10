@@ -13,7 +13,7 @@ final class DictionaryBoostGateTests: XCTestCase {
 
     override func setUp() {
         let p = AppPreferences.shared
-        saved = (p.customDictionaryEnabled, p.customDictionaryBoostEnabled, UserDefaults.standard.data(forKey: "customDictionaryData"))
+        saved = (p.customDictionaryEnabled, p.customDictionaryBoostEnabled, DefaultsStore.current.data(forKey: "customDictionaryData"))
         p.customDictionaryEntries = [CustomDictionaryEntry(original: "git hub", replacement: "GitHub")]
     }
 
@@ -21,8 +21,8 @@ final class DictionaryBoostGateTests: XCTestCase {
         let p = AppPreferences.shared
         p.customDictionaryEnabled = saved.enabled
         p.customDictionaryBoostEnabled = saved.boost
-        if let d = saved.data { UserDefaults.standard.set(d, forKey: "customDictionaryData") }
-        else { UserDefaults.standard.removeObject(forKey: "customDictionaryData") }
+        if let d = saved.data { DefaultsStore.current.set(d, forKey: "customDictionaryData") }
+        else { DefaultsStore.current.removeObject(forKey: "customDictionaryData") }
     }
 
     private func settings(enabled: Bool, boost: Bool) -> Settings {

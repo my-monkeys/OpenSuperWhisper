@@ -560,7 +560,7 @@ final class AddSpaceAfterSentenceTests: XCTestCase {
     }
     
     func testApplyPostProcessing_defaultPreferenceIsEnabled() {
-        UserDefaults.standard.removeObject(forKey: "addSpaceAfterSentence")
+        DefaultsStore.current.removeObject(forKey: "addSpaceAfterSentence")
         let result = IndicatorViewModel.applyPostProcessing("Test.")
         XCTAssertEqual(result, "Test. ")
     }
