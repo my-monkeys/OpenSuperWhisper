@@ -129,7 +129,10 @@ ln -s "$EXE" "$LINK_DIR/opensuperwhisper"
 run_cli() {  # name, launcher, clip
   local name=$1 launcher=$2 clip=$3 status=0 before=$FAILURES
   local out="$WORK/${name//\//-}.out" err="$WORK/${name//\//-}.err"
-  arch "-$ARCH" "$launcher" transcribe "$clip" --model "$MODEL" --raw > "$out" 2> "$err" || status=$?
+  # Release builds link clang's profile runtime (see the coverage follow-up in
+  # docs/core-extraction.md), which would leave a default.profraw in the caller's directory.
+  LLVM_PROFILE_FILE="$WORK/profile-%p.profraw" \
+    arch "-$ARCH" "$launcher" transcribe "$clip" --model "$MODEL" --raw > "$out" 2> "$err" || status=$?
   report "run $name: exit $status"
   [[ $status -eq 0 ]] || problem "$name exited with $status"
   report "run $name: text $(tr '\n' ' ' < "$out" | sed -E 's/^ +//; s/ +$//')"

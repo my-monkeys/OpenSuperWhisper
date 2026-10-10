@@ -319,9 +319,16 @@ SenseVoice on Intel (`"default"`) and for any engine it does not know (`"remote"
 and building the selected Whisper model for `"apple"` below macOS 26; Release builds still
 instrumenting all Swift code (the app, OpenSuperWhisperCore, OSWSenseVoice, FluidAudio, GRDB,
 KeyboardShortcuts, LiquidGlass), the app's Objective-C and FluidAudio's C targets for
-coverage, with the final link pulling in clang's profile runtime (fix with
-`CLANG_COVERAGE_MAPPING=NO ENABLE_CODE_COVERAGE=NO` on `notarize_app.sh`'s xcodebuild, since
-`-enableCodeCoverage` is only accepted when testing, and measure that change on its own).
+coverage, with the final link pulling in clang's profile runtime. User-visible: every CLI run,
+`opensuperwhisper transcribe` from Homebrew included, writes a 1.6 MB `default.profraw` into
+the caller's working directory (0.13.3 defines `___llvm_profile_write_file`; a Release build of
+this branch leaves the file after a `transcribe` from an empty directory), so this one should
+go first, in its own change right after the extraction merges, with the smoke references
+recorded again (fix with
+`CLANG_COVERAGE_MAPPING=NO ENABLE_CODE_COVERAGE=NO` on the xcodebuild of `notarize_app.sh` and
+of `Scripts/build-release-unsigned.sh`, kept in step, since `-enableCodeCoverage` is only
+accepted when testing, and measure that change on its own). Until then `smoke-release.sh` points
+`LLVM_PROFILE_FILE` at its temp directory.
 
 Credit: the module maps, the iOS xcframework flags, the consent seam and several tests come
 from PR #57 by @michael-wojcik.
