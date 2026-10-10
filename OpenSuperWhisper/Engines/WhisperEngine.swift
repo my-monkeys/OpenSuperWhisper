@@ -284,7 +284,10 @@ class WhisperEngine: TranscriptionEngine {
     /// Speech regions in `samples`, or an empty array when the VAD is unavailable or found
     /// nothing. Deliberately non-throwing: a missing bundle resource or a failed context must
     /// degrade to transcribing the whole clip, not take the main engine down with it.
-    private func detectSpeech(in samples: [Float]) -> [WhisperVadSegment] {
+    ///
+    /// Internal rather than private so a test can prove the engine's own VAD loads and trims:
+    /// the transcript alone cannot show it, because a VAD that never loaded falls back silently.
+    func detectSpeech(in samples: [Float]) -> [WhisperVadSegment] {
         if vadContext == nil {
             guard let path = Self.vadModelPath,
                   let vad = MyWhisperVadContext(modelPath: path) else {
