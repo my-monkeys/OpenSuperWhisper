@@ -46,11 +46,11 @@ struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equ
     }
 
     static var recordingsDirectory: URL {
-        let applicationSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask
-        ).first!
-        let appDirectory = applicationSupport.appendingPathComponent(AppIdentity.bundleID)
-        return appDirectory.appendingPathComponent("recordings")
+        recordingsDirectory(in: AppIdentity.storageRoot()!)
+    }
+
+    static func recordingsDirectory(in root: URL) -> URL {
+        root.appendingPathComponent("recordings")
     }
 
     var url: URL {
@@ -94,11 +94,8 @@ class RecordingStore: ObservableObject {
     private var retentionTimer: Timer?
 
     private init() {
-        let applicationSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask
-        ).first!
-        let appDirectory = applicationSupport.appendingPathComponent(AppIdentity.bundleID)
-        let dbPath = appDirectory.appendingPathComponent("recordings.sqlite")
+        let appDirectory = AppIdentity.storageRoot()!
+        let dbPath = Self.databaseURL(in: appDirectory)
 
         do {
             try FileManager.default.createDirectory(
@@ -108,6 +105,10 @@ class RecordingStore: ObservableObject {
         } catch {
             fatalError("Failed to setup database: \(error)")
         }
+    }
+
+    nonisolated static func databaseURL(in root: URL) -> URL {
+        root.appendingPathComponent("recordings.sqlite")
     }
 
     private nonisolated func setupDatabase() throws {

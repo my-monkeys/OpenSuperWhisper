@@ -54,9 +54,33 @@ enum AppIdentity {
     /// beyond the preferences: launched through the symlink this used to be a different directory,
     /// and the five places that built it force-unwrapped the identifier, so they were one step
     /// away from trapping rather than merely looking in the wrong place.
-    static func applicationSupportDirectory() -> URL? {
+    ///
+    /// This is the formula alone, whatever process runs it, so a test can pin it: whisper model
+    /// paths are persisted as absolute strings, and a different spelling of this directory would
+    /// orphan every model the user picked. Code that reads or writes files asks `storageRoot()`.
+    static func applicationSupportDirectory(bundleID: String = AppIdentity.bundleID) -> URL? {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
             .appendingPathComponent(bundleID)
     }
+
+    /// Where the app keeps its files: the recordings database and folder, the model folders, the
+    /// agents folder. `applicationSupportDirectory()` in a normal launch.
+    ///
+    /// Under XCTest it is a directory private to the process, for the reason `DefaultsStore`
+    /// swaps its suite: the test host is the app, so it used to open the user's real recordings
+    /// database at launch and create folders next to their models. FluidAudio keeps its models in
+    /// its own cache outside this directory, which this does not move.
+    static func storageRoot() -> URL? {
+        DefaultsStore.isRunningTests ? testStorageRoot : applicationSupportDirectory()
+    }
+
+    /// Named after the process like the defaults suite, and emptied the first time it is used,
+    /// since a pid gets reused and a directory left by an earlier run would seed this one.
+    private static let testStorageRoot: URL = {
+        let name = DefaultsStore.testSuiteName(for: ProcessInfo.processInfo.processIdentifier)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+        try? FileManager.default.removeItem(at: root)
+        return root
+    }()
 }

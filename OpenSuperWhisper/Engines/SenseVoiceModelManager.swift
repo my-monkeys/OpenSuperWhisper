@@ -7,15 +7,16 @@ final class SenseVoiceModelManager {
     static let shared = SenseVoiceModelManager()
     private init() {}
 
-    private let dirName = "sensevoice-model"
+    private static let dirName = "sensevoice-model"
     private let modelURL = URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.int8.onnx?download=true")!
     private let tokensURL = URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/tokens.txt?download=true")!
 
     var modelDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport
-            .appendingPathComponent(AppIdentity.bundleID)
-            .appendingPathComponent(dirName)
+        Self.modelDirectory(in: AppIdentity.storageRoot()!)
+    }
+
+    static func modelDirectory(in root: URL) -> URL {
+        root.appendingPathComponent(dirName)
     }
     var modelPath: URL { modelDirectory.appendingPathComponent("model.int8.onnx") }
     var tokensPath: URL { modelDirectory.appendingPathComponent("tokens.txt") }

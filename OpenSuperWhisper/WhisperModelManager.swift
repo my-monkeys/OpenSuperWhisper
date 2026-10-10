@@ -43,14 +43,16 @@ class WhisperDownloadDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownl
 class WhisperModelManager {
     static let shared = WhisperModelManager()
     
-    private let modelsDirectoryName = "whisper-models"
+    private static let modelsDirectoryName = "whisper-models"
     private var activeDownloadTasks: [String: URLSessionDownloadTask] = [:]
     private let downloadTasksLock = NSLock()
     
     var modelsDirectory: URL {
-        let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let modelsDirectory = applicationSupport.appendingPathComponent(AppIdentity.bundleID).appendingPathComponent(modelsDirectoryName)
-        return modelsDirectory
+        Self.modelsDirectory(in: AppIdentity.storageRoot()!)
+    }
+
+    static func modelsDirectory(in root: URL) -> URL {
+        root.appendingPathComponent(modelsDirectoryName)
     }
     
     private init() {

@@ -105,15 +105,16 @@ class LLMModelManager {
         availableModels.first { $0.fileName == fileName } ?? defaultModel
     }
 
-    private let modelsDirectoryName = "llm-models"
+    private static let modelsDirectoryName = "llm-models"
     private var activeDownloadTasks: [String: URLSessionDownloadTask] = [:]
     private let downloadTasksLock = NSLock()
 
     var modelsDirectory: URL {
-        let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return applicationSupport
-            .appendingPathComponent(AppIdentity.bundleID)
-            .appendingPathComponent(modelsDirectoryName)
+        Self.modelsDirectory(in: AppIdentity.storageRoot()!)
+    }
+
+    static func modelsDirectory(in root: URL) -> URL {
+        root.appendingPathComponent(modelsDirectoryName)
     }
 
     private init() {

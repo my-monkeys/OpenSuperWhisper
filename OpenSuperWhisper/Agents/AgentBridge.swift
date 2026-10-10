@@ -15,7 +15,7 @@ enum AgentBridge {
     static let requestNotification = Notification.Name("fr.my-monkey.opensuperwhisper.agent.request")
 
     static var directory: URL? {
-        AppIdentity.applicationSupportDirectory()?.appendingPathComponent("agents", isDirectory: true)
+        AppIdentity.storageRoot()?.appendingPathComponent("agents", isDirectory: true)
     }
 
     static var requestsDirectory: URL? { directory?.appendingPathComponent("requests", isDirectory: true) }
