@@ -307,7 +307,8 @@ passes the full suite, and goes through an adversarial review before the next on
    4. `Scripts/build-native.sh all` to rebuild the iOS slices the release build dropped, and
       `./run.sh build` for the dev derived data that `notarize_app.sh`'s `rm -rf build` deleted.
 3. `CoreConfiguration`, `TranscriptionSettings`, and the pure models and helpers.
-   Done, in six commits that each build and pass the suite. `DefaultsStore`, `AppIdentity`,
+   Done, in six code commits plus this record, each building and passing the suite, then four
+   review follow-ups (deviations 13 to 15 and a tighter consent test). `DefaultsStore`, `AppIdentity`,
    `Keychain`, the `UserDefault` wrappers, `TranscriptionResult` and `TranscriptionError` moved
    first, then the custom dictionary, `AppContextProfile`, `TranscriptionPrompt`,
    `LanguageUtil`, `VoiceActivity`, `AudioPCMConverter`, `DictationModelOption` and the
@@ -327,7 +328,8 @@ passes the full suite, and goes through an adversarial review before the next on
    Measured: the suite went from 858 passed and 9 skipped to 868 passed and 9 skipped, the ten
    new tests (`ErrorBridgingTests`, `CoreConfigurationTests`, `HistoryConsentTests`,
    `StorageRootInjectionTests`) being the only difference, with the llama half of the lifecycle
-   test run. The package builds for the iOS Simulator at every commit. The release smoke check
+   test run. The package builds for the iOS Simulator at every commit that changes sources (the
+   first one only adds a test). The release smoke check
    (`build-release-unsigned.sh`, then `smoke-release.sh --expect docs/smoke/post-swap-<arch>.txt`)
    gives reports identical to the post-swap references on arm64 and on x86_64 under Rosetta,
    and the test bundle holds no symbol, type descriptor or ObjC class of the core, GRDB,
@@ -362,7 +364,11 @@ Recorded as the slices land, so the plan above keeps its original wording.
 4. Sendable seam. `CoreConfiguration` is `Sendable` with `@Sendable` closures, and
    `CorePreferences` is `AnyObject, Sendable`. `AppPreferences` declares `@unchecked Sendable`,
    which changes nothing at run time: engines already read it from detached tasks and from the
-   llama queue, and all its state is in UserDefaults and the Keychain.
+   llama queue, and all its state is in UserDefaults and the Keychain. The public value types
+   that moved (`TranscriptionSettings`, `CustomDictionaryEntry` and its `Spacing`,
+   `AppContextProfile`, `DictationModelOption`, `SettingsDownloadableModel`,
+   `SettingsFluidAudioModel`) declare `Sendable` explicitly: Swift infers it only for internal
+   types, so without it the seam would hand out values another module cannot send.
 5. Preview exemption. The core cannot build a preview configuration that reads
    `AppPreferences`. Instead of the core skipping the trap in previews, each preview calls
    `AppCore.install()`, and previews then read what they read today.
@@ -380,19 +386,47 @@ Recorded as the slices land, so the plan above keeps its original wording.
    RecordingStore's call into the queue". `RecordingStore.deleteRecording` still calls
    `TranscriptionQueue.shared.cancelRecording`. Once both types are in the core it compiles and
    behaves as today; deleting a pending recording still creates the queue and, through it,
-   `TranscriptionService.shared`.
-10. The history consent test does not end on a failed recording. A dropped file whose source
-    does not exist is removed by the queue's first pass (`cleanupMissingFiles`) before
-    `processRecording` could mark it failed, and that removal goes through the call in item 9.
-    `HistoryConsentTests` therefore checks that the accepted file reaches the store as pending,
-    then that the queue finishes and the recording is gone, which is today's behaviour.
+   `TranscriptionService.shared`. `RecordingStore(storageRoot:)` is only half injected: its
+   database follows the given root, but `Recording.url` goes through the static
+   `recordingsDirectory`, which reads the configured root, so `deleteRecording`,
+   `deleteAllRecordings` and retention remove audio under the configured root, and the cancel
+   goes to the shared queue rather than the one that owns the store. The macOS app only builds
+   stores on the configured root, so nothing changes there; the iPhone host must do the same
+   until `Recording` gets a root-relative URL. Fix both together before a core test or the
+   iPhone host builds a store on another root.
+10. The history consent test does not end on a failed recording. The queue's first pass
+    (`cleanupMissingFiles`) schedules the deletion of a dropped file whose source does not
+    exist. Because `RecordingStore` cancels on `TranscriptionQueue.shared` (item 9), a queue
+    built with its own store still runs `processRecording` on the row, which may mark it failed
+    before the delete lands; the end state is the recording gone. In the shipped app the shared
+    queue owns the store, so `processRecording` returns early on the cancelled recording.
+    `HistoryConsentTests` checks that the accepted file reaches the temp store as pending, that
+    the queue finishes, that the temp store ends empty and that the shared store's rows did not
+    change. The deletion also creates `TranscriptionQueue.shared` in the test host and points
+    its audio removal at the shared recordings folder, so the test is not a full isolation of
+    the store.
 11. Gate wording. The static check for `Settings()` in core code also matched
     `CoreAccess.makeSettings()`, the spelling the plan asks for; the check now requires that
     `Settings()` is not part of a longer name. G6 lists `_sqlite3_open` as a sentinel present in
     the app image, but GRDB uses the system SQLite, so the app only references it; the checks on
-    the test bundle are unaffected.
+    the test bundle are unaffected. The G2 list extraction (`tr -d '\n' | grep -o ... | sort -u`)
+    can splice xcodebuild's end-of-run trailer into one result name, which happened in the run
+    recorded as `reference-slice4.txt`. The trailer is now stripped before sorting and any line
+    that is not a clean `Test case 'Class.test()' status` fails the run; the slice-4 reference
+    was normalised that way (877 lines, 868 passed, 9 skipped).
 12. `WhisperEngine`'s convenience `init(modelPathOverride:)` is not marked `public` while the
     class is still in the app (slice 3). It becomes public when the engine moves (slice 4).
+13. Trap wording. The spec's `notInstalledMessage` told core tests to install a configuration
+    "into a slot of their own", which never avoids the trap since `CoreAccess` reads only the
+    process's slot. It now names `CoreConfiguration.replaceForTesting(_:)` and the designated
+    initialisers, and the `ConfigurationSlot` comment says a private instance is for testing the
+    slot itself. The `CoreConfiguration` comment (and the 3.4 commit message) said every field is
+    a provider; `computePolicy` is a plain value, and the comment now says so.
+14. `/build-ios/` is ignored from slice 3, in its own commit, not in 4.1: gate G3 leaves its
+    derived data at the repository root after every commit. Commit 4.1 still adds the
+    `OpenSuperWhisperCore/Package.resolved` and `.swiftpm/` lines.
+15. `Sendable` on the public value types (item 4) is a slice-3 follow-up commit, an additive
+    conformance on moved code that the spec did not list.
 
 ## Follow-ups kept out of the extraction
 
@@ -410,7 +444,8 @@ iOS native slices cached); a committed `OpenSuperWhisperCore/Package.resolved` (
 file-name-based model paths for iOS; `.cpuOnly` for llama should also set `op_offload = false`
 (and be checked to create no `MTLDevice`) before the iPhone app relies on it in the background;
 the download-catalog strings in `Localizable.xcstrings`, rendered verbatim today so their
-translations are unused; and the `RecordingStore` to `TranscriptionQueue` call (deviation 9).
+translations are unused; and the `RecordingStore` to `TranscriptionQueue` call together with
+`Recording.url` reading the configured root (deviation 9).
 
 Release builds used to be instrumented for code coverage (Xcode enables it for the scheme),
 so every CLI run wrote a `default.profraw` into the caller's directory. Fixed on master by
