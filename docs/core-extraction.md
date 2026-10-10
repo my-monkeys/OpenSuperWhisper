@@ -624,7 +624,9 @@ Recorded as the slices land, so the plan above keeps its original wording.
     attached, and gave the same 718 results as before, this test skipped. A key on the internal
     keyboard has to come from the user, so the exception is accepted as it stands: the strict
     check is green but for this one status, and a hosted run after such a key press should show
-    it passed again.
+    it passed again. It did: the full hosted run after the follow-ups of the next review gave
+    exactly the reference minus the 159 mapped ids, this test passed, and the strict check was
+    green.
 30. The `core-tests` CI job still runs `./run.sh build`, a full Debug app build, where resolving
     the packages and patching FluidAudio would do. The review offered to factor the patch step out
     of run.sh; the job timeout went up to the sum of its step timeouts instead, which leaves the
