@@ -95,9 +95,11 @@ jobs:
   # TEST_RUNNER_OSW_GOLDEN_MACHINE=0 skips the exact whisper strings; the one cpu-only whisper
   # smoke test still runs on both destinations, without the paravirtual GPU. The llama tests
   # skip, since CI has no GGUF model.
+  # On a cold cache the native build, run.sh's app build and the two core builds can take most
+  # of the step budgets, so the job allows their sum.
   core-tests:
     runs-on: macos-26
-    timeout-minutes: 100
+    timeout-minutes: 140
     env:
       TEST_RUNNER_OSW_GOLDEN_MACHINE: "0"
     steps:
@@ -113,7 +115,8 @@ jobs:
           inputs=$( (git submodule status libwhisper | awk '{print $1, $2}'; xcodebuild -version; cmake --version) | shasum -a 256 | cut -d' ' -f1)
           echo "key=native-${inputs}" >> "$GITHUB_OUTPUT"
       - name: Restore the native xcframeworks, iOS slices included
-        uses: actions/cache@v6
+        id: native-cache
+        uses: actions/cache/restore@v6
         with:
           path: OpenSuperWhisperCore/Binaries
           key: ${{ steps.native-key.outputs.key }}-all-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
@@ -121,18 +124,29 @@ jobs:
       - name: Build the native slices for macOS and iOS
         timeout-minutes: 45
         run: Scripts/fetch-sherpa.sh && Scripts/build-native.sh all
+      # Saved as soon as it is built: actions/cache only saves when the whole job succeeds, so a
+      # red test run would throw the native build away and every retry would redo it.
+      - name: Save the native xcframeworks
+        if: ${{ steps.native-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
       # Resolves SourcePackages, patches FluidAudio, and shows the app still builds.
       - name: Build with run.sh
         timeout-minutes: 30
         run: ./run.sh build
       - name: Run the core tests on macOS
+        id: core-macos
         timeout-minutes: 25
         run: |
           Scripts/test-core.sh macos -resultBundlePath build-core/macos.xcresult \
             -test-timeouts-enabled YES -default-test-execution-time-allowance 300
       # test-core.sh picks the newest iPhone simulator the selected Xcode can target, since
-      # macos-26 images carry several Xcodes and simctl lists the runtimes of all of them.
+      # macos-26 images carry several Xcodes and simctl lists the runtimes of all of them. Runs
+      # after a macOS failure too, so an iOS-only regression shows in the same run.
       - name: Run the core tests on the iOS Simulator
+        if: ${{ !cancelled() && steps.core-macos.outcome != 'skipped' }}
         timeout-minutes: 30
         run: |
           Scripts/test-core.sh ios -resultBundlePath build-core/ios.xcresult \
