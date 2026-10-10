@@ -13,7 +13,17 @@ differ today:
 | Reference | How it is built | Used for |
 |---|---|---|
 | Test suite | `xcodebuild test` with `-derivedDataPath build -clonedSourcePackagesDirPath SourcePackages` (patched FluidAudio) | Every slice: the per-test pass/skip list of master (710 passed, 9 skipped on 47fe26b) must be reproduced, plus the new tests |
-| Shipped app | `notarize_app.sh` (universal libwhisper configure, `GGML_NATIVE=OFF`, so generic ggml CPU kernels; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to 0.13.3 |
+| Shipped app | `notarize_app.sh` (universal libwhisper configure, `GGML_NATIVE=OFF`, so generic ggml CPU kernels; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to the pre-swap references (below) |
+
+The release smoke check is `Scripts/build-release-unsigned.sh <arch>` (`notarize_app.sh` up to
+signing) followed by `Scripts/smoke-release.sh <app> --expect docs/smoke/pre-swap-<arch>.txt`,
+for arm64 and for x86_64 (under Rosetta). 0.13.3 cannot be the reference, because its CLI has no
+`--model` and `--raw`, so the references were recorded from slice 0 (f7444b0) on an Apple M5 Pro
+with Xcode 27.0 (27A266a). Their transcripts and VAD segments only hold on that Mac; the load
+commands, rpaths, frameworks, symbol counts and resources hold on any Mac with that Xcode. The
+one difference allowed is slice 2's: libomp goes, so the `@rpath/libomp.dylib` load command and
+`libomp.dylib` leave the report and its libomp line reads "linked no, embedded no". After that
+slice the references are recorded again and committed with the change.
 
 Two known divergences are kept as they are and listed as follow-ups, not fixed here: releases
 ship FluidAudio without `patches/fluidaudio-vocabulary-rescorer.patch`, and the release ggml
@@ -207,8 +217,9 @@ passes the full suite, and goes through an adversarial review before the next on
    - Tooling: drop the dangling `WhisperCppBindingTests` scheme entry; CLI flags `--model`
      and `--raw` for a deterministic smoke check; `Scripts/smoke-release.sh` (both
      architectures, app path and Homebrew-style symlink, VAD load line, Metal init, exit
-     code with a model loaded, one ggml, no libomp, signature); CI runs the unit tests
-     (serially, timing-sensitive host tests skipped) and an x86_64 Release build.
+     code with a model loaded, one ggml, libomp and onnxruntime per architecture, signature);
+     CI runs the unit tests (serially, tests that need the Mac's own keyboard layouts, screens
+     or Bluetooth microphone skipped) and an unsigned x86_64 Release build.
      The Whisper goldens and the exact VAD boundaries are only promised on an Apple Silicon
      Mac with its Metal GPU: `Fixtures.requireGoldenMachine()` skips them on another arch, with
      no Metal device or a GPU outside the Apple families, and when
