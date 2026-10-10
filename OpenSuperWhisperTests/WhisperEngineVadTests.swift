@@ -8,8 +8,8 @@ import XCTest
 /// directly, and `SpeechTrimmingTests` covers the stitching. Neither shows that the engine uses
 /// it: when the model cannot be found, `detectSpeech` returns nothing and the whole clip is
 /// transcribed without a word of warning, and `jfk.wav` has so little silence that its
-/// transcript is the same either way. The extraction moves the model lookup into an injected
-/// URL, which is exactly where that silent failure would come back.
+/// transcript is the same either way. The extraction moved the model lookup into an injected
+/// path, which is exactly where that silent failure would come back.
 final class WhisperEngineVadTests: XCTestCase {
 
     private static let paddingSeconds = 3

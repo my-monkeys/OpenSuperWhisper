@@ -8,7 +8,7 @@ import XCTest
 ///
 /// Users point this engine at servers we do not control (Groq, speaches, LiteLLM, their own
 /// proxies), so the wire format is a contract: field names, which fields are left out, the
-/// Authorization header only when a key is set. The extraction moves this code and its
+/// Authorization header only when a key is set. The extraction moved this code and its
 /// preference reads behind a protocol; the bytes must not change.
 final class RemoteEngineRequestTests: XCTestCase {
 

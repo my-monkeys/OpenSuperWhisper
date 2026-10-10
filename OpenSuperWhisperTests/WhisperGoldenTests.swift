@@ -5,9 +5,9 @@ import XCTest
 /// Byte-exact transcripts of `jfk.wav` through the real Whisper engine path (conversion, VAD,
 /// whisper.cpp, cleanup, post-processing) with the tiny English model tracked in the repo.
 ///
-/// These are the reference the core extraction is measured against: moving the engine, the
-/// wrappers or the native build must leave every string here unchanged. A failure is a
-/// behaviour change to explain, never a golden to re-record without review.
+/// These are the reference the core extraction was measured against: moving the engine, the
+/// wrappers and the native build left every string here unchanged, and later changes must too.
+/// A failure is a behaviour change to explain, never a golden to re-record without review.
 ///
 /// The strings can depend on the ggml kernels and the GPU, so they are only promised on the
 /// machine and toolchain they were recorded with (Apple Silicon M-series, Metal, Xcode 27.0);
@@ -15,7 +15,7 @@ import XCTest
 /// three libwhisper configurations: run.sh's (GGML_NATIVE=ON, so -mcpu=native+dotprod+i8mm, at
 /// -O0), notarize_app.sh's configure (GGML_NATIVE=OFF, arm64 and x86_64, generic CPU kernels)
 /// at -O0, and that same configure with the Debug flags set to -O3 -DNDEBUG, which is the
-/// generic-kernel optimised build the plan moves Debug and the tests to. The exact VAD pins in
+/// generic-kernel optimised build Debug and the tests moved to in slice 2. The exact VAD pins in
 /// `WhisperEngineVadTests` came later and were checked under the first and the last. A config
 /// switch that changes them is a real difference, not an expected one.
 final class WhisperGoldenTests: XCTestCase {

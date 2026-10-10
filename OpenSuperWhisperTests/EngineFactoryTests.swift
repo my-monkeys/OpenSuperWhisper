@@ -5,9 +5,9 @@ import XCTest
 /// Which engine `TranscriptionService` builds for each stored engine id, and for the model the
 /// remote engine falls back to.
 ///
-/// The ids are persisted in every user's preferences, and the extraction moves the factory into
+/// The ids are persisted in every user's preferences, and the extraction moved the factory into
 /// the core with new platform gates (`os(macOS) && arch(arm64)`, iOS 26 availability). Each id
-/// and each fallback is pinned here so the move cannot quietly send a user to another engine.
+/// and each fallback is pinned here so no later change quietly sends a user to another engine.
 final class EngineFactoryTests: XCTestCase {
 
     private typealias Kind = TranscriptionService.EngineKind
@@ -109,7 +109,7 @@ final class EngineFactoryTests: XCTestCase {
     }
 
     /// The fallback factory is a second mapping, keyed on the fallback model's engine and handing
-    /// its identifier to the engine. It moves with the service in slice 4.
+    /// its identifier to the engine. It moved with the service in slice 4.
     func testFallbackModelGetsItsEngineAndIdentifier() {
         XCTAssertEqual(choice("whisper", "/models/ggml-base.bin"), .whisper(modelPathOverride: "/models/ggml-base.bin"))
         XCTAssertEqual(choice("fluidaudio", "v3"), .fluidAudio(version: "v3"))

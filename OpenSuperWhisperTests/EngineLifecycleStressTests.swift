@@ -6,8 +6,8 @@ import XCTest
 ///
 /// whisper.cpp and llama.cpp share one ggml and one Metal device. Freeing a context tears down
 /// part of that shared state, and the whisper.cpp fork carries a Metal teardown fix that llama's
-/// own ggml copy lacks. The extraction rebuilds all of it as one static library, so this pins
-/// what works today: contexts come and go, in any order, and the survivors keep transcribing.
+/// own ggml copy lacks. The extraction rebuilt all of it as one static library, and this pins
+/// what worked before it: contexts come and go, in any order, and the survivors keep transcribing.
 final class EngineLifecycleStressTests: XCTestCase {
 
     private static let unloadKey = "unloadWhisperModelWhenIdle"

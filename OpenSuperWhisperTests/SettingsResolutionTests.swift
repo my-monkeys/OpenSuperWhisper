@@ -6,7 +6,7 @@ import XCTest
 /// What `Settings()` resolves from preferences, the keyboard layout and the prompt file.
 ///
 /// The file-drop queue, the CLI and the main-window recorder all build their transcription
-/// settings this way, and it becomes the app-side initialiser of the core's settings type.
+/// settings this way, and since slice 3 it is the app-side initialiser of the core's settings type.
 /// `PromptFileTests` covers reading the file on its own; these pin the precedence once the
 /// file and the preferences meet, and every field the initialiser copies. Under tests
 /// `Settings.promptFileURL` is inside the private storage root, so writing it is safe.
