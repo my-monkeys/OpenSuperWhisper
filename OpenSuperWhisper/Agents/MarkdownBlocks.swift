@@ -10,7 +10,7 @@ enum MarkdownBlock: Equatable {
     case bullet(items: [String])
     case numbered(items: [String])
     case code(language: String, text: String)
-    case quote(String)
+    case quote([MarkdownBlock])
     case table(header: [String], rows: [[String]])
     case rule
 
@@ -102,11 +102,16 @@ enum MarkdownBlock: Equatable {
                 flushParagraph()
                 var quoted: [String] = []
                 while index < lines.count, lines[index].trimmingCharacters(in: .whitespaces).hasPrefix(">") {
-                    quoted.append(String(lines[index].trimmingCharacters(in: .whitespaces).dropFirst())
-                        .trimmingCharacters(in: .whitespaces))
+                    // Only the one space after the marker goes: deeper indentation is still meaningful
+                    // inside the quote (a wrapped list item, an indented line of code).
+                    var body = lines[index].trimmingCharacters(in: .whitespaces).dropFirst()
+                    if body.first == " " { body = body.dropFirst() }
+                    quoted.append(String(body))
                     index += 1
                 }
-                blocks.append(.quote(quoted.joined(separator: " ")))
+                // A bare ">" has nothing to show, and an empty quote would draw a stray accent bar.
+                let inner = parse(quoted.joined(separator: "\n"))
+                if !inner.isEmpty { blocks.append(.quote(inner)) }
                 continue
             }
 

@@ -39,8 +39,80 @@ final class MarkdownBlockTests: XCTestCase {
             .bullet(items: ["`a.swift`", "`b.swift`"]),
             .numbered(items: ["Build", "Test"]),
             .code(language: "swift", text: "let x = 1"),
-            .quote("Careful."),
+            .quote([.paragraph("Careful.")]),
             .rule,
+        ])
+    }
+
+    /// The reply that came out as one run-on paragraph: the dashes inline, the blank quote lines gone.
+    func testQuoteKeepsItsParagraphsAndList() {
+        let blocks = MarkdownBlock.parse("""
+        Version courte :
+
+        > Bonjour Alex,
+        >
+        > Les retours sont en ligne (https://example.com) :
+        >
+        > - **Boutons** : « Valider » et « Annuler » suivent les couleurs du thème.
+        > - **Fenêtre** : uniquement le contenu, en pleine hauteur.
+        >
+        > **Dernier point** : l'option n'est pas proposée. Ça te va ?
+        """)
+        XCTAssertEqual(blocks, [
+            .paragraph("Version courte :"),
+            .quote([
+                .paragraph("Bonjour Alex,"),
+                .paragraph("Les retours sont en ligne (https://example.com) :"),
+                .bullet(items: [
+                    "**Boutons** : « Valider » et « Annuler » suivent les couleurs du thème.",
+                    "**Fenêtre** : uniquement le contenu, en pleine hauteur.",
+                ]),
+                .paragraph("**Dernier point** : l'option n'est pas proposée. Ça te va ?"),
+            ]),
+        ])
+    }
+
+    func testQuoteOfOneParagraphStillJoinsItsLines() {
+        XCTAssertEqual(MarkdownBlock.parse("> one\n>two\n> three"), [.quote([.paragraph("one two three")])])
+    }
+
+    func testNestedQuote() {
+        XCTAssertEqual(MarkdownBlock.parse("> outer\n>\n> > inner"), [
+            .quote([.paragraph("outer"), .quote([.paragraph("inner")])]),
+        ])
+    }
+
+    func testCodeInAQuoteKeepsItsIndentation() {
+        let blocks = MarkdownBlock.parse("""
+        > ```swift
+        > if ok {
+        >     run()
+        > }
+        > ```
+        """)
+        XCTAssertEqual(blocks, [.quote([.code(language: "swift", text: "if ok {\n    run()\n}")])])
+    }
+
+    func testWrappedListItemInAQuoteStaysWithItsItem() {
+        XCTAssertEqual(MarkdownBlock.parse("> - a\n>   wrapped\n> - b"), [.quote([.bullet(items: ["a wrapped", "b"])])])
+    }
+
+    func testEmptyQuoteIsDropped() {
+        XCTAssertEqual(MarkdownBlock.parse("before\n\n>\n> \n\nafter"), [.paragraph("before"), .paragraph("after")])
+    }
+
+    func testTextAroundAQuoteIsUntouched() {
+        let blocks = MarkdownBlock.parse("""
+        Before.
+        - a
+        > quoted
+        after, not quoted
+        """)
+        XCTAssertEqual(blocks, [
+            .paragraph("Before."),
+            .bullet(items: ["a"]),
+            .quote([.paragraph("quoted")]),
+            .paragraph("after, not quoted"),
         ])
     }
 

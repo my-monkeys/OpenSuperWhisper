@@ -7,13 +7,19 @@ struct MarkdownView: View {
     var fontSize: CGFloat = 13.5
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(MarkdownBlock.parse(markdown).enumerated()), id: \.offset) { _, block in
+        stack(MarkdownBlock.parse(markdown))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .textSelection(.enabled)
+    }
+
+    /// Type-erased because a quote lays out its blocks through here, and `view(for:)` lays out the
+    /// quote: an opaque return type cannot contain itself.
+    private func stack(_ blocks: [MarkdownBlock]) -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 view(for: block)
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
+        })
     }
 
     @ViewBuilder private func view(for block: MarkdownBlock) -> some View {
@@ -37,10 +43,10 @@ struct MarkdownView: View {
                     .padding(12)
             }
             .background(RoundedRectangle(cornerRadius: 10).fill(STheme.inputBg.opacity(0.7)))
-        case .quote(let text):
+        case .quote(let blocks):
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 1.5).fill(STheme.accent.opacity(0.6)).frame(width: 3)
-                prose(text).foregroundColor(STheme.hint)
+                stack(blocks)
             }
             .fixedSize(horizontal: false, vertical: true)
         case .table(let header, let rows):
