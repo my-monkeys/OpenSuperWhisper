@@ -31,6 +31,7 @@
 		840156E02D79EE0000FB5FFE /* libllama.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 840156DF2D79EE0000FB5FFE /* libllama.a */; };
 		CE0EAD6E2D56ACA80067FDEE /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CE0EAD6D2D56ACA80067FDEE /* GRDB */; };
 		A1B2C3D40000000000000001 /* LiquidGlass in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D40000000000000002 /* LiquidGlass */; };
+		1B09ECDAA2E6090EF46650B2 /* OpenSuperWhisperCore in Frameworks */ = {isa = PBXBuildFile; productRef = F90F800059BB5EA67278CA3C /* OpenSuperWhisperCore */; };
 		CE84DF6E2D55777800C54EA6 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6D2D55777800C54EA6 /* libc++.tbd */; };
 		CE84DF712D55778000C54EA6 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF6F2D55778000C54EA6 /* Metal.framework */; };
 		CE84DF722D55778000C54EA6 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE84DF702D55778000C54EA6 /* MetalKit.framework */; };
@@ -227,6 +228,7 @@
 				CEAC00032D82F00200000000 /* libautocorrect_swift.dylib in Frameworks */,
 				5BA9E0DA0000000000000A03 /* Sparkle in Frameworks */,
 				A1B2C3D40000000000000001 /* LiquidGlass in Frameworks */,
+				1B09ECDAA2E6090EF46650B2 /* OpenSuperWhisperCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -441,6 +443,7 @@
 				CE84E17E2D56550B00C54EA7 /* FluidAudio */,
 				5BA9E0DA0000000000000A02 /* Sparkle */,
 				A1B2C3D40000000000000002 /* LiquidGlass */,
+				F90F800059BB5EA67278CA3C /* OpenSuperWhisperCore */,
 			);
 			productName = OpenSuperWhisper;
 			productReference = CE57B0282D52C7BB00929AF3 /* OpenSuperWhisper.app */;
@@ -536,6 +539,7 @@
 				CE84E17D2D56550B00C54EA7 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				5BA9E0DA0000000000000A01 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				A1B2C3D40000000000000003 /* XCLocalSwiftPackageReference "LiquidGlass" */,
+				7EB30E6352F64DCAD5E5BFD1 /* XCLocalSwiftPackageReference "OpenSuperWhisperCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CE57B0292D52C7BB00929AF3 /* Products */;
@@ -1071,6 +1075,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = LiquidGlass;
 		};
+		7EB30E6352F64DCAD5E5BFD1 /* XCLocalSwiftPackageReference "OpenSuperWhisperCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = OpenSuperWhisperCore;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1133,6 +1141,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D40000000000000003 /* XCLocalSwiftPackageReference "LiquidGlass" */;
 			productName = LiquidGlass;
+		};
+		F90F800059BB5EA67278CA3C /* OpenSuperWhisperCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7EB30E6352F64DCAD5E5BFD1 /* XCLocalSwiftPackageReference "OpenSuperWhisperCore" */;
+			productName = OpenSuperWhisperCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
