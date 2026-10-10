@@ -191,7 +191,7 @@ jobs:
         with:
           submodules: recursive
       # cmake for Scripts/build-native.sh. The script rebuilds the core's xcframeworks with
-      # FORCE=1, as a release does, before packages resolve, so the build job's cache of
+      # RELEASE=1, as a release does, before packages resolve, so the build job's cache of
       # OpenSuperWhisperCore/Binaries is not restored here.
       - name: Install dependencies
         run: brew install cmake

@@ -15,7 +15,7 @@ differ today:
 | Reference | How it is built | Used for |
 |---|---|---|
 | Test suite | `xcodebuild test` with `-derivedDataPath build -clonedSourcePackagesDirPath SourcePackages` (patched FluidAudio) | Every slice: the per-test pass/skip list of master (710 passed, 9 skipped on 47fe26b) must be reproduced, plus the new tests |
-| Shipped app | `notarize_app.sh` (whisper, llama and ggml from `FORCE=1 Scripts/build-native.sh`, `GGML_NATIVE=OFF`, so generic ggml CPU kernels, as the universal libwhisper configure it replaced in slice 2; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to the current references, `docs/smoke/post-swap-<arch>.txt` since slice 2 (below) |
+| Shipped app | `notarize_app.sh` (whisper, llama and ggml from `RELEASE=1 Scripts/build-native.sh` (forced, pinned and clean submodules only), `GGML_NATIVE=OFF`, so generic ggml CPU kernels, as the universal libwhisper configure it replaced in slice 2; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to the current references, `docs/smoke/post-swap-<arch>.txt` since slice 2 (below) |
 
 The release smoke check is `Scripts/build-release-unsigned.sh <arch>` (`notarize_app.sh` up to
 signing) followed by `Scripts/smoke-release.sh <app> --expect docs/smoke/post-swap-<arch>.txt`,
@@ -233,10 +233,12 @@ order, and `5.5a` to `5.5d` are slice 5's move checker and its three moving comm
 - G5, the release smoke check of "Reference behaviour" on arm64 and x86_64, then `./run.sh build`.
 - G6, link checks on the hosted test bundle: no exported symbol, type descriptor or ObjC class of
   the core, GRDB, FluidAudio or OSWSenseVoice, and none of the native sentinels `_whisper_full`,
-  `_llama_backend_init` and `_sqlite3_open`, which the app image defines.
+  `_llama_backend_init` and `_sqlite3_open`. The app image defines the first two and only
+  references `_sqlite3_open`, since GRDB uses the system SQLite (deviation 11).
 - G7, an adversarial review of the slice.
 
-Every commit passed G1 to G4; G5 to G7 ran once per slice.
+Every commit passed G1, G2 and G4, and G3 once the package existed (deviation 20 covers the G2
+timing of 4.5 to 4.7); G5 to G7 ran once per slice.
 
 0. Groundwork, no move.
    - Isolation: a second test-detection signal (`NSClassFromString("XCTestCase")`); under
