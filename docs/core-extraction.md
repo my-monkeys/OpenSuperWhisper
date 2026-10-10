@@ -1,9 +1,9 @@
 # Extracting the transcription core
 
-Status: in progress on `refactor/core-package`. Supersedes the framework-target approach of
-PR #57 (WhisperCore), whose design decisions are reused where they still fit. Goal: one
-transcription core shared by the macOS app and a future iPhone app (issue #52), with no
-behaviour change for the macOS app.
+Status: slices 0 to 5 done on `refactor/core-package`; the slice-5 review is still to run.
+Supersedes the framework-target approach of PR #57 (WhisperCore), whose design decisions are
+reused where they still fit. Goal: one transcription core shared by the macOS app and a future
+iPhone app (issue #52), with no behaviour change for the macOS app.
 
 ## Reference behaviour
 
@@ -364,6 +364,52 @@ passes the full suite, and goes through an adversarial review before the next on
    and GRDB's.
 5. Core test target (macOS and iOS Simulator, run with the patched FluidAudio checkout);
    tests move with a committed rename map; the total may only grow.
+   Done, in four commits that add the target and 25 new tests, a checker, three moving commits,
+   the CI job and this record. `OpenSuperWhisperCoreTests` is a test target of the package, built
+   and run only through the project's committed `OpenSuperWhisperCoreTests` scheme, so it uses
+   the workspace pins and run.sh's patched FluidAudio. Run it after `./run.sh build` with
+   `Scripts/test-core.sh macos|ios [xcodebuild args]` (derived data in `build-core/`; the iOS
+   slices are built when missing, `OSW_SIM_DESTINATION` picks the simulator, otherwise the first
+   iPhone of the newest runtime). Never `swift test`: it resolves on its own into `.build/` with
+   an unpatched FluidAudio and writes `OpenSuperWhisperCore/Package.resolved`. Every XCTest class
+   derives from `CoreTestCase`, which installs one test configuration
+   (`CoreTestEnvironment`, through `replaceForTesting`) with in-memory preferences that touch no
+   UserDefaults or Keychain, a per-process storage root in the temporary directory, the app's
+   Silero file by path and `.cpuOnly` on the simulator. Fixtures are read in place through
+   `#filePath` (or `OSW_FIXTURES_ROOT`), the 0.13.3 database is the target's only resource.
+   New tests: process isolation, the installed configuration and the replace semantics, the
+   not-installed trap (Swift Testing exit tests, macOS), whisper under both compute policies and
+   llama under `.cpuOnly`, the platform gates and the fixtures. 159 tests in 18 whole files moved
+   from the hosted suite (`docs/test-moves-slice5.txt`, old id to new id), each with only the
+   app import dropped, `CoreTestCase` as base class and, in `RecordingMigrationTests`, the
+   fixture found through `Bundle.module`. `Scripts/check-test-moves.sh` checks the hosted and
+   core results against `docs/tests/hosted-slice4.txt` (the slice-4 reference, verbatim) and the
+   map: every unmoved test still hosted, every moved one gone from there and passed on both
+   destinations, no failure, and at least 902 results in all. CI gained a `core-tests` job
+   (macOS and the newest iPhone simulator of the runner), and the build job checks its hosted
+   results against the map.
+   Measured (M5 Pro, Xcode 27.0, `TEST_RUNNER_OSW_TEST_GGUF` set): the hosted suite has 718
+   results and the core 184 on macOS (all passed) and 180 on the iOS 26.5 simulator (179 passed,
+   `testAutomaticTranscriptIsExact` skipped there by design), so 902 in all. The hosted list is
+   the reference minus the 159 mapped ids at every moving commit; from 5.5d on, one keyboard
+   test of the hosted suite skipped for an environmental reason (deviation 29). In CI mode
+   (`TEST_RUNNER_OSW_GOLDEN_MACHINE=0`, no model) the core gives 178 passed and 6 skipped on
+   macOS and 174 and 6 on the iOS 27.0 simulator: the four exact whisper tests and the two llama
+   tests skip, and the cpu-only whisper smoke test runs on both. On the whisper side, `.cpuOnly`
+   with the VAD gives "...can do for you. Ask what you can do..." where Metal gives "...for you,
+   ask what...", byte-identical on macOS (generic kernels) and on the simulator (baseline arm64
+   kernels) and stable across runs; it is pinned as `jfkTranscriptCPU`. The timestamped run,
+   which skips the VAD, and the silence case match Metal, and `.automatic` gives the app's golden
+   from the standalone package. On the llama side, a `.cpuOnly` context and
+   `BuiltInLlamaBackend(computePolicy: .cpuOnly)` load and generate on macOS and on the
+   simulator; llama's Metal initialisation did not get in the way there. The exit tests ran
+   natively under xcodebuild, so the documented `TrapProbe` fallback was not needed. The core
+   test bundle links `@rpath/libonnxruntime.1.24.4.dylib` with the vendor rpath on macOS and
+   holds one `_whisper_full`; no run printed "is implemented in both". The hosted test bundle
+   still holds no symbol, type descriptor or ObjC class of the core, GRDB, FluidAudio or
+   OSWSenseVoice, and no native sentinel. The release smoke check gives reports identical to the
+   post-swap references on arm64 and on x86_64: the test target and the scheme are not part of
+   the app. The package pins and `Localizable.xcstrings` did not change.
 The extraction stops there. The iPhone app itself (issue #52) is a later project; until then
 the core only has to keep building for iOS, which every slice checks. Notes for that
 project: record in the foreground, transcribe on device (Parakeet, Apple Speech on iOS 26)
@@ -480,6 +526,52 @@ Recorded as the slices land, so the plan above keeps its original wording.
     with the same text, and that copy went in 4.6. The app's `AppCore.configuration` is private
     for the same reason: only `AppCore.install()` reads it now. A review follow-up after the
     slice 4 record, together with a whitespace-only realignment of the shared queue's arguments.
+22. The project references the package folder. Xcode put no test target of
+    `OpenSuperWhisperCore` in its build graph while the project only had the
+    `XCLocalSwiftPackageReference`, so the committed scheme resolved to nothing ("Supported
+    platforms for the buildables in the current scheme is empty"). A `PBXFileReference` to the
+    folder in the main group, which is what Xcode writes when a local package is dragged in,
+    makes the package an editable root and exposes `OpenSuperWhisperCoreTests`. It is in no build
+    phase; the app build, the pins and the autogenerated `OpenSuperWhisperCore` scheme that G3
+    uses are unchanged. The committed scheme is `OpenSuperWhisperCoreTests`, a name of its own so
+    that autogenerated scheme stays visible.
+23. onnxruntime is linked into the core test bundle on macOS (`unsafeFlags` on the test target
+    only, arm64 dylib found by an absolute rpath into `vendor/`), decided up front: the bundle
+    links the core as object files and sherpa leaves `_OrtGetApiBase` undefined, which only dead
+    stripping hid. The library product links nothing new.
+24. No `OpenSuperWhisperCore/Package.resolved` is committed, which closes the slice-5 follow-up:
+    every core build and test goes through the project, so the workspace pins are the only ones
+    read, and a second file could only drift. Its `.gitignore` line stays. `test-core.sh` fails
+    when a run leaves a resolution file or moves the pins. The repository root holds an old
+    tracked `Package.resolved` that nothing reads, so the check accepts tracked files that are
+    unchanged rather than requiring that only the workspace file exists.
+25. Moved files are whole files, with three edits only: the app import dropped, `CoreTestCase`
+    as base class, and `Bundle.module` for the 0.13.3 fixture in `RecordingMigrationTests`, whose
+    stale comment about the synchronized group stays as it was. Candidates for a later split,
+    not verified pure: `CustomDictionaryTests`, `EngineCapabilitiesTests` and
+    `HebrewIvritSupportTests` (OpenSuperWhisperTests.swift), `TranscriptionErrorTests`
+    (ErrorFeedbackTests.swift), `AsyncSemaphoreTests` (DictationPipelineTests.swift) and eight of
+    SpeechTrimmingTests' nine tests.
+26. `WhisperGoldenTests`, the VAD tests (`WhisperEngineVadTests`, `VadIntegrationTests`,
+    `SpeechTrimmingTests`) and `EngineFactoryTests` stay hosted: they pin the app process (its
+    configuration, the VAD model in the app bundle, the macOS build's gates). Their core
+    counterparts are `CoreWhisperComputePolicyTests` and `PlatformAvailabilityTests`.
+27. `BuiltInLlamaBackend.init(computePolicy:)` went from private to internal so a core test can
+    build the backend on `.cpuOnly`; no public or behaviour change. This is the first exercise of
+    `.cpuOnly` on the llama side (deviation 17).
+28. Test-level choices. `PlatformAvailabilityTests.testSenseVoiceModelsAreListedOnlyWhereCompiled`
+    stages two empty files under the SenseVoice model's names in the test storage root: the
+    catalog also requires the download, so without them it would be empty on macOS too.
+    `CoreTestIsolationTests` checks the defaults suite by writing a key through
+    `DefaultsStore.current` and reading it back from the pid-named suite, since `UserDefaults`
+    cannot report its suite name. `CoreWhisperComputePolicyTests` gets a `jfkTranscriptCPU`
+    constant for the measured `.cpuOnly` string (one for both platforms, since they agree).
+29. Gate G2 from 5.5d on: `KeyboardLayoutProviderTests.testResolveInfo_nonANSI_returnsNil` skipped
+    where the reference has it passed, so the strict check reported that one status, twice in a
+    row. The test skips when `LMGetKbdType()` reports an ANSI keyboard, and a probe outside any
+    test reported exactly that at the time (the reference was recorded on the ISO internal
+    keyboard); the app code and the test file are byte-identical to the slice-4 base. Every other
+    check, the non-strict one included, passed.
 
 ## Follow-ups kept out of the extraction
 
@@ -492,13 +584,16 @@ on model downloads; API keys sent over plain http; the remote local-fallback fac
 SenseVoice on Intel (`"default"`) and for any engine it does not know (`"remote"` included),
 and building the selected Whisper model for `"apple"` below macOS 26.
 
-Also out of scope, found while extracting: an iOS Simulator package build in CI (it needs the
-iOS native slices cached); a committed `OpenSuperWhisperCore/Package.resolved` (slice 5);
-file-name-based model paths for iOS; `.cpuOnly` for llama should also set `op_offload = false`
-(and be checked to create no `MTLDevice`) before the iPhone app relies on it in the background;
+Also out of scope, found while extracting: file-name-based model paths for iOS; `.cpuOnly` for
+llama should also set `op_offload = false` (and be checked to create no `MTLDevice`) before the
+iPhone app relies on it in the background; for whisper and llama alike, a core test should assert
+through the ggml log that `.cpuOnly` really runs without the GPU (`use_gpu = 0`, "offloaded 0/")
+and creates no `MTLDevice`, before the iPhone app relies on it;
 the download-catalog strings in `Localizable.xcstrings`, rendered verbatim today so their
 translations are unused; and the `RecordingStore` to `TranscriptionQueue` call together with
-`Recording.url` reading the configured root (deviation 9).
+`Recording.url` reading the configured root (deviation 9). Closed in slice 5: the iOS Simulator
+package build in CI (the `core-tests` job builds and tests the core there) and the question of a
+committed `OpenSuperWhisperCore/Package.resolved` (deviation 24).
 
 Release builds used to be instrumented for code coverage (Xcode enables it for the scheme),
 so every CLI run wrote a `default.profraw` into the caller's directory. Fixed on master by
