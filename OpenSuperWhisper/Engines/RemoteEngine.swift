@@ -58,10 +58,8 @@ final class RemoteEngine: TranscriptionEngine {
     }
 
     func transcribeAudio(url: URL, settings: Settings) async throws -> String {
-        // OpenAI splits transcribe vs translate into two endpoints; the translations
-        // endpoint always outputs English and ignores `language`.
-        let translate = settings.translateToEnglish
-        guard let endpoint = endpoint(for: translate ? "translations" : "transcriptions") else {
+        let clip = Self.clipParameters(for: settings)
+        guard let endpoint = endpoint(for: clip.action) else {
             throw TranscriptionError.contextInitializationFailed
         }
 
@@ -78,9 +76,9 @@ final class RemoteEngine: TranscriptionEngine {
                 boundary: boundary,
                 filename: url.lastPathComponent,
                 audioData: audioData,
-                language: translate ? "" : settings.selectedLanguage,
-                temperature: settings.temperature,
-                prompt: settings.initialPrompt
+                language: clip.language,
+                temperature: clip.temperature,
+                prompt: clip.prompt
             )
 
             self.onProgressUpdate?(0.2)
@@ -152,12 +150,29 @@ final class RemoteEngine: TranscriptionEngine {
 
     // MARK: - Helpers
 
+    /// What `transcribeAudio` takes from the settings for one request. Pure, so the mapping can
+    /// be pinned without a server: the remote engine sends the user's prompt only, never the
+    /// dictionary boost or the field's text that Whisper combines into its own (#89).
+    static func clipParameters(for settings: Settings)
+        -> (action: String, language: String, temperature: Double, prompt: String) {
+        // OpenAI splits transcribe vs translate into two endpoints; the translations
+        // endpoint always outputs English and ignores `language`.
+        let translate = settings.translateToEnglish
+        return (action: translate ? "translations" : "transcriptions",
+                language: translate ? "" : settings.selectedLanguage,
+                temperature: settings.temperature,
+                prompt: settings.initialPrompt)
+    }
+
     /// A URLSession whose request/resource timeouts honor the user's remote
     /// timeout setting. When disabled, an effectively-unbounded interval is used
     /// so slow server-side pipelines aren't cut off at URLSession's 60s default.
     /// POST-with-body ignores `URLRequest.timeoutInterval` in practice, so the
     /// interval must live on the session configuration.
-    private func makeSession() -> URLSession {
+    ///
+    /// Internal, like `makeRequest` and `endpoint(for:)`, so tests can pin what would be sent
+    /// without sending it: this session is built here, so a URLProtocol stub never sees it.
+    func makeSession() -> URLSession {
         let interval = timeoutEnabled
             ? max(1, timeoutSeconds)
             : Self.noTimeoutInterval
@@ -167,7 +182,7 @@ final class RemoteEngine: TranscriptionEngine {
         return URLSession(configuration: config)
     }
 
-    private func endpoint(for action: String) -> URL? {
+    func endpoint(for action: String) -> URL? {
         Self.endpoint(base: serverURL, action: action)
     }
 
@@ -188,7 +203,7 @@ final class RemoteEngine: TranscriptionEngine {
         return URL(string: base + "/v1/audio/\(action)")
     }
 
-    private func makeRequest(
+    func makeRequest(
         endpoint: URL,
         boundary: String,
         filename: String,
