@@ -25,6 +25,17 @@ final class TranscriptionServiceFallbackTests: XCTestCase {
         XCTAssertFalse(TranscriptionService.shouldUseFallback(for: CancellationError()))
     }
 
+    /// The edges of the 5xx range, and the statuses the remote engine retries (408, 429) but
+    /// that still do not hand the clip to a local model once the retries are spent.
+    func testFallbackStatusRangeIsExactly5xx() {
+        XCTAssertFalse(TranscriptionService.shouldUseFallback(for: RemoteError.api(499, nil)))
+        XCTAssertTrue(TranscriptionService.shouldUseFallback(for: RemoteError.api(501, nil)))
+        XCTAssertTrue(TranscriptionService.shouldUseFallback(for: RemoteError.api(599, nil)))
+        XCTAssertFalse(TranscriptionService.shouldUseFallback(for: RemoteError.api(600, nil)))
+        XCTAssertFalse(TranscriptionService.shouldUseFallback(for: RemoteError.api(408, nil)))
+        XCTAssertFalse(TranscriptionService.shouldUseFallback(for: RemoteError.api(429, nil)))
+    }
+
     func testTranslationCapableSetIsWhisperAndRemoteOnly() {
         XCTAssertTrue(EngineCapabilities.translationCapableEngines.contains("whisper"))
         XCTAssertTrue(EngineCapabilities.translationCapableEngines.contains("remote"))
