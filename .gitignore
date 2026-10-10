@@ -133,7 +133,8 @@ OpenSuperWhisperCore/Binaries/
 # Unsigned Release builds (Scripts/build-release-unsigned.sh)
 /build-release/
 
-# Derived data of the iOS Simulator package build (gate G3 in docs/core-extraction.md)
+# Derived data of the core package's iOS Simulator build (-derivedDataPath build-ios, gate G3
+# as defined in docs/core-extraction.md)
 /build-ios/
 
 # Derived data of the core package's test runs (Scripts/test-core.sh)
