@@ -1,4 +1,5 @@
 import Foundation
+import os
 @testable import OpenSuperWhisperCore
 
 /// In-memory preferences for the core tests. Touches no UserDefaults and no Keychain: the two
@@ -50,121 +51,158 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var builtInModelFileName = LLMModelManager.defaultModel.fileName
     }
 
-    private var values = Values()
+    // Core code reads preferences from detached tasks and from llama's inference queue, while
+    // `CoreTestCase.tearDown` resets them on the main thread.
+    private let state = OSAllocatedUnfairLock(initialState: Values())
 
-    func reset() { values = Values() }
+    private subscript<Value: Sendable>(key: WritableKeyPath<Values, Value>) -> Value {
+        get { state.withLock { $0[keyPath: key] } }
+        set { state.withLock { $0[keyPath: key] = newValue } }
+    }
 
-    var selectedEngine: String { get { values.selectedEngine } set { values.selectedEngine = newValue } }
+    func reset() { state.withLock { $0 = Values() } }
+
+    var selectedEngine: String {
+        get { self[\.selectedEngine] }
+        set { self[\.selectedEngine] = newValue }
+    }
     var selectedWhisperModelPath: String? {
-        get { values.selectedWhisperModelPath }
-        set { values.selectedWhisperModelPath = newValue }
+        get { self[\.selectedWhisperModelPath] }
+        set { self[\.selectedWhisperModelPath] = newValue }
     }
     var selectedModelPath: String? {
-        values.selectedEngine == "whisper" ? values.selectedWhisperModelPath : nil
+        state.withLock { $0.selectedEngine == "whisper" ? $0.selectedWhisperModelPath : nil }
     }
     var fluidAudioModelVersion: String {
-        get { values.fluidAudioModelVersion }
-        set { values.fluidAudioModelVersion = newValue }
+        get { self[\.fluidAudioModelVersion] }
+        set { self[\.fluidAudioModelVersion] = newValue }
     }
     var unloadWhisperModelWhenIdle: Bool {
-        get { values.unloadWhisperModelWhenIdle }
-        set { values.unloadWhisperModelWhenIdle = newValue }
+        get { self[\.unloadWhisperModelWhenIdle] }
+        set { self[\.unloadWhisperModelWhenIdle] = newValue }
     }
 
     var customDictionaryEnabled: Bool {
-        get { values.customDictionaryEnabled }
-        set { values.customDictionaryEnabled = newValue }
+        get { self[\.customDictionaryEnabled] }
+        set { self[\.customDictionaryEnabled] = newValue }
     }
     var customDictionaryBoostEnabled: Bool {
-        get { values.customDictionaryBoostEnabled }
-        set { values.customDictionaryBoostEnabled = newValue }
+        get { self[\.customDictionaryBoostEnabled] }
+        set { self[\.customDictionaryBoostEnabled] = newValue }
     }
     var customDictionaryEntries: [CustomDictionaryEntry] {
-        get { values.customDictionaryEntries }
-        set { values.customDictionaryEntries = newValue }
+        get { self[\.customDictionaryEntries] }
+        set { self[\.customDictionaryEntries] = newValue }
     }
 
-    var remoteServerURL: String { get { values.remoteServerURL } set { values.remoteServerURL = newValue } }
-    var remoteServerModel: String { get { values.remoteServerModel } set { values.remoteServerModel = newValue } }
+    var remoteServerURL: String {
+        get { self[\.remoteServerURL] }
+        set { self[\.remoteServerURL] = newValue }
+    }
+    var remoteServerModel: String {
+        get { self[\.remoteServerModel] }
+        set { self[\.remoteServerModel] = newValue }
+    }
     var remoteServerAPIKey: String? {
-        get { values.remoteServerAPIKey }
-        set { values.remoteServerAPIKey = newValue }
+        get { self[\.remoteServerAPIKey] }
+        set { self[\.remoteServerAPIKey] = newValue }
     }
     var remoteServerTimeoutEnabled: Bool {
-        get { values.remoteServerTimeoutEnabled }
-        set { values.remoteServerTimeoutEnabled = newValue }
+        get { self[\.remoteServerTimeoutEnabled] }
+        set { self[\.remoteServerTimeoutEnabled] = newValue }
     }
     var remoteServerTimeoutSeconds: Double {
-        get { values.remoteServerTimeoutSeconds }
-        set { values.remoteServerTimeoutSeconds = newValue }
+        get { self[\.remoteServerTimeoutSeconds] }
+        set { self[\.remoteServerTimeoutSeconds] = newValue }
     }
     var cachedRemoteModels: [String] {
-        get { values.cachedRemoteModels }
-        set { values.cachedRemoteModels = newValue }
+        get { self[\.cachedRemoteModels] }
+        set { self[\.cachedRemoteModels] = newValue }
     }
     var remoteFallbackEnabled: Bool {
-        get { values.remoteFallbackEnabled }
-        set { values.remoteFallbackEnabled = newValue }
+        get { self[\.remoteFallbackEnabled] }
+        set { self[\.remoteFallbackEnabled] = newValue }
     }
     var remoteFallbackModel: DictationModelOption? {
-        get { values.remoteFallbackModel }
-        set { values.remoteFallbackModel = newValue }
+        get { self[\.remoteFallbackModel] }
+        set { self[\.remoteFallbackModel] = newValue }
     }
 
     var saveTranscriptionHistory: Bool {
-        get { values.saveTranscriptionHistory }
-        set { values.saveTranscriptionHistory = newValue }
+        get { self[\.saveTranscriptionHistory] }
+        set { self[\.saveTranscriptionHistory] = newValue }
     }
     var retentionMaxCountEnabled: Bool {
-        get { values.retentionMaxCountEnabled }
-        set { values.retentionMaxCountEnabled = newValue }
+        get { self[\.retentionMaxCountEnabled] }
+        set { self[\.retentionMaxCountEnabled] = newValue }
     }
-    var retentionMaxCount: Int { get { values.retentionMaxCount } set { values.retentionMaxCount = newValue } }
+    var retentionMaxCount: Int {
+        get { self[\.retentionMaxCount] }
+        set { self[\.retentionMaxCount] = newValue }
+    }
     var retentionMaxAgeEnabled: Bool {
-        get { values.retentionMaxAgeEnabled }
-        set { values.retentionMaxAgeEnabled = newValue }
+        get { self[\.retentionMaxAgeEnabled] }
+        set { self[\.retentionMaxAgeEnabled] = newValue }
     }
     var retentionMaxAgeValue: Int {
-        get { values.retentionMaxAgeValue }
-        set { values.retentionMaxAgeValue = newValue }
+        get { self[\.retentionMaxAgeValue] }
+        set { self[\.retentionMaxAgeValue] = newValue }
     }
     var retentionMaxAgeUnit: String {
-        get { values.retentionMaxAgeUnit }
-        set { values.retentionMaxAgeUnit = newValue }
+        get { self[\.retentionMaxAgeUnit] }
+        set { self[\.retentionMaxAgeUnit] = newValue }
     }
 
-    var aiBackend: String { get { values.aiBackend } set { values.aiBackend = newValue } }
-    var aiRemoteEndpoint: String { get { values.aiRemoteEndpoint } set { values.aiRemoteEndpoint = newValue } }
-    var aiRemoteModel: String { get { values.aiRemoteModel } set { values.aiRemoteModel = newValue } }
-    var aiRemoteAPIKey: String? { get { values.aiRemoteAPIKey } set { values.aiRemoteAPIKey = newValue } }
-    var aiOllamaEndpoint: String { get { values.aiOllamaEndpoint } set { values.aiOllamaEndpoint = newValue } }
-    var aiOllamaModel: String { get { values.aiOllamaModel } set { values.aiOllamaModel = newValue } }
+    var aiBackend: String {
+        get { self[\.aiBackend] }
+        set { self[\.aiBackend] = newValue }
+    }
+    var aiRemoteEndpoint: String {
+        get { self[\.aiRemoteEndpoint] }
+        set { self[\.aiRemoteEndpoint] = newValue }
+    }
+    var aiRemoteModel: String {
+        get { self[\.aiRemoteModel] }
+        set { self[\.aiRemoteModel] = newValue }
+    }
+    var aiRemoteAPIKey: String? {
+        get { self[\.aiRemoteAPIKey] }
+        set { self[\.aiRemoteAPIKey] = newValue }
+    }
+    var aiOllamaEndpoint: String {
+        get { self[\.aiOllamaEndpoint] }
+        set { self[\.aiOllamaEndpoint] = newValue }
+    }
+    var aiOllamaModel: String {
+        get { self[\.aiOllamaModel] }
+        set { self[\.aiOllamaModel] = newValue }
+    }
     var aiPostProcessingEnabled: Bool {
-        get { values.aiPostProcessingEnabled }
-        set { values.aiPostProcessingEnabled = newValue }
+        get { self[\.aiPostProcessingEnabled] }
+        set { self[\.aiPostProcessingEnabled] = newValue }
     }
     var appContextFormattingEnabled: Bool {
-        get { values.appContextFormattingEnabled }
-        set { values.appContextFormattingEnabled = newValue }
+        get { self[\.appContextFormattingEnabled] }
+        set { self[\.appContextFormattingEnabled] = newValue }
     }
     var appContextProfiles: [AppContextProfile] {
-        get { values.appContextProfiles }
-        set { values.appContextProfiles = newValue }
+        get { self[\.appContextProfiles] }
+        set { self[\.appContextProfiles] = newValue }
     }
     var aiPostProcessingPrompt: String {
-        get { values.aiPostProcessingPrompt }
-        set { values.aiPostProcessingPrompt = newValue }
+        get { self[\.aiPostProcessingPrompt] }
+        set { self[\.aiPostProcessingPrompt] = newValue }
     }
     var aiPostProcessingClosing: String {
-        get { values.aiPostProcessingClosing }
-        set { values.aiPostProcessingClosing = newValue }
+        get { self[\.aiPostProcessingClosing] }
+        set { self[\.aiPostProcessingClosing] = newValue }
     }
     var aiPostProcessingTranslation: String {
-        get { values.aiPostProcessingTranslation }
-        set { values.aiPostProcessingTranslation = newValue }
+        get { self[\.aiPostProcessingTranslation] }
+        set { self[\.aiPostProcessingTranslation] = newValue }
     }
     var builtInModelFileName: String {
-        get { values.builtInModelFileName }
-        set { values.builtInModelFileName = newValue }
+        get { self[\.builtInModelFileName] }
+        set { self[\.builtInModelFileName] = newValue }
     }
 }
