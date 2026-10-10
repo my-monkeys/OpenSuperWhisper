@@ -3,8 +3,9 @@ import XCTest
 @testable import OpenSuperWhisperCore
 
 /// The model managers and the recording store take their storage root through their
-/// initialiser, so a host or a test can point them anywhere. `shared` passes the configured
-/// root; these build their own on a scratch directory.
+/// initialiser. Model folders and the recordings database follow the given root; recording audio
+/// (`Recording.url`) still follows the configured one. `shared` passes the configured root; these
+/// build their own on a scratch directory.
 final class StorageRootInjectionTests: XCTestCase {
 
     private var root: URL!

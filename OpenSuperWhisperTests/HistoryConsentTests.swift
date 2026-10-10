@@ -24,6 +24,9 @@ final class HistoryConsentTests: XCTestCase {
     override func tearDown() async throws {
         scratch.restore()
         try? FileManager.default.removeItem(at: root)
+        // XCTest keeps every test instance until the run ends; let this store's database go now.
+        store = nil
+        scratch = nil
     }
 
     func testDecliningLeavesHistoryOffAndQueuesNothing() async throws {
@@ -40,12 +43,15 @@ final class HistoryConsentTests: XCTestCase {
         XCTAssertFalse(queue.isProcessing)
     }
 
-    /// The file does not exist, so nothing is transcribed: the queue's first pass drops a
-    /// recording whose source is gone before it reaches an engine.
+    /// The file does not exist, so nothing is transcribed: the queue's first pass deletes a
+    /// recording whose source is gone before it reaches an engine. That deletion goes through
+    /// `RecordingStore.deleteRecording`, which cancels on `TranscriptionQueue.shared`, so it
+    /// creates the shared queue and service here too; the shared store's rows stay as they were.
     func testAcceptingTurnsHistoryOnAndQueuesTheFile() async throws {
         let answers = Answers(reply: true)
         let queue = makeQueue(answers)
         let missing = root.appendingPathComponent("missing.wav")
+        let sharedBefore = try await sharedRecordingIDs()
 
         await queue.addFileToQueue(url: missing)
 
@@ -55,7 +61,9 @@ final class HistoryConsentTests: XCTestCase {
         XCTAssertEqual(queued.map(\.sourceFileURL), [missing.path])
 
         try await waitUntil { !queue.isProcessing }
-        try await waitUntil { self.store.getPendingRecordings().isEmpty }
+        try await waitUntil { try await self.store.fetchRecordings(limit: 10, offset: 0).isEmpty }
+        let sharedAfter = try await sharedRecordingIDs()
+        XCTAssertEqual(sharedAfter, sharedBefore)
     }
 
     private func makeQueue(_ answers: Answers) -> TranscriptionQueue {
@@ -64,10 +72,14 @@ final class HistoryConsentTests: XCTestCase {
                            confirmEnableHistory: { answers.answer() })
     }
 
-    private func waitUntil(_ condition: @MainActor () -> Bool,
+    private func sharedRecordingIDs() async throws -> Set<UUID> {
+        Set(try await RecordingStore.shared.fetchRecordings(limit: 10_000, offset: 0).map(\.id))
+    }
+
+    private func waitUntil(_ condition: @MainActor () async throws -> Bool,
                            file: StaticString = #filePath, line: UInt = #line) async throws {
         let deadline = Date().addingTimeInterval(10)
-        while !condition() {
+        while try await !condition() {
             guard Date() < deadline else {
                 XCTFail("Timed out", file: file, line: line)
                 return
