@@ -129,3 +129,6 @@ docs/liquid-glass/*.gif
 # submodules, never committed
 OpenSuperWhisperCore/Binaries/
 /build-native/
+
+# Unsigned Release builds (Scripts/build-release-unsigned.sh)
+/build-release/
