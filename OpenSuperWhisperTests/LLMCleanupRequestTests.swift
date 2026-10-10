@@ -132,6 +132,18 @@ final class LLMCleanupRequestTests: XCTestCase {
                                         encoding: .utf8)!)
     }
 
+    /// `NSDictionary` equality treats `false` and `0` alike, but Ollama's Go decoder rejects a
+    /// number where it expects a bool (HTTP 400, which the fallback would then hide). So the JSON
+    /// type of each field is checked on its own: `stream` a boolean, `temperature` a number.
+    private func assertJSONTypes(stream: Any?, temperature: Any?,
+                                 file: StaticString = #filePath, line: UInt = #line) {
+        let booleanType = CFBooleanGetTypeID()
+        XCTAssertEqual(stream.map { CFGetTypeID($0 as CFTypeRef) }, booleanType, "stream", file: file, line: line)
+        XCTAssertNotNil(temperature as? NSNumber, file: file, line: line)
+        XCTAssertNotEqual(temperature.map { CFGetTypeID($0 as CFTypeRef) }, booleanType, "temperature",
+                          file: file, line: line)
+    }
+
     private func onlyRequest(file: StaticString = #filePath, line: UInt = #line) throws
         -> (request: URLRequest, json: NSDictionary) {
         let requests = LLMStubProtocol.requests
@@ -164,6 +176,7 @@ final class LLMCleanupRequestTests: XCTestCase {
                 ["role": "user", "content": Self.input],
             ],
         ] as NSDictionary)
+        assertJSONTypes(stream: json["stream"], temperature: (json["options"] as? NSDictionary)?["temperature"])
     }
 
     /// What a fresh install sends once cleanup is switched on and nothing else is touched: both
@@ -227,6 +240,7 @@ final class LLMCleanupRequestTests: XCTestCase {
                 ["role": "user", "content": Self.input],
             ],
         ] as NSDictionary)
+        assertJSONTypes(stream: json["stream"], temperature: json["temperature"])
     }
 
     /// No key, or a key of only spaces, sends no Authorization header at all (no-auth servers).
