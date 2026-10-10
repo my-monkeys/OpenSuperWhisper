@@ -12,8 +12,12 @@
 #   --core-ios      the .xcresult of `Scripts/test-core.sh ios`
 #   --allow-absent  a hosted class that may be missing from --hosted (CI skips
 #                   KeyboardLayoutProviderTests)
-#   --strict        hosted statuses must equal the reference's, and moved tests must pass, not
-#                   skip (local gates); without it a skip is accepted (CI skips the goldens)
+#   --strict        hosted statuses must equal the reference's (local gates); without it a
+#                   different status is accepted (CI skips the goldens)
+#
+# Moved tests must pass in every core input, strict or not: none of them skips, in CI mode
+# included. A core macOS run must also hold at least the floor minus the reference's unmoved
+# tests, so the tests the core added cannot go even when the hosted results are checked apart.
 #
 # The map and the static rules on OpenSuperWhisperCore/Tests are always checked. Every violation
 # is printed, then a tally per input; the exit status is non-zero if there was any.
@@ -142,20 +146,27 @@ if [[ -n $hosted ]]; then
   done
 fi
 
-# 5. Every moved test passes in every core input (a skip is accepted without --strict).
+# 5. Every moved test passes in every core input.
 for input in core-macos core-ios; do
   [[ -f $WORK/$input ]] || continue
   for new in $(cat "$WORK/map-new"); do
     actual="$(awk -v id="$new" '$1 == id { print $2 }' "$WORK/$input")"
     if [[ -z $actual ]]; then
       violation "$input: moved test missing: $new"
-    elif [[ $actual == skipped ]] && (( strict )); then
+    elif [[ $actual == skipped ]]; then
       violation "$input: moved test skipped: $new"
     fi
   done
 done
 
-# 6. The total only grows.
+# 6. The total only grows, and the core macOS run on its own keeps what the core added.
+map_count=$(wc -l < "$WORK/map" | tr -d ' ')
+core_floor=$(( floor - (reference_count - map_count) ))
+if [[ -n $core_macos ]]; then
+  core_count=$(wc -l < "$WORK/core-macos" | tr -d ' ')
+  (( core_count >= core_floor )) \
+    || violation "core macOS = $core_count results, below the core floor of $core_floor (floor $floor - $(( reference_count - map_count )) unmoved)"
+fi
 if [[ -n $hosted && -n $core_macos ]]; then
   total=$(( $(wc -l < "$WORK/hosted") + $(wc -l < "$WORK/core-macos") ))
   (( total >= floor )) || violation "hosted + core macOS = $total results, below the floor of $floor"
@@ -177,7 +188,7 @@ for file in $(find "$CORE_TESTS" -name '*.swift'); do
   done
 done
 
-echo "reference   $reference_count results; map: $(wc -l < "$WORK/map" | tr -d ' ') moved tests; floor $floor"
+echo "reference   $reference_count results; map: $map_count moved tests; floor $floor, core floor $core_floor"
 for input in hosted core-macos core-ios; do [[ -f $WORK/$input ]] && tally $input; done
 for input in core-macos core-ios; do
   [[ -f $WORK/$input ]] || continue
