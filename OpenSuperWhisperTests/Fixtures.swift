@@ -1,5 +1,7 @@
 import AVFoundation
 import Foundation
+import Metal
+import XCTest
 @testable import OpenSuperWhisper
 
 /// Files tracked at the repository root that tests read in place.
@@ -72,5 +74,31 @@ extension Fixtures {
         settings.useSurroundingTextAsContext = false
         settings.focusedText = nil
         return settings
+    }
+}
+
+extension Fixtures {
+    /// Skips a test whose expected output was recorded on an Apple Silicon Mac with its Metal GPU
+    /// (the Whisper goldens and the exact VAD boundaries). ggml picks its kernels from the CPU
+    /// and the GPU, so another machine can produce other strings for reasons unrelated to any
+    /// code change: an Intel or Rosetta build, a VM whose GPU is virtual or missing (CI's macos
+    /// runners). `OSW_GOLDEN_MACHINE=0`, passed as `TEST_RUNNER_OSW_GOLDEN_MACHINE=0` through
+    /// xcodebuild, skips them on purpose; a strict local run leaves it unset and enforces them.
+    static func requireGoldenMachine() throws {
+        if ProcessInfo.processInfo.environment["OSW_GOLDEN_MACHINE"] == "0" {
+            throw XCTSkip("OSW_GOLDEN_MACHINE=0: recorded outputs are not enforced on this machine")
+        }
+#if !arch(arm64)
+        throw XCTSkip("Recorded on arm64; this build runs other CPU kernels")
+#else
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            throw XCTSkip("No Metal device; whisper would run on the CPU only")
+        }
+        // Apple7 is the M1 family and up. A virtual GPU that reports no Apple family is skipped
+        // here; one that claims a family needs OSW_GOLDEN_MACHINE=0.
+        guard device.supportsFamily(.apple7) else {
+            throw XCTSkip("Metal device \(device.name) is not an Apple Silicon GPU")
+        }
+#endif
     }
 }

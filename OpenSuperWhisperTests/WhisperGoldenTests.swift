@@ -35,6 +35,11 @@ final class WhisperGoldenTests: XCTestCase {
 
     private var tempFiles: [URL] = []
 
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        try Fixtures.requireGoldenMachine()
+    }
+
     override func tearDown() {
         tempFiles.forEach { try? FileManager.default.removeItem(at: $0) }
         tempFiles = []
