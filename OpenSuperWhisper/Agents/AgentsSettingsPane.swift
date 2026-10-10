@@ -253,6 +253,7 @@ struct AgentsSettingsPane: View {
 
     static func abbreviated(_ path: String) -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
+        let insideHome = path == home || path.hasPrefix(home + "/")
+        return insideHome ? "~" + path.dropFirst(home.count) : path
     }
 }

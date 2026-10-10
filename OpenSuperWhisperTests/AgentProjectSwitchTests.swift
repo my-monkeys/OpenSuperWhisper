@@ -107,4 +107,12 @@ final class AgentProjectSwitchTests: XCTestCase {
         XCTAssertEqual(count("/a/e"), 0)
         XCTAssertEqual(count("/x"), 0, "a folder that is on keeps nothing off")
     }
+
+    func testOnlyPathsInsideTheHomeFolderGetATilde() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        XCTAssertEqual(AgentsSettingsPane.abbreviated(home), "~")
+        XCTAssertEqual(AgentsSettingsPane.abbreviated(home + "/code/site"), "~/code/site")
+        XCTAssertEqual(AgentsSettingsPane.abbreviated(home + "2/x"), home + "2/x")
+        XCTAssertEqual(AgentsSettingsPane.abbreviated("/tmp/x"), "/tmp/x")
+    }
 }
