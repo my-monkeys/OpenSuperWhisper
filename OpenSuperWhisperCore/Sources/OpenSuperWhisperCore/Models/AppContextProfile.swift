@@ -7,7 +7,7 @@ import Foundation
 ///
 /// This is independent of the general "AI Cleanup" prose pass: either can contribute to a single
 /// LLM call (see `LLMPostProcessor.assembleSystemPrompt`).
-public struct AppContextProfile: Codable, Identifiable, Equatable {
+public struct AppContextProfile: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var bundleIdentifier: String   // e.g. "com.tinyspeck.slackmacgap"
     public var appName: String            // display label, e.g. "Slack"

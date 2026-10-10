@@ -1,6 +1,6 @@
 import Foundation
 
-public struct SettingsDownloadableModel: Identifiable {
+public struct SettingsDownloadableModel: Identifiable, Sendable {
     public let id = UUID()
     public let name: String
     public var isDownloaded: Bool
@@ -103,7 +103,7 @@ public struct SettingsDownloadableModels {
     }
 }
 
-public struct SettingsFluidAudioModel: Identifiable {
+public struct SettingsFluidAudioModel: Identifiable, Sendable {
     public let id = UUID()
     public let name: String
     public let version: String

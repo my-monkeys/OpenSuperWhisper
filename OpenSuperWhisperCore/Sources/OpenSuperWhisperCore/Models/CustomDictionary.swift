@@ -4,14 +4,14 @@ import Foundation
 /// transcription it is rewritten to `replacement`. Useful for fixing proper
 /// nouns, brand names and domain jargon that the speech models consistently
 /// mis-transcribe (e.g. "git hub" -> "GitHub").
-public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable {
+public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable, Sendable {
 
     /// What the replacement does to the spaces around it.
     ///
     /// Dictating punctuation needs this. A rule turning the spoken "open quote" into `"` leaves
     /// `he said " hello "` if it only swaps the words, because the spaces that separated them
     /// are still there. Punctuation has to glue to the word it belongs to.
-    public enum Spacing: String, Codable {
+    public enum Spacing: String, Codable, Sendable {
         /// Replace the words and nothing else. Right for names and jargon.
         case standalone
         /// Also eat the space that follows, for an opening mark: `open quote hello` → `"hello`.

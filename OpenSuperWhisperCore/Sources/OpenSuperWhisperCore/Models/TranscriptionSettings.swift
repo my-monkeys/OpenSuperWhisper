@@ -3,7 +3,7 @@ import Foundation
 /// How one clip is transcribed: language, decoding options, prompt and dictionary. The macOS app
 /// builds it from its preferences (`Settings()` there); a host without them uses the memberwise
 /// initialiser.
-public struct TranscriptionSettings {
+public struct TranscriptionSettings: Sendable {
     public static let asianLanguages: Set<String> = ["zh", "ja", "ko"]
 
     public var selectedLanguage: String
