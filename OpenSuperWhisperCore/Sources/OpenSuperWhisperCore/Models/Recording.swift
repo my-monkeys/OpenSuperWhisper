@@ -533,10 +533,10 @@ public class RecordingStore: ObservableObject {
         Task { await enforceRetentionPolicy() }
 
         retentionTimer?.invalidate()
-        let timer = Timer.scheduledTimer(withTimeInterval: Self.retentionCheckInterval, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: Self.retentionCheckInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard CoreAccess.preferences.retentionMaxAgeEnabled else { return }
-                await RecordingStore.shared.enforceRetentionPolicy()
+                guard let self, CoreAccess.preferences.retentionMaxAgeEnabled else { return }
+                await self.enforceRetentionPolicy()
             }
         }
         RunLoop.main.add(timer, forMode: .common)

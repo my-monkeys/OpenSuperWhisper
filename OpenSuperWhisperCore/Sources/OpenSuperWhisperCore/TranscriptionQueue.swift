@@ -300,8 +300,8 @@ public class TranscriptionQueue: ObservableObject {
                 // The model that actually produced the text — the local fallback, not the
                 // configured/override model, when a remote rerun fell back to local.
                 let (modelUsed, wasFallback) = await MainActor.run {
-                    (TranscriptionService.shared.lastUsedModel?.displayName,
-                     TranscriptionService.shared.lastUsedFallback)
+                    (self.transcriptionService.lastUsedModel?.displayName,
+                     self.transcriptionService.lastUsedFallback)
                 }
                 await recordingStore.updateRecordingProgressOnlySync(
                     recording.id,
