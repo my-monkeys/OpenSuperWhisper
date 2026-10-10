@@ -33,16 +33,26 @@ enum Keychain {
     }
 
     static func set(_ value: String?, for account: String) {
-        let base: [String: Any] = [
+        SecItemDelete(itemQuery(for: account) as CFDictionary)
+        guard let value, !value.isEmpty, let data = value.data(using: .utf8) else { return }
+        SecItemAdd(addQuery(for: account, data: data) as CFDictionary, nil)
+    }
+
+    /// What `set` deletes by. Internal so a test can pin it.
+    static func itemQuery(for account: String) -> [String: Any] {
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-        SecItemDelete(base as CFDictionary)
-        guard let value, !value.isEmpty, let data = value.data(using: .utf8) else { return }
-        var add = base
+    }
+
+    /// What `set` adds. Internal so a test can pin the accessibility, which the legacy file
+    /// keychain the test host writes to does not report back on a read.
+    static func addQuery(for account: String, data: Data) -> [String: Any] {
+        var add = itemQuery(for: account)
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(add as CFDictionary, nil)
+        return add
     }
 }

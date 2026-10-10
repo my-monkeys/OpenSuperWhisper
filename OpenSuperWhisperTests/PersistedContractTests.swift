@@ -1,5 +1,6 @@
 import FluidAudio
 import KeyboardShortcuts
+import Security
 import XCTest
 
 @testable import OpenSuperWhisper
@@ -64,7 +65,12 @@ final class PersistedContractTests: XCTestCase {
 
     /// The account each secret is stored under, observed through the real accessors: written
     /// with the property, read back with the raw account name.
-    func testKeychainAccountNames() {
+    ///
+    /// Read back with a query written out here rather than through `Keychain.read`, which shares
+    /// its class and attributes with `Keychain.set`: a move that changed both the same way (another
+    /// item class, an access group, the data-protection keychain) would agree with itself and
+    /// still lose every key 0.13.3 saved. This is the lookup 0.13.3 does.
+    func testKeychainAccountNames() throws {
         let presetID = UUID(uuidString: "6F1C2B3A-0000-4000-8000-000000000001")!
         let presetAccount = "remotePreset.6F1C2B3A-0000-4000-8000-000000000001"
         let accounts = ["groqAPIKey", "remoteServerAPIKey", "aiRemoteAPIKey", presetAccount]
@@ -77,10 +83,49 @@ final class PersistedContractTests: XCTestCase {
         prefs.aiRemoteAPIKey = "cleanup-secret"
         RemoteUserPresets.setAPIKey("preset-secret", for: presetID)
 
-        XCTAssertEqual(Keychain.read("groqAPIKey"), "groq-secret")
-        XCTAssertEqual(Keychain.read("remoteServerAPIKey"), "remote-secret")
-        XCTAssertEqual(Keychain.read("aiRemoteAPIKey"), "cleanup-secret")
-        XCTAssertEqual(Keychain.read(presetAccount), "preset-secret")
+        let expected = [("groqAPIKey", "groq-secret"), ("remoteServerAPIKey", "remote-secret"),
+                        ("aiRemoteAPIKey", "cleanup-secret"), (presetAccount, "preset-secret")]
+        for (account, value) in expected {
+            let item = try XCTUnwrap(Self.keychainItem(account: account), account)
+            XCTAssertEqual((item[kSecValueData as String] as? Data).flatMap { String(data: $0, encoding: .utf8) },
+                           value, account)
+            // 0.13.3 sets no access group; `testKeychainAddAttributes` pins the write side.
+            XCTAssertNil(item[kSecAttrAccessGroup as String], account)
+        }
+    }
+
+    /// What every write adds, beyond the lookup attributes: the data and its accessibility.
+    /// Checked on the query because the legacy file keychain leaves `kSecAttrAccessible` out of
+    /// what a read returns (observed on macOS 27), so the item itself cannot show it.
+    func testKeychainAddAttributes() {
+        let data = Data("secret".utf8)
+        let add = Keychain.addQuery(for: "groqAPIKey", data: data)
+
+        XCTAssertEqual(Set(add.keys), [kSecClass as String, kSecAttrService as String, kSecAttrAccount as String,
+                                       kSecValueData as String, kSecAttrAccessible as String])
+        XCTAssertEqual(add[kSecClass as String] as? String, kSecClassGenericPassword as String)
+        XCTAssertEqual(add[kSecAttrService as String] as? String, Keychain.service)
+        XCTAssertEqual(add[kSecAttrAccount as String] as? String, "groqAPIKey")
+        XCTAssertEqual(add[kSecValueData as String] as? Data, data)
+        XCTAssertEqual(add[kSecAttrAccessible as String] as? String, kSecAttrAccessibleAfterFirstUnlock as String)
+        XCTAssertEqual(Set(Keychain.itemQuery(for: "groqAPIKey").keys),
+                       [kSecClass as String, kSecAttrService as String, kSecAttrAccount as String])
+    }
+
+    /// The generic-password lookup 0.13.3 does, with nothing added: no access group, no
+    /// data-protection keychain. Returns the item's attributes and its data.
+    private static func keychainItem(account: String) -> [String: Any]? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Keychain.service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess else { return nil }
+        return item as? [String: Any]
     }
 
     /// An empty string deletes the item rather than storing an empty secret, for both kinds of
