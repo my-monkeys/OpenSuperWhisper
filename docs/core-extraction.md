@@ -94,7 +94,8 @@ delete):
   included), the generated Xcode projects are identical apart from object IDs and the build
   directory, and ggml-cpu is compiled with `-DGGML_CPU_GENERIC` in both. The only configure
   difference is `GGML_OPENMP=OFF` instead of a NOTFOUND OpenMP; neither build has an OpenMP
-  symbol.
+  symbol. One thing this comparison could not see: built inside the app's xcodebuild, as
+  `notarize_app.sh` does, the subproject also got Xcode's coverage instrumentation (slice 2).
 
 Consequence, accepted on purpose: Debug builds and the test suite switch from native-kernel,
 -O0 ggml to the shipped configuration (generic kernels, Release). This closes a divergence
@@ -254,12 +255,33 @@ passes the full suite, and goes through an adversarial review before the next on
    wrappers. Measured against a Release build of the slice-1 commit, arm64 and x86_64: the load
    commands and the `Frameworks`/`Resources` listings differ only by libomp, the app defines
    `_whisper_full`, `_llama_backend_init` and `_ggml_backend_metal_reg` once, onnxruntime is
-   loaded on arm64 only, and the binary is about 4 MB smaller. Part of that is wrapper methods
-   nobody calls, now internal and dead-stripped with the C functions they referenced. The rest
-   is ggml code generation: the subproject as the app's own build drove it inlined more (for
-   instance `ggml_add_impl` into `ggml_add`) than the same targets built on their own, which is
-   how `build-native.sh` and slice 1's reference build them, although the compile command lines
-   match. Not explained yet; the goldens and VAD pins are unchanged.
+   loaded on arm64 only, and the binary is about 4 MB smaller (4.1 MB on arm64, 3.7 MB on
+   x86_64). A small part of that is wrapper methods nobody calls, now internal and
+   dead-stripped with the C functions they referenced. Most of it is coverage instrumentation:
+   `CLANG_COVERAGE_MAPPING` and `ENABLE_CODE_COVERAGE` resolve to YES for this scheme even in
+   Release (`xcodebuild -showBuildSettings -scheme OpenSuperWhisper -configuration Release`),
+   and Xcode applied them to the libwhisper subproject, so the slice-1 Release build and the
+   0.13.3 release compiled ggml, whisper and llama with `-fprofile-instr-generate
+   -fcoverage-mapping`. The flags sit in each target's `*-common-args.resp`, not on the
+   CompileC line, which is why the command lines looked identical. OSWNative is not
+   instrumented, so the swap removes the coverage counters from ggml's hot loops in shipped
+   builds: 0.13.3's arm64 binary holds 142 ggml `__profc_` counters, the swapped one none.
+   On arm64, `__llvm_covfun` goes from 2754864 to 824166 bytes, `__llvm_prf_cnts` from 538336
+   to 246056, `__llvm_prf_data` from 1223360 to 916800 and `__llvm_prf_names` from 840763 to
+   488485. The instrumentation also explains the inlining difference: the exact slice-1
+   compile of `ggml.c` inlines `ggml_add_impl` into `ggml_add` with the two flags and not
+   without them.
+   Floating-point semantics do not change. The goldens and VAD pins are unchanged on Apple
+   Silicon, and the x86_64 CPU kernels, which nothing else exercises, give byte-identical
+   results: a small C program transcribing `jfk.wav` (tiny.en, greedy, 4 threads, token
+   timestamps) and running the Silero VAD over it, under Rosetta, prints the same VAD
+   boundaries, segment times, token ids and token probabilities linked against OSWNative's
+   x86_64 slice and against an x86_64 build of the subproject with Xcode's coverage settings,
+   on the CPU backend (with BLAS) and on Metal. That does not replace the pre-merge release smoke check
+   (`jfk.wav` through both shipped binaries, x86_64 under Rosetta, identical to 0.13.3), which
+   stays a hard requirement for this change and has not run yet: the CLI reads the user's
+   configured engine and model, and the `--model`/`--raw` flags slice 0 lists are still to
+   come.
 3. `CoreConfiguration`, `TranscriptionSettings`, and the pure models and helpers.
 4. Engines, LLM cleanup, model managers and catalogs, the transcription service, recording
    storage and the queue.
@@ -280,7 +302,12 @@ patch in releases (ideally via a fork tag); native ARM kernels in releases; inte
 on model downloads; API keys sent over plain http; the remote local-fallback factory
 (`fallbackEngineChoice`) handing an option's identifier to Whisper as a model path for
 SenseVoice on Intel (`"default"`) and for any engine it does not know (`"remote"` included),
-and building the selected Whisper model for `"apple"` below macOS 26.
+and building the selected Whisper model for `"apple"` below macOS 26; Release builds still
+instrumenting all Swift code (the app, OpenSuperWhisperCore, OSWSenseVoice, FluidAudio, GRDB,
+KeyboardShortcuts, LiquidGlass), the app's Objective-C and FluidAudio's C targets for
+coverage, with the final link pulling in clang's profile runtime (fix with
+`CLANG_COVERAGE_MAPPING=NO ENABLE_CODE_COVERAGE=NO` on `notarize_app.sh`'s xcodebuild, since
+`-enableCodeCoverage` is only accepted when testing, and measure that change on its own).
 
 Credit: the module maps, the iOS xcframework flags, the consent seam and several tests come
 from PR #57 by @michael-wojcik.
