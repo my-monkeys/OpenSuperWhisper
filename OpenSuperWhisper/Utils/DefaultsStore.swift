@@ -60,6 +60,8 @@ enum DefaultsStore {
         "\(AppIdentity.bundleID).tests."
     }
 
+    /// Names both the defaults suite and `AppIdentity`'s storage root of a test process, so one
+    /// sweep rule can tell whether either is still in use.
     static func testSuiteName(for pid: Int32) -> String { "\(testSuitePrefix)\(pid)" }
 
     /// Empties suites left by earlier test processes. Done on the way in rather than at exit:
@@ -85,9 +87,9 @@ enum DefaultsStore {
         }
     }
 
-    /// Whether a suite belongs to a process that is gone. The scheme runs testables in
-    /// parallel, so a live sibling's suite must survive the sweep — deleting it would recreate
-    /// the very cross-process interference this file exists to stop.
+    /// Whether a suite or storage root belongs to a process that is gone. The scheme runs
+    /// testables in parallel, so a live sibling's suite must survive the sweep — deleting it
+    /// would recreate the very cross-process interference this file exists to stop.
     static func isAbandoned(_ suiteName: String) -> Bool {
         guard let pid = Int32(suiteName.dropFirst(testSuitePrefix.count)) else { return false }
         // kill(pid, 0) probes for existence without signalling; ESRCH means no such process.
