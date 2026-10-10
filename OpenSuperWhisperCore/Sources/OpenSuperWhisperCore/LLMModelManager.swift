@@ -10,7 +10,6 @@
 
 import Combine
 import Foundation
-import OpenSuperWhisperCore
 
 /// Reuses the same URLSession download-delegate shape as WhisperDownloadDelegate.
 /// Kept separate so the two managers don't share mutable delegate state.
@@ -52,19 +51,19 @@ class LLMDownloadDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownloadD
 }
 
 /// Descriptor for a downloadable LLM model.
-struct LLMModelDescriptor {
+public struct LLMModelDescriptor: Sendable {
     /// Human-readable name shown in UI.
-    let displayName: String
+    public let displayName: String
     /// On-disk filename (also used as the download "name" key).
-    let fileName: String
+    public let fileName: String
     /// Hugging Face (or other) download URL.
-    let downloadURL: URL
+    public let downloadURL: URL
     /// Approximate download size in bytes (for UI display).
-    let approxBytes: Int64
+    public let approxBytes: Int64
 }
 
-class LLMModelManager {
-    static let shared = LLMModelManager(storageRoot: CoreAccess.storageRoot)
+public class LLMModelManager {
+    public static let shared = LLMModelManager(storageRoot: CoreAccess.storageRoot)
 
     /// Default built-in cleanup model: Qwen2.5-1.5B-Instruct, GGUF Q4_K_M.
     /// Qwen2.5 is licensed Apache-2.0 (https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct/blob/main/LICENSE),
@@ -72,7 +71,7 @@ class LLMModelManager {
     /// Source: official Qwen first-party GGUF repo. Filename casing is exact —
     /// HF is case-sensitive and a wrong case is a silent 404 (verified 2026-06-27:
     /// HTTP 200, 1,117,320,736 bytes).
-    static let defaultModel = LLMModelDescriptor(
+    public static let defaultModel = LLMModelDescriptor(
         displayName: "Qwen2.5 1.5B Instruct (Q4_K_M)",
         fileName: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
         downloadURL: URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf?download=true")!,
@@ -98,11 +97,11 @@ class LLMModelManager {
     /// Everything offered in Settings, smallest first. Only models whose licence allows shipping a
     /// one-click download: Qwen2.5 is Apache-2.0 at 0.5B/1.5B/7B/14B — but **not** at 3B, which is
     /// under the non-commercial Qwen Research licence despite being the obvious middle step.
-    static let availableModels: [LLMModelDescriptor] = [defaultModel, largeModel]
+    public static let availableModels: [LLMModelDescriptor] = [defaultModel, largeModel]
 
     /// The descriptor for a stored file name, falling back to the default so an unknown or stale
     /// preference can never leave the app without a model.
-    static func model(fileName: String) -> LLMModelDescriptor {
+    public static func model(fileName: String) -> LLMModelDescriptor {
         availableModels.first { $0.fileName == fileName } ?? defaultModel
     }
 
@@ -145,12 +144,12 @@ class LLMModelManager {
     }
 
     /// On-disk location for a model by filename (whether or not it exists yet).
-    func localURL(for name: String) -> URL {
+    public func localURL(for name: String) -> URL {
         return modelsDirectory.appendingPathComponent(name)
     }
 
     /// Whether a specific model file is present on disk.
-    func isModelDownloaded(name: String) -> Bool {
+    public func isModelDownloaded(name: String) -> Bool {
         return FileManager.default.fileExists(atPath: localURL(for: name).path)
     }
 
@@ -160,7 +159,7 @@ class LLMModelManager {
     }
 
     /// Download a model with progress callback, reusing the WhisperModelManager pattern.
-    func downloadModel(url: URL, name: String, progressCallback: @escaping (Double) -> Void) async throws {
+    public func downloadModel(url: URL, name: String, progressCallback: @escaping (Double) -> Void) async throws {
         let destinationURL = localURL(for: name)
 
         if FileManager.default.fileExists(atPath: destinationURL.path) {
