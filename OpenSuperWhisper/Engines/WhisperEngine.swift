@@ -38,8 +38,9 @@ class WhisperEngine: TranscriptionEngine {
     private var progressContext: ProgressContext?
 
     /// When set, overrides the pref-selected model path — lets the remote local-fallback
-    /// build an engine for a specific model without mutating global prefs.
-    private let modelPathOverride: String?
+    /// build an engine for a specific model without mutating global prefs. Readable so a test
+    /// can check what the fallback factory passed.
+    let modelPathOverride: String?
 
     init(modelPathOverride: String? = nil) {
         self.modelPathOverride = modelPathOverride

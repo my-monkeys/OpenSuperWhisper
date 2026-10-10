@@ -13,8 +13,8 @@ class FluidAudioEngine: TranscriptionEngine {
 
     /// When set ("v2", "v3" or "ultra"), overrides the pref-selected model version — lets the
     /// remote local-fallback build an engine for a specific model without mutating
-    /// global prefs.
-    private let versionOverride: String?
+    /// global prefs. Readable so a test can check what the fallback factory passed.
+    let versionOverride: String?
 
     init(versionOverride: String? = nil) {
         self.versionOverride = versionOverride

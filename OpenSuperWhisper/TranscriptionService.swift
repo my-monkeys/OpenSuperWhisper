@@ -67,35 +67,7 @@ class TranscriptionService: ObservableObject {
 
         let kind = Self.engineKind(forSelectedEngine: selectedEngine)
         let result = await Task.detached(priority: .userInitiated) { () -> Result<TranscriptionEngine?, Error> in
-            let engine: TranscriptionEngine?
-
-            switch kind {
-            case .fluidAudio:
-                engine = await FluidAudioEngine()
-            case .senseVoice:
-#if arch(arm64)
-                engine = SenseVoiceEngine()
-#else
-                // Unreachable: engineKind never answers .senseVoice where it isn't compiled.
-                engine = await WhisperEngine()
-#endif
-            case .remote:
-                engine = RemoteEngine()
-            case .appleSpeech:
-#if canImport(FoundationModels)
-                if #available(macOS 26.0, *) {
-                    engine = AppleSpeechEngine()
-                } else {
-                    // Unreachable: engineKind never answers .appleSpeech below macOS 26.
-                    engine = await WhisperEngine()
-                }
-#else
-                // Unreachable: engineKind never answers .appleSpeech without FoundationModels.
-                engine = await WhisperEngine()
-#endif
-            case .whisper:
-                engine = await WhisperEngine()
-            }
+            let engine: TranscriptionEngine? = await Self.buildEngine(kind)
 
             do {
                 try await engine?.initialize()
@@ -151,6 +123,38 @@ class TranscriptionService: ObservableObject {
             return appleSpeechAvailable ? .appleSpeech : .whisper
         default:
             return .whisper
+        }
+    }
+
+    /// The engine `ensureEngineLoaded` builds for `kind`, not yet initialized. No init here
+    /// loads anything (they only store their arguments), so tests can check the class.
+    nonisolated static func buildEngine(_ kind: EngineKind) async -> TranscriptionEngine {
+        switch kind {
+        case .fluidAudio:
+            return await FluidAudioEngine()
+        case .senseVoice:
+#if arch(arm64)
+            return SenseVoiceEngine()
+#else
+            // Unreachable: engineKind never answers .senseVoice where it isn't compiled.
+            return await WhisperEngine()
+#endif
+        case .remote:
+            return RemoteEngine()
+        case .appleSpeech:
+#if canImport(FoundationModels)
+            if #available(macOS 26.0, *) {
+                return AppleSpeechEngine()
+            } else {
+                // Unreachable: engineKind never answers .appleSpeech below macOS 26.
+                return await WhisperEngine()
+            }
+#else
+            // Unreachable: engineKind never answers .appleSpeech without FoundationModels.
+            return await WhisperEngine()
+#endif
+        case .whisper:
+            return await WhisperEngine()
         }
     }
 
@@ -379,33 +383,76 @@ class TranscriptionService: ObservableObject {
     /// local-fallback), without touching the global engine/model prefs. Runs the load
     /// off the main actor, like `ensureEngineLoaded`.
     private func makeEngine(for option: DictationModelOption) async throws -> TranscriptionEngine {
-        try await Task.detached(priority: .userInitiated) { () -> TranscriptionEngine in
-            let engine: TranscriptionEngine
-            switch option.engine {
-            case "fluidaudio":
-                engine = await FluidAudioEngine(versionOverride: option.identifier)
-            case "apple":
-#if canImport(FoundationModels)
-                if #available(macOS 26.0, *) {
-                    engine = AppleSpeechEngine()
-                } else {
-                    engine = await WhisperEngine()
-                }
-#else
-                engine = await WhisperEngine()
-#endif
-            case "sensevoice":
-#if arch(arm64)
-                engine = SenseVoiceEngine()
-#else
-                engine = await WhisperEngine(modelPathOverride: option.identifier)
-#endif
-            default: // "whisper"
-                engine = await WhisperEngine(modelPathOverride: option.identifier)
-            }
+        let choice = Self.fallbackEngineChoice(for: option)
+        return try await Task.detached(priority: .userInitiated) { () -> TranscriptionEngine in
+            let engine = await Self.buildFallbackEngine(choice)
             try await engine.initialize()
             return engine
         }.value
+    }
+
+    /// The engines the remote local-fallback can build, with what each is given. Separate from
+    /// `EngineKind` because this factory has its own quirks, kept as they are (see below).
+    enum FallbackEngineChoice: Equatable {
+        case fluidAudio(version: String)
+        case appleSpeech
+        case senseVoice
+        case whisper(modelPathOverride: String?)
+    }
+
+    /// Which engine `makeEngine(for:)` builds for the configured fallback model. The gates are
+    /// parameters, like `engineKind`'s, so both sides can be tested on any machine.
+    ///
+    /// Three answers look wrong and are pinned as they are. "apple" without Apple Speech gets
+    /// Whisper with no override, so the user's selected Whisper model rather than the fallback.
+    /// "sensevoice" without SenseVoice passes the option's identifier, which is "default", as a
+    /// Whisper model path, which cannot load. Any other engine, "remote" included, also passes
+    /// its identifier as a Whisper model path.
+    nonisolated static func fallbackEngineChoice(
+        for option: DictationModelOption,
+        senseVoiceAvailable: Bool = isSenseVoiceCompiled,
+        appleSpeechAvailable: Bool = isAppleSpeechAvailable
+    ) -> FallbackEngineChoice {
+        switch option.engine {
+        case "fluidaudio":
+            return .fluidAudio(version: option.identifier)
+        case "apple":
+            return appleSpeechAvailable ? .appleSpeech : .whisper(modelPathOverride: nil)
+        case "sensevoice":
+            // SenseVoice has a single model, so the identifier is ignored where it is compiled.
+            return senseVoiceAvailable ? .senseVoice : .whisper(modelPathOverride: option.identifier)
+        default: // "whisper"
+            return .whisper(modelPathOverride: option.identifier)
+        }
+    }
+
+    /// The engine `makeEngine(for:)` builds for `choice`, not yet initialized.
+    nonisolated static func buildFallbackEngine(_ choice: FallbackEngineChoice) async -> TranscriptionEngine {
+        switch choice {
+        case .fluidAudio(let version):
+            return await FluidAudioEngine(versionOverride: version)
+        case .appleSpeech:
+#if canImport(FoundationModels)
+            if #available(macOS 26.0, *) {
+                return AppleSpeechEngine()
+            } else {
+                // Unreachable: fallbackEngineChoice never answers .appleSpeech below macOS 26.
+                return await WhisperEngine()
+            }
+#else
+            // Unreachable: fallbackEngineChoice never answers .appleSpeech without FoundationModels.
+            return await WhisperEngine()
+#endif
+        case .senseVoice:
+#if arch(arm64)
+            return SenseVoiceEngine()
+#else
+            // Unreachable: fallbackEngineChoice never answers .senseVoice where it isn't compiled.
+            return await WhisperEngine()
+#endif
+        case .whisper(let modelPathOverride):
+            return await WhisperEngine(modelPathOverride: modelPathOverride)
+        }
     }
 
     /// Whether a failed remote transcription should retry on the local fallback: only
