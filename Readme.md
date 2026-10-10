@@ -168,6 +168,25 @@ Contributions are welcome — issues, focused PRs, or big ideas
 menu of features). Open items live in the
 [issue tracker](https://github.com/my-monkeys/OpenSuperWhisper/issues).
 
+How the code is laid out: `OpenSuperWhisper/` is the macOS app (UI, audio capture, text insertion,
+shortcuts). `OpenSuperWhisperCore/` is a local Swift package with the transcription core shared with
+a future iPhone app: engines, model managers, LLM cleanup, recording storage and the queue. Its
+native libraries (whisper.cpp, llama.cpp and their one ggml) come from the `libwhisper/` submodules
+and are built into `OpenSuperWhisperCore/Binaries/` by `Scripts/build-native.sh`, which `./run.sh
+build` calls for you. [`docs/core-extraction.md`](docs/core-extraction.md) explains the split.
+
+Tests, after `./run.sh build`:
+
+- the app's suite: `xcodebuild test -scheme OpenSuperWhisper -derivedDataPath build
+  -clonedSourcePackagesDirPath SourcePackages -destination 'platform=macOS,arch=arm64'
+  -only-testing:OpenSuperWhisperTests` (the same derived data and packages as `run.sh`);
+- the core's: `Scripts/test-core.sh macos` and `Scripts/test-core.sh ios` (iOS Simulator).
+
+Never run `swift test` in `OpenSuperWhisperCore/`: it resolves the packages on its own, without the
+FluidAudio patch `run.sh` applies, and writes a `Package.resolved` nobody should commit. After a
+submodule bump (`git submodule update`), run `./run.sh build` again so the native libraries are
+rebuilt before Xcode resolves the packages.
+
 ## Also from My-Monkey
 
 Two other free, open-source apps from the same collective:
