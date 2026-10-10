@@ -36,7 +36,7 @@ jobs:
           inputs=$( (git submodule status libwhisper | awk '{print $1, $2}'; xcodebuild -version; cmake --version) | shasum -a 256 | cut -d' ' -f1)
           echo "key=native-${inputs}" >> "$GITHUB_OUTPUT"
       - name: Restore the native xcframeworks
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: OpenSuperWhisperCore/Binaries
           key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
