@@ -328,18 +328,15 @@ timing of 4.5 to 4.7); G5 to G7 ran once per slice.
    line, and "libomp: linked no, embedded no". Transcripts, VAD segments, Metal, exit codes,
    rpaths, onnxruntime per architecture, the single `_whisper_full` and
    `_ggml_backend_metal_reg`, and the VAD resource are unchanged. The new reports are
-   `docs/smoke/post-swap-<arch>.txt`. Still to do on a signed build: the signature check,
-   which the unsigned builds skip. Steps, in the OpenSuperWhisper-core checkout, never the
-   main one, and never with `make_release.sh`, which bumps the version, tags and pushes:
-   1. `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./notarize_app.sh "$IDENTITY" arm64`
-      (signs, notarizes and builds `OpenSuperWhisper-arm64.dmg`, which is not uploaded).
-   2. Before the next architecture overwrites `build/`, which both write:
-      `Scripts/smoke-release.sh build/Build/Products/Release/OpenSuperWhisper.app --expect docs/smoke/post-swap-arm64.txt`.
-      It must print "smoke-release: signature valid" and "smoke-release: OK", and not the
-      "not signed" note.
-   3. The same two steps with `x86_64` and `post-swap-x86_64.txt`.
-   4. `Scripts/build-native.sh all` to rebuild the iOS slices the release build dropped, and
-      `./run.sh build` for the dev derived data that `notarize_app.sh`'s `rm -rf build` deleted.
+   `docs/smoke/post-swap-<arch>.txt`. Signed check, done on 2026-10-10 on the final branch (d188bc2) with
+   the stable Xcode 27.0, in the OpenSuperWhisper-core checkout and never with `make_release.sh`:
+   `notarize_app.sh "Developer ID Application: …" <arch>` for arm64 then x86_64, each followed by
+   `Scripts/smoke-release.sh build/Build/Products/Release/OpenSuperWhisper.app --expect
+   docs/smoke/post-swap-<arch>.txt`. Both printed "signature valid" and "OK", `xcrun stapler
+   validate` passed, `spctl -a -vvv -t exec` gave "accepted, source=Notarized Developer ID", and
+   `codesign -dv` showed `flags=0x10000(runtime)`. The DMGs were not uploaded. To repeat it after
+   a change to the release path: the same commands, then `Scripts/build-native.sh all` and
+   `./run.sh build`, since `notarize_app.sh` deletes `build/` and leaves macOS slices only.
 3. `CoreConfiguration`, `TranscriptionSettings`, and the pure models and helpers.
    Done, in six code commits plus this record, each building and passing the suite, then four
    review follow-ups (deviations 13 to 15 and a tighter consent test). `DefaultsStore`, `AppIdentity`,
