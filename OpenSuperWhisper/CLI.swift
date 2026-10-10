@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OpenSuperWhisperCore
 
 /// Headless command-line transcription (#150). Reached from the app's entry point when the first
 /// argument is `transcribe`, so it reuses the exact same engines as the GUI without a second target.
@@ -243,20 +244,21 @@ extension Settings {
     /// Each field is set here rather than starting from `Settings()`, so neither the preferences
     /// nor the prompt file are read.
     init(freshInstallLanguage language: String) {
-        self.selectedLanguage = language
-        self.translateToEnglish = false
-        self.suppressBlankAudio = true
-        self.showTimestamps = false
-        self.temperature = 0
-        self.noSpeechThreshold = 0.6
-        self.initialPrompt = ""
-        self.useBeamSearch = false
-        self.beamSize = 5
-        self.useAsianAutocorrect = true
-        self.customDictionaryEnabled = false
-        self.customDictionaryBoostEnabled = false
-        self.customDictionaryEntries = []
-        self.useSurroundingTextAsContext = false
-        self.focusedText = nil
+        self.init(
+            selectedLanguage: language,
+            translateToEnglish: false,
+            suppressBlankAudio: true,
+            showTimestamps: false,
+            temperature: 0,
+            noSpeechThreshold: 0.6,
+            initialPrompt: "",
+            useBeamSearch: false,
+            beamSize: 5,
+            useAsianAutocorrect: true,
+            customDictionaryEnabled: false,
+            customDictionaryBoostEnabled: false,
+            customDictionaryEntries: [],
+            useSurroundingTextAsContext: false,
+            focusedText: nil)
     }
 }

@@ -1336,9 +1336,9 @@ class SettingsViewModel: ObservableObject {
     }
 }
 
-struct Settings {
-    static let asianLanguages: Set<String> = ["zh", "ja", "ko"]
+typealias Settings = TranscriptionSettings
 
+extension TranscriptionSettings {
     /// A prompt kept in a file wins over the one typed in Settings.
     ///
     /// Whisper copies the style of whatever it is primed with, so anyone writing to a house
@@ -1369,42 +1369,6 @@ struct Settings {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
-    
-    var selectedLanguage: String
-    var translateToEnglish: Bool
-    var suppressBlankAudio: Bool
-    var showTimestamps: Bool
-    var temperature: Double
-    var noSpeechThreshold: Double
-    var initialPrompt: String
-    var useBeamSearch: Bool
-    var beamSize: Int
-    var useAsianAutocorrect: Bool
-    var customDictionaryEnabled: Bool
-    var customDictionaryBoostEnabled: Bool
-    var customDictionaryEntries: [CustomDictionaryEntry]
-    var useSurroundingTextAsContext: Bool
-    /// The field's contents at record-start, set per clip by the pipeline rather than read from
-    /// preferences: it belongs to one dictation, not to the app's standing configuration.
-    var focusedText: String?
-
-    var isAsianLanguage: Bool {
-        Settings.asianLanguages.contains(selectedLanguage)
-    }
-
-    var shouldApplyAsianAutocorrect: Bool {
-        isAsianLanguage && useAsianAutocorrect
-    }
-
-    var shouldApplyCustomDictionary: Bool {
-        customDictionaryEnabled && !customDictionaryEntries.isEmpty
-    }
-
-    /// Whether to also bias recognition toward the dictionary terms (opt-in, on top of the
-    /// always-on text replacement). Gated by the separate `customDictionaryBoostEnabled` flag.
-    var shouldBoostCustomDictionary: Bool {
-        customDictionaryBoostEnabled && shouldApplyCustomDictionary
-    }
 
     init() {
         let prefs = AppPreferences.shared
@@ -1412,25 +1376,26 @@ struct Settings {
         // not a language, and the file-drop queue and the CLI build a Settings of their own
         // without going through the dictation pipeline. They get the layout as it is now; the
         // pipeline overrides this with the layout as it was when the clip was recorded (#120).
-        self.selectedLanguage = KeyboardLanguage.language(
-            for: prefs.whisperLanguage,
-            resolved: prefs.whisperLanguage == KeyboardLanguage.selectionCode
-                ? KeyboardLanguage.current(engine: prefs.selectedEngine,
-                                           fluidAudioModelVersion: prefs.fluidAudioModelVersion)
-                : nil)
-        self.translateToEnglish = prefs.translateToEnglish
-        self.suppressBlankAudio = prefs.suppressBlankAudio
-        self.showTimestamps = prefs.showTimestamps
-        self.temperature = prefs.temperature
-        self.noSpeechThreshold = prefs.noSpeechThreshold
-        self.initialPrompt = Settings.promptFileContents() ?? prefs.initialPrompt
-        self.useBeamSearch = prefs.useBeamSearch
-        self.beamSize = prefs.beamSize
-        self.useAsianAutocorrect = prefs.useAsianAutocorrect
-        self.customDictionaryEnabled = prefs.customDictionaryEnabled
-        self.customDictionaryBoostEnabled = prefs.customDictionaryBoostEnabled
-        self.customDictionaryEntries = prefs.customDictionaryEntries
-        self.useSurroundingTextAsContext = prefs.useSurroundingTextAsContext
+        self.init(
+            selectedLanguage: KeyboardLanguage.language(
+                for: prefs.whisperLanguage,
+                resolved: prefs.whisperLanguage == KeyboardLanguage.selectionCode
+                    ? KeyboardLanguage.current(engine: prefs.selectedEngine,
+                                               fluidAudioModelVersion: prefs.fluidAudioModelVersion)
+                    : nil),
+            translateToEnglish: prefs.translateToEnglish,
+            suppressBlankAudio: prefs.suppressBlankAudio,
+            showTimestamps: prefs.showTimestamps,
+            temperature: prefs.temperature,
+            noSpeechThreshold: prefs.noSpeechThreshold,
+            initialPrompt: Settings.promptFileContents() ?? prefs.initialPrompt,
+            useBeamSearch: prefs.useBeamSearch,
+            beamSize: prefs.beamSize,
+            useAsianAutocorrect: prefs.useAsianAutocorrect,
+            customDictionaryEnabled: prefs.customDictionaryEnabled,
+            customDictionaryBoostEnabled: prefs.customDictionaryBoostEnabled,
+            customDictionaryEntries: prefs.customDictionaryEntries,
+            useSurroundingTextAsContext: prefs.useSurroundingTextAsContext)
     }
 }
 
