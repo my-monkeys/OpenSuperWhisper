@@ -186,6 +186,13 @@ passes the full suite, and goes through an adversarial review before the next on
      architectures, app path and Homebrew-style symlink, VAD load line, Metal init, exit
      code with a model loaded, one ggml, no libomp, signature); CI runs the unit tests
      (serially, timing-sensitive host tests skipped) and an x86_64 Release build.
+     The Whisper goldens and the exact VAD boundaries are only promised on an Apple Silicon
+     Mac with its Metal GPU: `Fixtures.requireGoldenMachine()` skips them on another arch, with
+     no Metal device or a GPU outside the Apple families, and when
+     `TEST_RUNNER_OSW_GOLDEN_MACHINE=0` is set, which CI sets unless its runner is known to
+     match. The llama lifecycle test reads its model only from `TEST_RUNNER_OSW_TEST_GGUF` and
+     skips without it; the required-tests check sets it, so the llama half cannot drop out
+     unnoticed.
 1. Native build script and an empty core package wired into the app (Debug, Release,
    x86_64, iOS Simulator), proving module lookup without linking any native symbol from it,
    hosted `@testable` access, and no duplicate copy in the test bundle.
