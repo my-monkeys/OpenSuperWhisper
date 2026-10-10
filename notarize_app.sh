@@ -126,6 +126,10 @@ cp vendor/onnxruntime/libonnxruntime.1.24.4.dylib ./build/libonnxruntime.1.24.4.
 ln -sf libonnxruntime.1.24.4.dylib ./build/libonnxruntime.dylib
 codesign --force --sign "${CODE_SIGN_IDENTITY}" --timestamp ./build/libonnxruntime.1.24.4.dylib
 
+# Code coverage off: Xcode turns it on for the scheme by default, and an instrumented Release
+# binary wrote a default.profraw into the working directory on every CLI run (0.13.3 and
+# earlier), besides carrying ~4 MB of counters. The project setting alone does not win over
+# the scheme, a command-line setting does.
 xcodebuild \
   -scheme "OpenSuperWhisper" \
   -configuration Release \
@@ -136,6 +140,7 @@ xcodebuild \
   CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY}" \
   OTHER_CODE_SIGN_FLAGS=--timestamp \
   CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+  CLANG_COVERAGE_MAPPING=NO ENABLE_CODE_COVERAGE=NO \
   -derivedDataPath build \
   build | xcpretty --simple --color
 
