@@ -1,14 +1,13 @@
 import FluidAudio
 import Foundation
-import OpenSuperWhisperCore
 
 /// Single source of truth for which models are actually usable right now
 /// (downloaded locally, or advertised by the configured remote server) and for
 /// applying a selection. The menu and the context rules read from here so they
 /// always agree.
-enum ModelCatalog {
+public enum ModelCatalog {
     /// Downloaded whisper.cpp model files.
-    static func whisperModels() -> [DictationModelOption] {
+    public static func whisperModels() -> [DictationModelOption] {
         WhisperModelManager.shared.getAvailableModels().map { url in
             DictationModelOption(
                 engine: "whisper",
@@ -20,7 +19,7 @@ enum ModelCatalog {
 
     /// Downloaded Parakeet (FluidAudio) model versions only — hide ones that
     /// aren't on disk, since the menu must never trigger a download.
-    static func parakeetModels() -> [DictationModelOption] {
+    public static func parakeetModels() -> [DictationModelOption] {
         SettingsFluidAudioModels.availableModels.compactMap { model in
             let version = AsrModelVersion(preference: model.version)
             let cache = AsrModels.defaultCacheDirectory(for: version)
@@ -34,7 +33,7 @@ enum ModelCatalog {
     }
 
     /// SenseVoice — a single (int8) model, arm64-only and only when downloaded.
-    static func senseVoiceModels() -> [DictationModelOption] {
+    public static func senseVoiceModels() -> [DictationModelOption] {
 #if os(macOS) && arch(arm64)
         guard SenseVoiceModelManager.shared.isDownloaded else { return [] }
         return [DictationModelOption(engine: "sensevoice", identifier: "default", displayName: "SenseVoice")]
@@ -47,7 +46,7 @@ enum ModelCatalog {
     /// settings panel when it last fetched. The currently-selected model is
     /// always included even if the cache is empty/stale, so the active choice is
     /// never missing from the list.
-    static func remoteModels() -> [DictationModelOption] {
+    public static func remoteModels() -> [DictationModelOption] {
         var ids = CoreAccess.preferences.cachedRemoteModels
         let current = CoreAccess.preferences.remoteServerModel
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -69,12 +68,12 @@ enum ModelCatalog {
 
     /// Every usable model across engines. Used to decide whether switching is
     /// even meaningful (one model → nothing to choose).
-    static func allAvailable() -> [DictationModelOption] {
+    public static func allAvailable() -> [DictationModelOption] {
         whisperModels() + parakeetModels() + senseVoiceModels() + appleSpeechModels() + remoteModels()
     }
 
     /// The model currently in effect (active engine + its selected model).
-    static func activeOption() -> DictationModelOption? {
+    public static func activeOption() -> DictationModelOption? {
         let prefs = CoreAccess.preferences
         switch prefs.selectedEngine {
         case "whisper":
@@ -106,7 +105,7 @@ enum ModelCatalog {
 
     /// Switch the active engine + model, then invalidate the engine so the next
     /// recording re-initializes with the new choice. Mirrors the Settings UI.
-    static func activate(_ option: DictationModelOption) {
+    public static func activate(_ option: DictationModelOption) {
         let prefs = CoreAccess.preferences
         prefs.selectedEngine = option.engine
         switch option.engine {
@@ -129,4 +128,10 @@ enum ModelCatalog {
         // Settings window to reflect this change (it caches its own @Published copies).
         NotificationCenter.default.post(name: .modelSelectionDidChange, object: nil)
     }
+}
+
+public extension Notification.Name {
+    /// Posted when the active engine/model changes outside the Settings view (the
+    /// menu-bar Model picker), so an open Settings window re-syncs from AppPreferences.
+    static let modelSelectionDidChange = Notification.Name("ModelSelectionDidChange")
 }

@@ -1,23 +1,22 @@
 import AVFoundation
 import Foundation
-import OpenSuperWhisperCore
 
 @MainActor
-class TranscriptionService: ObservableObject {
-    static let shared = TranscriptionService()
+public class TranscriptionService: ObservableObject {
+    public static let shared = TranscriptionService()
 
     /// One-permit gate serializing every transcription across the whole app. See the note in
     /// `transcribeAudio` — the engines share one non-thread-safe context. (parallel-recording #2)
     private static let engineGate = AsyncSemaphore(1)
 
-    @Published private(set) var isTranscribing = false
+    @Published public private(set) var isTranscribing = false
     @Published private(set) var transcribedText = ""
     @Published private(set) var currentSegment = ""
-    @Published private(set) var isLoading = false
-    @Published private(set) var progress: Float = 0.0
+    @Published public private(set) var isLoading = false
+    @Published public private(set) var progress: Float = 0.0
     @Published private(set) var isConverting = false
     @Published private(set) var conversionProgress: Float = 0.0
-    @Published private(set) var engineError: String?
+    @Published public private(set) var engineError: String?
 
     var isEngineReady: Bool {
         currentEngine != nil && !isLoading
@@ -30,8 +29,8 @@ class TranscriptionService: ObservableObject {
     /// The model that actually produced the most recent transcription, and whether it
     /// came from the remote local-fallback. Read by the recording-save paths so history
     /// shows the real model (and flags fallbacks). Set on the main actor per run.
-    private(set) var lastUsedModel: DictationModelOption?
-    private(set) var lastUsedFallback = false
+    public private(set) var lastUsedModel: DictationModelOption?
+    public private(set) var lastUsedFallback = false
     private var transcriptionTask: Task<String, Error>? = nil
     private var isCancelled = false
     
@@ -42,7 +41,7 @@ class TranscriptionService: ObservableObject {
         // transcribe with that engine.
     }
 
-    func cancelTranscription() {
+    public func cancelTranscription() {
         isCancelled = true
         currentEngine?.cancelTranscription()
         transcriptionTask?.cancel()
@@ -178,13 +177,13 @@ class TranscriptionService: ObservableObject {
     /// (used when the engine selection or model changes). Intentionally does NOT
     /// load or download anything — that's deferred to next use. Clears any stale
     /// load error, since the invalidated engine gets a fresh attempt next time.
-    func reloadEngine() {
+    public func reloadEngine() {
         currentEngine = nil
         loadedEngineKind = nil
         engineError = nil
     }
     
-    func reloadModel(with path: String) {
+    public func reloadModel(with path: String) {
         if CoreAccess.preferences.selectedEngine == "whisper" {
             CoreAccess.preferences.selectedWhisperModelPath = path
             reloadEngine()
@@ -225,7 +224,7 @@ class TranscriptionService: ObservableObject {
         }
     }
     
-    func transcribeAudio(url: URL, settings: TranscriptionSettings, modelOverride: DictationModelOption? = nil) async throws -> String {
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings, modelOverride: DictationModelOption? = nil) async throws -> String {
         // Serialize every transcription across the app (dictation pipeline, file-drop queue,
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
