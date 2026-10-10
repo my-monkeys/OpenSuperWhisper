@@ -73,4 +73,19 @@ final class AgentProjectSwitchTests: XCTestCase {
             disabled: ["/Users/me/code/site", "/Users/me/Documents", "/Users/me"])
         XCTAssertEqual(listed, ["/Users/me", "/Users/me/Documents", "/Users/me/code/site", "/Users/me/code/app"])
     }
+
+    func testARowUnderATurnedOffFolderNamesThatFolder() {
+        XCTAssertEqual(AgentsSettingsPane.folderTurningOff("/code/site", disabled: ["/code"]), "/code")
+        XCTAssertNil(AgentsSettingsPane.folderTurningOff("/code/site", disabled: ["/code/site"]))
+        XCTAssertNil(AgentsSettingsPane.folderTurningOff("/code", disabled: ["/code/site"]))
+    }
+
+    /// A project turned off on its own, then its folder: the row names the folder (and locks its
+    /// switch) rather than offering a switch that would drop the project's own setting.
+    func testAProjectOffOnItsOwnAndByItsFolderNamesTheFolder() {
+        let disabled = ["/code/site", "/code"]
+        XCTAssertEqual(AgentsSettingsPane.folderTurningOff("/code/site", disabled: disabled), "/code")
+        XCTAssertEqual(turnedOff("/code/site", disabled.filter { $0 != "/code" }), "/code/site",
+                       "the folder back on, the project is still off on its own")
+    }
 }

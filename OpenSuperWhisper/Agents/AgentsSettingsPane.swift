@@ -189,14 +189,15 @@ struct AgentsSettingsPane: View {
 
     private func projectRow(_ path: String) -> some View {
         let turnedOffBy = AppPreferences.agentProjectTurnedOff(path, by: disabledProjects)
-        let parent = turnedOffBy == path ? nil : turnedOffBy
+        let parent = Self.folderTurningOff(path, disabled: disabledProjects)
         let coveredBelow = projects.filter { $0 != path && AppPreferences.agentFolder(path, covers: $0) }.count
         return VStack(alignment: .leading, spacing: 2) {
             SRow(title: LocalizedStringKey(URL(fileURLWithPath: path).lastPathComponent),
                  hint: LocalizedStringKey(Self.abbreviated(path))) {
-                // Under a turned-off folder the switch stays put: the folder's rule covers
-                // everything below it, and turning the folder on from here would also turn on
-                // its other projects without saying so.
+                // Under a turned-off folder the switch stays put, even when the project is also
+                // off on its own: the folder's rule covers everything below it, turning the
+                // folder on from here would also turn on its other projects without saying so,
+                // and turning this one on would change nothing until the folder is back on.
                 SToggle(isOn: projectBinding(path), disabled: !enabled || parent != nil)
             }
             if let parent {
@@ -225,6 +226,13 @@ struct AgentsSettingsPane: View {
                 AppPreferences.shared.setAgentProject(path, enabled: on)
                 disabledProjects = AppPreferences.shared.agentDisabledProjects
             })
+    }
+
+    /// The turned-off folder above `path` that keeps it off whatever its own switch says. The
+    /// project's own entry is left out, so it survives while the folder is off and the row
+    /// reads it again once the folder is back on.
+    static func folderTurningOff(_ path: String, disabled: [String]) -> String? {
+        AppPreferences.agentProjectTurnedOff(path, by: disabled.filter { $0 != path })
     }
 
     /// The recent projects, after the turned-off folders that are not among them. A folder that
