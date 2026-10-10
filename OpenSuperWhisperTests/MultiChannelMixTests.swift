@@ -48,8 +48,7 @@ final class MultiChannelMixTests: XCTestCase {
     func testParakeetHearsSpeechOnFirstOfFourChannels() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["OSW_TEST_FLUIDAUDIO"] == "1",
                           "Needs the Parakeet models")
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        let source = try AVAudioFile(forReading: root.appendingPathComponent("jfk.wav"))
+        let source = try AVAudioFile(forReading: Fixtures.jfkWav)
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: source.processingFormat,
                                                     frameCapacity: AVAudioFrameCount(source.length)))
         try source.read(into: buffer)
