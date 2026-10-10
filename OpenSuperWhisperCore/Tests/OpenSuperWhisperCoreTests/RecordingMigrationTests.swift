@@ -1,7 +1,6 @@
 import GRDB
 import XCTest
 
-@testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
 /// The rows inside `Fixtures/recordings-0.13.3.sqlite`. The file was written once, before any
@@ -46,7 +45,7 @@ enum RecordingMigrationFixture {
 /// anything is shown. These tests pin the identifiers, the schema they produce, and that a
 /// database written by 0.13.3 opens unchanged and maps back to the same values.
 @MainActor
-final class RecordingMigrationTests: XCTestCase {
+final class RecordingMigrationTests: CoreTestCase {
 
     private var directory: URL!
 
@@ -119,7 +118,7 @@ final class RecordingMigrationTests: XCTestCase {
     /// From the test bundle, where the synchronized group copies it, so the tests do not depend
     /// on the source checkout sitting where it was compiled.
     private func copyOfFixture() throws -> URL {
-        let fixture = try XCTUnwrap(Bundle(for: RecordingMigrationTests.self)
+        let fixture = try XCTUnwrap(Bundle.module
             .url(forResource: "recordings-0.13.3", withExtension: "sqlite"))
         let copy = directory.appendingPathComponent("recordings.sqlite")
         try FileManager.default.copyItem(at: fixture, to: copy)

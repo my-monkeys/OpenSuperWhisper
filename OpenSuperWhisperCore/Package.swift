@@ -47,6 +47,7 @@ let package = Package(
             name: "OpenSuperWhisperCoreTests",
             dependencies: ["OpenSuperWhisperCore",
                            .product(name: "GRDB", package: "GRDB.swift")],
+            resources: [.copy("Fixtures/recordings-0.13.3.sqlite")],
             linkerSettings: [
                 // sherpa (OSWSenseVoice) references OrtGetApiBase on Apple Silicon Macs. The app
                 // links onnxruntime itself and the library product never does; here the test
