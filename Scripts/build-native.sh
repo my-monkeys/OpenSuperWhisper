@@ -157,11 +157,14 @@ rm -f "$STAMP"
 mkdir -p "$WORK" "$OUT"
 
 # Configures and builds one slice; leaves the merged archive at $WORK/<slice>/libOSWNative.a.
-# The configure directory is reused (incremental build) unless the arguments or toolchain changed.
+# The configure directory is reused (incremental build) unless the arguments, the toolchain, the
+# submodule commits or libwhisper/CMakeLists.txt changed: a bump that drops a target would leave
+# its stale archive behind and fail the archive check below on every run.
 build_slice() {
   local slice="$1" dir="$WORK/$1" logfile="$WORK/$1.log" key started=$SECONDS
   slice_args "$slice"
-  key="$(printf '%s\n' "${ARGS[@]}"; toolchain)"
+  key="$(printf '%s\n' "${ARGS[@]}"; toolchain; git -C "$SRC/whisper.cpp" rev-parse HEAD
+         git -C "$SRC/llama.cpp" rev-parse HEAD; shasum -a 256 <"$SRC/CMakeLists.txt")"
   if [[ "$FORCE" == 1 || "$(cat "$dir/.configure-key" 2>/dev/null || true)" != "$key" ]]; then
     rm -rf "$dir"
   fi
