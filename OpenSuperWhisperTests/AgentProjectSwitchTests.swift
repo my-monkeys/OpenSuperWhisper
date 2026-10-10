@@ -88,4 +88,16 @@ final class AgentProjectSwitchTests: XCTestCase {
         XCTAssertEqual(turnedOff("/code/site", disabled.filter { $0 != "/code" }), "/code/site",
                        "the folder back on, the project is still off on its own")
     }
+
+    func testAFolderCountsOnlyTheProjectsItAloneTurnsOff() {
+        let projects = ["/a", "/a/b", "/a/b/c", "/a/d", "/a/e", "/x"]
+        let disabled = ["/a", "/a/b", "/a/e"]
+        func count(_ folder: String) -> Int {
+            AgentsSettingsPane.projectsOnlyTurnedOff(by: folder, among: projects, disabled: disabled)
+        }
+        XCTAssertEqual(count("/a"), 1, "only /a/d comes back with /a on")
+        XCTAssertEqual(count("/a/b"), 1)
+        XCTAssertEqual(count("/a/e"), 0)
+        XCTAssertEqual(count("/x"), 0, "a folder that is on keeps nothing off")
+    }
 }

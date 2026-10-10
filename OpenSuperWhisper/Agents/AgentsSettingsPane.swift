@@ -188,9 +188,8 @@ struct AgentsSettingsPane: View {
     }
 
     private func projectRow(_ path: String) -> some View {
-        let turnedOffBy = AppPreferences.agentProjectTurnedOff(path, by: disabledProjects)
         let parent = Self.folderTurningOff(path, disabled: disabledProjects)
-        let coveredBelow = projects.filter { $0 != path && AppPreferences.agentFolder(path, covers: $0) }.count
+        let coveredBelow = Self.projectsOnlyTurnedOff(by: path, among: projects, disabled: disabledProjects)
         return VStack(alignment: .leading, spacing: 2) {
             SRow(title: LocalizedStringKey(URL(fileURLWithPath: path).lastPathComponent),
                  hint: LocalizedStringKey(Self.abbreviated(path))) {
@@ -203,7 +202,7 @@ struct AgentsSettingsPane: View {
             if let parent {
                 caption("Off because \(Self.abbreviated(parent)) is off. Turn that folder back on to use the panel here.",
                         color: STheme.warn)
-            } else if turnedOffBy != nil, coveredBelow > 0 {
+            } else if coveredBelow > 0 {
                 caption(coveredBelow == 1
                         ? "Also keeps 1 project below in the terminal."
                         : "Also keeps \(coveredBelow) projects below in the terminal.",
@@ -233,6 +232,12 @@ struct AgentsSettingsPane: View {
     /// reads it again once the folder is back on.
     static func folderTurningOff(_ path: String, disabled: [String]) -> String? {
         AppPreferences.agentProjectTurnedOff(path, by: disabled.filter { $0 != path })
+    }
+
+    /// How many of `projects` turning `folder` back on would bring back to the panel: the ones
+    /// a nearer turned-off folder, or their own switch, keeps off are left out.
+    static func projectsOnlyTurnedOff(by folder: String, among projects: [String], disabled: [String]) -> Int {
+        projects.filter { $0 != folder && AppPreferences.agentProjectTurnedOff($0, by: disabled) == folder }.count
     }
 
     /// The recent projects, after the turned-off folders that are not among them. A folder that

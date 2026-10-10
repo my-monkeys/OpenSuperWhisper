@@ -753,7 +753,7 @@ final class AppPreferences {
 
     /// Whether a switch on `folder` reaches agents started in `path`: the folder itself and
     /// everything below it, but not a sibling that only starts with the same name.
-    static func agentFolder(_ folder: String, covers path: String) -> Bool {
+    private static func agentFolder(_ folder: String, covers path: String) -> Bool {
         path == folder || path.hasPrefix(folder + "/")
     }
 
