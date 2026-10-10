@@ -337,7 +337,7 @@ passes the full suite, and goes through an adversarial review before the next on
    pins did not change.
 4. Engines, LLM cleanup, model managers and catalogs, the transcription service, recording
    storage and the queue.
-   Done, in seven code commits, one review follow-up and the records. The engines and the
+   Done, in seven code commits, three review follow-ups and the records. The engines and the
    SenseVoice model manager moved first, with FluidAudio as a core dependency, then the Whisper
    and LLM model managers, LLM cleanup, the compute policy, the transcription service with the
    model catalog and `Notification.Name.modelSelectionDidChange` (the app's declaration went),
@@ -346,8 +346,13 @@ passes the full suite, and goes through an adversarial review before the next on
    any more, and the app and the core share no top-level name. The last code commit took back
    to internal every public the move needed on the way: the engine protocol and its witnesses,
    four of the five engines, `TranscriptionError`, the audio, prompt and post-processing
-   helpers, the service's progress and the slice-2 native wrappers. The public surface is now
-   what the app's remaining code calls, plus the GRDB witness of deviation 18.
+   helpers, the service's progress and the slice-2 native wrappers. The public surface is the
+   spec's final list plus the GRDB witness of deviation 18, less the not-installed message
+   (deviation 21). That list keeps a few members the app no longer calls, which the core or
+   the tests use: `AppleSpeechSupport.hasInstalledModel`, `CustomDictionary.promptBoost`, the
+   four flags of `TranscriptionSettings` (`isAsianLanguage`, `shouldApplyAsianAutocorrect`,
+   `shouldApplyCustomDictionary`, `shouldBoostCustomDictionary`) and `enforcesLengthRatio`. They
+   are left for the iPhone app to settle.
    Measured: the hosted suite reproduces `reference-slice4.txt` exactly at every code commit
    (868 passed, 9 skipped, the llama half of the lifecycle test run), and the package builds for
    the iOS Simulator at every commit. The package pins did not move when FluidAudio and GRDB
@@ -470,6 +475,11 @@ Recorded as the slices land, so the plan above keeps its original wording.
     user's decision. Each commit was meanwhile built with its test bundle
     (`xcodebuild build-for-testing`, G2's arguments), and the full suite was run on each of them
     once the prompt was answered, before this record. The lists match the reference exactly.
+21. `CoreConfiguration.notInstalledMessage` is internal, although the spec's final list keeps it
+    public. The spec made it public only so the temporary app copy of `CoreAccess` could trap
+    with the same text, and that copy went in 4.6. The app's `AppCore.configuration` is private
+    for the same reason: only `AppCore.install()` reads it now. A review follow-up after the
+    slice 4 record, together with a whitespace-only realignment of the shared queue's arguments.
 
 ## Follow-ups kept out of the extraction
 
