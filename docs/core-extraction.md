@@ -427,6 +427,14 @@ Recorded as the slices land, so the plan above keeps its original wording.
     `OpenSuperWhisperCore/Package.resolved` and `.swiftpm/` lines.
 15. `Sendable` on the public value types (item 4) is a slice-3 follow-up commit, an additive
     conformance on moved code that the spec did not list.
+16. The same conformance goes on the public value types that move in slice 4, in the commit
+    that moves each one: `LLMModelDescriptor` (4.2) and `LLMStatus` (4.3). The spec lists them as
+    public without it. Apart from that, rows 4.1 to 4.3 made public exactly the §5.1 members and
+    the §5.2 engine witnesses; the app's remaining code needed nothing more.
+17. The compute policy (4.4) has no test of its own. The spec adds no test file in slice 4, and
+    the hosted suite must reproduce `reference-slice4.txt` exactly. `.automatic` is covered by the
+    unchanged Whisper goldens, VAD pins and llama lifecycle test; `.cpuOnly` is first exercised
+    by the core test target (slice 5).
 
 ## Follow-ups kept out of the extraction
 
