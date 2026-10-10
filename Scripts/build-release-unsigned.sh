@@ -82,13 +82,15 @@ codesign --force --sign - ./build/libonnxruntime.1.24.4.dylib
 
 rm -rf "$DERIVED"
 # The two -skip flags only stop xcodebuild from asking to trust package plugins and macros, which
-# a machine that never opened the project in Xcode (CI) cannot answer.
+# a machine that never opened the project in Xcode (CI) cannot answer. Coverage off as in
+# notarize_app.sh, which says why.
 xcodebuild \
   -scheme "OpenSuperWhisper" \
   -configuration Release \
   -destination "generic/platform=macOS" \
   ARCHS="$ARCH" ONLY_ACTIVE_ARCH=NO \
   CODE_SIGNING_ALLOWED=NO \
+  CLANG_COVERAGE_MAPPING=NO ENABLE_CODE_COVERAGE=NO \
   -derivedDataPath "$DERIVED" \
   -skipPackagePluginValidation -skipMacroValidation \
   -quiet \
