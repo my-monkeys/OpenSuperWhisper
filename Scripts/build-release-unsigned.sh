@@ -8,9 +8,10 @@
 #   clean build, as notarize_app.sh's is. The app lands in
 #   <derived-data-dir>/Build/Products/Release/OpenSuperWhisper.app.
 #
-# Copied from notarize_app.sh, and to be kept in step with it: the forced native build, the
-# autocorrect and onnxruntime staging, the xcodebuild flags and the x86_64 post-build edits. Swift
-# packages are cloned inside the derived data, so FluidAudio is not patched, as in a release.
+# Copied from notarize_app.sh, and to be kept in step with it: the beta Xcode refusal, the forced
+# native build, the autocorrect and onnxruntime staging, the xcodebuild flags and the x86_64
+# post-build edits. Swift packages are cloned inside the derived data, so FluidAudio is not
+# patched, as in a release.
 #
 # build/ is left holding the universal autocorrect the project links from there, as
 # notarize_app.sh leaves it; run.sh copies its own back. The core's xcframeworks in
@@ -26,6 +27,16 @@ case "$ARCH" in
   arm64|x86_64) ;;
   *) echo "usage: $0 <arm64|x86_64> [derived-data-dir]" >&2; exit 2 ;;
 esac
+
+# notarize_app.sh refuses a beta toolchain (swiftlang/swift#89214), so a smoke check made with one
+# would not stand for the shipped binary.
+XCODE_DIR="${DEVELOPER_DIR:-$(xcode-select -p 2>/dev/null)}"
+if [[ "$XCODE_DIR" == *[Bb]eta* && "${ALLOW_BETA_XCODE:-0}" != "1" ]]; then
+  echo "Refusing a BETA Xcode, as notarize_app.sh does: $XCODE_DIR" >&2
+  echo "Build with the stable one: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer $0 $ARCH" >&2
+  echo "(ALLOW_BETA_XCODE=1 overrides it, as in notarize_app.sh.)" >&2
+  exit 1
+fi
 cd "$ROOT"
 APP_PATH="$DERIVED/Build/Products/Release/OpenSuperWhisper.app"
 
