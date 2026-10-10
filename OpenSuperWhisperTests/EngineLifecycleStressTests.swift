@@ -12,8 +12,10 @@ final class EngineLifecycleStressTests: XCTestCase {
     private static let unloadKey = "unloadWhisperModelWhenIdle"
     private var savedUnload: Any?
 
-    override func setUp() {
-        super.setUp()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        // Every test here checks the jfk.wav golden after each lifecycle.
+        try Fixtures.requireGoldenMachine()
         savedUnload = DefaultsStore.current.object(forKey: Self.unloadKey)
     }
 
@@ -43,49 +45,56 @@ final class EngineLifecycleStressTests: XCTestCase {
         }
     }
 
-    /// A llama context created, used on the GPU and freed while a whisper context stays alive,
-    /// then whisper transcribes again. This is the built-in LLM cleanup running between two
-    /// dictations with the Whisper model kept hot.
+    /// whisper and llama contexts created and freed in both orders, which is what the shared
+    /// ggml and Metal teardown has to survive. Idle unloading is on, so each transcription loads
+    /// and frees a whisper context while a llama context is alive; then llama is used and freed,
+    /// and the next round loads both again. Last, with the whisper model kept hot, a llama
+    /// context comes and goes beside it (the built-in LLM cleanup between two dictations), and
+    /// whisper must still give the golden.
     ///
-    /// Needs a GGUF model on disk and never downloads one: `OSW_TEST_GGUF` (passed as
-    /// `TEST_RUNNER_OSW_TEST_GGUF` through xcodebuild) names one, otherwise the app's smallest
-    /// cleanup model is used if this Mac already has it. It is only read, memory-mapped by
-    /// llama.cpp, so the test host's isolation from user data still holds for writes. Takes a
-    /// second or two for the 1.1 GB model.
-    func testLlamaContextComesAndGoesBesideALiveWhisperContext() async throws {
-        let modelPath = try Self.localGGUFModel()
+    /// Needs a GGUF model and never downloads one or looks in the user's Application Support:
+    /// `OSW_TEST_GGUF`, passed as `TEST_RUNNER_OSW_TEST_GGUF` through xcodebuild, names it (the
+    /// app's smallest cleanup model, qwen2.5-1.5b-instruct-q4_k_m.gguf, is the one this was
+    /// written against). Without it the test skips, which keeps the test host away from the
+    /// user's data; a run that must cover llama sets it. Each llama load takes a second or so.
+    func testWhisperAndLlamaContextsComeAndGoInEitherOrder() async throws {
+        let modelPath = try Self.ggufModelFromEnvironment()
+        AppPreferences.shared.unloadWhisperModelWhenIdle = true
+        let engine = WhisperEngine(modelPathOverride: Fixtures.tinyEnModel.path)
+        try await engine.initialize()
+
+        for round in 1...2 {
+            var llama = LlamaContext(modelPath: modelPath)
+            XCTAssertNotNil(llama, "round \(round): llama.cpp failed to load \(modelPath)")
+
+            let text = try await engine.transcribeAudio(url: Fixtures.jfkWav,
+                                                        settings: Fixtures.pinnedSettings())
+            XCTAssertEqual(text, WhisperGoldenTests.jfkTranscript, "round \(round)")
+            XCTAssertFalse(engine.isModelLoaded, "round \(round): whisper was not freed beside llama")
+
+            let reply = llama?.generate(system: "Answer with one word.", user: "Is water wet?", maxTokens: 4)
+            XCTAssertFalse((reply ?? "").isEmpty, "round \(round): the llama context produced nothing")
+            llama = nil
+        }
+
         AppPreferences.shared.unloadWhisperModelWhenIdle = false
-        let engine = try await WhisperGoldenTests.loadedTinyEngine()
-        XCTAssertTrue(engine.isModelLoaded)
-
+        let hot = try await WhisperGoldenTests.loadedTinyEngine()
+        XCTAssertTrue(hot.isModelLoaded)
         var llama = LlamaContext(modelPath: modelPath)
-        XCTAssertNotNil(llama, "llama.cpp failed to load \(modelPath)")
-        let reply = llama?.generate(system: "Answer with one word.", user: "Is water wet?", maxTokens: 4)
-        XCTAssertFalse((reply ?? "").isEmpty, "the llama context produced nothing")
+        XCTAssertFalse((llama?.generate(system: "Answer with one word.", user: "Is fire hot?",
+                                        maxTokens: 4) ?? "").isEmpty, "the last llama context produced nothing")
         llama = nil
-
-        XCTAssertTrue(engine.isModelLoaded)
-        let text = try await engine.transcribeAudio(url: Fixtures.jfkWav,
-                                                    settings: Fixtures.pinnedSettings())
-        XCTAssertEqual(text, WhisperGoldenTests.jfkTranscript)
+        XCTAssertTrue(hot.isModelLoaded)
+        let text = try await hot.transcribeAudio(url: Fixtures.jfkWav, settings: Fixtures.pinnedSettings())
+        XCTAssertEqual(text, WhisperGoldenTests.jfkTranscript, "after the last llama context was freed")
     }
 
-    private static func localGGUFModel() throws -> String {
-        if let path = ProcessInfo.processInfo.environment["OSW_TEST_GGUF"], !path.isEmpty {
-            guard FileManager.default.fileExists(atPath: path) else {
-                throw XCTSkip("OSW_TEST_GGUF points at a missing file: \(path)")
-            }
-            return path
+    private static func ggufModelFromEnvironment() throws -> String {
+        guard let path = ProcessInfo.processInfo.environment["OSW_TEST_GGUF"], !path.isEmpty else {
+            throw XCTSkip("Set TEST_RUNNER_OSW_TEST_GGUF to a local GGUF model to run the llama half")
         }
-        // The production directory on purpose: the test storage root is empty by design.
-        guard let root = AppIdentity.applicationSupportDirectory() else {
-            throw XCTSkip("No Application Support directory")
-        }
-        let path = LLMModelManager.modelsDirectory(in: root)
-            .appendingPathComponent(LLMModelManager.defaultModel.fileName).path
         guard FileManager.default.fileExists(atPath: path) else {
-            throw XCTSkip("No local GGUF model (set OSW_TEST_GGUF, or download "
-                          + "\(LLMModelManager.defaultModel.fileName) in the app); not downloading one")
+            throw XCTSkip("OSW_TEST_GGUF points at a missing file: \(path)")
         }
         return path
     }
