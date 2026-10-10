@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// The VAD gate is allowed to make whisper faster, never to lose words. These pin the rule
 /// that trimming only ever *removes silence*, and that every degenerate case the VAD can hand

@@ -6,12 +6,13 @@
 //
 
 import Foundation
+internal import OSWNative
 
 // MARK: - C Type Wrappers
 
-public typealias WhisperPos = Int32
-public typealias WhisperToken = Int32
-public typealias WhisperSeqId = Int32
+typealias WhisperPos = Int32
+typealias WhisperToken = Int32
+typealias WhisperSeqId = Int32
 
 // MARK: - VAD (Silero)
 
@@ -101,28 +102,28 @@ public class MyWhisperContext {
         return MyWhisperContext(context: context)
     }
     
-    public static func initFromBuffer(buffer: UnsafeRawPointer, size: Int, params: WhisperContextParams) -> MyWhisperContext? {
+    static func initFromBuffer(buffer: UnsafeRawPointer, size: Int, params: WhisperContextParams) -> MyWhisperContext? {
         let cParams = params.toC()
         let context = whisper_init_from_buffer_with_params(UnsafeMutableRawPointer(mutating: buffer), size, cParams)
         guard let context = context else { return nil }
         return MyWhisperContext(context: context)
     }
     
-    public static func initFromFileNoState(path: String, params: WhisperContextParams) -> MyWhisperContext? {
+    static func initFromFileNoState(path: String, params: WhisperContextParams) -> MyWhisperContext? {
         let cParams = params.toC()
         let context = path.withCString { whisper_init_from_file_with_params_no_state($0, cParams) }
         guard let context = context else { return nil }
         return MyWhisperContext(context: context)
     }
     
-    public static func initFromBufferNoState(buffer: UnsafeRawPointer, size: Int, params: WhisperContextParams) -> MyWhisperContext? {
+    static func initFromBufferNoState(buffer: UnsafeRawPointer, size: Int, params: WhisperContextParams) -> MyWhisperContext? {
         let cParams = params.toC()
         let context = whisper_init_from_buffer_with_params_no_state(UnsafeMutableRawPointer(mutating: buffer), size, cParams)
         guard let context = context else { return nil }
         return MyWhisperContext(context: context)
     }
     
-    public static func initWith(loader: WhisperModelLoader, params: WhisperContextParams) -> MyWhisperContext? {
+    static func initWith(loader: WhisperModelLoader, params: WhisperContextParams) -> MyWhisperContext? {
         var cLoader = loader.toC()
         let cParams = params.toC()
         
@@ -131,7 +132,7 @@ public class MyWhisperContext {
         return MyWhisperContext(context: context)
     }
     
-    public func initState() -> Bool {
+    func initState() -> Bool {
         guard let ctx = ctx else { return false }
         let state = whisper_init_state(ctx)
         if let state = state {
@@ -143,7 +144,7 @@ public class MyWhisperContext {
     
     // MARK: - OpenVINO
 
-    public func initOpenVINOEncoder(modelPath: String? = nil, device: String = "CPU", cacheDir: String? = nil) -> Bool {
+    func initOpenVINOEncoder(modelPath: String? = nil, device: String = "CPU", cacheDir: String? = nil) -> Bool {
         guard let ctx = ctx else { return false }
         
         let modelPathCStr = modelPath?.withCString { strdup($0) } ?? nil
@@ -176,7 +177,7 @@ public class MyWhisperContext {
     
     // MARK: - Processing
     
-    public func pcmToMel(samples: [Float], nSamples: Int, nThreads: Int) -> Bool {
+    func pcmToMel(samples: [Float], nSamples: Int, nThreads: Int) -> Bool {
         guard let ctx = ctx else { return false }
         let result = samples.withUnsafeBufferPointer { buffer in
             if let state = state {
@@ -187,7 +188,7 @@ public class MyWhisperContext {
         return result == 0
     }
     
-    public func setMel(data: [Float], nLen: Int, nMel: Int) -> Bool {
+    func setMel(data: [Float], nLen: Int, nMel: Int) -> Bool {
         guard let ctx = ctx else { return false }
         let result = data.withUnsafeBufferPointer { buffer in
             if let state = state {
@@ -198,7 +199,7 @@ public class MyWhisperContext {
         return result == 0
     }
     
-    public func encode(offset: Int, nThreads: Int) -> Bool {
+    func encode(offset: Int, nThreads: Int) -> Bool {
         guard let ctx = ctx else { return false }
         if let state = state {
             return whisper_encode_with_state(ctx, state, Int32(offset), Int32(nThreads)) == 0
@@ -206,7 +207,7 @@ public class MyWhisperContext {
         return whisper_encode(ctx, Int32(offset), Int32(nThreads)) == 0
     }
     
-    public func decode(tokens: [WhisperToken], nTokens: Int, nPast: Int, nThreads: Int) -> Bool {
+    func decode(tokens: [WhisperToken], nTokens: Int, nPast: Int, nThreads: Int) -> Bool {
         guard let ctx = ctx else { return false }
         let result = tokens.withUnsafeBufferPointer { buffer in
             if let state = state {
@@ -217,14 +218,14 @@ public class MyWhisperContext {
         return result == 0
     }
     
-    public func tokenize(text: String, tokens: inout [WhisperToken], nMaxTokens: Int) -> Int {
+    func tokenize(text: String, tokens: inout [WhisperToken], nMaxTokens: Int) -> Int {
         guard let ctx = ctx else { return -1 }
         return Int(text.withCString {
             whisper_tokenize(ctx, $0, &tokens, Int32(nMaxTokens))
         })
     }
     
-    public func tokenCount(text: String) -> Int {
+    func tokenCount(text: String) -> Int {
         guard let ctx = ctx else { return 0 }
         return Int(text.withCString { whisper_token_count(ctx, $0) })
     }
@@ -249,7 +250,7 @@ public class MyWhisperContext {
         return String(cString: cStr)
     }
     
-    public func langAutoDetect(offsetMs: Int, nThreads: Int, langProbs: inout [Float]) -> Int {
+    func langAutoDetect(offsetMs: Int, nThreads: Int, langProbs: inout [Float]) -> Int {
         guard let ctx = ctx else { return -1 }
         if let state = state {
             return Int(whisper_lang_auto_detect_with_state(ctx, state, Int32(offsetMs), Int32(nThreads), &langProbs))
@@ -259,7 +260,7 @@ public class MyWhisperContext {
     
     // MARK: - Getters
 
-    public var nLen: Int {
+    var nLen: Int {
         guard let ctx = ctx else { return 0 }
         if let state = state {
             return Int(whisper_n_len_from_state(state))
@@ -267,87 +268,87 @@ public class MyWhisperContext {
         return Int(whisper_n_len(ctx))
     }
     
-    public var nVocab: Int {
+    var nVocab: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_n_vocab(ctx))
     }
     
-    public var nTextCtx: Int {
+    var nTextCtx: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_n_text_ctx(ctx))
     }
     
-    public var nAudioCtx: Int {
+    var nAudioCtx: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_n_audio_ctx(ctx))
     }
     
-    public var isMultilingual: Bool {
+    var isMultilingual: Bool {
         guard let ctx = ctx else { return false }
         return whisper_is_multilingual(ctx) != 0
     }
     
-    public var modelNVocab: Int {
+    var modelNVocab: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_vocab(ctx))
     }
     
-    public var modelNAudioCtx: Int {
+    var modelNAudioCtx: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_audio_ctx(ctx))
     }
     
-    public var modelNAudioState: Int {
+    var modelNAudioState: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_audio_state(ctx))
     }
     
-    public var modelNAudioHead: Int {
+    var modelNAudioHead: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_audio_head(ctx))
     }
     
-    public var modelNAudioLayer: Int {
+    var modelNAudioLayer: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_audio_layer(ctx))
     }
     
-    public var modelNTextCtx: Int {
+    var modelNTextCtx: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_text_ctx(ctx))
     }
     
-    public var modelNTextState: Int {
+    var modelNTextState: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_text_state(ctx))
     }
     
-    public var modelNTextHead: Int {
+    var modelNTextHead: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_text_head(ctx))
     }
     
-    public var modelNTextLayer: Int {
+    var modelNTextLayer: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_text_layer(ctx))
     }
     
-    public var modelNMels: Int {
+    var modelNMels: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_n_mels(ctx))
     }
     
-    public var modelFtype: Int {
+    var modelFtype: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_ftype(ctx))
     }
     
-    public var modelType: Int {
+    var modelType: Int {
         guard let ctx = ctx else { return 0 }
         return Int(whisper_model_type(ctx))
     }
     
-    public var logits: [Float]? {
+    var logits: [Float]? {
         guard let ctx = ctx else { return nil }
         
         let logitsPtr: UnsafeMutablePointer<Float>?
@@ -366,13 +367,13 @@ public class MyWhisperContext {
         return Array(buffer)
     }
     
-    public func tokenToStr(token: WhisperToken) -> String? {
+    func tokenToStr(token: WhisperToken) -> String? {
         guard let ctx = ctx else { return nil }
         guard let cStr = whisper_token_to_str(ctx, token) else { return nil }
         return String(cString: cStr)
     }
     
-    public func modelTypeReadable() -> String? {
+    func modelTypeReadable() -> String? {
         guard let ctx = ctx else { return nil }
         guard let cStr = whisper_model_type_readable(ctx) else { return nil }
         return String(cString: cStr)
@@ -380,52 +381,52 @@ public class MyWhisperContext {
     
     // MARK: - Special Tokens
 
-    public var tokenEot: WhisperToken {
+    var tokenEot: WhisperToken {
         guard let ctx = ctx else { return 0 } // Or another appropriate default value
         return whisper_token_eot(ctx)
     }
     
-    public var tokenSot: WhisperToken {
+    var tokenSot: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_sot(ctx)
     }
     
-    public var tokenSolm: WhisperToken {
+    var tokenSolm: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_solm(ctx)
     }
     
-    public var tokenPrev: WhisperToken {
+    var tokenPrev: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_prev(ctx)
     }
     
-    public var tokenNosp: WhisperToken {
+    var tokenNosp: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_nosp(ctx)
     }
     
-    public var tokenNot: WhisperToken {
+    var tokenNot: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_not(ctx)
     }
     
-    public var tokenBeg: WhisperToken {
+    var tokenBeg: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_beg(ctx)
     }
     
-    public func tokenLang(langId: Int) -> WhisperToken {
+    func tokenLang(langId: Int) -> WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_lang(ctx, Int32(langId))
     }
     
-    public var tokenTranslate: WhisperToken {
+    var tokenTranslate: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_translate(ctx)
     }
     
-    public var tokenTranscribe: WhisperToken {
+    var tokenTranscribe: WhisperToken {
         guard let ctx = ctx else { return 0 }
         return whisper_token_transcribe(ctx)
     }
@@ -438,25 +439,25 @@ public class MyWhisperContext {
         return WhisperTimings.fromC(cTimings.pointee)
     }
     
-    public func printTimings() {
+    func printTimings() {
         guard let ctx = ctx else { return }
         whisper_print_timings(ctx)
     }
     
-    public func resetTimings() {
+    func resetTimings() {
         guard let ctx = ctx else { return }
         whisper_reset_timings(ctx)
     }
     
     // MARK: - System Info
 
-    public static func printSystemInfo() -> String {
+    static func printSystemInfo() -> String {
         return String(cString: whisper_print_system_info())
     }
     
     // MARK: Context Default Params
     
-    public static func contextDefaultParams() -> WhisperContextParams {
+    static func contextDefaultParams() -> WhisperContextParams {
         let cParams = whisper_context_default_params()
         var params = WhisperContextParams()
         params.useGPU = cParams.use_gpu
@@ -472,7 +473,7 @@ public class MyWhisperContext {
         return params
     }
     
-    public static func contextDefaultParamsByRef() -> UnsafeMutablePointer<WhisperContextParams>? {
+    static func contextDefaultParamsByRef() -> UnsafeMutablePointer<WhisperContextParams>? {
         guard let defaultParams = whisper_context_default_params_by_ref()?.pointee else { return nil }
         
         // Allocate memory for a new WhisperContextParams instance
@@ -497,20 +498,20 @@ public class MyWhisperContext {
         return swiftParamsPointer
     }
     
-    public static func freeContextParams(params: UnsafeMutablePointer<WhisperContextParams>?) {
+    static func freeContextParams(params: UnsafeMutablePointer<WhisperContextParams>?) {
         guard let params = params else { return }
         params.deallocate()
     }
     
     // MARK: - Full Decoding
     
-    public static func fullDefaultParams(strategy: WhisperSamplingStrategy) -> WhisperFullParams {
+    static func fullDefaultParams(strategy: WhisperSamplingStrategy) -> WhisperFullParams {
         let cParams = whisper_full_default_params(whisper_sampling_strategy(rawValue: UInt32(strategy.rawValue)))
         return mapWhisperFullParams(from: cParams)
     }
     
     // NOTE: This is replicating the functionality from the objective-c implementation in the question.
-    public static func fullDefaultParamsByRef(strategy: WhisperSamplingStrategy) -> UnsafeMutablePointer<WhisperFullParams>? {
+    static func fullDefaultParamsByRef(strategy: WhisperSamplingStrategy) -> UnsafeMutablePointer<WhisperFullParams>? {
         guard let defaultParams = whisper_full_default_params_by_ref(whisper_sampling_strategy(rawValue: UInt32(strategy.rawValue)))?.pointee else { return nil }
         
         let swiftParamsPointer = UnsafeMutablePointer<WhisperFullParams>.allocate(capacity: 1)
@@ -679,7 +680,7 @@ public class MyWhisperContext {
         return params
     }
     
-    public func full(samples: [Float], params: inout whisper_full_params) -> Bool {
+    func full(samples: [Float], params: inout whisper_full_params) -> Bool {
         guard let ctx = ctx else { return false }
         let result = samples.withUnsafeBufferPointer { buffer in
             let result: Int32
@@ -709,8 +710,13 @@ public class MyWhisperContext {
         
         return result == 0
     }
-    
-    public func fullParallel(samples: [Float], params: inout WhisperFullParams, nProcessors: Int) -> Bool {
+
+    public func full(samples: [Float], params: inout WhisperFullParams) -> Bool {
+        var cParams = params.toC()
+        return full(samples: samples, params: &cParams)
+    }
+
+    func fullParallel(samples: [Float], params: inout WhisperFullParams, nProcessors: Int) -> Bool {
         guard let ctx = ctx else { return false }
         let cParams = params.toC()
         let result = samples.withUnsafeBufferPointer { buffer in
@@ -743,7 +749,7 @@ public class MyWhisperContext {
         return Int(whisper_full_n_segments(ctx))
     }
     
-    public var fullLangId: Int {
+    var fullLangId: Int {
         guard let ctx = ctx else { return -1 }
         if let state = state {
             return Int(whisper_full_lang_id_from_state(state))
@@ -767,7 +773,7 @@ public class MyWhisperContext {
         return whisper_full_get_segment_t1(ctx, Int32(iSegment))
     }
     
-    public func fullGetSegmentSpeakerTurnNext(iSegment: Int) -> Bool {
+    func fullGetSegmentSpeakerTurnNext(iSegment: Int) -> Bool {
         guard let ctx = ctx else { return false }
         if let state = state {
             return whisper_full_get_segment_speaker_turn_next_from_state(state, Int32(iSegment))
@@ -788,7 +794,7 @@ public class MyWhisperContext {
         return String(cString: cStr)
     }
     
-    public func fullNTokens(iSegment: Int) -> Int {
+    func fullNTokens(iSegment: Int) -> Int {
         guard let ctx = ctx else { return 0 }
         if let state = state {
             return Int(whisper_full_n_tokens_from_state(state, Int32(iSegment)))
@@ -796,7 +802,7 @@ public class MyWhisperContext {
         return Int(whisper_full_n_tokens(ctx, Int32(iSegment)))
     }
     
-    public func fullGetTokenText(iSegment: Int, iToken: Int) -> String? {
+    func fullGetTokenText(iSegment: Int, iToken: Int) -> String? {
         guard let ctx = ctx else { return nil }
         let cStr: UnsafePointer<CChar>?
         if let state = state {
@@ -809,7 +815,7 @@ public class MyWhisperContext {
         return String(cString: cStr)
     }
     
-    public func fullGetTokenId(iSegment: Int, iToken: Int) -> WhisperToken {
+    func fullGetTokenId(iSegment: Int, iToken: Int) -> WhisperToken {
         guard let ctx = ctx else { return 0 } // Return a default value, e.g., 0 or -1
         if let state = state {
             return whisper_full_get_token_id_from_state(state, Int32(iSegment), Int32(iToken))
@@ -817,7 +823,7 @@ public class MyWhisperContext {
         return whisper_full_get_token_id(ctx, Int32(iSegment), Int32(iToken))
     }
     
-    public func fullGetTokenData(iSegment: Int, iToken: Int) -> WhisperTokenData {
+    func fullGetTokenData(iSegment: Int, iToken: Int) -> WhisperTokenData {
         if let state = state {
             return WhisperTokenData.fromC(whisper_full_get_token_data_from_state(state, Int32(iSegment), Int32(iToken)))
         }
@@ -825,7 +831,7 @@ public class MyWhisperContext {
         return WhisperTokenData.fromC(whisper_full_get_token_data(ctx, Int32(iSegment), Int32(iToken)))
     }
     
-    public func fullGetTokenP(iSegment: Int, iToken: Int) -> Float {
+    func fullGetTokenP(iSegment: Int, iToken: Int) -> Float {
         guard let ctx = ctx else { return 0.0 } // Return a default value
         if let state = state {
             return whisper_full_get_token_p_from_state(state, Int32(iSegment), Int32(iToken))
@@ -833,7 +839,7 @@ public class MyWhisperContext {
         return whisper_full_get_token_p(ctx, Int32(iSegment), Int32(iToken))
     }
     
-    public func fullGetSegmentNoSpeechProb(iSegment: Int) -> Float {
+    func fullGetSegmentNoSpeechProb(iSegment: Int) -> Float {
         guard let ctx = ctx else { return 0.0 } // Return a default value.
         if let state = state {
             return whisper_full_get_segment_no_speech_prob_from_state(state, Int32(iSegment))
@@ -843,25 +849,25 @@ public class MyWhisperContext {
     
     // MARK: - Benchmarks (For completeness)
 
-    public static func benchMemcpy(nThreads: Int) -> Int {
+    static func benchMemcpy(nThreads: Int) -> Int {
         return Int(whisper_bench_memcpy(Int32(nThreads)))
     }
     
-    public static func benchMemcpyStr(nThreads: Int) -> String {
+    static func benchMemcpyStr(nThreads: Int) -> String {
         return String(cString: whisper_bench_memcpy_str(Int32(nThreads)))
     }
     
-    public static func benchGgmlMulMat(nThreads: Int) -> Int {
+    static func benchGgmlMulMat(nThreads: Int) -> Int {
         return Int(whisper_bench_ggml_mul_mat(Int32(nThreads)))
     }
     
-    public static func benchGgmlMulMatStr(nThreads: Int) -> String {
+    static func benchGgmlMulMatStr(nThreads: Int) -> String {
         return String(cString: whisper_bench_ggml_mul_mat_str(Int32(nThreads)))
     }
     
     // MARK: - Log
     
-    public static func whisperLogSet(logCallback: @escaping ggml_log_callback, userData: UnsafeMutableRawPointer?) {
+    static func whisperLogSet(logCallback: @escaping ggml_log_callback, userData: UnsafeMutableRawPointer?) {
         whisper_log_set(logCallback, userData)
     }
 }

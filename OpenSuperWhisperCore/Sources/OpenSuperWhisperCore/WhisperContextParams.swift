@@ -3,16 +3,17 @@
 //
 
 import Foundation
+internal import OSWNative
 
 public struct WhisperContextParams {
-    public var useGPU: Bool = true
-    public var flashAttention: Bool = true
-    public var gpuDevice: Int32 = 0
-    public var dtwTokenTimestamps: Bool = false
-    public var dtwAheadsPreset: WhisperAlignmentHeadsPreset = .none
-    public var dtwNTop: Int32 = 0
-    public var dtwAheads: WhisperAheads = .init(heads: [])
-    public var dtwMemSize: Int = 0 // remove
+    var useGPU: Bool = true
+    var flashAttention: Bool = true
+    var gpuDevice: Int32 = 0
+    var dtwTokenTimestamps: Bool = false
+    var dtwAheadsPreset: WhisperAlignmentHeadsPreset = .none
+    var dtwNTop: Int32 = 0
+    var dtwAheads: WhisperAheads = .init(heads: [])
+    var dtwMemSize: Int = 0 // remove
 
     public init() {}
 

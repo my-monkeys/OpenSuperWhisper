@@ -3,12 +3,13 @@
 //
 
 import Foundation
+internal import OSWNative
 
-public struct WhisperAhead {
-    public let nTextLayer: Int32
-    public let nHead: Int32
+struct WhisperAhead {
+    let nTextLayer: Int32
+    let nHead: Int32
 
-    public init(nTextLayer: Int32, nHead: Int32) {
+    init(nTextLayer: Int32, nHead: Int32) {
         self.nTextLayer = nTextLayer
         self.nHead = nHead
     }

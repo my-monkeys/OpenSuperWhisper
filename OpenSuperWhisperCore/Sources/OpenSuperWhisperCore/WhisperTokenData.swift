@@ -3,20 +3,21 @@
 //
 
 import Foundation
+internal import OSWNative
 
-public struct WhisperTokenData {
-    public let id: WhisperToken
-    public let tid: WhisperToken
-    public let p: Float
-    public let plog: Float
-    public let pt: Float
-    public let ptsum: Float
-    public let t0: Int64
-    public let t1: Int64
-    public let tDtw: Int64
-    public let vlen: Float
+struct WhisperTokenData {
+    let id: WhisperToken
+    let tid: WhisperToken
+    let p: Float
+    let plog: Float
+    let pt: Float
+    let ptsum: Float
+    let t0: Int64
+    let t1: Int64
+    let tDtw: Int64
+    let vlen: Float
 
-    public init(id: WhisperToken, tid: WhisperToken, p: Float, plog: Float, pt: Float, ptsum: Float, t0: Int64, t1: Int64, tDtw: Int64, vlen: Float) {
+    init(id: WhisperToken, tid: WhisperToken, p: Float, plog: Float, pt: Float, ptsum: Float, t0: Int64, t1: Int64, tDtw: Int64, vlen: Float) {
         self.id = id
         self.tid = tid
         self.p = p

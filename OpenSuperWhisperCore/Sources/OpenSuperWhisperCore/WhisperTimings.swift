@@ -3,13 +3,14 @@
 //
 
 import Foundation
+internal import OSWNative
 
-public struct WhisperTimings {
-    public let sampleMs: Float
-    public let encodeMs: Float
-    public let decodeMs: Float
-    public let batchdMs: Float
-    public let promptMs: Float
+struct WhisperTimings {
+    let sampleMs: Float
+    let encodeMs: Float
+    let decodeMs: Float
+    let batchdMs: Float
+    let promptMs: Float
 
     init(sampleMs: Float, encodeMs: Float, decodeMs: Float, batchdMs: Float, promptMs: Float) {
         self.sampleMs = sampleMs

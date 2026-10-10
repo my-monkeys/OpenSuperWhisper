@@ -3,11 +3,12 @@
 //
 
 import Foundation
+internal import OSWNative
 
-public struct WhisperAheads {
-    public let heads: [WhisperAhead]
+struct WhisperAheads {
+    let heads: [WhisperAhead]
 
-    public init(heads: [WhisperAhead]) {
+    init(heads: [WhisperAhead]) {
         self.heads = heads
     }
 

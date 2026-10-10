@@ -1,13 +1,14 @@
 #if arch(arm64)
 import AVFoundation
 import Foundation
+import OSWSenseVoice
 
 /// Local SenseVoice engine (Chinese/Cantonese/English/Japanese/Korean) via sherpa-onnx.
 /// Non-autoregressive CTC model — fast, fully on-device.
 final class SenseVoiceEngine: TranscriptionEngine {
     var engineName: String { "SenseVoice" }
 
-    private var recognizer: SherpaOnnxOfflineRecognizer?
+    private var recognizer: SenseVoiceRecognizer?
     private var isCancelled = false
 
     var isModelLoaded: Bool { recognizer != nil }
@@ -16,21 +17,7 @@ final class SenseVoiceEngine: TranscriptionEngine {
         let mgr = SenseVoiceModelManager.shared
         guard mgr.isDownloaded else { throw TranscriptionError.contextInitializationFailed }
 
-        let svConfig = sherpaOnnxOfflineSenseVoiceModelConfig(
-            model: mgr.modelPath.path,
-            language: "",                     // "" = auto-detect among zh/en/ja/ko/yue
-            useInverseTextNormalization: true // punctuation + digits
-        )
-        let modelConfig = sherpaOnnxOfflineModelConfig(
-            tokens: mgr.tokensPath.path,
-            numThreads: 2,
-            provider: "cpu",
-            debug: 0,
-            senseVoice: svConfig
-        )
-        let featConfig = sherpaOnnxFeatureConfig(sampleRate: 16000, featureDim: 80)
-        var config = sherpaOnnxOfflineRecognizerConfig(featConfig: featConfig, modelConfig: modelConfig)
-        recognizer = SherpaOnnxOfflineRecognizer(config: &config)
+        recognizer = SenseVoiceRecognizer(modelPath: mgr.modelPath.path, tokensPath: mgr.tokensPath.path)
     }
 
     func transcribeAudio(url: URL, settings: Settings) async throws -> String {
@@ -41,10 +28,10 @@ final class SenseVoiceEngine: TranscriptionEngine {
         guard !isCancelled else { throw CancellationError() }
 
         // Decode is synchronous + CPU-bound; this runs off the main thread (queue Task).
-        let result = recognizer.decode(samples: samples, sampleRate: 16000)
+        let text = recognizer.decode(samples: samples, sampleRate: 16000)
         guard !isCancelled else { throw CancellationError() }
 
-        return TranscriptionPostProcessing.finish(result.text, settings: settings)
+        return TranscriptionPostProcessing.finish(text, settings: settings)
     }
 
     func cancelTranscription() { isCancelled = true }

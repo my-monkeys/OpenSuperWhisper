@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import CoreAudioTypes
+import OpenSuperWhisperCore
 
 private class ProgressContext {
     var onProgress: ((Float) -> Void)?
@@ -228,16 +229,15 @@ class WhisperEngine: TranscriptionEngine {
         params.printRealtime = true
         params.print_realtime = true
         
-        var cParams = params.toC()
-        cParams.abort_callback = abortCallback
+        params.abortCallback = abortCallback
         
         if let abortFlag = abortFlag {
-            cParams.abort_callback_user_data = UnsafeMutableRawPointer(abortFlag)
+            params.abortCallbackUserData = UnsafeMutableRawPointer(abortFlag)
         }
         
         try Task.checkCancellation()
         
-        guard context.full(samples: samples, params: &cParams) else {
+        guard context.full(samples: samples, params: &params) else {
             throw TranscriptionError.processingFailed
         }
         

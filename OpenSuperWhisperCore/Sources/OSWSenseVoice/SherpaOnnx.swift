@@ -1,8 +1,9 @@
-#if arch(arm64)
+#if os(macOS) && arch(arm64)
 /// swift-api-examples/SherpaOnnx.swift
 /// Copyright (c)  2023  Xiaomi Corporation
 
 import Foundation  // For NSString
+internal import sherpa_onnx
 
 /// Convert a String from swift to a `const char*` so that we can pass it to
 /// the C language.

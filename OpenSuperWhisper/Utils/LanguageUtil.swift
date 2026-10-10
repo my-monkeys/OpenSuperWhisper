@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 class LanguageUtil {
 
     /// Every language the bundled Whisper build can transcribe, read from the library instead of
@@ -26,17 +27,15 @@ class LanguageUtil {
     }
 
     private static let whisperCodes: [String] = {
-        let maxId = Int(whisper_lang_max_id())
+        let maxId = MyWhisperContext.langMaxId()
         guard maxId >= 0 else { return [] }
-        return (0...maxId).compactMap { id in
-            whisper_lang_str(Int32(id)).map { String(cString: $0) }
-        }
+        return (0...maxId).compactMap { MyWhisperContext.langStr(id: $0) }
     }()
 
     private static func whisperName(for code: String) -> String? {
-        let id = whisper_lang_id(code)
-        guard id >= 0, let full = whisper_lang_str_full(id) else { return nil }
-        return String(cString: full).capitalized
+        let id = MyWhisperContext.langId(lang: code)
+        guard id >= 0, let full = MyWhisperContext.langStrFull(id: id) else { return nil }
+        return full.capitalized
     }
 
     private static let curatedNames = [

@@ -4,7 +4,7 @@
 
 import Foundation
 
-public enum WhisperAlignmentHeadsPreset: Int32 {
+enum WhisperAlignmentHeadsPreset: Int32 {
     case none
     case nTopMost
     case custom

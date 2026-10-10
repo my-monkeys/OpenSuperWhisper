@@ -4,7 +4,7 @@
 
 import Foundation
 
-public enum WhisperGrammarElementType: Int32 {
+enum WhisperGrammarElementType: Int32 {
     case end = 0
     case alt = 1
     case ruleRef = 2

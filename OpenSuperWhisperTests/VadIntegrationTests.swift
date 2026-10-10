@@ -2,6 +2,7 @@ import AVFoundation
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Proves the VAD gate works end to end: the Silero model is in the bundle, it loads, and it
 /// finds real speech where the speech actually is.

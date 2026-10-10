@@ -60,13 +60,14 @@
 //
 
 import Foundation
+internal import OSWNative
 
 /// NOT thread-safe: `llama_context` holds the KV cache and must be used by one caller at a
 /// time. Every access goes through `BuiltInLlamaBackend`'s serial inference queue, which is
 /// also what owns this object's lifetime.
 public final class LlamaContext {
 
-    public typealias LlamaToken = Int32
+    typealias LlamaToken = Int32
 
     // llama_model* and llama_context* are opaque in llama.h, so they import as OpaquePointer.
     // llama_sampler is a complete struct, so it imports as UnsafeMutablePointer<llama_sampler>.

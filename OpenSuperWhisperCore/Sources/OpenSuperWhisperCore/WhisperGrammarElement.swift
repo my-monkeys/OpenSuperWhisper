@@ -3,12 +3,13 @@
 //
 
 import Foundation
+internal import OSWNative
 
-public struct WhisperGrammarElement {
-    public let type: WhisperGrammarElementType
-    public let value: UInt32
+struct WhisperGrammarElement {
+    let type: WhisperGrammarElementType
+    let value: UInt32
 
-    public init(type: WhisperGrammarElementType, value: UInt32) {
+    init(type: WhisperGrammarElementType, value: UInt32) {
         self.type = type
         self.value = value
     }

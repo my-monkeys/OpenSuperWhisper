@@ -13,18 +13,24 @@ let package = Package(
     name: "OpenSuperWhisperCore",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
-        .library(name: "OpenSuperWhisperCore", type: .static, targets: ["OpenSuperWhisperCore"]),
+        .library(name: "OpenSuperWhisperCore", type: .static,
+                 targets: ["OpenSuperWhisperCore", "OSWSenseVoice"]),
     ],
     targets: [
         .binaryTarget(name: "OSWNative", path: "Binaries/OSWNative.xcframework"),
         // macOS only: the vendored sherpa-onnx library has no iOS slice.
         .binaryTarget(name: "SherpaOnnx", path: "Binaries/SherpaOnnx.xcframework"),
+        // SenseVoice through sherpa-onnx. Its sources compile to nothing outside Apple Silicon
+        // Macs, because onnxruntime, which sherpa needs, ships for arm64 macOS only.
         .target(
-            name: "OpenSuperWhisperCore",
+            name: "OSWSenseVoice",
             dependencies: [
-                "OSWNative",
                 .target(name: "SherpaOnnx", condition: .when(platforms: [.macOS])),
             ]
+        ),
+        .target(
+            name: "OpenSuperWhisperCore",
+            dependencies: ["OSWNative", "OSWSenseVoice"]
         ),
     ],
     swiftLanguageModes: [.v5]
