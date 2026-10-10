@@ -33,22 +33,46 @@ final class WhisperEngineVadTests: XCTestCase {
 
     /// jfk.wav with three seconds of digital silence on each side, built in code so the input
     /// is the same on every machine. No model is loaded: `detectSpeech` only needs the VAD.
+    ///
+    /// The segments are pinned exactly, in centiseconds (deterministic: same input, same model,
+    /// same kernels). They pin the engine's padMs 30: 0 or 100 move every boundary. They cannot
+    /// pin minSpeechMs, because every segment here is longer than both the engine's 100 ms and
+    /// whisper.cpp's default 250 ms; the short burst below does.
     func testEngineVadFindsTheSpeechAndCutsThePadding() async throws {
+        try Fixtures.requireGoldenMachine()
         let speech = try await Fixtures.whisperSamples(of: Fixtures.jfkWav)
         let padded = Self.padded(speech)
 
         let segments = WhisperEngine().detectSpeech(in: padded)
-
-        XCTAssertFalse(segments.isEmpty, "the engine's VAD did not run, or heard nothing")
-        let firstStart = Double(try XCTUnwrap(segments.first).startCs) / 100
-        XCTAssertEqual(firstStart, Double(Self.paddingSeconds), accuracy: 0.5,
-                       "speech located somewhere other than after the leading padding")
-
         let trimmed = WhisperEngine.speechOnlySamples(from: padded, segments: segments)
-        let rate = Fixtures.whisperSampleRate
-        // Both paddings gone, and then some: the VAD also drops the pauses inside the speech.
+
+        XCTAssertEqual(segments.map { [$0.startCs, $0.endCs] }, Self.expectedSegments)
+        // Both paddings gone, and the pauses inside the speech too.
+        XCTAssertEqual(trimmed.count, Self.expectedTrimmedCount)
         XCTAssertLessThan(trimmed.count, speech.count)
-        XCTAssertLessThan(trimmed.count, padded.count - 2 * Self.paddingSeconds * rate)
+    }
+
+    /// [startCs, endCs]: speech starts at 3.30 s, after the 3 s of leading padding, and the last
+    /// segment ends at 13.53 s, before the trailing padding; the gaps are JFK's pauses.
+    private static let expectedSegments: [[Int64]] = [
+        [330, 525], [627, 681], [698, 729], [839, 1062], [1117, 1353],
+    ]
+    private static let expectedTrimmedCount = 133_760
+
+    /// 150 ms of speech (jfk.wav from 0.50 s) between two seconds of silence. The engine asks
+    /// for a 100 ms minimum and keeps it; whisper.cpp's default 250 ms minimum drops it (checked
+    /// when this was written), so a move that stopped passing the engine's parameters would
+    /// lose short words like this one.
+    func testEngineVadKeepsAShortBurstTheLibraryDefaultsDrop() async throws {
+        try Fixtures.requireGoldenMachine()
+        let speech = try await Fixtures.whisperSamples(of: Fixtures.jfkWav)
+        let rate = Fixtures.whisperSampleRate
+        let silence = [Float](repeating: 0, count: rate)
+        let burst = Array(speech[(rate / 2)..<(rate / 2 + rate * 150 / 1000)])
+
+        let segments = WhisperEngine().detectSpeech(in: silence + burst + silence)
+
+        XCTAssertEqual(segments.map { [$0.startCs, $0.endCs] }, [[96, 121]])
     }
 
     /// The same padded clip through `transcribeAudio`. Pinned because it differs from the
@@ -56,6 +80,7 @@ final class WhisperEngineVadTests: XCTestCase {
     /// "for you, ask"): the padding moves the VAD's segment boundaries, and with them the
     /// pauses whisper hears. A change here with the golden unchanged means the trimming moved.
     func testPaddedClipTranscribesFromTheTrimmedAudio() async throws {
+        try Fixtures.requireGoldenMachine()
         let speech = try await Fixtures.whisperSamples(of: Fixtures.jfkWav)
         let url = try Fixtures.writeWhisperWav(Self.padded(speech), name: "jfk-padded")
         tempFiles.append(url)
