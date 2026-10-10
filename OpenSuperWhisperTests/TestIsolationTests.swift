@@ -86,6 +86,7 @@ final class TestIsolationTests: XCTestCase {
         try assertInsideTestRoot(LLMModelManager.shared.modelsDirectory, "LLM models")
         try assertInsideTestRoot(SenseVoiceModelManager.shared.modelDirectory, "SenseVoice model")
         try assertInsideTestRoot(AgentBridge.directory, "agents folder")
+        try assertInsideTestRoot(Settings.promptFileURL, "Whisper prompt file")
     }
 
     /// The store opens its database at launch, so the file has to exist where the root says.

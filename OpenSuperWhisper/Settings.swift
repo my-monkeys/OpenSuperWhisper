@@ -1447,8 +1447,13 @@ struct Settings {
     /// style wants a sample of their own prose here: punctuation, dialogue, names. That belongs
     /// in a file next to their work and under version control, not retyped into a text field on
     /// every machine. Read fresh each time, so editing it takes effect on the next dictation.
-    static let promptFileURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/opensuperwhisper/prompt.md")
+    ///
+    /// Under tests it sits in the private storage root instead, or the developer's own prompt
+    /// would steer every transcription a test makes through `Settings()`.
+    static let promptFileURL = DefaultsStore.isRunningTests
+        ? AppIdentity.storageRoot()!.appendingPathComponent("prompt.md")
+        : FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/opensuperwhisper/prompt.md")
 
     /// Whisper keeps only its last ~224 tokens of prompt anyway, and this is read on the
     /// dictation path, so a file pointed at something enormous is truncated rather than read
