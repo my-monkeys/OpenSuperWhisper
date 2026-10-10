@@ -31,7 +31,7 @@ public final class BuiltInLlamaBackend: LLMCleanupBackend {
     /// `inferenceQueue`-confined.
     private var loadedFileName: String?
 
-    private init(computePolicy: ComputePolicy) {
+    init(computePolicy: ComputePolicy) {
         self.computePolicy = computePolicy
     }
 
