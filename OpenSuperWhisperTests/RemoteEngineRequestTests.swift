@@ -1,8 +1,9 @@
 import XCTest
 @testable import OpenSuperWhisper
 
-/// The exact HTTP request the remote engine would send, built from fixed preferences and
-/// settings, without touching the network.
+/// The exact HTTP request the remote engine sends, built from fixed preferences and settings,
+/// without touching the network: first through the builders, then through `transcribeAudio`
+/// against a stub server, so how it wires them together is pinned too.
 ///
 /// Users point this engine at servers we do not control (Groq, speaches, LiteLLM, their own
 /// proxies), so the wire format is a contract: field names, which fields are left out, the
@@ -23,7 +24,7 @@ final class RemoteEngineRequestTests: XCTestCase {
         savedAPIKey = AppPreferences.shared.remoteServerAPIKey
     }
 
-    override func tearDown() {
+    private func restoreDefaults() {
         for key in Self.defaultsKeys {
             if let value = savedDefaults[key] {
                 DefaultsStore.current.set(value, forKey: key)
@@ -32,18 +33,28 @@ final class RemoteEngineRequestTests: XCTestCase {
             }
         }
         AppPreferences.shared.remoteServerAPIKey = savedAPIKey
+    }
+
+    private var tempDirectories: [URL] = []
+
+    override func tearDown() {
+        tempDirectories.forEach { try? FileManager.default.removeItem(at: $0) }
+        tempDirectories = []
+        StubServer.reset()
+        restoreDefaults()
         super.tearDown()
     }
 
     private func engine(url: String, model: String = "", apiKey: String? = nil,
-                        timeoutEnabled: Bool = true, timeoutSeconds: Double = 60) async throws -> RemoteEngine {
+                        timeoutEnabled: Bool = true, timeoutSeconds: Double = 60,
+                        stubbed: Bool = false) async throws -> RemoteEngine {
         let prefs = AppPreferences.shared
         prefs.remoteServerURL = url
         prefs.remoteServerModel = model
         prefs.remoteServerAPIKey = apiKey
         prefs.remoteServerTimeoutEnabled = timeoutEnabled
         prefs.remoteServerTimeoutSeconds = timeoutSeconds
-        let engine = RemoteEngine()
+        let engine = stubbed ? RemoteEngine(sessionConfiguration: StubServer.configuration) : RemoteEngine()
         try await engine.initialize()
         return engine
     }
@@ -58,7 +69,8 @@ final class RemoteEngineRequestTests: XCTestCase {
         return settings
     }
 
-    /// What `transcribeAudio` sends for `settings`, with the boundary and audio fixed.
+    /// What `transcribeAudio` sends for `settings`, with the boundary and audio fixed, rebuilt
+    /// from its builders. The tests under "transcribeAudio" below check the real call.
     private func request(_ engine: RemoteEngine, _ settings: Settings) throws -> URLRequest {
         let clip = RemoteEngine.clipParameters(for: settings)
         let endpoint = try XCTUnwrap(engine.endpoint(for: clip.action))
@@ -184,5 +196,180 @@ final class RemoteEngineRequestTests: XCTestCase {
             XCTFail("initialized with no server")
         } catch TranscriptionError.contextInitializationFailed {
         }
+    }
+
+    // MARK: transcribeAudio
+
+    /// A file named as a recording would be, holding fixed bytes: the engine sends the file as is.
+    private func clipFile() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        tempDirectories.append(directory)
+        let url = directory.appendingPathComponent("clip.wav")
+        try Data("RIFFDATA".utf8).write(to: url)
+        return url
+    }
+
+    /// The real call, end to end against the stub: the request is the one the builders give
+    /// (with a fresh "Boundary-<UUID>" each time, normalised here), the file keeps its name, and
+    /// the server's text goes through the same post-processing as a local engine's (#101). The
+    /// dictionary boost and the focused field's text are set and must not leave the Mac (#89).
+    func testTranscribeSendsTheBuiltRequestAndPostProcessesTheReply() async throws {
+        StubServer.reset(responses: [(200, #"{"text":"osw"}"#)])
+        let engine = try await engine(url: "https://api.example.test/v1", model: "whisper-1",
+                                      apiKey: "sk-test", stubbed: true)
+        var settings = settings(language: "fr", temperature: 0.2, prompt: "Mein Prompt")
+        settings.customDictionaryEnabled = true
+        settings.customDictionaryBoostEnabled = true
+        settings.customDictionaryEntries = [CustomDictionaryEntry(original: "osw", replacement: "OpenSuperWhisper")]
+        settings.useSurroundingTextAsContext = true
+        settings.focusedText = "Text already in the field"
+
+        let text = try await engine.transcribeAudio(url: try clipFile(), settings: settings)
+
+        XCTAssertEqual(text, "OpenSuperWhisper", "the server's text was not post-processed")
+        let sent = StubServer.requests
+        XCTAssertEqual(sent.count, 1)
+        let request = try XCTUnwrap(sent.first)
+        XCTAssertEqual(request.url, "https://api.example.test/v1/audio/transcriptions")
+        XCTAssertEqual(request.method, "POST")
+        XCTAssertEqual(request.headers["Authorization"], "Bearer sk-test")
+        let contentType = try XCTUnwrap(request.headers["Content-Type"])
+        let prefix = "multipart/form-data; boundary="
+        XCTAssertTrue(contentType.hasPrefix(prefix), contentType)
+        let boundary = String(contentType.dropFirst(prefix.count))
+        XCTAssertNotNil(boundary.range(of: #"^Boundary-[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$"#,
+                                       options: .regularExpression), boundary)
+
+        let body = try XCTUnwrap(String(data: request.body, encoding: .utf8))
+        XCTAssertEqual(body.replacingOccurrences(of: boundary, with: "BOUNDARY"),
+                       field("response_format", "json")
+                       + field("model", "whisper-1")
+                       + field("language", "fr")
+                       + field("temperature", "0.2")
+                       + field("prompt", "Mein Prompt")
+                       + fileField + closing)
+        XCTAssertFalse(body.contains("OpenSuperWhisper"), "the dictionary boost was sent")
+        XCTAssertFalse(body.contains("Text already in the field"), "the focused text was sent")
+    }
+
+    /// 401 and 403 are not retried and name the problem from whether a key is set.
+    func testUnauthorizedWithoutAKeyAsksForOne() async throws {
+        StubServer.reset(responses: [(401, #"{"error":"unauthorized"}"#)])
+        let engine = try await engine(url: "https://api.example.test", stubbed: true)
+        do {
+            _ = try await engine.transcribeAudio(url: try clipFile(), settings: settings())
+            XCTFail("a 401 transcribed")
+        } catch RemoteError.missingAPIKey {
+        }
+        XCTAssertEqual(StubServer.requests.count, 1)
+    }
+
+    func testForbiddenWithAKeyRejectsIt() async throws {
+        StubServer.reset(responses: [(403, #"{"error":"forbidden"}"#)])
+        let engine = try await engine(url: "https://api.example.test", apiKey: "sk-wrong", stubbed: true)
+        do {
+            _ = try await engine.transcribeAudio(url: try clipFile(), settings: settings())
+            XCTFail("a 403 transcribed")
+        } catch RemoteError.invalidAPIKey {
+        }
+        XCTAssertEqual(StubServer.requests.count, 1)
+    }
+
+    /// A real client error is reported with the server's own message after one request: retrying
+    /// the same audio would only fail again.
+    func testClientErrorIsReportedWithoutRetrying() async throws {
+        StubServer.reset(responses: [(400, #"{"error":{"message":"bad audio"}}"#)])
+        let engine = try await engine(url: "https://api.example.test", stubbed: true)
+        do {
+            _ = try await engine.transcribeAudio(url: try clipFile(), settings: settings())
+            XCTFail("a 400 transcribed")
+        } catch RemoteError.api(let status, let message) {
+            XCTAssertEqual(status, 400)
+            XCTAssertEqual(message, "bad audio")
+        }
+        XCTAssertEqual(StubServer.requests.count, 1)
+    }
+
+    /// A 503 is retried with the same request, and the second answer is used. Waits through the
+    /// real first backoff (half a second).
+    func testServerErrorIsRetriedWithTheSameRequest() async throws {
+        StubServer.reset(responses: [(503, "busy"), (200, #"{"text":"bonjour"}"#)])
+        let engine = try await engine(url: "https://api.example.test", stubbed: true)
+
+        let text = try await engine.transcribeAudio(url: try clipFile(), settings: settings())
+
+        XCTAssertEqual(text, "bonjour")
+        let sent = StubServer.requests
+        XCTAssertEqual(sent.count, 2)
+        XCTAssertEqual(sent.first?.body, sent.last?.body)
+        XCTAssertEqual(sent.first?.headers, sent.last?.headers)
+    }
+}
+
+/// A server that answers from a queue and records what reached it. URLProtocol only sees a body
+/// stream, never `httpBody`, so the stream is read out. Static state: the engine builds a new
+/// session per attempt, and the tests in this class run one at a time.
+private final class StubServer: URLProtocol {
+    struct Received {
+        let url: String
+        let method: String
+        let headers: [String: String]
+        let body: Data
+    }
+
+    private static let lock = NSLock()
+    private static var responses: [(status: Int, body: String)] = []
+    private static var received: [Received] = []
+
+    static func configuration() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.default
+        config.protocolClasses = [StubServer.self]
+        return config
+    }
+
+    static func reset(responses: [(Int, String)] = []) {
+        lock.withLock {
+            self.responses = responses.map { (status: $0.0, body: $0.1) }
+            received = []
+        }
+    }
+
+    static var requests: [Received] { lock.withLock { received } }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let record = Received(url: request.url?.absoluteString ?? "",
+                              method: request.httpMethod ?? "",
+                              headers: request.allHTTPHeaderFields ?? [:],
+                              body: Self.readBody(of: request))
+        let answer: (status: Int, body: String) = Self.lock.withLock {
+            Self.received.append(record)
+            return Self.responses.isEmpty ? (500, "no stubbed response") : Self.responses.removeFirst()
+        }
+        let response = HTTPURLResponse(url: request.url!, statusCode: answer.status,
+                                       httpVersion: "HTTP/1.1", headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(answer.body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+
+    private static func readBody(of request: URLRequest) -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: buffer.count)
+            guard read > 0 else { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }
