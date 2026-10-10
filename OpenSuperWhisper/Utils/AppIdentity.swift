@@ -78,9 +78,23 @@ enum AppIdentity {
     /// Named after the process like the defaults suite, and emptied the first time it is used,
     /// since a pid gets reused and a directory left by an earlier run would seed this one.
     private static let testStorageRoot: URL = {
+        let temporary = FileManager.default.temporaryDirectory
+        sweepTestStorageFromPreviousRuns(in: temporary)
         let name = DefaultsStore.testSuiteName(for: ProcessInfo.processInfo.processIdentifier)
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+        let root = temporary.appendingPathComponent(name, isDirectory: true)
         try? FileManager.default.removeItem(at: root)
         return root
     }()
+
+    /// Every test process leaves a database behind, and the host is killed rather than allowed
+    /// to clean up. Same rule as the defaults sweep: a parallel sibling's root is still in use.
+    static func sweepTestStorageFromPreviousRuns(in temporary: URL) {
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: temporary.path)
+        else { return }
+
+        for entry in entries
+        where entry.hasPrefix(DefaultsStore.testSuitePrefix) && DefaultsStore.isAbandoned(entry) {
+            try? FileManager.default.removeItem(at: temporary.appendingPathComponent(entry))
+        }
+    }
 }

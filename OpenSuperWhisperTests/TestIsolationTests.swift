@@ -55,6 +55,27 @@ final class TestIsolationTests: XCTestCase {
         XCTAssertNotEqual(root, AppIdentity.applicationSupportDirectory())
     }
 
+    /// Roots of finished processes go; a parallel sibling's, and anything not ours, stay.
+    func testSweepRemovesOnlyRootsOfDeadProcesses() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let dead = scratch.appendingPathComponent(DefaultsStore.testSuiteName(for: 999997))
+        let live = scratch.appendingPathComponent(
+            DefaultsStore.testSuiteName(for: ProcessInfo.processInfo.processIdentifier))
+        let unrelated = scratch.appendingPathComponent("unrelated")
+        try XCTSkipUnless(DefaultsStore.isAbandoned(dead.lastPathComponent), "PID 999997 unexpectedly alive")
+        for directory in [dead, live, unrelated] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        AppIdentity.sweepTestStorageFromPreviousRuns(in: scratch)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dead.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: live.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path))
+    }
+
     func testEveryStorageLocationResolvesInsideTheTestRoot() throws {
         try assertInsideTestRoot(Recording.recordingsDirectory, "recordings folder")
         try assertInsideTestRoot(WhisperModelManager.shared.modelsDirectory, "whisper models")
