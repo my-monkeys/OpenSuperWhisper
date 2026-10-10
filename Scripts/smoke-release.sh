@@ -28,6 +28,7 @@
 # Intended differences from the pre-swap references (docs/core-extraction.md, slice 0): slice 2
 # drops libomp, which removes the @rpath/libomp.dylib load command, libomp.dylib from the
 # frameworks line, and turns the libomp line into "linked no, embedded no". Nothing else may move.
+# From slice 2 on, compare against docs/smoke/post-swap-<arch>.txt, where nothing may move at all.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -43,7 +43,8 @@ jobs:
           key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
       - name: Build with run.sh
         run: ./run.sh build
-      # Serial, on run.sh's derived data and its patched FluidAudio checkout. Only
+      # Serial, on run.sh's derived data, its patched FluidAudio checkout and the core's
+      # xcframeworks it built or restored from the cache above. Only
       # KeyboardLayoutProviderTests is skipped here, because it switches the system keyboard
       # layout; tests that need a Bluetooth microphone or a notched screen skip themselves.
       # TEST_RUNNER_OSW_GOLDEN_MACHINE=0 skips every test that runs Whisper (goldens, VAD pins, the
@@ -92,9 +93,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
-      # libomp is the arm64 half of the universal copy fetch-libomp-universal.sh assembles.
+      # cmake for Scripts/build-native.sh. The script rebuilds the core's xcframeworks with
+      # FORCE=1, as a release does, before packages resolve, so the build job's cache of
+      # OpenSuperWhisperCore/Binaries is not restored here.
       - name: Install dependencies
-        run: brew install cmake libomp
+        run: brew install cmake
       # No vendored autocorrect on CI, so it is built from source for both architectures, with
       # rustup where notarize_app.sh expects it.
       - name: Install Rust with the x86_64 target
@@ -106,7 +109,7 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Build Release for x86_64, unsigned
         run: ./Scripts/build-release-unsigned.sh x86_64
-      - name: Check the Intel app leaves onnxruntime out
+      - name: Check the Intel app leaves onnxruntime and libomp out
         run: |
           app=build-release/x86_64/Build/Products/Release/OpenSuperWhisper.app
           exe="$app/Contents/MacOS/OpenSuperWhisper"
@@ -115,5 +118,9 @@ jobs:
           if grep -q onnxruntime <<< "$loads" || grep -q _OrtGetApiBase <<< "$undefined" \
              || compgen -G "$app/Contents/Frameworks/libonnxruntime*" > /dev/null; then
             echo "::error::the x86_64 app links, references or embeds onnxruntime, which is arm64 only"
+            exit 1
+          fi
+          if grep -q libomp <<< "$loads" || compgen -G "$app/Contents/Frameworks/libomp*" > /dev/null; then
+            echo "::error::the x86_64 app links or embeds libomp, which the core's native build does not use"
             exit 1
           fi

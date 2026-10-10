@@ -8,16 +8,14 @@
 #   clean build, as notarize_app.sh's is. The app lands in
 #   <derived-data-dir>/Build/Products/Release/OpenSuperWhisper.app.
 #
-# Copied from notarize_app.sh, and to be kept in step with it: the libwhisper configure, the
-# forced native build, the autocorrect, libomp and onnxruntime staging, the xcodebuild flags and
-# the x86_64 post-build edits. Swift packages are cloned inside the derived data, so FluidAudio is
-# not patched, as in a release.
+# Copied from notarize_app.sh, and to be kept in step with it: the forced native build, the
+# autocorrect and onnxruntime staging, the xcodebuild flags and the x86_64 post-build edits. Swift
+# packages are cloned inside the derived data, so FluidAudio is not patched, as in a release.
 #
-# Two things are left changed for the next dev build, as notarize_app.sh leaves them:
-#   - build/ holds the universal autocorrect and libomp the project links from there; run.sh
-#     copies its own back.
-#   - libwhisper/build is configured for both architectures with generic CPU kernels, and run.sh
-#     keeps that configuration (CMake caches it) until libwhisper/build is deleted.
+# build/ is left holding the universal autocorrect the project links from there, as
+# notarize_app.sh leaves it; run.sh copies its own back. The core's xcframeworks in
+# OpenSuperWhisperCore/Binaries are rebuilt for macOS only, so a later `Scripts/build-native.sh
+# ios` or `all` builds the iOS slices again.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -34,16 +32,13 @@ APP_PATH="$DERIVED/Build/Products/Release/OpenSuperWhisper.app"
 echo "=== Building OpenSuperWhisper for $ARCH, unsigned, into $DERIVED ==="
 
 ./Scripts/fetch-sherpa.sh
-./Scripts/fetch-libomp-universal.sh
-
-rm -rf libwhisper/build
-cmake -G Xcode -B libwhisper/build -S libwhisper -DGGML_NATIVE=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
 mkdir -p build
-# notarize_app.sh starts from an empty build/; this one keeps it. Both libomp copies are
-# read-only (0444), and copying over a read-only build/libomp.dylib fails, here and in the next
-# run.sh, so the staged files are removed first and libomp is made writable once copied.
-rm -f build/libautocorrect_swift.dylib build/libomp.dylib build/libonnxruntime*.dylib
+# notarize_app.sh starts from an empty build/; this one keeps the dev build's derived data and
+# only removes the dylibs it stages there, so none of the dev build's copies is linked by mistake.
+rm -f build/libautocorrect_swift.dylib build/libonnxruntime*.dylib
+
+# The core package's xcframeworks, always rebuilt from scratch, as for a release.
 FORCE=1 ./Scripts/build-native.sh
 
 # The dylibs are signed ad hoc where notarize_app.sh uses the Developer ID: an arm64 binary that
@@ -68,12 +63,6 @@ else
   install_name_tool -id "@rpath/libautocorrect_swift.dylib" ./build/libautocorrect_swift.dylib
 fi
 codesign --force --sign - ./build/libautocorrect_swift.dylib
-
-echo "Copying libomp.dylib (universal)..."
-cp vendor/libomp-universal.dylib ./build/libomp.dylib
-chmod u+w ./build/libomp.dylib
-install_name_tool -id "@rpath/libomp.dylib" ./build/libomp.dylib
-codesign --force --sign - ./build/libomp.dylib
 
 echo "Copying libonnxruntime.dylib..."
 cp vendor/onnxruntime/libonnxruntime.1.24.4.dylib ./build/libonnxruntime.1.24.4.dylib

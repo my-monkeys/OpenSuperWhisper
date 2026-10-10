@@ -13,7 +13,7 @@ differ today:
 | Reference | How it is built | Used for |
 |---|---|---|
 | Test suite | `xcodebuild test` with `-derivedDataPath build -clonedSourcePackagesDirPath SourcePackages` (patched FluidAudio) | Every slice: the per-test pass/skip list of master (710 passed, 9 skipped on 47fe26b) must be reproduced, plus the new tests |
-| Shipped app | `notarize_app.sh` (universal libwhisper configure, `GGML_NATIVE=OFF`, so generic ggml CPU kernels; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to the pre-swap references (below) |
+| Shipped app | `notarize_app.sh` (whisper, llama and ggml from `FORCE=1 Scripts/build-native.sh`, `GGML_NATIVE=OFF`, so generic ggml CPU kernels, as the universal libwhisper configure it replaced in slice 2; unpatched FluidAudio) | Release smoke check before merging: load commands, embedded files, `jfk.wav` transcription identical to the pre-swap references (below) |
 
 The release smoke check is `Scripts/build-release-unsigned.sh <arch>` (`notarize_app.sh` up to
 signing) followed by `Scripts/smoke-release.sh <app> --expect docs/smoke/pre-swap-<arch>.txt`,
@@ -22,8 +22,16 @@ for arm64 and for x86_64 (under Rosetta). 0.13.3 cannot be the reference, becaus
 with Xcode 27.0 (27A266a). Their transcripts and VAD segments only hold on that Mac; the load
 commands, rpaths, frameworks, symbol counts and resources hold on any Mac with that Xcode. The
 one difference allowed is slice 2's: libomp goes, so the `@rpath/libomp.dylib` load command and
-`libomp.dylib` leave the report and its libomp line reads "linked no, embedded no". After that
-slice the references are recorded again and committed with the change.
+`libomp.dylib` leave the report and its libomp line reads "linked no, embedded no". Slice 2
+recorded the references again as `docs/smoke/post-swap-<arch>.txt`; later slices compare against
+those, with no difference allowed.
+
+Running the Release binary as a CLI for the check is safe on a developer's Mac: `CLI.run`
+creates `NSApplication` only to set the `.prohibited` activation policy, and never runs
+`AppDelegate`, the windows or the hotkeys (the headless mode Homebrew installs). `--model` and
+`--raw` keep the user's engine, model, prompt and dictionary out of the run. The one preference
+still read is "Unload model when idle" (`unloadWhisperModelWhenIdle`): with it on the CLI exits
+with no context loaded, so `smoke-release.sh` refuses to run and leaves the setting to the user.
 
 Two known divergences are kept as they are and listed as follow-ups, not fixed here: releases
 ship FluidAudio without `patches/fluidaudio-vocabulary-rescorer.patch`, and the release ggml
@@ -277,11 +285,16 @@ passes the full suite, and goes through an adversarial review before the next on
    timestamps) and running the Silero VAD over it, under Rosetta, prints the same VAD
    boundaries, segment times, token ids and token probabilities linked against OSWNative's
    x86_64 slice and against an x86_64 build of the subproject with Xcode's coverage settings,
-   on the CPU backend (with BLAS) and on Metal. That does not replace the pre-merge release smoke check
-   (`jfk.wav` through both shipped binaries, x86_64 under Rosetta, identical to 0.13.3), which
-   stays a hard requirement for this change and has not run yet: the CLI reads the user's
-   configured engine and model, and the `--model`/`--raw` flags slice 0 lists are still to
-   come.
+   on the CPU backend (with BLAS) and on Metal. That does not replace the pre-merge release smoke
+   check, which ran once slice 0's `--model`/`--raw` flags were in: `build-release-unsigned.sh`
+   then `smoke-release.sh --expect docs/smoke/pre-swap-<arch>.txt`, arm64 and x86_64 (under
+   Rosetta), on the Mac and Xcode that recorded the references. Both reports differ from them
+   only by libomp: the `@rpath/libomp.dylib` load command, `libomp.dylib` on the frameworks
+   line, and "libomp: linked no, embedded no". Transcripts, VAD segments, Metal, exit codes,
+   rpaths, onnxruntime per architecture, the single `_whisper_full` and
+   `_ggml_backend_metal_reg`, and the VAD resource are unchanged. The new reports are
+   `docs/smoke/post-swap-<arch>.txt`. Still to do on a signed build: the signature check,
+   which the unsigned builds skip.
 3. `CoreConfiguration`, `TranscriptionSettings`, and the pure models and helpers.
 4. Engines, LLM cleanup, model managers and catalogs, the transcription service, recording
    storage and the queue.
