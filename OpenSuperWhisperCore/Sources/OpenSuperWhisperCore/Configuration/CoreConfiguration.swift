@@ -3,7 +3,8 @@ import os
 
 /// What a host hands the core: its preferences, where files live, the VAD model, its text
 /// formatter, where inference may run, and the two main-actor services the transcription queue
-/// needs. Every field is a provider, so installing a configuration evaluates none of them.
+/// needs. Every field but `computePolicy` is a provider, so installing a configuration evaluates
+/// none of the host's services.
 public struct CoreConfiguration: Sendable {
     public var preferences: @Sendable () -> any CorePreferences
     public var storageRoot: @Sendable () -> URL
@@ -30,8 +31,8 @@ public struct CoreConfiguration: Sendable {
     }
 }
 
-/// One installed configuration behind a lock. A type of its own so a test can install into a
-/// slot of its own without touching the process's.
+/// One installed configuration behind a lock. A type of its own so its install and read
+/// behaviour can be tested on a private instance without touching the process's.
 final class ConfigurationSlot: Sendable {
     private let lock = OSAllocatedUnfairLock<CoreConfiguration?>(initialState: nil)
 
@@ -75,7 +76,7 @@ extension CoreConfiguration {
     public static let notInstalledMessage = """
         OpenSuperWhisperCore was used before CoreConfiguration.install(_:). The macOS app installs it \
         on the first line of AppMain.main (AppCore.install()); a SwiftUI preview calls AppCore.install() \
-        in its body; core tests install one into a slot of their own, or use the designated initialisers.
+        in its body; core tests call CoreConfiguration.replaceForTesting(_:) or use the designated initialisers.
         """
 
     #if DEBUG
