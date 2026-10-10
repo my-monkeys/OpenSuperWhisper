@@ -90,6 +90,29 @@ final class RecordingMigrationTests: XCTestCase {
         XCTAssertEqual(try Self.dump(queue), before)
     }
 
+    // MARK: - Opening the file
+
+    /// The app opens its file with GRDB's default configuration: SQLite's rollback journal, which
+    /// leaves nothing next to the database between writes. Switching to WAL, or adding a
+    /// `prepareDatabase`, would change the files on every user's disk (WAL also persists in the
+    /// file itself, so an older build would then open it in WAL too).
+    func testDatabaseOpensWithTheRollbackJournal() throws {
+        let url = RecordingStore.databaseURL(in: directory)
+        let queue = try RecordingStore.openDatabase(at: url)
+        _ = try RecordingStore(databaseQueue: queue)
+        try queue.write { db in try RecordingMigrationFixture.rows[0].insert(db) }
+
+        XCTAssertEqual(try queue.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") }, "delete")
+        let siblings = try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
+        XCTAssertEqual(siblings, ["recordings.sqlite"])
+    }
+
+    /// The 0.13.3 file is in the same mode, so the comparison above is with what users have.
+    func testDatabaseFrom0133UsesTheRollbackJournal() throws {
+        let queue = try RecordingStore.openDatabase(at: copyOfFixture())
+        XCTAssertEqual(try queue.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") }, "delete")
+    }
+
     // MARK: - 0.13.3 fixture
 
     private func copyOfFixture() throws -> URL {
@@ -104,7 +127,7 @@ final class RecordingMigrationTests: XCTestCase {
     /// Opening it is what every user's launch does today: nothing may be migrated, rewritten or
     /// lost, whatever the status of the row.
     func testDatabaseFrom0133OpensUnchanged() throws {
-        let queue = try DatabaseQueue(path: copyOfFixture().path)
+        let queue = try RecordingStore.openDatabase(at: copyOfFixture())
         let before = try Self.dump(queue)
         XCTAssertEqual(try Self.appliedMigrations(queue), RecordingStore.makeMigrator().migrations)
 

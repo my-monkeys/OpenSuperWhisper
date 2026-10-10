@@ -100,7 +100,7 @@ class RecordingStore: ObservableObject {
         do {
             try FileManager.default.createDirectory(
                 at: appDirectory, withIntermediateDirectories: true)
-            dbQueue = try DatabaseQueue(path: dbPath.path)
+            dbQueue = try Self.openDatabase(at: dbPath)
             try setupDatabase()
         } catch {
             fatalError("Failed to setup database: \(error)")
@@ -112,6 +112,12 @@ class RecordingStore: ObservableObject {
     init(databaseQueue: DatabaseQueue) throws {
         dbQueue = databaseQueue
         try setupDatabase()
+    }
+
+    /// How the app opens its database file: GRDB's default configuration, so the rollback
+    /// journal SQLite defaults to. Internal so a test can pin what that leaves on disk.
+    nonisolated static func openDatabase(at url: URL) throws -> DatabaseQueue {
+        try DatabaseQueue(path: url.path)
     }
 
     nonisolated static func databaseURL(in root: URL) -> URL {
