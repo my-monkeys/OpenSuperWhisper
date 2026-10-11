@@ -14,8 +14,10 @@ enum UISnapshotProbe {
     static let screens: [String: () -> AnyView] = [
         "home": { AnyView(AppShellView(page: .home)) },
         "home-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return AnyView(AppShellView(page: .home)) },
-        "dictionary": { AnyView(AppShellView(page: .dictionary)) },
-        "style": { AnyView(AppShellView(page: .style)) },
+        "dictionary": { seedDictionary(); return AnyView(AppShellView(page: .dictionary)) },
+        "dictionary-editor": { seedDictionary(openEditor: true); return AnyView(AppShellView(page: .dictionary)) },
+        "style": { seedStyle(); return AnyView(AppShellView(page: .style)) },
+        "style-expanded": { seedStyle(expandFirst: true); return AnyView(AppShellView(page: .style)) },
         "help": { AppNavigation.shared.helpOpen = true; return AnyView(AppShellView(page: .home)) },
         "onboarding": { AnyView(OnboardingView().environmentObject(AppState())) },
         "settings-textAndAI-ai": {
