@@ -1,6 +1,7 @@
 import AVFoundation
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Interfaces such as the Audient EVO 4 expose 4 inputs (2 mics + 2 loopback) with speech on
 /// the first only. The recorder writes all four, and every engine must hear the one that carries
@@ -48,8 +49,7 @@ final class MultiChannelMixTests: XCTestCase {
     func testParakeetHearsSpeechOnFirstOfFourChannels() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["OSW_TEST_FLUIDAUDIO"] == "1",
                           "Needs the Parakeet models")
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        let source = try AVAudioFile(forReading: root.appendingPathComponent("jfk.wav"))
+        let source = try AVAudioFile(forReading: Fixtures.jfkWav)
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: source.processingFormat,
                                                     frameCapacity: AVAudioFrameCount(source.length)))
         try source.read(into: buffer)

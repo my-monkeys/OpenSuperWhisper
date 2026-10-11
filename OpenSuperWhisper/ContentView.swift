@@ -11,6 +11,7 @@ import Combine
 import KeyboardShortcuts
 import SwiftUI
 import UniformTypeIdentifiers
+import OpenSuperWhisperCore
 
 @MainActor
 class ContentViewModel: ObservableObject {
@@ -1513,6 +1514,7 @@ enum ThemePalette {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
+        let _ = AppCore.install()
         ContentView()
     }
 }

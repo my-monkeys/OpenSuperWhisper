@@ -41,17 +41,6 @@
                ReferencedContainer = "container:OpenSuperWhisper.xcodeproj">
             </BuildableReference>
          </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "CE37B5F22D54F09A009D6564"
-               BuildableName = "WhisperCppBindingTests.xctest"
-               BlueprintName = "WhisperCppBindingTests"
-               ReferencedContainer = "container:OpenSuperWhisper.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

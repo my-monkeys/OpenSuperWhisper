@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Learning punctuation rules by comparing a sentence we asked for with what came back.
 ///

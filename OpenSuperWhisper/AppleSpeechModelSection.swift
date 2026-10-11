@@ -1,5 +1,6 @@
 import Speech
 import SwiftUI
+import OpenSuperWhisperCore
 
 // SpeechTranscriber/AssetInventory and the full AppleSpeechSupport only exist in the
 // macOS 26 SDK. `@available` guards the runtime, not compilation — so gate the whole

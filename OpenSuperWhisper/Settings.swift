@@ -5,6 +5,7 @@ import Foundation
 import KeyboardShortcuts
 import SwiftUI
 import FluidAudio
+import OpenSuperWhisperCore
 
 class SettingsViewModel: ObservableObject {
     /// True while re-syncing the @Published copies from AppPreferences (e.g. after the
@@ -1335,120 +1336,22 @@ class SettingsViewModel: ObservableObject {
     }
 }
 
-struct SettingsDownloadableModel: Identifiable {
-    let id = UUID()
-    let name: String
-    var isDownloaded: Bool
-    let url: URL
-    let size: Int
-    let description: String
-    var downloadProgress: Double = 0.0
-    /// On-disk filename. Defaults to the URL's basename, but some sources (e.g. the ivrit.ai
-    /// model served as a generic `ggml-model.bin`) need an explicit, distinct name.
-    let filename: String
-    /// Language to switch to when this model is selected (e.g. "he" for the Hebrew model).
-    let preferredLanguage: String?
+typealias Settings = TranscriptionSettings
 
-    var sizeString: String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useMB, .useGB]
-        formatter.countStyle = .file
-        formatter.includesUnit = true
-        formatter.isAdaptive = true
-        return formatter.string(fromByteCount: Int64(size) * 1000000)
-    }
-
-    init(name: String, isDownloaded: Bool, url: URL, size: Int, description: String,
-         filename: String? = nil, preferredLanguage: String? = nil) {
-        self.name = name
-        self.isDownloaded = isDownloaded
-        self.url = url
-        self.size = size
-        self.description = description
-        self.filename = filename ?? url.lastPathComponent
-        self.preferredLanguage = preferredLanguage
-    }
-}
-
-struct SettingsDownloadableModels {
-    static let availableModels = [
-        SettingsDownloadableModel(
-            name: "Turbo V3 large",
-            isDownloaded: false,
-            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin?download=true")!,
-            size: 1624,
-            description: "High accuracy, best quality"
-        ),
-        SettingsDownloadableModel(
-            name: "Turbo V3 medium",
-            isDownloaded: false,
-            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin?download=true")!,
-            size: 874,
-            description: "Balanced speed and accuracy"
-        ),
-        SettingsDownloadableModel(
-            name: "Turbo V3 small",
-            isDownloaded: false,
-            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin?download=true")!,
-            size: 574,
-            description: "Fastest processing"
-        ),
-        // The only models here that translate. Every Turbo build above returns the source
-        // language unchanged with the translate task set, measured on the same clip, so until
-        // these existed there was no configuration in the app that could translate at all. Two
-        // users found that out the hard way and one went and installed a model by hand (#86).
-        SettingsDownloadableModel(
-            name: "Large v3 — translates",
-            isDownloaded: false,
-            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin?download=true")!,
-            size: 2951,
-            description: "Slower than Turbo, and the most accurate. Can translate to English"
-        ),
-        SettingsDownloadableModel(
-            name: "Medium — translates",
-            isDownloaded: false,
-            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin?download=true")!,
-            size: 1462,
-            description: "A middle ground. Can translate to English"
-        ),
-        SettingsDownloadableModel(
-            name: "Small — translates",
-            isDownloaded: false,
-            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin?download=true")!,
-            size: 465,
-            description: "Light, less accurate. Can translate to English"
-        ),
-        // Distil large-v3 was here briefly — dropped after our FLEURS benchmark: on
-        // Metal it matches large-v3-turbo's speed exactly (the shared large encoder
-        // dominates short dictation clips) with worse accuracy (8% vs 5.9% WER) and
-        // English only. Anyone who downloaded it keeps using it via the on-disk list.
-        SettingsDownloadableModel(
-            name: "Hebrew — ivrit.ai Turbo v3",
-            isDownloaded: false,
-            url: URL(string: "https://huggingface.co/ivrit-ai/whisper-large-v3-turbo-ggml/resolve/main/ggml-model.bin?download=true")!,
-            size: 1624,
-            description: "Hebrew-optimized model by ivrit.ai. Selecting it sets the language to Hebrew.",
-            filename: "ggml-ivrit-large-v3-turbo.bin",
-            preferredLanguage: "he"
-        )
-    ]
-
-    static func preferredLanguage(forFilename filename: String) -> String? {
-        availableModels.first { $0.filename == filename }?.preferredLanguage
-    }
-}
-
-struct Settings {
-    static let asianLanguages: Set<String> = ["zh", "ja", "ko"]
-
+extension TranscriptionSettings {
     /// A prompt kept in a file wins over the one typed in Settings.
     ///
     /// Whisper copies the style of whatever it is primed with, so anyone writing to a house
     /// style wants a sample of their own prose here: punctuation, dialogue, names. That belongs
     /// in a file next to their work and under version control, not retyped into a text field on
     /// every machine. Read fresh each time, so editing it takes effect on the next dictation.
-    static let promptFileURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/opensuperwhisper/prompt.md")
+    ///
+    /// Under tests it sits in the private storage root instead, or the developer's own prompt
+    /// would steer every transcription a test makes through `Settings()`.
+    static let promptFileURL = DefaultsStore.isRunningTests
+        ? AppIdentity.storageRoot()!.appendingPathComponent("prompt.md")
+        : FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/opensuperwhisper/prompt.md")
 
     /// Whisper keeps only its last ~224 tokens of prompt anyway, and this is read on the
     /// dictation path, so a file pointed at something enormous is truncated rather than read
@@ -1466,42 +1369,6 @@ struct Settings {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
-    
-    var selectedLanguage: String
-    var translateToEnglish: Bool
-    var suppressBlankAudio: Bool
-    var showTimestamps: Bool
-    var temperature: Double
-    var noSpeechThreshold: Double
-    var initialPrompt: String
-    var useBeamSearch: Bool
-    var beamSize: Int
-    var useAsianAutocorrect: Bool
-    var customDictionaryEnabled: Bool
-    var customDictionaryBoostEnabled: Bool
-    var customDictionaryEntries: [CustomDictionaryEntry]
-    var useSurroundingTextAsContext: Bool
-    /// The field's contents at record-start, set per clip by the pipeline rather than read from
-    /// preferences: it belongs to one dictation, not to the app's standing configuration.
-    var focusedText: String?
-
-    var isAsianLanguage: Bool {
-        Settings.asianLanguages.contains(selectedLanguage)
-    }
-
-    var shouldApplyAsianAutocorrect: Bool {
-        isAsianLanguage && useAsianAutocorrect
-    }
-
-    var shouldApplyCustomDictionary: Bool {
-        customDictionaryEnabled && !customDictionaryEntries.isEmpty
-    }
-
-    /// Whether to also bias recognition toward the dictionary terms (opt-in, on top of the
-    /// always-on text replacement). Gated by the separate `customDictionaryBoostEnabled` flag.
-    var shouldBoostCustomDictionary: Bool {
-        customDictionaryBoostEnabled && shouldApplyCustomDictionary
-    }
 
     init() {
         let prefs = AppPreferences.shared
@@ -1509,25 +1376,26 @@ struct Settings {
         // not a language, and the file-drop queue and the CLI build a Settings of their own
         // without going through the dictation pipeline. They get the layout as it is now; the
         // pipeline overrides this with the layout as it was when the clip was recorded (#120).
-        self.selectedLanguage = KeyboardLanguage.language(
-            for: prefs.whisperLanguage,
-            resolved: prefs.whisperLanguage == KeyboardLanguage.selectionCode
-                ? KeyboardLanguage.current(engine: prefs.selectedEngine,
-                                           fluidAudioModelVersion: prefs.fluidAudioModelVersion)
-                : nil)
-        self.translateToEnglish = prefs.translateToEnglish
-        self.suppressBlankAudio = prefs.suppressBlankAudio
-        self.showTimestamps = prefs.showTimestamps
-        self.temperature = prefs.temperature
-        self.noSpeechThreshold = prefs.noSpeechThreshold
-        self.initialPrompt = Settings.promptFileContents() ?? prefs.initialPrompt
-        self.useBeamSearch = prefs.useBeamSearch
-        self.beamSize = prefs.beamSize
-        self.useAsianAutocorrect = prefs.useAsianAutocorrect
-        self.customDictionaryEnabled = prefs.customDictionaryEnabled
-        self.customDictionaryBoostEnabled = prefs.customDictionaryBoostEnabled
-        self.customDictionaryEntries = prefs.customDictionaryEntries
-        self.useSurroundingTextAsContext = prefs.useSurroundingTextAsContext
+        self.init(
+            selectedLanguage: KeyboardLanguage.language(
+                for: prefs.whisperLanguage,
+                resolved: prefs.whisperLanguage == KeyboardLanguage.selectionCode
+                    ? KeyboardLanguage.current(engine: prefs.selectedEngine,
+                                               fluidAudioModelVersion: prefs.fluidAudioModelVersion)
+                    : nil),
+            translateToEnglish: prefs.translateToEnglish,
+            suppressBlankAudio: prefs.suppressBlankAudio,
+            showTimestamps: prefs.showTimestamps,
+            temperature: prefs.temperature,
+            noSpeechThreshold: prefs.noSpeechThreshold,
+            initialPrompt: Settings.promptFileContents() ?? prefs.initialPrompt,
+            useBeamSearch: prefs.useBeamSearch,
+            beamSize: prefs.beamSize,
+            useAsianAutocorrect: prefs.useAsianAutocorrect,
+            customDictionaryEnabled: prefs.customDictionaryEnabled,
+            customDictionaryBoostEnabled: prefs.customDictionaryBoostEnabled,
+            customDictionaryEntries: prefs.customDictionaryEntries,
+            useSurroundingTextAsContext: prefs.useSurroundingTextAsContext)
     }
 }
 
@@ -3077,49 +2945,6 @@ struct SettingsView: View {
             }
         }
     }
-}
-
-struct SettingsFluidAudioModel: Identifiable {
-    let id = UUID()
-    let name: String
-    let version: String
-    var isDownloaded: Bool
-    let description: String
-    var size: Int = 0   // approximate download size, MB
-    var downloadProgress: Double = 0.0
-
-    var sizeString: String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        formatter.isAdaptive = true
-        return formatter.string(fromByteCount: Int64(size) * 1_000_000)
-    }
-}
-
-struct SettingsFluidAudioModels {
-    static let availableModels = [
-        SettingsFluidAudioModel(
-            name: "Parakeet v3",
-            version: "v3",
-            isDownloaded: false,
-            description: "Multilingual, 25 languages",
-            size: 461
-        ),
-        SettingsFluidAudioModel(
-            name: "Parakeet Ultra",
-            version: "ultra",
-            isDownloaded: false,
-            description: "Multilingual, 25 languages, most accurate",
-            size: 614
-        ),
-        SettingsFluidAudioModel(
-            name: "Parakeet v2",
-            version: "v2",
-            isDownloaded: false,
-            description: "English-only, higher recall",
-            size: 460
-        )
-    ]
 }
 
 enum OnboardingModelType {

@@ -109,7 +109,7 @@ interrompre (mixing) via réécriture AVAudioEngine, chevauche #147. → #126 ga
   (`TranscriptionService.swift:151,156`, `ContentView.swift:1096`) — erreurs en Swift 6 language mode.
 - ⚠️ `MicrophoneService.swift:294-296` : `UnsafeMutableRawPointer` formé sur une `CFString` —
   **vrai code smell** à auditer (lié possiblement à #57 input device).
-- Warnings linker : `libomp`/`libautocorrect` bâtis pour SDK macOS 26/27 vs deployment target 14.0.
+- Warnings linker : `libautocorrect` bâti pour SDK macOS 26/27 vs deployment target 14.0.
 
 ## Backlog priorisé (entrée des phases 2-3)
 

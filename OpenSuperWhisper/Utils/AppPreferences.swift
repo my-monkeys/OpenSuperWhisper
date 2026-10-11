@@ -1,36 +1,19 @@
 import Foundation
 import KeyboardShortcuts
-
-enum TranscriptionResult {
-    /// Returned by the engines when nothing intelligible was transcribed. It is shown to the
-    /// user as feedback but never pasted into the focused field.
-    static let noSpeech = "No speech detected in the audio"
-}
-
-@propertyWrapper
-struct UserDefault<T> {
-    let key: String
-    let defaultValue: T
-    
-    var wrappedValue: T {
-        get { DefaultsStore.current.object(forKey: key) as? T ?? defaultValue }
-        set { DefaultsStore.current.set(newValue, forKey: key) }
-    }
-}
-
-@propertyWrapper
-struct OptionalUserDefault<T> {
-    let key: String
-    
-    var wrappedValue: T? {
-        get { DefaultsStore.current.object(forKey: key) as? T }
-        set { DefaultsStore.current.set(newValue, forKey: key) }
-    }
-}
+import OpenSuperWhisperCore
 
 final class AppPreferences {
     static let shared = AppPreferences()
     private init() {
+        runMigrations()
+    }
+
+    /// Brings preferences written by older builds up to date, in this order. Runs once, from
+    /// `init`, the first time anything touches `shared`. Internal only so a test can replay it
+    /// on a store seeded with legacy keys: each step checks the state it migrates from first.
+    /// App code must not call it: a second run is not a no-op, it sets the
+    /// "onboardingTriggerHealed" flag and can rewrite `recordingTriggers`.
+    func runMigrations() {
         migrateOldPreferences()
         seedAppContextPresetsIfNeeded()
         migrateGroqToRemote()
@@ -61,10 +44,16 @@ final class AppPreferences {
             healOnboardingTrigger()
             return
         }
+        // KeyboardShortcuts only reads UserDefaults.standard, which in the test host is the user's
+        // real domain: every test process would start with their binding. Tests get what a fresh
+        // install gets.
+        let legacyShortcut = DefaultsStore.isRunningTests
+            ? KeyboardShortcuts.Name.toggleRecord.defaultShortcut
+            : KeyboardShortcuts.getShortcut(for: .toggleRecord)
         recordingTriggers = RecordingTriggerSet.migrated(
             mouseRaw: mouseButtonHotkey,
             modifierRaw: modifierOnlyHotkey,
-            shortcut: KeyboardShortcuts.getShortcut(for: .toggleRecord)).json
+            shortcut: legacyShortcut).json
     }
 
     /// Onboarding's Right ⌥ choice is the list's job now. It used to land only in the old

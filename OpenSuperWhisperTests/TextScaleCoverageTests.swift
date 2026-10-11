@@ -82,7 +82,7 @@ final class TextScaleCoverageTests: XCTestCase {
     func testTheMainWindowReadsTheScaleObservably() throws {
         let app = try source("OpenSuperWhisperApp.swift")
 
-        XCTAssertTrue(app.contains("@AppStorage(\"textScale\")"),
+        XCTAssertTrue(app.contains("@AppStorage(\"textScale\", store: DefaultsStore.current)"),
                       "an unobserved read means the slider only applies after a relaunch")
         XCTAssertFalse(app.contains("\\.appTextScale, AppPreferences.shared.textScale"),
                        "that read is not observed")

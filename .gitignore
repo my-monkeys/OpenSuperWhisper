@@ -124,3 +124,23 @@ vendor/
 
 # Indicator GIFs (Scripts/indicator-gifs.sh): regenerated on demand, attached to PRs, not versioned
 docs/liquid-glass/*.gif
+
+# Native xcframeworks and their scratch builds (Scripts/build-native.sh): rebuilt from the
+# submodules, never committed
+OpenSuperWhisperCore/Binaries/
+/build-native/
+
+# Unsigned Release builds (Scripts/build-release-unsigned.sh)
+/build-release/
+
+# Derived data of the core package's iOS Simulator build (-derivedDataPath build-ios, gate G3
+# as defined in docs/core-extraction.md)
+/build-ios/
+
+# Derived data of the core package's test runs (Scripts/test-core.sh)
+/build-core/
+
+# The core package's own resolution files: the workspace pins (project.xcworkspace) are the only
+# ones that count, since every core build and test goes through the project. Never committed.
+OpenSuperWhisperCore/Package.resolved
+OpenSuperWhisperCore/.swiftpm/

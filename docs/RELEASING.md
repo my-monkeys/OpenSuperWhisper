@@ -27,7 +27,7 @@ Each release ships **two** notarized DMGs — there is no universal binary:
 SenseVoice is excluded from x86_64 because its onnxruntime ships arm64-only (the engine is behind
 `#if arch(arm64)`; the x86_64 build strips the onnxruntime dylib and points `SUFeedURL` at the
 Intel feed). `notarize_app.sh` builds the universal native deps (autocorrect pinned to deployment
-target 14.0; a fat libomp via `Scripts/fetch-libomp-universal.sh`) so either slice can link.
+target 14.0; whisper, llama and ggml via `Scripts/build-native.sh`) so either slice can link.
 
 ## Cut a release
 

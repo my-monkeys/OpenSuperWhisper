@@ -7,6 +7,7 @@ on:
 
 jobs:
   build:
+    timeout-minutes: 90
     # Pinned to the macOS 26 runner: it ships only Xcode 26.x (macOS 26 SDK), so the
     # Apple Speech engine (SpeechTranscriber/AssetInventory, gated on
     # `#if canImport(FoundationModels)`) is always compiled and tested. `macos-latest`
@@ -19,7 +20,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install dependencies
-        run: brew install cmake libomp rust
+        run: brew install cmake rust
       - name: Set up Ruby (for xcpretty)
         uses: ruby/setup-ruby@v1
         with:
@@ -28,5 +29,195 @@ jobs:
         run: gem install xcpretty
       - name: Make run.sh executable
         run: chmod +x ./run.sh
+      # Same inputs as the stamp of Scripts/build-native.sh, which restores its stamp with the
+      # outputs and skips the native build when nothing changed.
+      - name: Compute the native build cache key
+        id: native-key
+        run: |
+          inputs=$( (git submodule status libwhisper | awk '{print $1, $2}'; xcodebuild -version; cmake --version) | shasum -a 256 | cut -d' ' -f1)
+          echo "key=native-${inputs}" >> "$GITHUB_OUTPUT"
+      - name: Restore the native xcframeworks
+        uses: actions/cache@v6
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
       - name: Build with run.sh
-        run: ./run.sh build 
+        run: ./run.sh build
+      # Serial, on run.sh's derived data, its patched FluidAudio checkout and the core's
+      # xcframeworks it built or restored from the cache above. Only
+      # KeyboardLayoutProviderTests is skipped here, because it switches the system keyboard
+      # layout; tests that need a Bluetooth microphone or a notched screen skip themselves.
+      # TEST_RUNNER_OSW_GOLDEN_MACHINE=0 skips every test that runs Whisper (goldens, VAD pins, the
+      # context lifecycle), since their outputs are only promised on Apple Silicon with its own
+      # GPU: CI does not exercise Whisper inference. A failing test runs once more and the summary
+      # names any that only passed on that retry: the timing-sensitive ones (ErrorFeedbackTests,
+      # ClipboardRestoreTests) should hold on a VM, as their timers and checks share the main
+      # queue, and a retry shows when they do not.
+      - name: Run the unit tests
+        timeout-minutes: 45
+        env:
+          TEST_RUNNER_OSW_GOLDEN_MACHINE: "0"
+        run: |
+          set -o pipefail
+          xcodebuild test -scheme OpenSuperWhisper -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages \
+            -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation -skipMacroValidation \
+            -only-testing:OpenSuperWhisperTests \
+            -skip-testing:OpenSuperWhisperTests/KeyboardLayoutProviderTests \
+            -parallel-testing-enabled NO \
+            -retry-tests-on-failure -test-iterations 2 \
+            -resultBundlePath build/TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" | xcpretty --simple --color
+      - name: Summarize the unit tests
+        if: ${{ !cancelled() && hashFiles('build/TestResults.xcresult/Info.plist') != '' }}
+        run: |
+          results=build/TestResults.xcresult
+          summary=$(xcrun xcresulttool get test-results summary --path "$results")
+          {
+            echo "### Unit tests: $(jq -r .result <<< "$summary")"
+            jq -r '"\(.passedTests) passed, \(.failedTests) failed, \(.skippedTests) skipped"' <<< "$summary"
+            jq -r '.testFailures[] | "- failed: \(.testIdentifierString // .testName): \(.failureText)"' <<< "$summary"
+            tests=$(xcrun xcresulttool get test-results tests --path "$results")
+            jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Passed")
+              | select(any(.children[]?; .nodeType == "Repetition" and .result == "Failed"))
+              | "- passed only on retry: \(.nodeIdentifier): \([.. | objects | select(.nodeType? == "Failure Message") | .name][0])"' <<< "$tests"
+            jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"' <<< "$tests"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      # No test the map moved to the core (docs/test-moves-slice5.txt) came back to the hosted
+      # suite. The comparison with the frozen slice-4 reference (--slice5) is local only, since a
+      # PR that adds, renames or removes a hosted test differs from it by design.
+      - name: Check the hosted tests against the moves to the core
+        if: ${{ !cancelled() && hashFiles('build/TestResults.xcresult/Info.plist') != '' }}
+        run: Scripts/check-test-moves.sh --hosted build/TestResults.xcresult
+
+  # The core package's own tests (docs/core-extraction.md, slice 5), on macOS and on the iOS
+  # Simulator, through Scripts/test-core.sh like a local run. Its native cache holds the iOS
+  # slices too, under a key of its own so it never overwrites the build job's macOS-only one.
+  # TEST_RUNNER_OSW_GOLDEN_MACHINE=0 skips the exact whisper strings; the one cpu-only whisper
+  # smoke test still runs on both destinations, without the paravirtual GPU. The llama tests
+  # skip, since CI has no GGUF model.
+  # On a cold cache the native build, run.sh's app build and the two core builds can take most
+  # of the step budgets, so the job allows their sum.
+  core-tests:
+    runs-on: macos-26
+    timeout-minutes: 140
+    env:
+      TEST_RUNNER_OSW_GOLDEN_MACHINE: "0"
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: brew install cmake rust
+      - name: Compute the native build cache key
+        id: native-key
+        run: |
+          inputs=$( (git submodule status libwhisper | awk '{print $1, $2}'; xcodebuild -version; cmake --version) | shasum -a 256 | cut -d' ' -f1)
+          echo "key=native-${inputs}" >> "$GITHUB_OUTPUT"
+      - name: Restore the native xcframeworks, iOS slices included
+        id: native-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-key.outputs.key }}-all-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
+      # Before run.sh, so the stamp already covers the macOS slices run.sh asks for.
+      - name: Build the native slices for macOS and iOS
+        timeout-minutes: 45
+        run: Scripts/fetch-sherpa.sh && Scripts/build-native.sh all
+      # Saved as soon as it is built: actions/cache only saves when the whole job succeeds, so a
+      # red test run would throw the native build away and every retry would redo it.
+      - name: Save the native xcframeworks
+        if: ${{ steps.native-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+      # Resolves SourcePackages, patches FluidAudio, and shows the app still builds.
+      - name: Build with run.sh
+        timeout-minutes: 30
+        run: ./run.sh build
+      - name: Run the core tests on macOS
+        id: core-macos
+        timeout-minutes: 25
+        run: |
+          Scripts/test-core.sh macos -resultBundlePath build-core/macos.xcresult \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 300
+      # test-core.sh picks the newest iPhone simulator the selected Xcode can target, since
+      # macos-26 images carry several Xcodes and simctl lists the runtimes of all of them. Runs
+      # after a macOS failure too, so an iOS-only regression shows in the same run.
+      - name: Run the core tests on the iOS Simulator
+        if: ${{ !cancelled() && steps.core-macos.outcome != 'skipped' }}
+        timeout-minutes: 30
+        run: |
+          Scripts/test-core.sh ios -resultBundlePath build-core/ios.xcresult \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 300
+      - name: Summarize the core tests and check the moves
+        if: ${{ !cancelled() }}
+        run: |
+          for destination in macos ios; do
+            results=build-core/$destination.xcresult
+            [ -f "$results/Info.plist" ] || { echo "### Core tests ($destination): no results" | tee -a "$GITHUB_STEP_SUMMARY"; continue; }
+            summary=$(xcrun xcresulttool get test-results summary --path "$results")
+            tests=$(xcrun xcresulttool get test-results tests --path "$results")
+            {
+              echo "### Core tests ($destination): $(jq -r .result <<< "$summary")"
+              jq -r '"\(.passedTests) passed, \(.failedTests) failed, \(.skippedTests) skipped"' <<< "$summary"
+              jq -r '.testFailures[] | "- failed: \(.testIdentifierString // .testName): \(.failureText)"' <<< "$summary"
+              jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Passed")
+                | select(any(.children[]?; .nodeType == "Repetition" and .result == "Failed"))
+                | "- passed only on retry: \(.nodeIdentifier)"' <<< "$tests"
+              jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"' <<< "$tests"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          Scripts/check-test-moves.sh --core-macos build-core/macos.xcresult --core-ios build-core/ios.xcresult
+      - name: Upload the core test results
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: core-test-results
+          path: |
+            build-core/macos.xcresult
+            build-core/ios.xcresult
+          if-no-files-found: ignore
+
+  # The Intel lane of notarize_app.sh, unsigned: nothing else compiles the x86_64 app, where
+  # SenseVoice and onnxruntime must stay out. Built on Apple Silicon like a release, not tested.
+  release-x86_64:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      # cmake for Scripts/build-native.sh. The script rebuilds the core's xcframeworks with
+      # RELEASE=1, as a release does, before packages resolve, so the build job's cache of
+      # OpenSuperWhisperCore/Binaries is not restored here.
+      - name: Install dependencies
+        run: brew install cmake
+      # No vendored autocorrect on CI, so it is built from source for both architectures, with
+      # rustup where notarize_app.sh expects it.
+      - name: Install Rust with the x86_64 target
+        run: |
+          [ -x "$HOME/.cargo/bin/rustup" ] \
+            || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+          "$HOME/.cargo/bin/rustup" toolchain install stable --profile minimal --target aarch64-apple-darwin --target x86_64-apple-darwin
+          "$HOME/.cargo/bin/rustup" default stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Build Release for x86_64, unsigned
+        run: ./Scripts/build-release-unsigned.sh x86_64
+      - name: Check the Intel app leaves onnxruntime and libomp out
+        run: |
+          app=build-release/x86_64/Build/Products/Release/OpenSuperWhisper.app
+          exe="$app/Contents/MacOS/OpenSuperWhisper"
+          test "$(lipo -archs "$exe")" = x86_64
+          loads=$(otool -L "$exe"); undefined=$(nm -u "$exe")
+          if grep -q onnxruntime <<< "$loads" || grep -q _OrtGetApiBase <<< "$undefined" \
+             || compgen -G "$app/Contents/Frameworks/libonnxruntime*" > /dev/null; then
+            echo "::error::the x86_64 app links, references or embeds onnxruntime, which is arm64 only"
+            exit 1
+          fi
+          if grep -q libomp <<< "$loads" || compgen -G "$app/Contents/Frameworks/libomp*" > /dev/null; then
+            echo "::error::the x86_64 app links or embeds libomp, which the core's native build does not use"
+            exit 1
+          fi

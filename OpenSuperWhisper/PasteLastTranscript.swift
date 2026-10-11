@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OpenSuperWhisperCore
 
 /// Re-inserts the most recent transcription into the focused app on demand.
 ///

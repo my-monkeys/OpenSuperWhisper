@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// Picking the transcription language from the keyboard layout instead of a setting.
 ///

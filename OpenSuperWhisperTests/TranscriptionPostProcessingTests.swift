@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// What every engine owes a transcription before handing it back.
 ///
@@ -68,7 +69,7 @@ final class TranscriptionPostProcessingTests: XCTestCase {
         let engines = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()      // OpenSuperWhisperTests
             .deletingLastPathComponent()      // repo root
-            .appendingPathComponent("OpenSuperWhisper/Engines")
+            .appendingPathComponent("OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/Engines")
 
         let files = try FileManager.default.contentsOfDirectory(atPath: engines.path)
             .filter { $0.hasSuffix(".swift") }

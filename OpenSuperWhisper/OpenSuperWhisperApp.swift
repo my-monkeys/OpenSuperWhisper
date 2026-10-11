@@ -10,10 +10,12 @@ import SwiftUI
 import AppKit
 import Combine
 import UniformTypeIdentifiers
+import OpenSuperWhisperCore
 
 @main
 enum AppMain {
     static func main() {
+        AppCore.install()
         // `OpenSuperWhisper transcribe <file>` runs headless and never launches the GUI (#150).
         let args = CommandLine.arguments
         if CLI.shouldHandle(args) {
@@ -30,7 +32,7 @@ struct OpenSuperWhisperApp: App {
     /// Same key as `AppPreferences.textScale`, read through @AppStorage so the window redraws
     /// when the slider moves. Reading the preference directly would not: that is what made the
     /// slider appear to do nothing in 0.10.1 (#82).
-    @AppStorage("textScale") private var textScale: Double = TextScale.default
+    @AppStorage("textScale", store: DefaultsStore.current) private var textScale: Double = TextScale.default
 
     var body: some Scene {
         WindowGroup {
@@ -80,12 +82,16 @@ struct OpenSuperWhisperApp: App {
 
 extension OpenSuperWhisperApp {
     static func startTranscriptionQueue() {
+        // A test host must not transcribe or delete pending recordings on its own.
+        guard !DefaultsStore.isRunningTests else { return }
         Task { @MainActor in
             TranscriptionQueue.shared.startProcessingQueue()
         }
     }
 
     static func startRetentionScheduler() {
+        // A test host must not delete recordings behind the tests' backs.
+        guard !DefaultsStore.isRunningTests else { return }
         Task { @MainActor in
             RecordingStore.shared.startRetentionScheduler()
         }

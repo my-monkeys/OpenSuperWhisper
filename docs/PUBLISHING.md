@@ -41,8 +41,9 @@ behind `#if arch(arm64)`; the x86_64 build strips the onnxruntime dylib post-bui
 
 `notarize_app.sh` builds the universal native deps so either slice can link:
 - **autocorrect** (Rust) → universal, pinned to deployment target 14.0.
-- **libomp** → fat dylib from `vendor/libomp-universal.dylib`.
-- **libwhisper** → built with generic CPU flags (`GGML_NATIVE=OFF`) for both arches.
+- **whisper, llama and ggml** → `OSWNative.xcframework` from `Scripts/build-native.sh`, generic CPU
+  flags (`GGML_NATIVE=OFF`), both arches, always rebuilt for a release (`RELEASE=1`), and only from
+  the `libwhisper/` submodule commits the release commit pins, with clean worktrees.
 - **onnxruntime** → arm64-only; copied in for the embed phase, stripped from the x86_64 app after build.
 
 ---
@@ -119,8 +120,8 @@ xcrun notarytool store-credentials osw-notary \
   prebuilt `vendor/libautocorrect_swift.dylib` is vendored; `notarize_app.sh` uses it automatically
   when present (`if [ -f vendor/libautocorrect_swift.dylib ]`). **Delete that vendored file once the
   toolchain is fixed** so the build goes back to compiling autocorrect from source.
-- **Build deps** (already installed): `cmake`, `libomp`, `rust`/`cargo`, and `xcpretty`
-  (`gem install xcpretty`). CI installs them via `brew install cmake libomp rust`.
+- **Build deps** (already installed): `cmake`, `rust`/`cargo`, and `xcpretty`
+  (`gem install xcpretty`). CI installs them via `brew install cmake rust`.
 - **`log` is shadowed by a zsh function** in this shell — use `/usr/bin/log` if you need unified
   logging while diagnosing.
 
@@ -134,9 +135,11 @@ xcrun notarytool store-credentials osw-notary \
 ```
 
 One invocation, per arch (~12 min each), runs end to end:
-1. `Scripts/fetch-sherpa.sh` + `Scripts/fetch-libomp-universal.sh` (native deps).
-2. Build libwhisper (both arches, generic CPU), autocorrect (universal or vendored), copy
-   libomp/onnxruntime, codesign each dylib with `--timestamp`.
+1. `Scripts/fetch-sherpa.sh` (native deps).
+2. Build the core's native xcframeworks (`RELEASE=1 Scripts/build-native.sh`: both arches, generic
+   CPU; it stops if a `libwhisper/` submodule is uninitialised, conflicted, off the pinned commit or
+   has local changes, so run `git submodule update --init --recursive` and clean them first),
+   autocorrect (universal or vendored), copy onnxruntime, codesign each dylib with `--timestamp`.
 3. `xcodebuild -scheme OpenSuperWhisper -configuration Release` for the requested `ARCHS`, manual
    signing, hardened runtime.
 4. **x86_64 only:** strip `libonnxruntime*.dylib` from the app, rewrite `SUFeedURL` → Intel feed.
@@ -150,6 +153,29 @@ Output: `./OpenSuperWhisper-arm64.dmg` (and `./OpenSuperWhisper-x86_64.dmg`).
 
 > The DMG produced is unversioned (`OpenSuperWhisper-<arch>.dmg`); you rename it with the version in
 > the next step.
+
+`notarize_app.sh` starts with `rm -rf build` and rebuilds the native xcframeworks for macOS only, so
+afterwards run `Scripts/build-native.sh all` if you need the iOS slices (core tests on the
+simulator) and `./run.sh build` to get the dev build back.
+
+### Smoke check before a release
+
+A change to the native build, the core package or the release scripts goes through the unsigned
+smoke check first, on the Mac and Xcode that recorded the references (`docs/smoke/`):
+
+```sh
+Scripts/build-release-unsigned.sh arm64
+Scripts/smoke-release.sh build-release/arm64/Build/Products/Release/OpenSuperWhisper.app \
+  --expect docs/smoke/post-swap-arm64.txt
+Scripts/build-release-unsigned.sh x86_64
+Scripts/smoke-release.sh build-release/x86_64/Build/Products/Release/OpenSuperWhisper.app \
+  --expect docs/smoke/post-swap-x86_64.txt          # runs under Rosetta
+./run.sh build
+```
+
+`build-release-unsigned.sh` is `notarize_app.sh` up to signing (same `RELEASE=1` native build, same
+flags); the last `./run.sh build` puts back the dev autocorrect it replaced in `build/`. On a
+signed `notarize_app.sh` output, `smoke-release.sh` also verifies the signature.
 
 ---
 
@@ -366,13 +392,17 @@ marketing. A 🍌 at the end is on-brand but optional.
 |---|---|
 | `notarize_app.sh` | the real build → sign → notarize → staple → DMG pipeline (per arch) |
 | `run.sh` | dev build & run (Debug, ad-hoc/dev-signed); CI uses `./run.sh build` |
+| `Scripts/build-native.sh` | whisper + llama + ggml (and sherpa) as the core package's xcframeworks; `RELEASE=1` for releases |
+| `Scripts/fetch-sherpa.sh` | downloads sherpa-onnx and onnxruntime into `vendor/`, checked against pinned SHA-256 |
+| `Scripts/build-release-unsigned.sh` / `Scripts/smoke-release.sh` | unsigned release build and its smoke check (§5) |
+| `Scripts/test-core.sh` | the core package's tests, `macos` or `ios` (never `swift test`) |
 | `Scripts/dev-codesign.sh` | re-signs the dev build with the pinned `.osw-codesign-identity` for TCC stability |
 | `.osw-codesign-identity` | the **dev** signing identity (Apple Development) — **not** for release |
 | `appcast.xml` / `appcast-x86_64.xml` | Sparkle feeds (arm64 / Intel), served raw from `master` |
 | `OpenSuperWhisper/OpenSuperWhisper-Info.plist` | `SUFeedURL`, `SUPublicEDKey`, `CFBundleVersion`, etc. |
 | `vendor/libautocorrect_swift.dylib` | beta-toolchain workaround (delete when ld is fixed) |
-| `vendor/libomp-universal.dylib`, `vendor/onnxruntime/` | native deps |
-| `.github/workflows/build.yml` | CI **build check only** (push/PR/manual) — does NOT notarize or release |
+| `vendor/onnxruntime/` | native deps |
+| `.github/workflows/build.yml` | CI build and tests (app suite, core on macOS and iOS Simulator, unsigned Intel build) on push/PR/manual; it does NOT notarize or release |
 | `~/.osw-signing/` | App Store Connect API key material (chmod 700) |
 | `SourcePackages/artifacts/sparkle/Sparkle/bin/` | `sign_update`, `generate_keys`, `generate_appcast` |
 

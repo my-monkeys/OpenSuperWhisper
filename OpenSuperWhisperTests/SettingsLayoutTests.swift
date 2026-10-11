@@ -3,6 +3,7 @@ import SwiftUI
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Every control in the Settings window has to sit inside the window, in every shipped language.
 ///
@@ -50,9 +51,8 @@ final class SettingsLayoutTests: XCTestCase {
         prefs.aiPostProcessingEnabled = true
         prefs.appContextFormattingEnabled = true
         prefs.retentionMaxCountEnabled = true
-        // The test host is the app, and its RecordingStore is the user's real database. With the
-        // limit switched on, the row renders; at the stepper's ceiling, no retention pass that
-        // runs meanwhile could ever delete a recording.
+        // With the limit switched on, the row renders; at the stepper's ceiling, no retention pass
+        // that runs meanwhile could ever delete a recording, even from the test database.
         prefs.retentionMaxCount = 100_000
         prefs.textScale = TextScale.default
         prefs.customDictionaryEnabled = true

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import OpenSuperWhisperCore
 
 /// Drives the read-aloud calibration: record a sentence, transcribe it, compare, move on.
 @MainActor

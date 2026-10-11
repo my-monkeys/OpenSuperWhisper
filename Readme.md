@@ -117,6 +117,10 @@ opensuperwhisper transcribe path/to/audio.wav          # text on stdout
 opensuperwhisper transcribe path/to/audio.wav --json   # { "file", "text" }
 ```
 
+`--model path/to/ggml-model.bin` transcribes with Whisper on that model whatever engine the app is
+set to, and `--raw` ignores your prompt, custom dictionary and transcription settings (English, a
+fresh install's defaults), so nothing set up in the app changes the result.
+
 Engine logs go to stderr, so it pipes cleanly: `opensuperwhisper transcribe note.m4a > note.txt`.
 Set up a model in the app at least once first. There's also a **post-record hook** to run your own
 shell command after each dictation (text + audio path via env vars / JSON on stdin).
@@ -146,7 +150,7 @@ OpenSuperWhisper is free forever — no Pro tier, no paywall. If it saves you ti
 git clone git@github.com:my-monkeys/OpenSuperWhisper.git
 cd OpenSuperWhisper
 git submodule update --init --recursive
-brew install cmake libomp rust ruby
+brew install cmake rust ruby
 gem install xcpretty
 ./run.sh build
 ```
@@ -163,6 +167,25 @@ Contributions are welcome — issues, focused PRs, or big ideas
 ([the last community batch](https://github.com/my-monkeys/OpenSuperWhisper/pull/21) shipped a whole
 menu of features). Open items live in the
 [issue tracker](https://github.com/my-monkeys/OpenSuperWhisper/issues).
+
+How the code is laid out: `OpenSuperWhisper/` is the macOS app (UI, audio capture, text insertion,
+shortcuts). `OpenSuperWhisperCore/` is a local Swift package with the transcription core shared with
+a future iPhone app: engines, model managers, LLM cleanup, recording storage and the queue. Its
+native libraries (whisper.cpp, llama.cpp and their one ggml) come from the `libwhisper/` submodules
+and are built into `OpenSuperWhisperCore/Binaries/` by `Scripts/build-native.sh`, which `./run.sh
+build` calls for you. [`docs/core-extraction.md`](docs/core-extraction.md) explains the split.
+
+Tests, after `./run.sh build`:
+
+- the app's suite: `xcodebuild test -scheme OpenSuperWhisper -derivedDataPath build
+  -clonedSourcePackagesDirPath SourcePackages -destination 'platform=macOS,arch=arm64'
+  -only-testing:OpenSuperWhisperTests` (the same derived data and packages as `run.sh`);
+- the core's: `Scripts/test-core.sh macos` and `Scripts/test-core.sh ios` (iOS Simulator).
+
+Never run `swift test` in `OpenSuperWhisperCore/`: it resolves the packages on its own, without the
+FluidAudio patch `run.sh` applies, and writes a `Package.resolved` nobody should commit. After a
+submodule bump (`git submodule update`), run `./run.sh build` again so the native libraries are
+rebuilt before Xcode resolves the packages.
 
 ## Also from My-Monkey
 

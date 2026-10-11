@@ -5,6 +5,7 @@ import Cocoa
 import Foundation
 import KeyboardShortcuts
 import SwiftUI
+import OpenSuperWhisperCore
 
 extension KeyboardShortcuts.Name {
     static let toggleRecord = Self("toggleRecord", default: .init(.backtick, modifiers: .option))
@@ -54,6 +55,10 @@ class ShortcutManager {
 
     private init() {
         print("ShortcutManager init")
+        // A test host would grab the hotkeys the daily app holds and rewrite the user's bindings
+        // in UserDefaults.standard, which KeyboardShortcuts always uses. Checked here rather than
+        // at launch because the stop phrase and the agent inbox also reach `.shared` lazily.
+        guard !DefaultsStore.isRunningTests else { return }
 
         setupKeyboardShortcuts()
         setupRecordingTrigger()

@@ -7,6 +7,7 @@
 
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 // MARK: - RecordingState Error Case Tests
 

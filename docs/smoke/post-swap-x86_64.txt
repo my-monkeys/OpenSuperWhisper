@@ -1,0 +1,83 @@
+# Scripts/smoke-release.sh report
+arch: x86_64
+toolchain: Xcode 27A266a, SDK macosx27.0
+run jfk/app: exit 0
+run jfk/app: text And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.
+run jfk/app: vad model <app>/Contents/Resources/ggml-silero-v5.1.2.bin
+run jfk/app: vad segments 0.29-2.21 3.30-3.77 4.00-4.35 5.38-7.65 8.16-10.59
+run jfk/app: metal yes
+run jfk/symlink: exit 0
+run jfk/symlink: text And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.
+run jfk/symlink: vad model <app>/Contents/Resources/ggml-silero-v5.1.2.bin
+run jfk/symlink: vad segments 0.29-2.21 3.30-3.77 4.00-4.35 5.38-7.65 8.16-10.59
+run jfk/symlink: metal yes
+run padded/app: exit 0
+run padded/app: text And so my fellow Americans ask not what your country can do for you. Ask what you can do for your country.
+run padded/app: vad model <app>/Contents/Resources/ggml-silero-v5.1.2.bin
+run padded/app: vad segments 3.30-5.25 6.27-6.81 6.98-7.29 8.39-10.62 11.17-13.53
+run padded/app: metal yes
+run padded/symlink: exit 0
+run padded/symlink: text And so my fellow Americans ask not what your country can do for you. Ask what you can do for your country.
+run padded/symlink: vad model <app>/Contents/Resources/ggml-silero-v5.1.2.bin
+run padded/symlink: vad segments 3.30-5.25 6.27-6.81 6.98-7.29 8.39-10.62 11.17-13.53
+run padded/symlink: metal yes
+load: /System/Library/Frameworks/AVFAudio.framework/Versions/A/AVFAudio
+load: /System/Library/Frameworks/AVFoundation.framework/Versions/A/AVFoundation
+load: /System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate
+load: /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit
+load: /System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices
+load: /System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork
+load: /System/Library/Frameworks/Carbon.framework/Versions/A/Carbon
+load: /System/Library/Frameworks/Combine.framework/Versions/A/Combine
+load: /System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio
+load: /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation
+load: /System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics
+load: /System/Library/Frameworks/CoreML.framework/Versions/A/CoreML
+load: /System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia
+load: /System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices
+load: /System/Library/Frameworks/Foundation.framework/Versions/C/Foundation
+load: /System/Library/Frameworks/Metal.framework/Versions/A/Metal
+load: /System/Library/Frameworks/MetalKit.framework/Versions/A/MetalKit
+load: /System/Library/Frameworks/NaturalLanguage.framework/Versions/A/NaturalLanguage
+load: /System/Library/Frameworks/Security.framework/Versions/A/Security
+load: /System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement
+load: /System/Library/Frameworks/Speech.framework/Versions/A/Speech
+load: /System/Library/Frameworks/SwiftUI.framework/Versions/A/SwiftUI
+load: /System/Library/Frameworks/Symbols.framework/Versions/A/Symbols
+load: /usr/lib/libSystem.B.dylib
+load: /usr/lib/libc++.1.dylib
+load: /usr/lib/libobjc.A.dylib
+load: /usr/lib/libsqlite3.dylib
+load: /usr/lib/swift/libswiftAVFoundation.dylib
+load: /usr/lib/swift/libswiftAccelerate.dylib
+load: /usr/lib/swift/libswiftCore.dylib
+load: /usr/lib/swift/libswiftCoreAudio.dylib
+load: /usr/lib/swift/libswiftCoreFoundation.dylib
+load: /usr/lib/swift/libswiftCoreGraphics.dylib
+load: /usr/lib/swift/libswiftCoreImage.dylib
+load: /usr/lib/swift/libswiftCoreMIDI.dylib
+load: /usr/lib/swift/libswiftCoreML.dylib
+load: /usr/lib/swift/libswiftDarwin.dylib
+load: /usr/lib/swift/libswiftDispatch.dylib
+load: /usr/lib/swift/libswiftIOKit.dylib
+load: /usr/lib/swift/libswiftMetal.dylib
+load: /usr/lib/swift/libswiftNaturalLanguage.dylib
+load: /usr/lib/swift/libswiftOSLog.dylib
+load: /usr/lib/swift/libswiftObjectiveC.dylib
+load: /usr/lib/swift/libswiftQuartzCore.dylib
+load: /usr/lib/swift/libswiftSpatial.dylib
+load: /usr/lib/swift/libswiftUniformTypeIdentifiers.dylib
+load: /usr/lib/swift/libswiftXPC.dylib
+load: /usr/lib/swift/libswift_Concurrency.dylib
+load: /usr/lib/swift/libswiftos.dylib
+load: /usr/lib/swift/libswiftsimd.dylib
+load: @rpath/Sparkle.framework/Versions/B/Sparkle
+load: @rpath/libautocorrect_swift.dylib
+rpath: /usr/lib/swift
+rpath: @executable_path/../Frameworks
+frameworks: Sparkle.framework libautocorrect_swift.dylib
+libomp: linked no, embedded no
+onnxruntime: linked no, embedded no, _OrtGetApiBase undefined no
+defined _whisper_full: 1
+defined _ggml_backend_metal_reg: 1
+resource ggml-silero-v5.1.2.bin: present

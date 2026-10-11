@@ -2,6 +2,7 @@ import AVFoundation
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Proves the VAD gate works end to end: the Silero model is in the bundle, it loads, and it
 /// finds real speech where the speech actually is.
@@ -30,6 +31,11 @@ final class VadIntegrationTests: XCTestCase {
                 ["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", aiff.path, wav.path])
 
         let speech = try read(wav)
+        // A GitHub macOS runner has the synthesiser but renders silence, which would read as
+        // "the VAD found nothing" rather than "there was nothing to find".
+        guard speech.contains(where: { abs($0) > 0.01 }) else {
+            throw XCTSkip("say rendered silence: no usable speech voice on this machine")
+        }
         let silence = [Float](repeating: 0, count: Int(leadingSilence * sampleRate))
         let speechSeconds = Double(speech.count) / sampleRate
         return (silence + speech + silence, leadingSilence + speechSeconds)

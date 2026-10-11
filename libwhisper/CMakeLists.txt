@@ -4,7 +4,10 @@
 cmake_minimum_required(VERSION 3.30)
 
 set(CMAKE_CXX_FLAGS_INIT "-fvisibility=hidden")
-set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+# macOS default; Scripts/build-native.sh passes 17.0 for the iOS slices.
+if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+endif()
 
 project(libwhisper)
 

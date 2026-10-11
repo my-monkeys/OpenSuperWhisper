@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import OpenSuperWhisperCore
 
 /// Single source of truth **and** single mutation point for the active engine + model.
 ///

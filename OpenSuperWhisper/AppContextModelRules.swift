@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OpenSuperWhisperCore
 
 /// How context-aware model selection behaves.
 enum ContextAwareModelMode: String, CaseIterable {

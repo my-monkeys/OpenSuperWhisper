@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Feeding the transcriber what the user was already writing.
 ///

@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Finding our own bundle when the path we were launched by is a symlink pointing into it.
 ///

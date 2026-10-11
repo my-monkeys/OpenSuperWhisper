@@ -1,11 +1,17 @@
+# Building whisper.cpp and llama.cpp
 
-TBD
+The app no longer builds whisper.cpp by hand. `Scripts/build-native.sh` configures `libwhisper/`
+(the whisper.cpp and llama.cpp submodules, sharing one ggml) once per platform with CMake, builds it
+in Release with generic CPU kernels, and merges the archives into
+`OpenSuperWhisperCore/Binaries/OSWNative.xcframework`, which the core package links statically.
 
-
-build .a static lib, move lib and headers to project. Include c++ std and other libs to the project linking.
-
-```curl
-cd ../.. && rm -rf build && mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_CXX_STANDARD=11 -DCMAKE_CXX_FLAGS="-fvisibility=hidden" -DWHISPER_BUILD_EXAMPLES=OFF -DWHISPER_BUILD_TESTS=OFF ..
-
-make -j$(sysctl -n hw.ncpu)
+```sh
+Scripts/build-native.sh            # macOS arm64 + x86_64 (what ./run.sh build runs)
+Scripts/build-native.sh all        # plus iOS and the iOS Simulator
+FORCE=1 Scripts/build-native.sh    # rebuild from a clean configure
+RELEASE=1 Scripts/build-native.sh  # forced, and only from the pinned, clean submodules
 ```
+
+It skips the build when nothing it depends on changed (submodule commits and local changes, the
+CMake file, the script, the toolchain). The full design is in the "Native binaries" section of
+[`core-extraction.md`](core-extraction.md).

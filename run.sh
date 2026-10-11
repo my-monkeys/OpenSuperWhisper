@@ -36,15 +36,14 @@ apply_fluidaudio_patches() {
     fi
 }
 
-# Configure libwhisper
-echo "Configuring libwhisper..."
-cmake -G Xcode -B libwhisper/build -S libwhisper
+./Scripts/fetch-sherpa.sh
+
+# The core package's binary targets must exist before Swift packages are resolved.
+./Scripts/build-native.sh
 if [[ $? -ne 0 ]]; then
-    echo "CMake configuration failed!"
+    echo "Native build failed!"
     exit 1
 fi
-
-./Scripts/fetch-sherpa.sh
 
 echo "Building autocorrect-swift..."
 mkdir -p build
@@ -56,11 +55,6 @@ if [[ $? -ne 0 ]]; then
     echo "Cargo build failed!"
     exit 1
 fi
-
-echo "Copying libomp.dylib..."
-cp /opt/homebrew/opt/libomp/lib/libomp.dylib ./build/libomp.dylib
-install_name_tool -id "@rpath/libomp.dylib" ./build/libomp.dylib
-codesign --force --sign - ./build/libomp.dylib
 
 echo "Copying libonnxruntime.dylib..."
 cp vendor/onnxruntime/libonnxruntime.1.24.4.dylib ./build/libonnxruntime.1.24.4.dylib

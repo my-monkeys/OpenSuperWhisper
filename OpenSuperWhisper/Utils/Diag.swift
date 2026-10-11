@@ -1,5 +1,6 @@
 import Foundation
 import os
+import OpenSuperWhisperCore
 
 /// Lightweight diagnostic tracing for the record-start / hotkey hot path.
 ///
@@ -14,7 +15,10 @@ import os
 /// you'll find the last `▶` with no matching `◀` — that names the culprit, and
 /// it's already on disk.
 enum Diag {
-    static let log = Logger(subsystem: "fr.my-monkey.opensuperwhisper", category: "hotpath")
+    static let log = Logger(subsystem: subsystem, category: category)
+    /// What the `log show` predicate above filters on.
+    static let subsystem = "fr.my-monkey.opensuperwhisper"
+    static let category = "hotpath"
 
     /// On by default in DEBUG (the build used day-to-day). In release, enable with:
     ///   defaults write fr.my-monkey.opensuperwhisper diagnosticLogging -bool YES

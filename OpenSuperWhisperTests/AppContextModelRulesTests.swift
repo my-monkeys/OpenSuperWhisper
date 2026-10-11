@@ -1,5 +1,6 @@
 import XCTest
 @testable import OpenSuperWhisper
+@testable import OpenSuperWhisperCore
 
 /// Per-app / per-site model rules resolve with **site-beats-app** precedence: a
 /// rule bound to a specific website (`bundleID|host`) wins over the app-wide rule

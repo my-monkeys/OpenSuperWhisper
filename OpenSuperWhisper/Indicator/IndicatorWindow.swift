@@ -3,6 +3,7 @@ import Cocoa
 import Combine
 import LiquidGlass
 import SwiftUI
+import OpenSuperWhisperCore
 
 enum RecordingState: Equatable {
     case idle
@@ -1255,5 +1256,6 @@ struct IndicatorWindowPreview: View {
 }
 
 #Preview {
+    let _ = AppCore.install()
     IndicatorWindowPreview()
 }
