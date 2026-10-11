@@ -96,7 +96,7 @@ struct AdvancedRubric: View {
                 .scaledFont(size: 13)
                 .foregroundColor(STheme.hint)
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(SettingsView.postRecordHookVariables, id: \.name) { variable in
+            ForEach(PostRecordHookVariables.all, id: \.name) { variable in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(verbatim: variable.name)
                         .scaledFont(size: 12, weight: .medium, design: .monospaced)

@@ -75,23 +75,23 @@ final class AgentProjectSwitchTests: XCTestCase {
     // MARK: The pane's list
 
     func testATurnedOffFolderOutsideTheRecentListStaysListed() {
-        let listed = AgentsSettingsPane.listedProjects(
+        let listed = AgentSettings.listedProjects(
             recent: ["/Users/me/code/site", "/Users/me/code/app"],
             disabled: ["/Users/me/code/site", "/Users/me/Documents", "/Users/me"])
         XCTAssertEqual(listed, ["/Users/me", "/Users/me/Documents", "/Users/me/code/site", "/Users/me/code/app"])
     }
 
     func testARowUnderATurnedOffFolderNamesThatFolder() {
-        XCTAssertEqual(AgentsSettingsPane.folderTurningOff("/code/site", disabled: ["/code"]), "/code")
-        XCTAssertNil(AgentsSettingsPane.folderTurningOff("/code/site", disabled: ["/code/site"]))
-        XCTAssertNil(AgentsSettingsPane.folderTurningOff("/code", disabled: ["/code/site"]))
+        XCTAssertEqual(AgentSettings.folderTurningOff("/code/site", disabled: ["/code"]), "/code")
+        XCTAssertNil(AgentSettings.folderTurningOff("/code/site", disabled: ["/code/site"]))
+        XCTAssertNil(AgentSettings.folderTurningOff("/code", disabled: ["/code/site"]))
     }
 
     /// A project turned off on its own, then its folder: the row names the folder (and locks its
     /// switch) rather than offering a switch that would drop the project's own setting.
     func testAProjectOffOnItsOwnAndByItsFolderNamesTheFolder() {
         let disabled = ["/code/site", "/code"]
-        XCTAssertEqual(AgentsSettingsPane.folderTurningOff("/code/site", disabled: disabled), "/code")
+        XCTAssertEqual(AgentSettings.folderTurningOff("/code/site", disabled: disabled), "/code")
         XCTAssertEqual(turnedOff("/code/site", disabled.filter { $0 != "/code" }), "/code/site",
                        "the folder back on, the project is still off on its own")
     }
@@ -100,7 +100,7 @@ final class AgentProjectSwitchTests: XCTestCase {
         let projects = ["/a", "/a/b", "/a/b/c", "/a/d", "/a/e", "/x"]
         let disabled = ["/a", "/a/b", "/a/e"]
         func count(_ folder: String) -> Int {
-            AgentsSettingsPane.projectsOnlyTurnedOff(by: folder, among: projects, disabled: disabled)
+            AgentSettings.projectsOnlyTurnedOff(by: folder, among: projects, disabled: disabled)
         }
         XCTAssertEqual(count("/a"), 1, "only /a/d comes back with /a on")
         XCTAssertEqual(count("/a/b"), 1)
@@ -110,9 +110,9 @@ final class AgentProjectSwitchTests: XCTestCase {
 
     func testOnlyPathsInsideTheHomeFolderGetATilde() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        XCTAssertEqual(AgentsSettingsPane.abbreviated(home), "~")
-        XCTAssertEqual(AgentsSettingsPane.abbreviated(home + "/code/site"), "~/code/site")
-        XCTAssertEqual(AgentsSettingsPane.abbreviated(home + "2/x"), home + "2/x")
-        XCTAssertEqual(AgentsSettingsPane.abbreviated("/tmp/x"), "/tmp/x")
+        XCTAssertEqual(AgentSettings.abbreviated(home), "~")
+        XCTAssertEqual(AgentSettings.abbreviated(home + "/code/site"), "~/code/site")
+        XCTAssertEqual(AgentSettings.abbreviated(home + "2/x"), home + "2/x")
+        XCTAssertEqual(AgentSettings.abbreviated("/tmp/x"), "/tmp/x")
     }
 }

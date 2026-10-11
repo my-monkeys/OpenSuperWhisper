@@ -419,15 +419,3 @@ class ContentViewModel: ObservableObject {
         isBlinking = false
     }
 }
-
-/// The history as the old settings window's Transcriptions tab embeds it. That window is on its
-/// way out; the main window shows `HomePage` through `AppShellView`, which provides the
-/// permissions itself.
-struct ContentView: View {
-    @StateObject private var permissions = PermissionsManager()
-
-    var body: some View {
-        HomePage()
-            .environmentObject(permissions)
-    }
-}

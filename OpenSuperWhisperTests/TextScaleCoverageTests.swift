@@ -33,27 +33,40 @@ final class TextScaleCoverageTests: XCTestCase {
         ".font(.largeTitle)",
     ]
 
-    /// Every window's own text, in the files that draw it.
-    private static let userFacingViews = [
+    /// Folders holding nothing but window content: every Swift file in them is checked, so a new
+    /// page or rubric is covered the day it is added.
+    private static let userFacingFolders = ["Pages", "Shell", "Settings", "Theme", "Onboarding"]
+
+    /// Window content that lives outside those folders.
+    private static let userFacingFiles = [
         "ContentView.swift",
-        "Pages/HomePage.swift",
-        "Pages/Home/CollapsibleTranscript.swift",
-        "Pages/Home/FeedRow.swift",
-        "Pages/Home/HomeFeed.swift",
-        "Pages/Home/HomeFilterBar.swift",
-        "Pages/Home/HomeHeader.swift",
-        "Pages/Home/HomeRecordControl.swift",
-        "Pages/Home/HomeTriggerSummary.swift",
         "Settings.swift",
+        "SettingsTheme.swift",
         "Indicator/IndicatorWindow.swift",
         "Indicator/IndicatorElementView.swift",
-        "Settings/DictionaryBadgeEditor.swift",
-        "Settings/DownloadsSidebarCard.swift",
-        "Settings/PunctuationCalibrationView.swift",
     ]
 
+    /// Every window's own text, in the files that draw it.
+    private var userFacingViews: [String] {
+        let fileManager = FileManager.default
+        let inFolders = Self.userFacingFolders.flatMap { folder -> [String] in
+            let root = sourceRoot.appendingPathComponent(folder)
+            let files = fileManager.enumerator(at: root, includingPropertiesForKeys: nil)?
+                .compactMap { $0 as? URL }
+                .filter { $0.pathExtension == "swift" } ?? []
+            return files.map { folder + "/" + $0.path.dropFirst(root.path.count + 1) }
+        }
+        return Self.userFacingFiles + inFolders.sorted()
+    }
+
+    func testTheFolderScanFindsTheWindows() {
+        XCTAssertTrue(userFacingViews.contains("Shell/AppShellView.swift"))
+        XCTAssertTrue(userFacingViews.contains("Pages/HomePage.swift"))
+        XCTAssertGreaterThan(userFacingViews.count, 40)
+    }
+
     func testNoWindowUsesAFontThatIgnoresTheSetting() throws {
-        for path in Self.userFacingViews {
+        for path in userFacingViews {
             let text = try source(path)
             for style in Self.semanticFontStyles {
                 XCTAssertFalse(text.contains(style),
@@ -64,7 +77,7 @@ final class TextScaleCoverageTests: XCTestCase {
 
     /// A fixed point size ignores the setting just as thoroughly.
     func testNoWindowHardcodesAPointSize() throws {
-        for path in Self.userFacingViews {
+        for path in userFacingViews {
             let text = try source(path)
             XCTAssertFalse(text.contains(".font(.system(size:"),
                            "\(path) sets a fixed point size; use scaledFont")
@@ -77,8 +90,9 @@ final class TextScaleCoverageTests: XCTestCase {
         XCTAssertTrue(app.contains("\\.appTextScale"),
                       "the main window and onboarding would ignore the setting")
 
-        let settings = try source("Settings.swift")
-        XCTAssertTrue(settings.contains("\\.appTextScale"))
+        let shell = try source("Shell/AppShellView.swift")
+        XCTAssertTrue(shell.contains("\\.appTextScale"),
+                      "the main window and the settings would ignore the setting")
 
         let indicator = try source("Indicator/IndicatorWindowManager.swift")
         XCTAssertTrue(indicator.contains("\\.appTextScale"),

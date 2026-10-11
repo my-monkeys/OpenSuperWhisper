@@ -64,7 +64,7 @@ final class AssistantsSettingsModel: ObservableObject {
 
     func refreshProjects() {
         disabledProjects = AppPreferences.shared.agentDisabledProjects
-        projects = AgentsSettingsPane.listedProjects(recent: AppPreferences.shared.agentRecentProjects,
+        projects = AgentSettings.listedProjects(recent: AppPreferences.shared.agentRecentProjects,
                                                      disabled: disabledProjects)
     }
 
@@ -79,11 +79,11 @@ final class AssistantsSettingsModel: ObservableObject {
     }
 
     func folderTurningOff(_ path: String) -> String? {
-        AgentsSettingsPane.folderTurningOff(path, disabled: disabledProjects)
+        AgentSettings.folderTurningOff(path, disabled: disabledProjects)
     }
 
     func projectsOnlyTurnedOff(by folder: String) -> Int {
-        AgentsSettingsPane.projectsOnlyTurnedOff(by: folder, among: projects, disabled: disabledProjects)
+        AgentSettings.projectsOnlyTurnedOff(by: folder, among: projects, disabled: disabledProjects)
     }
 
     /// "opensuperwhisper · site · 2 others": the first followed projects by name.

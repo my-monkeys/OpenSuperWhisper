@@ -152,7 +152,7 @@ struct AssistantsRubric: View {
                        hint: "Then the agent goes back to its terminal, where you can still answer.") {
                 SPicker(selection: $model.waitSeconds,
                         options: AppPreferences.agentWaitChoices.map {
-                            ($0, LocalizedStringKey(AgentsSettingsPane.label(forWait: $0)))
+                            ($0, LocalizedStringKey(AgentSettings.label(forWait: $0)))
                         })
                 .disabled(!model.enabled)
             }

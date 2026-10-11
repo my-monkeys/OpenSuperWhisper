@@ -404,7 +404,7 @@ enum IndicatorProbe {
             w.contentView = NSHostingView(rootView:
                 Group {
                     if ProcessInfo.processInfo.environment["PROBE_SETTINGS"] != nil {
-                        SettingsView()
+                        AppShellView(settings: .appearance)
                     } else {
                         ScrollView { IndicatorLayoutEditor(viewModel: SettingsViewModel()).padding(20) }
                     }

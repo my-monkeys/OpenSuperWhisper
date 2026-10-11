@@ -69,7 +69,7 @@ private struct ProjectRow: View {
                     Text(verbatim: URL(fileURLWithPath: path).lastPathComponent)
                         .scaledFont(size: 15, weight: .semibold)
                         .foregroundColor(STheme.textBright)
-                    Text(verbatim: AgentsSettingsPane.abbreviated(path))
+                    Text(verbatim: AgentSettings.abbreviated(path))
                         .scaledFont(size: 13)
                         .foregroundColor(STheme.hint)
                         .lineLimit(1)
@@ -87,7 +87,7 @@ private struct ProjectRow: View {
                 .disabled(!model.enabled || parent != nil)
             }
             if let parent {
-                caption("Off because it is inside \(AgentsSettingsPane.abbreviated(parent)), which is off. Turn that folder back on to use the panel here.",
+                caption("Off because it is inside \(AgentSettings.abbreviated(parent)), which is off. Turn that folder back on to use the panel here.",
                         color: STheme.warn)
             } else if coveredInside > 0 {
                 caption(coveredInside == 1
