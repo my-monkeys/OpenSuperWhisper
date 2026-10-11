@@ -9,6 +9,11 @@ public enum RecordingStatus: String, Codable, Sendable {
     case failed
 }
 
+/// Which recordings the history shows: everything, live dictations, imported files, or failures.
+public enum RecordingFilter: String, CaseIterable, Sendable {
+    case all, dictations, files, errors
+}
+
 public struct Recording: Identifiable, Codable, FetchableRecord, PersistableRecord, Equatable, Sendable {
     public let id: UUID
     public let timestamp: Date
@@ -600,6 +605,36 @@ public class RecordingStore: ObservableObject {
         }
     }
     
+    /// One page of the history narrowed by kind and, when `query` is not empty, by text.
+    public nonisolated func fetchRecordings(filter: RecordingFilter, query: String = "",
+                                            limit: Int, offset: Int) async throws -> [Recording] {
+        try await dbQueue.read { db in
+            try Self.request(filter: filter, query: query)
+                .order(Recording.Columns.timestamp.desc)
+                .limit(limit, offset: offset)
+                .fetchAll(db)
+        }
+    }
+
+    /// How many recordings the filter matches, over the whole history rather than a loaded page.
+    public nonisolated func countRecordings(filter: RecordingFilter) async -> Int {
+        (try? await dbQueue.read { db in try Self.request(filter: filter, query: "").fetchCount(db) }) ?? 0
+    }
+
+    private nonisolated static func request(filter: RecordingFilter, query: String) -> QueryInterfaceRequest<Recording> {
+        var request = Recording.all()
+        switch filter {
+        case .all: break
+        case .dictations: request = request.filter(Recording.Columns.sourceFileURL == nil)
+        case .files: request = request.filter(Recording.Columns.sourceFileURL != nil)
+        case .errors: request = request.filter(Recording.Columns.status == RecordingStatus.failed.rawValue)
+        }
+        if !query.isEmpty {
+            request = request.filter(Recording.Columns.transcription.like("%\(query)%").collating(.nocase))
+        }
+        return request
+    }
+
     public nonisolated func searchRecordingsAsync(query: String, limit: Int = 100, offset: Int = 0) async -> [Recording] {
         do {
             return try await dbQueue.read { db in
