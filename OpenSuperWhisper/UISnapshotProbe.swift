@@ -18,7 +18,32 @@ enum UISnapshotProbe {
         "style": { AnyView(AppShellView(page: .style)) },
         "help": { AppNavigation.shared.helpOpen = true; return AnyView(AppShellView(page: .home)) },
         "onboarding": { AnyView(OnboardingView().environmentObject(AppState())) },
+        "settings-textAndAI-ai": {
+            AppPreferences.shared.aiPostProcessingEnabled = true
+            return scrolled(.textAndAI, to: "Format with AI")
+        },
+        "settings-textAndAI-prompts": {
+            AppPreferences.shared.aiPostProcessingEnabled = true
+            AppPreferences.shared.aiBackend = "builtin"
+            return scrolled(.textAndAI, to: "Opening instruction")
+        },
+        "settings-textAndAI-server": {
+            AppPreferences.shared.aiPostProcessingEnabled = true
+            AppPreferences.shared.aiBackend = "remote"
+            return scrolled(.textAndAI, to: "Server")
+        },
+        "settings-textAndAI-insertion": { scrolled(.textAndAI, to: "Warn when no field is focused") },
+        "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
+        "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
     ]
+
+    /// A rubric with Advanced on, scrolled to one of its rows, for the parts below the fold.
+    private static func scrolled(_ rubric: SettingsRubric, to row: String) -> AnyView {
+        AdvancedRubrics.shared.set(rubric.rawValue, true)
+        let view = AnyView(AppShellView(page: .home, settings: rubric))
+        AppNavigation.shared.settingsFocusRow = row
+        return view
+    }
 
     static func run(outputDir: String, names: [String]) -> Never {
         guard DefaultsStore.isRunningTests else {
