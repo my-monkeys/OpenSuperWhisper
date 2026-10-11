@@ -5,906 +5,233 @@
 //  Created by user on 08.02.2025.
 //
 
-import Foundation
+import CoreGraphics
 import SwiftUI
-import FluidAudio
 import OpenSuperWhisperCore
 
-enum OnboardingShortcutOption: String, CaseIterable {
-    case keyCombination
-    case rightOption
-}
-
-class OnboardingViewModel: ObservableObject {
-    @Published var selectedLanguage: String {
-        didSet {
-            AppPreferences.shared.whisperLanguage = selectedLanguage
-            suggestDefaultModel()
-        }
-    }
-    
-    @Published var useAsianAutocorrect: Bool {
-        didSet {
-            AppPreferences.shared.useAsianAutocorrect = useAsianAutocorrect
-        }
-    }
-    
-    @Published var selectedShortcut: OnboardingShortcutOption {
-        didSet {
-            switch selectedShortcut {
-            case .keyCombination:
-                AppPreferences.shared.modifierOnlyHotkey = ModifierKey.none.rawValue
-            case .rightOption:
-                AppPreferences.shared.modifierOnlyHotkey = ModifierKey.rightOption.rawValue
-            }
-            AppPreferences.shared.setRightOptionTrigger(selectedShortcut == .rightOption)
-            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
-        }
-    }
-
-    @Published var unifiedModels: [OnboardingUnifiedModel] = []
-    @Published var selectedModelId: UUID?
-    @Published var remoteSelected: Bool = false
-    @Published var isDownloading: Bool = false
-    @Published var downloadProgress: Double = 0.0
-    @Published var downloadingModelName: String?
-
-    private let modelManager = WhisperModelManager.shared
-    private var downloadTask: Task<Void, Error>?
-
-    init() {
-        let systemLanguage = LanguageUtil.getSystemLanguage()
-        AppPreferences.shared.whisperLanguage = systemLanguage
-        self.selectedLanguage = systemLanguage
-        self.useAsianAutocorrect = AppPreferences.shared.useAsianAutocorrect
-        
-        let currentHotkey = ModifierKey(rawValue: AppPreferences.shared.modifierOnlyHotkey) ?? .none
-        if currentHotkey == .none && !AppPreferences.shared.hasCompletedOnboarding {
-            // Default to key combination mode — does NOT require Input Monitoring permission.
-            // Users can switch to single modifier key mode later in Settings if they prefer.
-            self.selectedShortcut = .keyCombination
-            AppPreferences.shared.modifierOnlyHotkey = ModifierKey.none.rawValue
-            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
-        } else {
-            self.selectedShortcut = currentHotkey == .rightOption ? .rightOption : .keyCombination
-        }
-        
-        initializeUnifiedModels()
-    }
-
-    func initializeUnifiedModels() {
-        unifiedModels = OnboardingUnifiedModels.availableModels.map { model in
-            var updatedModel = model
-            switch model.type {
-            case .whisper(let url, _):
-                let filename = url.lastPathComponent
-                updatedModel.isDownloaded = modelManager.isModelDownloaded(name: filename)
-            case .parakeet(let version):
-                updatedModel.isDownloaded = isFluidAudioModelDownloaded(version: version)
-            case .senseVoice:
-                updatedModel.isDownloaded = SenseVoiceModelManager.shared.isDownloaded
-            }
-            return updatedModel
-        }
-        
-        if selectedModelId == nil, let firstDownloaded = unifiedModels.first(where: { $0.isDownloaded }) {
-            selectedModelId = firstDownloaded.id
-        }
-        suggestDefaultModel()
-    }
-
-    /// With nothing downloaded yet, preselects Parakeet Ultra, or Whisper when Ultra does not
-    /// speak the chosen language. Follows the language picker until a model is on disk; a model
-    /// the user already has is never second-guessed.
-    private func suggestDefaultModel() {
-        guard !remoteSelected, !unifiedModels.contains(where: { $0.isDownloaded }) else { return }
-        guard let model = unifiedModels.first(where: { Self.isDefaultCandidate($0, language: selectedLanguage) })
-        else { return }
-        selectModel(model)
-    }
-
-    static func isDefaultCandidate(_ model: OnboardingUnifiedModel, language: String) -> Bool {
-        switch model.type {
-        case .parakeet(let version):
-            return language == "auto" || EngineCapabilities.supportedLanguages(
-                engine: "fluidaudio", fluidAudioModelVersion: version).contains(language)
-        case .whisper:
-            return true
-        case .senseVoice:
-            return false
-        }
-    }
-    
-    func isFluidAudioModelDownloaded(version: String) -> Bool {
-        let asrVersion = AsrModelVersion(preference: version)
-        let cacheDirectory = AsrModels.defaultCacheDirectory(for: asrVersion)
-        return AsrModels.modelsExist(at: cacheDirectory, version: asrVersion)
-    }
-    
-    var canContinue: Bool {
-        if remoteSelected { return true }
-        guard let selectedId = selectedModelId else { return false }
-        return unifiedModels.contains { $0.id == selectedId && $0.isDownloaded }
-    }
-
-    // Selecting a remote (OpenAI-compatible) server skips the local-model
-    // requirement entirely; the endpoint/key are configured later in Settings.
-    func selectRemote() {
-        remoteSelected = true
-        selectedModelId = nil
-        AppPreferences.shared.selectedEngine = "remote"
-    }
-
-    func selectModel(_ model: OnboardingUnifiedModel) {
-        remoteSelected = false
-        selectedModelId = model.id
-
-        switch model.type {
-        case .whisper(let url, _):
-            AppPreferences.shared.selectedEngine = "whisper"
-            let modelPath = modelManager.modelsDirectory.appendingPathComponent(url.lastPathComponent).path
-            AppPreferences.shared.selectedWhisperModelPath = modelPath
-        case .parakeet(let version):
-            AppPreferences.shared.selectedEngine = "fluidaudio"
-            AppPreferences.shared.fluidAudioModelVersion = version
-        case .senseVoice:
-            AppPreferences.shared.selectedEngine = "sensevoice"
-        }
-    }
-
-    @MainActor
-    func downloadModel(_ model: OnboardingUnifiedModel) async throws {
-        guard !isDownloading else { return }
-        
-        isDownloading = true
-        downloadingModelName = model.name
-        downloadProgress = 0.0
-        
-        if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-            unifiedModels[index].downloadProgress = 0.0
-        }
-        
-        switch model.type {
-        case .whisper(let url, _):
-            try await downloadWhisperModel(model: model, url: url)
-        case .parakeet(let version):
-            try await downloadParakeetModel(model: model, version: version)
-        case .senseVoice:
-            try await downloadSenseVoiceModel(model: model)
-        }
-    }
-    
-    @MainActor
-    private func downloadWhisperModel(model: OnboardingUnifiedModel, url: URL) async throws {
-        downloadTask = Task {
-            do {
-                let filename = url.lastPathComponent
-                
-                try await modelManager.downloadModel(url: url, name: filename) { [weak self] progress in
-                    Task { @MainActor [weak self] in
-                        guard let self = self, !Task.isCancelled else { return }
-                        guard let task = self.downloadTask, !task.isCancelled else { return }
-                        
-                        self.downloadProgress = progress
-                        if let index = self.unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            self.unifiedModels[index].downloadProgress = progress
-                            if progress >= 1.0 {
-                                self.unifiedModels[index].isDownloaded = true
-                            }
-                        }
-                    }
-                }
-                
-                guard !Task.isCancelled else {
-                    await MainActor.run {
-                        self.isDownloading = false
-                        self.downloadingModelName = nil
-                        self.downloadProgress = 0.0
-                        if let index = self.unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            self.unifiedModels[index].downloadProgress = 0.0
-                        }
-                    }
-                    throw CancellationError()
-                }
-                
-                await MainActor.run {
-                    if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                        unifiedModels[index].isDownloaded = true
-                        unifiedModels[index].downloadProgress = 0.0
-                    }
-                    selectModel(model)
-                    isDownloading = false
-                    downloadingModelName = nil
-                    downloadProgress = 0.0
-                }
-            } catch is CancellationError {
-                await MainActor.run {
-                    isDownloading = false
-                    downloadingModelName = nil
-                    downloadProgress = 0.0
-                    if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                        unifiedModels[index].downloadProgress = 0.0
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    isDownloading = false
-                    downloadingModelName = nil
-                    downloadProgress = 0.0
-                    if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                        unifiedModels[index].downloadProgress = 0.0
-                    }
-                }
-                throw error
-            }
-        }
-        
-        try await downloadTask?.value
-    }
-    
-    @MainActor
-    private func downloadSenseVoiceModel(model: OnboardingUnifiedModel) async throws {
-        downloadTask = Task {
-            do {
-                try await SenseVoiceModelManager.shared.download { [weak self] progress in
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.downloadProgress = progress
-                        if let index = self.unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            self.unifiedModels[index].downloadProgress = progress
-                        }
-                    }
-                }
-                try Task.checkCancellation()
-
-                await MainActor.run {
-                    if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                        unifiedModels[index].isDownloaded = true
-                        unifiedModels[index].downloadProgress = 1.0
-                    }
-                    selectModel(model)
-                    isDownloading = false
-                    downloadingModelName = nil
-                    downloadProgress = 1.0
-                }
-            } catch {
-                await MainActor.run {
-                    isDownloading = false
-                    downloadingModelName = nil
-                    downloadProgress = 0.0
-                    if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                        unifiedModels[index].downloadProgress = 0.0
-                    }
-                }
-                throw error
-            }
-        }
-
-        try await downloadTask?.value
-    }
-
-    private func downloadParakeetModel(model: OnboardingUnifiedModel, version: String) async throws {
-        var wasCancelled = false
-        
-        downloadTask = Task {
-            do {
-                let asrVersion = AsrModelVersion(preference: version)
-                
-                guard !Task.isCancelled else {
-                    await MainActor.run {
-                        self.isDownloading = false
-                        self.downloadingModelName = nil
-                        self.downloadProgress = 0.0
-                        if let index = self.unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            self.unifiedModels[index].downloadProgress = 0.0
-                        }
-                    }
-                    throw CancellationError()
-                }
-                
-                // Same progress as the Models pane: FluidAudio reports it, forward only.
-                let models = try await AsrModels.downloadAndLoad(version: asrVersion) { progress in
-                    Task { @MainActor [weak self] in
-                        guard let self, self.isDownloading else { return }
-                        let value = max(self.downloadProgress, progress.fractionCompleted)
-                        self.downloadProgress = value
-                        if let index = self.unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            self.unifiedModels[index].downloadProgress = value
-                        }
-                    }
-                }
-                
-                guard !Task.isCancelled else {
-                    await MainActor.run {
-                        self.isDownloading = false
-                        self.downloadingModelName = nil
-                        self.downloadProgress = 0.0
-                        if let index = self.unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            self.unifiedModels[index].downloadProgress = 0.0
-                        }
-                    }
-                    throw CancellationError()
-                }
-                
-                let manager = AsrManager(config: .default)
-                try await manager.loadModels(models)
-                
-                await MainActor.run {
-                    if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                        unifiedModels[index].isDownloaded = true
-                        unifiedModels[index].downloadProgress = 1.0
-                    }
-                    selectModel(model)
-                    isDownloading = false
-                    downloadingModelName = nil
-                    downloadProgress = 1.0
-                }
-            } catch is CancellationError {
-                wasCancelled = true
-                await MainActor.run {
-                    isDownloading = false
-                    downloadingModelName = nil
-                    downloadProgress = 0.0
-                    if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                        unifiedModels[index].downloadProgress = 0.0
-                    }
-                }
-            } catch {
-                if Task.isCancelled {
-                    wasCancelled = true
-                    await MainActor.run {
-                        isDownloading = false
-                        downloadingModelName = nil
-                        downloadProgress = 0.0
-                        if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            unifiedModels[index].downloadProgress = 0.0
-                        }
-                    }
-                } else {
-                    await MainActor.run {
-                        isDownloading = false
-                        downloadingModelName = nil
-                        downloadProgress = 0.0
-                        if let index = unifiedModels.firstIndex(where: { $0.id == model.id }) {
-                            unifiedModels[index].downloadProgress = 0.0
-                        }
-                    }
-                    throw error
-                }
-            }
-        }
-        
-        do {
-            try await downloadTask?.value
-        } catch is CancellationError {
-            wasCancelled = true
-        } catch {
-            if !wasCancelled {
-                throw error
-            }
-        }
-    }
-    
-    func cancelDownload() {
-        downloadTask?.cancel()
-        if let modelName = downloadingModelName {
-            if let model = unifiedModels.first(where: { $0.name == modelName }) {
-                if case .whisper(let url, _) = model.type {
-                    let filename = url.lastPathComponent
-                    modelManager.cancelDownload(name: filename)
-                }
-            }
-            if let index = unifiedModels.firstIndex(where: { $0.name == modelName }) {
-                unifiedModels[index].downloadProgress = 0.0
-            }
-        }
-        isDownloading = false
-        downloadingModelName = nil
-        downloadProgress = 0.0
-    }
-}
-
+/// First launch, shown full window in place of the app: shortcut, model, permissions, then a
+/// first dictation. Only the model is required, so nobody reaches the app with no way to
+/// transcribe; permissions can be granted later, the main window's status card asks for them.
 struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
+    @StateObject private var permissions = PermissionsManager()
     @EnvironmentObject private var appState: AppState
-    @State private var showError = false
-    @State private var errorMessage = ""
-    
+    @State private var step: OnboardingStep
+    /// The furthest step visited, so the stepper can go forward again after going back.
+    @State private var furthest: OnboardingStep
+    @State private var inputMonitoringGranted = CGPreflightListenEventAccess()
+
     private let keyboardLayoutInfo: KeyboardLayoutInfo? = KeyboardLayoutProvider.shared.resolveInfo()
+    /// PermissionsManager polls the microphone and Accessibility; Input Monitoring has no
+    /// notification either, so it is re-read on the same rhythm while its row is on screen.
+    private let inputMonitoringPoll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    init(initialStep: OnboardingStep = .shortcut) {
+        _step = State(initialValue: initialStep)
+        _furthest = State(initialValue: initialStep)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with gradient background
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Welcome to")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    
-                    Text("OpenSuperWhisper")
-                        .scaledFont(size: 32, weight: .bold)
-                        .foregroundStyle(
-                            .white
-                        )
-                }
-                .padding(.bottom, 8)
-                
-                // Language Selection
-                HStack(spacing: 8) {
-                    
-                    Picker("Language", selection: $viewModel.selectedLanguage) {
-                        ForEach(LanguageUtil.availableLanguages, id: \.self) { code in
-                            Text(LanguageUtil.languageNames[code] ?? code)
-                                .tag(code)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 150)
-                }
-                
-                if Settings.asianLanguages.contains(viewModel.selectedLanguage) {
-                    Toggle(isOn: $viewModel.useAsianAutocorrect) {
-                        Text("Use Asian Autocorrect")
-                            .font(.caption)
-                    }
-                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
-                }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.05),
-                        Color.white.opacity(0.03),
-                        Color.clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            
-            Divider()
-            
-            // Content - Scrollable area
+            header
+            OnboardingStepper(current: step, isReachable: isReachable) { step = $0 }
+                .padding(.horizontal, 32).padding(.top, 18).padding(.bottom, 16)
+            hairline
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Shortcut Selection
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Shortcut")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        
-                        Text("Choose how to trigger recording")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        if let layoutInfo = keyboardLayoutInfo {
-                            OnboardingKeyboardView(selectedShortcut: viewModel.selectedShortcut, layoutInfo: layoutInfo)
-                        }
-                        
-                        HStack(spacing: 8) {
-                            OnboardingShortcutCard(
-                                title: "⌥ + ~",
-                                subtitle: "Key Combination",
-                                isSelected: viewModel.selectedShortcut == .keyCombination
-                            ) {
-                                viewModel.selectedShortcut = .keyCombination
-                            }
-                            
-                            OnboardingShortcutCard(
-                                title: "Right ⌥",
-                                subtitle: "Single Modifier Key",
-                                isSelected: viewModel.selectedShortcut == .rightOption
-                            ) {
-                                viewModel.selectedShortcut = .rightOption
-                            }
-                        }
-                        
-                        if viewModel.selectedShortcut == .rightOption {
-                            Text("⚠️ Single modifier key mode requires Input Monitoring permission (macOS needs it to detect modifier keys globally). Only modifier key events are monitored — no regular keystrokes.")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                        }
-
-                        Text("You can change this later in Settings")
-                            .font(.caption2)
-                            .foregroundColor(Color(.tertiaryLabelColor))
-                    }
-                    
-                    // Model Selection
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Model")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        
-                        Text("Download a model to get started")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        VStack(spacing: 8) {
-                            ForEach($viewModel.unifiedModels) { $model in
-                                OnboardingUnifiedModelItemView(model: $model, viewModel: viewModel)
-                            }
-                        }
-
-                        // Remote server option — no local model download required.
-                        Button(action: { viewModel.selectRemote() }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "cloud")
-                                    .scaledFont(size: 18)
-                                    .foregroundColor(.accentColor)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Use a remote server")
-                                        .scaledFont(size: 13, weight: .semibold)
-                                    Text("OpenAI-compatible API (Groq, or your own server). Set the endpoint and key in Settings after setup.")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer()
-                                if viewModel.remoteSelected {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
-                            .padding(10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(viewModel.remoteSelected ? Color.accentColor : Color.gray.opacity(0.3),
-                                            lineWidth: viewModel.remoteSelected ? 2 : 1)
-                            )
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
+                VStack(alignment: .leading, spacing: 28) {
+                    stepHeading
+                    stepContent
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: 660, alignment: .leading)
+                .padding(.horizontal, 32).padding(.top, 36).padding(.bottom, 40)
+                .frame(maxWidth: .infinity)
             }
-            
-            Divider()
-            
-            // Footer with Continue button
-            HStack {
-                Spacer()
-                Button(action: {
-                    handleContinueButtonTap()
-                }) {
-                    HStack(spacing: 6) {
-                        Text("Continue")
-                        Image(systemName: "arrow.right")
-                            .scaledFont(size: 12, weight: .semibold)
-                    }
-                    .frame(minWidth: 100)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!viewModel.canContinue || viewModel.isDownloading)
-            }
-            .padding(16)
+            .id(step)
+            hairline
+            footer
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            ZStack {
-                Color(.windowBackgroundColor)
-                
-                // Subtle gradient overlay
-                LinearGradient(
-                    colors: [
-                        Color.blue.opacity(0.02),
-                        Color.clear,
-                        Color.purple.opacity(0.02)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        )
-        .alert("Download Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage)
+        .background(STheme.windowBg.ignoresSafeArea())
+        .ignoresSafeArea(.container, edges: .top)
+        .tint(STheme.accent)
+        .onChange(of: step) { _, newStep in furthest = max(furthest, newStep) }
+        .onReceive(inputMonitoringPoll) { _ in
+            guard step == .permissions else { return }
+            inputMonitoringGranted = CGPreflightListenEventAccess()
         }
     }
 
-    private func handleContinueButtonTap() {
+    // MARK: Frame
+
+    private var header: some View {
+        HStack(spacing: 16) {
+            OnboardingBrand()
+            Spacer(minLength: 0)
+            Text("Step \(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
+                .scaledFont(size: 13)
+                .foregroundColor(STheme.hint)
+        }
+        // Clears the traffic lights: the title bar is hidden and the view runs under it.
+        .padding(.horizontal, 32).padding(.top, 44)
+    }
+
+    private var hairline: some View {
+        Rectangle().fill(STheme.border).frame(height: 1)
+    }
+
+    private var stepHeading: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(step.eyebrow)
+                .scaledFont(size: 12, weight: .bold)
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundColor(STheme.accent)
+            Text(step.headline)
+                .scaledFont(size: 30, weight: .bold)
+                .foregroundColor(STheme.textBright)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(step.subtitle)
+                .scaledFont(size: 16)
+                .foregroundColor(STheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder private var stepContent: some View {
+        switch step {
+        case .shortcut:
+            OnboardingShortcutStep(viewModel: viewModel, layoutInfo: keyboardLayoutInfo)
+        case .model:
+            OnboardingModelStep(viewModel: viewModel)
+        case .permissions:
+            OnboardingPermissionsStep(permissions: permissions,
+                                      needsInputMonitoring: needsInputMonitoring,
+                                      inputMonitoringGranted: inputMonitoringGranted,
+                                      allGranted: permissionsGranted)
+        case .firstTry:
+            OnboardingFirstTryStep(triggerKeys: triggerKeys,
+                                   microphoneGranted: permissions.isMicrophonePermissionGranted)
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            if showsFinishLater {
+                Button("Finish later", action: finish)
+                    .buttonStyle(OnboardingTextButtonStyle())
+                    .help("Open the app now. You can finish the setup from Settings.")
+            }
+            Spacer(minLength: 0)
+            if let previous = step.previous {
+                Button("Back") { step = previous }
+                    .buttonStyle(.sSecondary)
+            }
+            primaryButton
+        }
+        .padding(.horizontal, 32).padding(.vertical, 18)
+    }
+
+    @ViewBuilder private var primaryButton: some View {
+        switch step {
+        case .firstTry:
+            Button("Skip", action: finish)
+                .buttonStyle(.sSecondary)
+            Button("Finish", action: finish)
+                .buttonStyle(.sPrimary)
+        case .permissions where !permissionsGranted:
+            continueButton(Text("Continue without"))
+        default:
+            continueButton(Text("Continue"))
+        }
+    }
+
+    private func continueButton(_ label: Text) -> some View {
+        Button {
+            if let next = step.next { step = next }
+        } label: {
+            HStack(spacing: 6) {
+                label
+                Image(systemName: "arrow.right")
+                    .scaledFont(size: 12, weight: .bold)
+            }
+        }
+        .buttonStyle(.sPrimary)
+        .keyboardShortcut(.defaultAction)
+        .disabled(!isPassable(step))
+    }
+
+    // MARK: Rules
+
+    /// Whether a step lets the user past it. Only the model gates: it is what the app needs to
+    /// work at all. The test target is optional, and so are permissions, which can be granted
+    /// later from the main window.
+    private func isPassable(_ step: OnboardingStep) -> Bool {
+        switch step {
+        case .model: return viewModel.canContinue && !viewModel.isDownloading
+        case .shortcut, .permissions, .firstTry: return true
+        }
+    }
+
+    /// Back is always open; forward only to a step already seen, past steps that are done.
+    private func isReachable(_ target: OnboardingStep) -> Bool {
+        target <= furthest && OnboardingStep.allCases.filter { $0 < target }.allSatisfy(isPassable)
+    }
+
+    /// Leaving early keeps the model requirement: hidden until a model is ready (or a remote
+    /// server is chosen), and on the last step, where Skip does the same.
+    private var showsFinishLater: Bool {
+        step != .firstTry && isPassable(.model)
+    }
+
+    private var needsInputMonitoring: Bool {
+        viewModel.selectedShortcut == .rightOption
+    }
+
+    private var permissionsGranted: Bool {
+        permissions.isMicrophonePermissionGranted && permissions.isAccessibilityPermissionGranted
+            && (!needsInputMonitoring || inputMonitoringGranted)
+    }
+
+    private var triggerKeys: String {
+        switch viewModel.selectedShortcut {
+        case .rightOption: return OnboardingShortcutLabel.rightOption
+        case .keyCombination: return OnboardingShortcutLabel.combination(layout: keyboardLayoutInfo)
+        }
+    }
+
+    private func finish() {
         appState.hasCompletedOnboarding = true
     }
 }
 
-struct OnboardingUnifiedModelItemView: View {
-    @Binding var model: OnboardingUnifiedModel
-    @ObservedObject var viewModel: OnboardingViewModel
-    @State private var showError = false
-    @State private var errorMessage = ""
-    
-    var isSelected: Bool {
-        viewModel.selectedModelId == model.id
-    }
-    
-    var isParakeet: Bool {
-        if case .parakeet = model.type { return true }
-        return false
-    }
-    
+/// The app's mark in the top-left corner, as the sidebar draws it once setup is done.
+private struct OnboardingBrand: View {
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(model.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    if model.isDownloaded {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundColor(.blue)
-                            .imageScale(.small)
-                    }
-                }
-                
-                Text(model.description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                if viewModel.isDownloading && viewModel.downloadingModelName == model.name && isParakeet {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(0.7)
-                        .padding(.top, 4)
-                } else if model.downloadProgress > 0 && model.downloadProgress < 1 {
-                    ProgressView(value: model.downloadProgress)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .frame(height: 6)
-                        .padding(.top, 4)
-                }
-            }
-            
-            Spacer()
-            
-            if viewModel.isDownloading && viewModel.downloadingModelName == model.name {
-                Button("Cancel") {
-                    viewModel.cancelDownload()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            } else if model.isDownloaded {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .imageScale(.large)
-                } else {
-                    Button(action: {
-                        viewModel.selectModel(model)
-                    }) {
-                        Text("Select")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                }
-            } else {
-                Button(action: {
-                    Task {
-                        do {
-                            try await viewModel.downloadModel(model)
-                        } catch is CancellationError {
-                            // Don't show error for manual cancellation
-                        } catch {
-                            errorMessage = error.localizedDescription
-                            showError = true
-                        }
-                    }
-                }) {
-                    Label("Download", systemImage: "arrow.down.circle")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(viewModel.isDownloading)
+        HStack(spacing: 10) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: -1) {
+                Text(verbatim: "OpenSuper")
+                    .scaledFont(size: 13)
+                    .foregroundColor(STheme.textBright)
+                Text(verbatim: "Whisper")
+                    .scaledFont(size: 17, weight: .bold)
+                    .foregroundColor(STheme.textBright)
             }
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color(.controlBackgroundColor).opacity(0.8) : Color(.controlBackgroundColor).opacity(0.5))
-                .shadow(color: isSelected ? Color.blue.opacity(0.2) : Color.black.opacity(0.05), radius: isSelected ? 8 : 4, x: 0, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1.5)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if model.isDownloaded && !isSelected {
-                viewModel.selectModel(model)
-            }
-        }
-        .alert("Download Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage)
-        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: "OpenSuperWhisper"))
     }
 }
 
-private struct KeyCap: View {
-    let label: String
-    let w: CGFloat
-    let h: CGFloat
-    let highlighted: Bool
-    
-    var body: some View {
-        Text(label)
-            .scaledFont(size: w > 20 ? 9 : 7, weight: .medium)
-            .lineLimit(2)
-            .multilineTextAlignment(.center)
-            .frame(width: w, height: h)
-            .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(highlighted ? Color.accentColor.opacity(0.35) : Color(.controlBackgroundColor).opacity(0.5))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(highlighted ? Color.accentColor.opacity(0.7) : Color.white.opacity(0.08), lineWidth: 1)
-            )
-            .foregroundColor(highlighted ? .white : .secondary)
-    }
-}
-
-struct OnboardingKeyboardView: View {
-    let selectedShortcut: OnboardingShortcutOption
-    let layoutInfo: KeyboardLayoutInfo
-    
-    private let gap: CGFloat = 2
-    private let pad: CGFloat = 6
-    private let refUnits: CGFloat = 14.5
-    private let refGaps: CGFloat = 13
-    
-    private static let row0Keycodes: [UInt16] = [50, 18, 19, 20, 21, 23, 22, 26, 28, 25, 29, 27, 24]
-    private static let row1Keycodes: [UInt16] = [12, 13, 14, 15, 17, 16, 32, 34, 31, 35, 33, 30]
-    private static let row2Keycodes: [UInt16] = [0, 1, 2, 3, 5, 4, 38, 40, 37, 41, 39]
-    private static let row3Keycodes: [UInt16] = [6, 7, 8, 9, 11, 45, 46, 43, 47, 44]
-    
-    private func isHighlighted(_ id: String) -> Bool {
-        switch selectedShortcut {
-        case .keyCombination:
-            return id == "leftOption" || id == "tilde"
-        case .rightOption:
-            return id == "rightOption"
-        }
-    }
-    
-    private func label(_ keycode: UInt16) -> String {
-        layoutInfo.labels[keycode] ?? ""
-    }
-    
-    private func u(for width: CGFloat) -> CGFloat {
-        (width - pad * 2 - gap * refGaps) / refUnits
-    }
-    
-    private func wideKey(singleCount: Int, wideCount: Int, u: CGFloat) -> CGFloat {
-        let rowWidth = refUnits * u + refGaps * gap
-        let singleWidth = CGFloat(singleCount) * u
-        let totalGaps = CGFloat(singleCount + wideCount - 1) * gap
-        return (rowWidth - singleWidth - totalGaps) / CGFloat(wideCount)
-    }
-    
-    private func spaceWidth(singleCount: Int, cmdWidth: CGFloat, u: CGFloat) -> CGFloat {
-        let rowWidth = refUnits * u + refGaps * gap
-        let singleWidth = CGFloat(singleCount) * u
-        let cmds = cmdWidth * 2
-        let totalGaps = CGFloat(singleCount + 3) * gap
-        return rowWidth - singleWidth - cmds - totalGaps
-    }
-    
-    var body: some View {
-        GeometryReader { geo in
-            let u = u(for: geo.size.width)
-            let h = u
-            
-            let backspace = refUnits * u + refGaps * gap - 13 * u - 13 * gap
-            let tab = backspace
-            let caps = wideKey(singleCount: 11, wideCount: 2, u: u)
-            let shift = wideKey(singleCount: 10, wideCount: 2, u: u)
-            let cmd = u * 1.25
-            let space = spaceWidth(singleCount: 7, cmdWidth: cmd, u: u)
-            
-            VStack(spacing: gap) {
-                HStack(spacing: gap) {
-                    KeyCap(label: label(50), w: u, h: h, highlighted: isHighlighted("tilde"))
-                    ForEach(Array(Self.row0Keycodes.dropFirst()), id: \.self) { kc in
-                        KeyCap(label: label(kc), w: u, h: h, highlighted: false)
-                    }
-                    KeyCap(label: "⌫", w: backspace, h: h, highlighted: false)
-                }
-                
-                HStack(spacing: gap) {
-                    KeyCap(label: "⇥", w: tab, h: h, highlighted: false)
-                    ForEach(Self.row1Keycodes, id: \.self) { kc in
-                        KeyCap(label: label(kc), w: u, h: h, highlighted: false)
-                    }
-                    KeyCap(label: label(42), w: u, h: h, highlighted: false)
-                }
-                
-                HStack(spacing: gap) {
-                    KeyCap(label: "⇪", w: caps, h: h, highlighted: false)
-                    ForEach(Self.row2Keycodes, id: \.self) { kc in
-                        KeyCap(label: label(kc), w: u, h: h, highlighted: false)
-                    }
-                    KeyCap(label: "⏎", w: caps, h: h, highlighted: false)
-                }
-                
-                HStack(spacing: gap) {
-                    KeyCap(label: "⇧", w: shift, h: h, highlighted: false)
-                    ForEach(Self.row3Keycodes, id: \.self) { kc in
-                        KeyCap(label: label(kc), w: u, h: h, highlighted: false)
-                    }
-                    KeyCap(label: "⇧", w: shift, h: h, highlighted: false)
-                }
-                
-                HStack(spacing: gap) {
-                    KeyCap(label: "fn", w: u, h: h, highlighted: false)
-                    KeyCap(label: "⌃", w: u, h: h, highlighted: false)
-                    KeyCap(label: "⌥", w: u, h: h, highlighted: isHighlighted("leftOption"))
-                    KeyCap(label: "⌘", w: cmd, h: h, highlighted: false)
-                    KeyCap(label: "", w: space, h: h, highlighted: false)
-                    KeyCap(label: "⌘", w: cmd, h: h, highlighted: false)
-                    KeyCap(label: "⌥", w: u, h: h, highlighted: isHighlighted("rightOption"))
-                    KeyCap(label: "←", w: u, h: h, highlighted: false)
-                    VStack(spacing: 1) {
-                        KeyCap(label: "↑", w: u, h: h / 2 - 0.5, highlighted: false)
-                        KeyCap(label: "↓", w: u, h: h / 2 - 0.5, highlighted: false)
-                    }
-                    KeyCap(label: "→", w: u, h: h, highlighted: false)
-                }
-            }
-            .padding(pad)
-        }
-        .frame(height: heightForWidth(450 - 24))
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(.controlBackgroundColor).opacity(0.3))
-        )
-        .animation(.easeInOut(duration: 0.2), value: selectedShortcut)
-    }
-    
-    private func heightForWidth(_ width: CGFloat) -> CGFloat {
-        let u = u(for: width)
-        return pad * 2 + u * 5 + gap * 4
-    }
-}
-
-struct OnboardingShortcutCard: View {
-    let title: String
-    let subtitle: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .padding(.horizontal, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? Color(.controlBackgroundColor).opacity(0.8) : Color(.controlBackgroundColor).opacity(0.5))
-                    .shadow(color: isSelected ? Color.blue.opacity(0.2) : Color.black.opacity(0.05), radius: isSelected ? 8 : 4, x: 0, y: 2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1.5)
-            )
-        }
-        .buttonStyle(.plain)
+/// A borderless text button, for the footer's way out.
+struct OnboardingTextButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaledFont(size: 14, weight: .semibold)
+            .foregroundColor(configuration.isPressed ? STheme.hint : STheme.textBright)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
     }
 }
 
@@ -912,4 +239,3 @@ struct OnboardingShortcutCard: View {
     let _ = AppCore.install()
     OnboardingView()
 }
-

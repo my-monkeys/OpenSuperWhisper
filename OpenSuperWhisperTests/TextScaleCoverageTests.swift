@@ -42,6 +42,13 @@ final class TextScaleCoverageTests: XCTestCase {
         "Settings/DictionaryBadgeEditor.swift",
         "Settings/DownloadsSidebarCard.swift",
         "Settings/PunctuationCalibrationView.swift",
+        "Onboarding/OnboardingView.swift",
+        "Onboarding/OnboardingStepper.swift",
+        "Onboarding/OnboardingShortcutStep.swift",
+        "Onboarding/OnboardingKeyboardView.swift",
+        "Onboarding/OnboardingModelStep.swift",
+        "Onboarding/OnboardingPermissionsStep.swift",
+        "Onboarding/OnboardingFirstTryStep.swift",
     ]
 
     func testNoWindowUsesAFontThatIgnoresTheSetting() throws {

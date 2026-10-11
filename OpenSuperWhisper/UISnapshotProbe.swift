@@ -17,6 +17,9 @@ enum UISnapshotProbe {
         "style": { AnyView(AppShellView(page: .style)) },
         "help": { AppNavigation.shared.helpOpen = true; return AnyView(AppShellView(page: .home)) },
         "onboarding": { AnyView(OnboardingView().environmentObject(AppState())) },
+        "onboarding-2": { AnyView(OnboardingView(initialStep: .model).environmentObject(AppState())) },
+        "onboarding-3": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
+        "onboarding-4": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
     ]
 
     static func run(outputDir: String, names: [String]) -> Never {
