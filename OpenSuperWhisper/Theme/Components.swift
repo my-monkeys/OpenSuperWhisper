@@ -279,13 +279,46 @@ extension SettingNotice where Action == EmptyView {
 
 // MARK: - Controls
 
-/// The redesign's switch: terracotta when on, warm grey when off.
+/// The redesign's switch: terracotta when on, warm grey when off. Drawn rather than left to
+/// AppKit, which greys an "on" switch out whenever its window is not the key one, so the
+/// settings card looked half switched off next to any other window.
 struct SSwitch: View {
     @Binding var isOn: Bool
     var body: some View {
         Toggle("", isOn: $isOn)
-            .toggleStyle(SwitchToggleStyle(tint: STheme.accent))
+            .toggleStyle(SSwitchStyle())
             .labelsHidden()
+    }
+}
+
+struct SSwitchStyle: ToggleStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.controlSize) private var controlSize
+
+    func makeBody(configuration: Configuration) -> some View {
+        let small = controlSize == .small || controlSize == .mini
+        let width: CGFloat = small ? 32 : 40
+        let height: CGFloat = small ? 19 : 24
+        return Button {
+            configuration.isOn.toggle()
+        } label: {
+            ZStack(alignment: configuration.isOn ? .trailing : .leading) {
+                Capsule()
+                    .fill(configuration.isOn ? STheme.accent : STheme.track)
+                Circle()
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
+                    .padding(2)
+            }
+            .frame(width: width, height: height)
+            .animation(.easeOut(duration: 0.12), value: configuration.isOn)
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement()
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(configuration.isOn ? Text("On") : Text("Off"))
     }
 }
 
@@ -382,7 +415,10 @@ struct SMenu<Content: View>: View {
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(STheme.border, lineWidth: 1))
             .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
+        // The button style draws the label as given. A borderless menu flattens it to a plain
+        // title and icon, losing the border, the type size and the chevron's place.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
     }
