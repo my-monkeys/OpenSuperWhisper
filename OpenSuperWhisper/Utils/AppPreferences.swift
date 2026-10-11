@@ -432,6 +432,16 @@ final class AppPreferences {
     @UserDefault(key: "uiTheme", defaultValue: "system")
     var uiTheme: String
 
+    /// Appearance of the app's windows: "system", "light" or "dark". Read through
+    /// `AppearanceController`, which applies it to `NSApp`.
+    @UserDefault(key: "appAppearance", defaultValue: "system")
+    var appAppearance: String
+
+    /// Settings rubrics whose Advanced switch is on, by `SettingsRubric` raw value. Remembered so
+    /// someone who tunes a rubric often does not have to reveal its options on every visit.
+    @UserDefault(key: "settingsAdvancedRubrics", defaultValue: [String]())
+    var settingsAdvancedRubrics: [String]
+
     /// Size factor of the Liquid Glass recording bubble (1 = Spotlight-sized). Read through
     /// `ThemeController`.
     @UserDefault(key: "glassBubbleSize", defaultValue: 0.8)

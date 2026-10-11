@@ -86,7 +86,9 @@ enum CLI {
     /// The Liquid Glass probes (screenshots, synthetic clicks, the user's real indicator): Debug
     /// builds only, so a release binary never takes them.
     #if DEBUG && canImport(FoundationModels)
-    private static let debugModes = ["gallery", "gallery-live", "indicator-live"]
+    private static let debugModes = ["gallery", "gallery-live", "indicator-live", "ui-snapshot"]
+    #elseif DEBUG
+    private static let debugModes = ["ui-snapshot"]
     #else
     private static let debugModes: [String] = []
     #endif
@@ -98,6 +100,14 @@ enum CLI {
         let mode = args[1]
         // Run by the Claude Code plugin on every hook, so it answers before anything heavier.
         if mode == "agent-hook" { AgentHookCommand.run(args) }
+        #if DEBUG
+        if mode == "ui-snapshot" {
+            MainActor.assumeIsolated {
+                UISnapshotProbe.run(outputDir: args.count >= 3 ? args[2] : "/tmp/osw-ui",
+                                    names: Array(args.dropFirst(3)))
+            }
+        }
+        #endif
         #if DEBUG && canImport(FoundationModels)
         if mode == "gallery" {
             MainActor.assumeIsolated {

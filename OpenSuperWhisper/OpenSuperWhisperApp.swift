@@ -43,7 +43,7 @@ struct OpenSuperWhisperApp: App {
                     OnboardingView()
                         .frame(minWidth: 450, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
                 } else {
-                    SettingsView()
+                    AppShellView()
                 }
             }
             .environmentObject(appState)
@@ -54,7 +54,7 @@ struct OpenSuperWhisperApp: App {
             .environment(\.appTextScale, textScale)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 780, height: 600)
+        .defaultSize(width: 1080, height: 760)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
@@ -137,6 +137,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         setupStatusBarItem()
+        AppearanceController.shared.apply()
 
         // Start in the menu bar only when requested. Never during onboarding: the user needs the
         // window to finish setup.
