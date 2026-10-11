@@ -1,101 +1,57 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// SenseVoice model row (Settings → Engine & Model when browsing SenseVoice). One model; clicking
-/// the row downloads it if needed, then activates SenseVoice — same interaction as every other engine.
+/// SenseVoice's Model group (Settings → Models when browsing SenseVoice). One model: Download
+/// fetches it and then uses it, Use activates SenseVoice once it is on disk.
 struct SenseVoiceModelSection: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var isDownloading = false
     @State private var progress: Double = 0
     @State private var isDownloaded = SenseVoiceModelManager.shared.isDownloaded
-    @State private var errorMessage: String?
+    @State private var downloadFailed = false
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("SenseVoice Model")
-                .font(.headline)
-            Text("Multilingual (Chinese, Cantonese, English, Japanese, Korean), fully on-device. Click to download & use.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            row
-
-            if let errorMessage {
-                Text(errorMessage).font(.caption).foregroundColor(.red)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(8)
+    private var state: ModelRowState {
+        if isDownloading { return .downloading(progress: progress > 0 ? progress : nil, cancellable: false) }
+        guard isDownloaded else { return .notDownloaded }
+        return viewModel.selectedEngine == "sensevoice" ? .active : .downloaded
     }
 
-    private var row: some View {
-        let active = viewModel.selectedEngine == "sensevoice" && isDownloaded
-        return HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("SenseVoice")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text("zh · yue · en · ja · ko · \(SenseVoiceModelManager.shared.downloadSizeString)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                if isDownloading {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .frame(height: 6)
-                        .padding(.top, 2)
-                }
-            }
-
-            Spacer()
-
-            if active {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                    .imageScale(.large)
-            } else if isDownloading {
-                ProgressView().controlSize(.small)
-            } else if isDownloaded {
-                Image(systemName: "checkmark.circle")
-                    .foregroundColor(.secondary)
-                    .imageScale(.large)
-            } else {
-                Image(systemName: "arrow.down.circle")
-                    .foregroundColor(.blue)
-                    .imageScale(.large)
+    var body: some View {
+        SettingsGroup("Model") {
+            ModelRow(name: "SenseVoice Small",
+                     detail: String(localized: "Chinese, Cantonese, English, Japanese, Korean · Apple Silicon"),
+                     size: SenseVoiceModelManager.shared.downloadSizeString,
+                     state: state,
+                     onUse: select, onDownload: select)
+            if downloadFailed {
+                SettingNotice("Download failed. Check your connection and try again.")
             }
         }
-        .padding(12)
-        .background(Color(.controlBackgroundColor).opacity(active ? 0.8 : 0.4))
-        .cornerRadius(8)
-        .contentShape(Rectangle())
-        .onTapGesture { select() }
     }
 
     private func select() {
         guard !isDownloading else { return }
-        errorMessage = nil
+        downloadFailed = false
         if isDownloaded {
             viewModel.selectSenseVoice()
-        } else {
-            isDownloading = true
-            progress = 0
-            Task {
-                do {
-                    try await SenseVoiceModelManager.shared.download { p in
-                        Task { @MainActor in progress = p }
-                    }
-                    await MainActor.run {
-                        isDownloaded = true
-                        isDownloading = false
-                        viewModel.selectSenseVoice()
-                    }
-                } catch {
-                    await MainActor.run {
-                        isDownloading = false
-                        errorMessage = "Download failed. Check your connection and try again."
-                    }
+            return
+        }
+        isDownloading = true
+        progress = 0
+        Task {
+            do {
+                try await SenseVoiceModelManager.shared.download { p in
+                    Task { @MainActor in progress = p }
+                }
+                await MainActor.run {
+                    isDownloaded = true
+                    isDownloading = false
+                    viewModel.selectSenseVoice()
+                }
+            } catch {
+                await MainActor.run {
+                    isDownloading = false
+                    downloadFailed = true
                 }
             }
         }

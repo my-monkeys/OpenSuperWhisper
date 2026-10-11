@@ -38,37 +38,37 @@ struct AppleSpeechModelSection: View {
     }
 
     var body: some View {
-        SSection(title: "Languages") {
+        SettingsGroup("Languages") {
             if languages.isEmpty {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Checking the system speech model…")
-                        .scaledFont(size: 11.5)
+                        .scaledFont(size: 13)
                         .foregroundColor(STheme.hint)
                 }
+                .modelRowFrame()
             } else {
-                VStack(spacing: 8) {
-                    ForEach(languages) { lang in
-                        languageRow(lang)
-                    }
+                ForEach(languages) { lang in
+                    languageRow(lang)
                 }
             }
 
             if let errorMessage {
-                Text(errorMessage).scaledFont(size: 11).foregroundColor(.red)
+                SettingNotice(LocalizedStringKey(errorMessage))
             }
 
             if variants.count > 1 {
-                SRow(title: "Regional variant",
-                     hint: "Which regional model transcribes the selected language — spelling and numbers follow it.") {
-                    Picker("", selection: $selectedVariantID) {
-                        ForEach(variants, id: \.identifier) { locale in
-                            Text(Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier)
-                                .tag(locale.identifier)
+                SettingRow("Regional variant",
+                           hint: "Which regional model transcribes the selected language. Spelling and numbers follow it.") {
+                    SMenu(Text(verbatim: variantName(selectedVariantID))) {
+                        Picker("", selection: $selectedVariantID) {
+                            ForEach(variants, id: \.identifier) { locale in
+                                Text(verbatim: variantName(locale.identifier)).tag(locale.identifier)
+                            }
                         }
+                        .pickerStyle(.inline)
+                        .labelsHidden()
                     }
-                    .labelsHidden()
-                    .fixedSize()
                     .onChange(of: selectedVariantID) { _, newID in
                         guard !newID.isEmpty else { return }
                         let code = AppleSpeechSupport.effectiveLanguageCode(for: viewModel.selectedLanguage)
@@ -79,12 +79,17 @@ struct AppleSpeechModelSection: View {
                 }
             }
 
-            Text("The model is built into macOS: downloaded per language by the system, shared across apps, and updated with the OS — nothing is stored in the app. Selecting a language here also sets the transcription language. macOS keeps up to 5 languages reserved per app; beyond that the app rotates automatically.")
-                .scaledFont(size: 11)
+            Text("The model is built into macOS: downloaded per language by the system, shared across apps and updated with the OS. Nothing is stored in the app. Using a language here also sets the spoken language. macOS keeps up to 5 languages per app and rotates them beyond that.")
+                .scaledFont(size: 13)
                 .foregroundColor(STheme.hint)
                 .fixedSize(horizontal: false, vertical: true)
+                .modelRowFrame()
         }
         .task(id: viewModel.selectedLanguage) { await refresh() }
+    }
+
+    private func variantName(_ identifier: String) -> String {
+        Locale.current.localizedString(forIdentifier: identifier) ?? identifier
     }
 
     /// The language actually transcribing right now: Apple engine active + this row's
@@ -96,54 +101,22 @@ struct AppleSpeechModelSection: View {
     }
 
     private func languageRow(_ lang: LangAsset) -> some View {
-        let active = isActive(lang)
-        return HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(lang.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(lang.installed ? "Installed · on-device · managed by macOS"
-                                    : "One-time system download")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                if installingCode == lang.code {
-                    ProgressView(value: langProgress)
-                        .progressViewStyle(.linear)
-                        .frame(height: 6)
-                        .padding(.top, 2)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            if active {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                    .imageScale(.large)
-            } else if installingCode == lang.code {
-                ProgressView().controlSize(.small)
-            } else if lang.installed {
-                Button("Select") { select(lang) }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            } else {
-                Button {
-                    installLanguage(lang)
-                } label: {
-                    Label("Download", systemImage: "arrow.down.circle")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(installingCode != nil)
-            }
+        let state: ModelRowState
+        if installingCode == lang.code {
+            state = .downloading(progress: langProgress > 0 ? langProgress : nil, cancellable: false)
+        } else if lang.installed {
+            state = isActive(lang) ? .active : .downloaded
+        } else {
+            state = .notDownloaded
         }
-        .padding(12)
-        .background(Color(.controlBackgroundColor).opacity(active ? 0.7 : 0.5))
-        .cornerRadius(8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if lang.installed && !active { select(lang) }
-        }
+        return ModelRow(name: lang.name,
+                        detail: lang.installed ? String(localized: "Installed · on this Mac · managed by macOS")
+                                               : String(localized: "One-time system download"),
+                        size: nil,
+                        state: state,
+                        downloadDisabled: installingCode != nil,
+                        onUse: { select(lang) },
+                        onDownload: { installLanguage(lang) })
     }
 
     /// Activate the Apple engine on this language — the language picker in Output and

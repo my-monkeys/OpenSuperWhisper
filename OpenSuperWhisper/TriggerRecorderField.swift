@@ -33,6 +33,11 @@ struct TriggerRecorderField: View {
     /// The regular trigger list takes chords in its own JSON; the hold-only list never does,
     /// since a chord fires on release and has nothing to hold.
     var chord: Binding<String>? = nil
+    /// `.chips` draws the redesign's key caps: the list as a wrapping row of caps ending in
+    /// "Add", a single binding as one cap. Same capture and storage either way.
+    var style: Style = .field
+
+    enum Style { case field, chips }
 
     private var allowsChord: Bool {
         guard allowsModifier else { return false }
@@ -85,10 +90,11 @@ struct TriggerRecorderField: View {
     }
 
     @ViewBuilder var body: some View {
-        if allowsMultiple {
-            listBody
-        } else {
-            singleField
+        switch (allowsMultiple, style) {
+        case (true, .field): listBody
+        case (false, .field): singleField
+        case (true, .chips): chipList
+        case (false, .chips): singleChip
         }
     }
 
@@ -218,6 +224,115 @@ struct TriggerRecorderField: View {
                     .foregroundColor(STheme.hint)
                 Spacer(minLength: 0)
             }
+        }
+    }
+
+    // MARK: - Chips
+
+    private var chipList: some View {
+        TrailingFlowLayout(spacing: 6) {
+            ForEach(Array(triggers.enumerated()), id: \.offset) { _, configured in
+                HStack(spacing: 6) {
+                    Text(Self.chipLabel(configured))
+                        .scaledFont(size: 13, weight: .semibold)
+                        .foregroundColor(STheme.textBright)
+                        .lineLimit(1)
+                    Button { remove(configured) } label: {
+                        Image(systemName: "xmark")
+                            .scaledFont(size: 9, weight: .bold)
+                            .foregroundColor(STheme.hint)
+                    }
+                    .buttonStyle(.plain)
+                    .pointerCursorOnHover()
+                    .help("Remove this shortcut")
+                }
+                .modifier(TriggerChipFrame(armed: false))
+            }
+            addChip
+        }
+        .onAppear { loadShortcut() }
+        .onReceive(NotificationCenter.default.publisher(for: .hotkeySettingsChanged)) { _ in
+            if !isRecording { loadShortcut() }
+        }
+        .onDisappear { disarm() }
+    }
+
+    /// "Esc" reads better than the ⎋ glyph, which looks like a refresh icon at chip size.
+    private static func chipLabel(_ trigger: RecordingTrigger) -> String {
+        trigger.caps.map { $0 == "⎋" ? "Esc" : $0 }.joined(separator: " ")
+    }
+
+    /// The capture surface of the chip list, like `addRow` for the plain list.
+    private var addChip: some View {
+        Group {
+            if isRecording {
+                armedLabel
+            } else {
+                Text(triggers.isEmpty ? "+ Add a shortcut" : "+ Add")
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundColor(STheme.textBright)
+                    .lineLimit(1)
+            }
+        }
+        .modifier(TriggerChipFrame(armed: isRecording))
+        .contentShape(Rectangle())
+        .onTapGesture { if isRecording { disarm() } else { arm() } }
+        .onHover { isHovering = $0 }
+        .pointerCursorOnHover()
+        .accessibilityAddTraits(.isButton)
+        .animation(.easeOut(duration: 0.12), value: heldModifiers.rawValue)
+        .animation(.easeOut(duration: 0.12), value: isRecording)
+    }
+
+    private var singleChip: some View {
+        HStack(spacing: 6) {
+            if isRecording {
+                armedLabel
+            } else if let configured = triggers.first {
+                Text(Self.chipLabel(configured))
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundColor(STheme.textBright)
+                    .lineLimit(1)
+                if isHovering {
+                    Button { clear() } label: {
+                        Image(systemName: "xmark")
+                            .scaledFont(size: 9, weight: .bold)
+                            .foregroundColor(STheme.hint)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear shortcut")
+                }
+            } else {
+                Text("Click to record")
+                    .scaledFont(size: 13)
+                    .foregroundColor(STheme.hint)
+                    .lineLimit(1)
+            }
+        }
+        .modifier(TriggerChipFrame(armed: isRecording))
+        .contentShape(Rectangle())
+        .onTapGesture { if isRecording { disarm() } else { arm() } }
+        .onHover { isHovering = $0 }
+        .pointerCursorOnHover()
+        .accessibilityAddTraits(.isButton)
+        .onAppear { loadShortcut() }
+        .onDisappear { disarm() }
+        .animation(.easeOut(duration: 0.12), value: heldModifiers.rawValue)
+        .animation(.easeOut(duration: 0.12), value: isRecording)
+    }
+
+    /// While armed: the modifiers being held, or what the field is waiting for.
+    @ViewBuilder private var armedLabel: some View {
+        if heldBadges.isEmpty {
+            Text(placeholder)
+                .scaledFont(size: 13)
+                .foregroundColor(STheme.accent)
+                .lineLimit(1)
+        } else {
+            Text(heldBadges.map(\.symbol).joined(separator: " "))
+                .scaledFont(size: 13, weight: .semibold)
+                .foregroundColor(STheme.accent)
+                .lineLimit(1)
         }
     }
 
@@ -471,3 +586,4 @@ private struct TriggerCap: View {
             .overlay(RoundedRectangle(cornerRadius: 3.5).stroke(STheme.controlBorder, lineWidth: 0.5))
     }
 }
+

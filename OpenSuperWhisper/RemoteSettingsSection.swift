@@ -79,8 +79,8 @@ struct RemoteSettingsSection: View {
 
     var body: some View {
         RemoteServerSettingsView(viewModel: viewModel) {
-            SRow(title: "Preset") {
-                Menu {
+            SettingRow("Service", hint: "Groq fills in the address and models. Custom takes any OpenAI-compatible server.") {
+                SMenu(Text(verbatim: DictationRubric.middleTruncated(selectionLabel))) {
                     Button("Custom") { select(.custom) }
                     Button("Groq") { select(.groq) }
                     if !userPresets.isEmpty {
@@ -108,14 +108,7 @@ struct RemoteSettingsSection: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
-                } label: {
-                    Text(selectionLabel)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
                 }
-                // A saved preset is named by the user, so the label has no length limit.
-                .frame(maxWidth: 220)
-                .fixedSize()
             }
             .alert("Save preset", isPresented: $showSavePrompt) {
                 TextField("Name (e.g. Home LiteLLM)", text: $newPresetName)

@@ -95,7 +95,7 @@ struct RemoteModelListBox: View {
                         .foregroundColor(STheme.hint)
                     TextField("", text: $modelSearchText, prompt: Text("Filter models…"))
                         .textFieldStyle(.plain)
-                        .scaledFont(size: 12)
+                        .scaledFont(size: 13)
                         .autocorrectionDisabled(true)
                     if !modelSearchText.isEmpty {
                         Button { modelSearchText = "" } label: {
@@ -117,7 +117,7 @@ struct RemoteModelListBox: View {
                 VStack(spacing: 0) {
                     if visibleModels.isEmpty && !modelSearchText.isEmpty {
                         Text("No models match \"\(modelSearchText)\"")
-                            .scaledFont(size: 11).foregroundColor(STheme.hint)
+                            .scaledFont(size: 13).foregroundColor(STheme.hint)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 14)
                     }
@@ -156,7 +156,7 @@ struct RemoteModelListBox: View {
                                 .foregroundColor(STheme.hint)
                         }
                     }
-                    .scaledFont(size: 11.5)
+                    .scaledFont(size: 13)
                 }
                 .buttonStyle(.plain)
             }
@@ -166,14 +166,14 @@ struct RemoteModelListBox: View {
                 // GET /v1/models without credentials, so the list stays empty until
                 // a key is set and Test Connection runs.
                 Text("The server's models are listed here after a successful Test Connection — most providers (e.g. Groq) need the API key set first.")
-                    .scaledFont(size: 11).foregroundColor(STheme.hint)
+                    .scaledFont(size: 13).foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if isCustom {
-                TextField("", text: $customText, prompt: Text(customPrompt))
+                TextField("", text: $customText, prompt: Text(verbatim: customPrompt))
                     .textFieldStyle(.plain)
-                    .scaledFont(size: 12, design: .monospaced)
+                    .scaledFont(size: 13, design: .monospaced)
                     .autocorrectionDisabled(true)
                     .padding(.horizontal, 9).padding(.vertical, 5)
                     .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
@@ -190,8 +190,8 @@ struct RemoteModelListBox: View {
                     .fill(selected ? STheme.accent : Color.clear)
                     .overlay(Circle().stroke(selected ? STheme.accent : STheme.controlBorder, lineWidth: 1.5))
                     .frame(width: 8, height: 8)
-                Text(name)
-                    .scaledFont(size: 12.5, design: .monospaced)
+                Text(verbatim: name)
+                    .scaledFont(size: 13, design: .monospaced)
                     .foregroundColor(selected ? STheme.textBright : STheme.text)
                 Spacer()
                 if selected {
