@@ -485,13 +485,15 @@ struct SSlider: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Group {
-                if let step {
-                    Slider(value: $value, in: range, step: step)
-                } else {
-                    Slider(value: $value, in: range)
-                }
-            }
+            // Stepped by rounding rather than through `Slider(step:)`, which on macOS draws a
+            // tick under the track for every step.
+            Slider(value: Binding(
+                get: { value },
+                set: { newValue in
+                    guard let step, step > 0 else { value = newValue; return }
+                    let snapped = (newValue / step).rounded() * step
+                    value = min(max(snapped, range.lowerBound), range.upperBound)
+                }), in: range)
             .tint(STheme.accent)
             .frame(width: 180)
             Text(valueLabel)
