@@ -4,7 +4,7 @@ import SwiftUI
 /// `AttributedString`. Sized for reading at a glance in the agent panel, not for documents.
 struct MarkdownView: View {
     let markdown: String
-    var fontSize: CGFloat = 13.5
+    var fontSize: CGFloat = 14
 
     var body: some View {
         stack(MarkdownBlock.parse(markdown))
@@ -26,7 +26,7 @@ struct MarkdownView: View {
         switch block {
         case .heading(let level, let text):
             Text(Self.inline(text))
-                .font(.system(size: fontSize + CGFloat(max(0, 4 - level)) * 1.5, weight: .semibold))
+                .scaledFont(size: fontSize + CGFloat(max(0, 4 - level)) * 1.5, weight: .semibold)
                 .foregroundColor(STheme.textBright)
                 .padding(.top, level <= 2 ? 4 : 0)
         case .paragraph(let text):
@@ -38,11 +38,11 @@ struct MarkdownView: View {
         case .code(_, let text):
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(text)
-                    .font(.system(size: fontSize - 1.5, design: .monospaced))
-                    .foregroundColor(STheme.text)
+                    .scaledFont(size: fontSize - 1.5, design: .monospaced)
+                    .foregroundColor(STheme.textBright)
                     .padding(12)
             }
-            .background(RoundedRectangle(cornerRadius: 10).fill(STheme.inputBg.opacity(0.7)))
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.fill))
         case .quote(let blocks):
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 1.5).fill(STheme.accent.opacity(0.6)).frame(width: 3)
@@ -58,7 +58,7 @@ struct MarkdownView: View {
 
     private func prose(_ text: String) -> some View {
         Text(Self.inline(text))
-            .font(.system(size: fontSize))
+            .scaledFont(size: fontSize)
             .foregroundColor(STheme.text)
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
@@ -69,7 +69,8 @@ struct MarkdownView: View {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(marker(index))
-                        .font(.system(size: fontSize, weight: .medium).monospacedDigit())
+                        .scaledFont(size: fontSize, weight: .medium)
+                        .monospacedDigit()
                         .foregroundColor(STheme.hint)
                         .frame(minWidth: 14, alignment: .trailing)
                     prose(item)
@@ -85,7 +86,7 @@ struct MarkdownView: View {
                 GridRow {
                     ForEach(0..<columns, id: \.self) { column in
                         Text(Self.inline(column < header.count ? header[column] : ""))
-                            .font(.system(size: fontSize - 1, weight: .semibold))
+                            .scaledFont(size: fontSize - 1, weight: .semibold)
                             .foregroundColor(STheme.textBright)
                     }
                 }
@@ -94,7 +95,8 @@ struct MarkdownView: View {
                     GridRow {
                         ForEach(0..<columns, id: \.self) { column in
                             Text(Self.inline(column < row.count ? row[column] : ""))
-                                .font(.system(size: fontSize - 1).monospacedDigit())
+                                .scaledFont(size: fontSize - 1)
+                                .monospacedDigit()
                                 .foregroundColor(STheme.text)
                         }
                     }
@@ -102,12 +104,18 @@ struct MarkdownView: View {
             }
             .padding(12)
         }
-        .background(RoundedRectangle(cornerRadius: 10).fill(STheme.inputBg.opacity(0.5)))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.fill))
     }
 
+    /// Inline styling, with code spans set on a light fill so identifiers stand out from prose.
     static func inline(_ text: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(
             interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+        var styled = (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+        for run in styled.runs where run.inlinePresentationIntent?.contains(.code) == true {
+            styled[run.range].backgroundColor = STheme.fill
+            styled[run.range].foregroundColor = STheme.textBright
+        }
+        return styled
     }
 }

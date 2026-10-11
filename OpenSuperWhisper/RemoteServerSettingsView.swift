@@ -30,77 +30,48 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SSection(title: "Server") {
+        SPaneStack(spacing: 26) {
+            SettingsGroup("Server") {
+                SettingNotice("Audio is uploaded to the server you set up. It does not necessarily stay on this Mac.")
                 presetRow()
-                SRow(title: "Server URL",
-                     hint: "Without a scheme, plain http:// (unencrypted) is used — type https:// explicitly for TLS.") {
-                    TextField("", text: $viewModel.remoteServerURL,
-                              prompt: Text("http://localhost:11434"))
-                        .textFieldStyle(.plain)
-                        .scaledFont(size: 12, design: .monospaced)
-                        .autocorrectionDisabled(true)
-                        .padding(.horizontal, 9).padding(.vertical, 5)
-                        .frame(width: 280)
-                        .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+                SettingRow("Server URL",
+                           hint: "Without a scheme, plain http:// (unencrypted) is used. Type https:// for TLS.") {
+                    serverURLField
                 }
-                SRow(title: "API key", hint: "Optional — only auth servers need one. Stored in your Keychain.") {
-                    HStack(spacing: 8) {
-                        Group {
-                            if revealKey {
-                                TextField("", text: $viewModel.remoteServerAPIKey,
-                                          prompt: Text("optional"))
-                            } else {
-                                SecureField("", text: $viewModel.remoteServerAPIKey,
-                                            prompt: Text("optional"))
-                            }
-                        }
-                        .textFieldStyle(.plain)
-                        .scaledFont(size: 12, design: .monospaced)
-                        .autocorrectionDisabled(true)
-                        .padding(.horizontal, 9).padding(.vertical, 5)
-                        .frame(width: 240)
-                        .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
-                        Button { revealKey.toggle() } label: {
-                            Image(systemName: revealKey ? "eye.slash" : "eye")
-                                .scaledFont(size: 11)
-                                .foregroundColor(STheme.hint)
-                        }
-                        .buttonStyle(.plain)
-                        .help(revealKey ? "Hide key" : "Reveal key")
+                SettingRow("API key", hint: "Optional, only servers with authentication need one. Stored in your Keychain.") {
+                    apiKeyField
+                }
+                SettingRow("Connection") {
+                    HStack(spacing: 10) {
+                        statusLabel
+                        Button("Test connection") { runTest() }
+                            .buttonStyle(.sSecondary)
+                            .disabled(viewModel.remoteServerURL.isEmpty || testStatus == .testing)
                     }
-                }
-                HStack(spacing: 12) {
-                    Button("Test Connection") { runTest() }
-                        .controlSize(.small)
-                        .disabled(viewModel.remoteServerURL.isEmpty || testStatus == .testing)
-                    statusLabel
-                    Spacer()
                 }
             }
 
             modelSection
 
-            SSection(title: "Reliability") {
-                SRow(title: "Request timeout",
-                     hint: viewModel.remoteServerTimeoutEnabled
-                        ? "Raise it for slow server-side pipelines"
-                        : "No timeout — requests wait indefinitely") {
+            SettingsGroup("Reliability") {
+                SettingRow("Request timeout",
+                           hint: viewModel.remoteServerTimeoutEnabled
+                           ? "Raise it for slow server-side pipelines."
+                           : "No timeout: requests wait as long as it takes.") {
                     HStack(spacing: 8) {
                         if viewModel.remoteServerTimeoutEnabled {
                             TextField("", value: $viewModel.remoteServerTimeoutSeconds, format: .number)
                                 .textFieldStyle(.plain)
-                                .scaledFont(size: 12, design: .monospaced)
+                                .scaledFont(size: 13, design: .monospaced)
                                 .multilineTextAlignment(.trailing)
-                                .padding(.horizontal, 9).padding(.vertical, 4)
-                                .frame(width: 56)
-                                .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
-                            Text("s").scaledFont(size: 11).foregroundColor(STheme.hint)
+                                .foregroundColor(STheme.textBright)
+                                .padding(.horizontal, 10).padding(.vertical, 7)
+                                .frame(width: 64)
+                                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.inputBg))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(STheme.border, lineWidth: 1))
+                            Text("s").scaledFont(size: 13).foregroundColor(STheme.hint)
                         }
-                        SToggle(isOn: $viewModel.remoteServerTimeoutEnabled)
+                        SSwitch(isOn: $viewModel.remoteServerTimeoutEnabled)
                     }
                 }
                 fallbackBody
@@ -120,6 +91,46 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                 runTest()
             }
         }
+    }
+
+    /// Not an `STextField`: its prompt is a localized key, which renders a URL as a blue link.
+    private var serverURLField: some View {
+        TextField("", text: $viewModel.remoteServerURL, prompt: Text(verbatim: "http://localhost:11434"))
+            .textFieldStyle(.plain)
+            .scaledFont(size: 13, design: .monospaced)
+            .foregroundColor(STheme.textBright)
+            .autocorrectionDisabled(true)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .frame(width: 260)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.inputBg))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(STheme.border, lineWidth: 1))
+    }
+
+    private var apiKeyField: some View {
+        HStack(spacing: 6) {
+            Group {
+                if revealKey {
+                    TextField("", text: $viewModel.remoteServerAPIKey, prompt: Text("optional"))
+                } else {
+                    SecureField("", text: $viewModel.remoteServerAPIKey, prompt: Text("optional"))
+                }
+            }
+            .textFieldStyle(.plain)
+            .scaledFont(size: 13, design: .monospaced)
+            .foregroundColor(STheme.textBright)
+            .autocorrectionDisabled(true)
+            Button { revealKey.toggle() } label: {
+                Image(systemName: revealKey ? "eye.slash" : "eye")
+                    .scaledFont(size: 12)
+                    .foregroundColor(STheme.hint)
+            }
+            .buttonStyle(.plain)
+            .help(revealKey ? "Hide key" : "Reveal key")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .frame(width: 260)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.inputBg))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(STheme.border, lineWidth: 1))
     }
 
     // Debounced auto-test: re-run a moment after the URL/key stops changing, so we
@@ -154,38 +165,32 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
 
     @ViewBuilder private var fallbackBody: some View {
         Group {
-            if !hasAnyLocalModel {
-                Text("To enable local fallback, download an on-device model first (Models → Whisper or Parakeet).")
-                    .scaledFont(size: 11).foregroundColor(STheme.hint)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                SRow(title: "Local fallback", hint: "Transcribe locally if the server is unreachable") {
-                    SToggle(isOn: $viewModel.remoteFallbackEnabled)
-                }
-                if viewModel.remoteFallbackEnabled {
-                    let models = localFallbackModels
-                    if models.isEmpty {
-                        Text("Translate to English is on, but no Whisper model is downloaded — only Whisper supports translation. Download one under Models.")
-                            .scaledFont(size: 11).foregroundColor(STheme.warn)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.leading, 16)
-                    } else {
-                        SRow(title: "Fallback model", indented: true) {
+            SettingRow("Local fallback",
+                       hint: hasAnyLocalModel
+                       ? "Transcribes on this Mac when the server can't be reached."
+                       : "Download an on-device model first (Parakeet or Whisper) to fall back to it.") {
+                SSwitch(isOn: $viewModel.remoteFallbackEnabled)
+                    .disabled(!hasAnyLocalModel)
+                    .opacity(hasAnyLocalModel ? 1 : 0.5)
+            }
+            if hasAnyLocalModel && viewModel.remoteFallbackEnabled {
+                let models = localFallbackModels
+                if models.isEmpty {
+                    SettingNotice("Translate to English is on, but no Whisper model is downloaded, and only Whisper translates. Download one under Whisper.")
+                } else {
+                    SettingRow("Fallback model", indented: true) {
+                        SMenu(Text(verbatim: viewModel.remoteFallbackModel?.displayName ?? "")) {
                             Picker("", selection: $viewModel.remoteFallbackModel) {
                                 ForEach(models, id: \.self) { model in
-                                    Text(model.displayName).tag(DictationModelOption?.some(model))
+                                    Text(verbatim: model.displayName).tag(DictationModelOption?.some(model))
                                 }
                             }
+                            .pickerStyle(.inline)
                             .labelsHidden()
-                            .frame(maxWidth: 280)
-                            .fixedSize()
                         }
-                        if viewModel.translateToEnglish {
-                            Text("Translate to English is on, so only Whisper models are offered — Parakeet and SenseVoice can't translate.")
-                                .scaledFont(size: 11).foregroundColor(STheme.warn)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.leading, 16)
-                        }
+                    }
+                    if viewModel.translateToEnglish {
+                        SettingNotice("Translate to English is on, so only Whisper models are offered. Parakeet and SenseVoice can't translate.")
                     }
                 }
             }
@@ -210,7 +215,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
     // reveals a free-text field. The list UI is shared with the Remote LLM-cleanup
     // settings via RemoteModelListBox — here, picking a model activates the engine.
     private var modelSection: some View {
-        SSection(title: "Model") {
+        SettingsGroup("Model") {
             RemoteModelListBox(
                 models: availableModels,
                 isCustom: $isCustomModel,
@@ -224,6 +229,7 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                 onPick: { viewModel.selectRemote($0) },
                 onPickCustom: { viewModel.selectRemote(viewModel.remoteServerModel) }
             )
+            .padding(16)
         }
     }
 
@@ -236,17 +242,20 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
             ProgressView().controlSize(.small)
         case .success(let message):
             Text("✓ \(message)")
-                .scaledFont(size: 11, weight: .semibold)
+                .scaledFont(size: 13, weight: .semibold)
                 .foregroundColor(STheme.ok)
-                .padding(.horizontal, 9).padding(.vertical, 2)
-                .background(Capsule().fill(STheme.okBg))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.okBg))
         case .failure(let message):
             Text("✕ \(message)")
-                .scaledFont(size: 11, weight: .semibold)
-                .foregroundColor(.red)
-                .padding(.horizontal, 9).padding(.vertical, 2)
-                .background(Capsule().fill(Color.red.opacity(0.12)))
+                .scaledFont(size: 13, weight: .semibold)
+                .foregroundColor(STheme.danger)
                 .lineLimit(1)
+                .truncationMode(.middle)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.warnBg))
         }
     }
 

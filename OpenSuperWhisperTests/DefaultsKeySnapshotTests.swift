@@ -32,6 +32,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "aiPostProcessingTranslation",
         "aiRemoteEndpoint",
         "aiRemoteModel",
+        "appAppearance",
         "appContextFormattingEnabled",
         "appContextProfilesData",
         "appInsertionRulesData",
@@ -94,6 +95,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "selectedEngine",
         "selectedMicrophoneData",
         "selectedWhisperModelPath",
+        "settingsAdvancedRubrics",
         "showCancelButtonOnIndicator",
         "showStopButtonOnIndicator",
         "showTimestamps",
@@ -220,6 +222,8 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("indicatorPosition") { prefs.indicatorPosition = "top" }
         assertWrites("uiTheme") { prefs.uiTheme = "legacy" }
         assertWrites("glassBubbleSize") { prefs.glassBubbleSize = 1 }
+        assertWrites("appAppearance") { prefs.appAppearance = "dark" }
+        assertWrites("settingsAdvancedRubrics") { prefs.settingsAdvancedRubrics = ["dictation"] }
         assertWrites("indicatorCustomAnchor") { prefs.indicatorCustomAnchor = CGPoint(x: 1, y: 2) }
         assertWrites("indicatorLayout") { prefs.indicatorLayout = "{}" }
         assertWrites("indicatorMeterMode") { prefs.indicatorMeterMode = "off" }
@@ -378,6 +382,8 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.indicatorPosition, "cursor")
         XCTAssertEqual(prefs.uiTheme, "system")
         XCTAssertEqual(prefs.glassBubbleSize, 0.8)
+        XCTAssertEqual(prefs.appAppearance, "system")
+        XCTAssertEqual(prefs.settingsAdvancedRubrics, [])
         XCTAssertNil(prefs.indicatorCustomAnchor)
         XCTAssertEqual(prefs.indicatorLayout, "")
         XCTAssertEqual(prefs.indicatorMeterMode, "replacesDot")
