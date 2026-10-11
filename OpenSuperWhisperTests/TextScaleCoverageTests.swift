@@ -49,6 +49,11 @@ final class TextScaleCoverageTests: XCTestCase {
         "Onboarding/OnboardingModelStep.swift",
         "Onboarding/OnboardingPermissionsStep.swift",
         "Onboarding/OnboardingFirstTryStep.swift",
+        "Agents/AgentPanel.swift",
+        "Agents/AgentComposer.swift",
+        "Agents/AgentPanelParts.swift",
+        "Agents/AgentRecordingControls.swift",
+        "Agents/MarkdownView.swift",
     ]
 
     func testNoWindowUsesAFontThatIgnoresTheSetting() throws {
@@ -82,6 +87,10 @@ final class TextScaleCoverageTests: XCTestCase {
         let indicator = try source("Indicator/IndicatorWindowManager.swift")
         XCTAssertTrue(indicator.contains("\\.appTextScale"),
                       "the recording bubble would ignore the setting")
+
+        let agentPanel = try source("Agents/AgentPanel.swift")
+        XCTAssertTrue(agentPanel.contains("\\.appTextScale"),
+                      "the agent panel would ignore the setting")
     }
 
     /// Read through a mechanism that publishes changes. Reading the preference directly is what

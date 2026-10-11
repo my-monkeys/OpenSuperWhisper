@@ -37,6 +37,10 @@ enum UISnapshotProbe {
         "settings-textAndAI-insertion": { scrolled(.textAndAI, to: "Warn when no field is focused") },
         "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
         "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
+        "agent-panel": { AgentPanelSnapshot.make(focused: true) },
+        "agent-panel-draft": { AgentPanelSnapshot.make(draft: "Yes, open it and ask for a review.") },
+        "agent-panel-permission": { AgentPanelSnapshot.make(showing: .permission) },
+        "agent-panel-question": { AgentPanelSnapshot.make(showing: .question) },
     ]
 
     /// A rubric with Advanced on, scrolled to one of its rows, for the parts below the fold.

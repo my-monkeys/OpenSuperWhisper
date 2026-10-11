@@ -1,8 +1,8 @@
 import LiquidGlass
 import SwiftUI
 
-/// The left end of the agent panel's composer: a microphone that, once a reply is being
-/// dictated, swells into the live meter while delete and stop separate from it on either side.
+/// The left end of the agent panel's composer: a filled terracotta microphone, the panel's main
+/// action, that, once a reply is being dictated, swells into the live meter while delete and stop separate from it on either side.
 /// On macOS 26 the three are Liquid Glass shapes in one container, so the system morphs them
 /// out of the microphone the way it does the recording bubble; earlier systems get a spring.
 struct AgentRecordingControls: View {
@@ -11,7 +11,7 @@ struct AgentRecordingControls: View {
     let onDelete: () -> Void
     let onStop: () -> Void
 
-    static let size: CGFloat = 34
+    static let size: CGFloat = 36
     static let spacing: CGFloat = 8
     /// How close two shapes must be for the glass to blend them. Kept under `spacing`, so once
     /// they have separated they stay clean circles; at the container's old 12 pt the settled
@@ -22,9 +22,19 @@ struct AgentRecordingControls: View {
 
     @Namespace private var glassSpace
 
+    /// Liquid Glass is composited by the window server, so an off-screen snapshot shows none of
+    /// it, the microphone included; the probe draws the plain controls instead.
+    @MainActor private static var drawsPlain: Bool {
+        #if DEBUG
+        AgentPanelController.shared.isSnapshotting
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
         Group {
-            if #available(macOS 26.0, *) {
+            if #available(macOS 26.0, *), !Self.drawsPlain {
                 glassControls
             } else {
                 plainControls
@@ -40,8 +50,8 @@ struct AgentRecordingControls: View {
         GlassEffectContainer(spacing: Self.blendDistance) {
             HStack(spacing: Self.spacing) {
                 if listening {
-                    icon("trash", tint: .red, action: onDelete, help: "Delete this recording")
-                        .glassEffect(.regular.tint(Color.red.opacity(0.18)).interactive(), in: Circle())
+                    icon("trash", tint: STheme.danger, action: onDelete, help: "Delete this recording")
+                        .glassEffect(.regular.tint(STheme.danger.opacity(0.18)).interactive(), in: Circle())
                         .glassEffectID("delete", in: glassSpace)
                 }
                 center
@@ -62,12 +72,12 @@ struct AgentRecordingControls: View {
     private var plainControls: some View {
         HStack(spacing: Self.spacing) {
             if listening {
-                icon("trash", tint: .red, action: onDelete, help: "Delete this recording")
-                    .background(Circle().fill(Color.red.opacity(0.14)))
+                icon("trash", tint: STheme.danger, action: onDelete, help: "Delete this recording")
+                    .background(Circle().fill(STheme.danger.opacity(0.14)))
                     .transition(.scale(scale: 0.4, anchor: .trailing).combined(with: .opacity))
             }
             center
-                .background(Capsule().fill(STheme.accentSoft))
+                .background(Capsule().fill(listening ? STheme.accentSoft : Color.clear))
             if listening {
                 icon("stop.fill", tint: STheme.accent, action: onStop,
                      help: "Stop, and put the words in the field")
@@ -96,9 +106,12 @@ struct AgentRecordingControls: View {
                 AgentLiveMeter()
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
             } else {
+                // Its own fill, drawn over the glass: a tint alone reads as a pale button.
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(STheme.accent)
+                    .scaledFont(size: 15, weight: .semibold)
+                    .foregroundColor(STheme.onAccent)
+                    .frame(width: Self.size, height: Self.size)
+                    .background(Circle().fill(STheme.accent))
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
         }
@@ -113,7 +126,7 @@ struct AgentRecordingControls: View {
     private func icon(_ symbol: String, tint: Color, action: @escaping () -> Void, help: String) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 13, weight: .bold))
+                .scaledFont(size: 13, weight: .bold)
                 .foregroundColor(tint)
                 .frame(width: Self.size, height: Self.size)
                 .contentShape(Circle())
