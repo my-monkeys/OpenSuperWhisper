@@ -44,6 +44,11 @@ final class TextScaleCoverageTests: XCTestCase {
         "SettingsTheme.swift",
         "Indicator/IndicatorWindow.swift",
         "Indicator/IndicatorElementView.swift",
+        "Agents/AgentPanel.swift",
+        "Agents/AgentComposer.swift",
+        "Agents/AgentPanelParts.swift",
+        "Agents/AgentRecordingControls.swift",
+        "Agents/MarkdownView.swift",
     ]
 
     /// Every window's own text, in the files that draw it.
@@ -97,6 +102,10 @@ final class TextScaleCoverageTests: XCTestCase {
         let indicator = try source("Indicator/IndicatorWindowManager.swift")
         XCTAssertTrue(indicator.contains("\\.appTextScale"),
                       "the recording bubble would ignore the setting")
+
+        let agentPanel = try source("Agents/AgentPanel.swift")
+        XCTAssertTrue(agentPanel.contains("\\.appTextScale"),
+                      "the agent panel would ignore the setting")
     }
 
     /// Read through a mechanism that publishes changes. Reading the preference directly is what

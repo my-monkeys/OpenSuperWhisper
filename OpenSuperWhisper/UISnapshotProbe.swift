@@ -20,6 +20,9 @@ enum UISnapshotProbe {
         "style-expanded": { seedStyle(expandFirst: true); return AnyView(AppShellView(page: .style)) },
         "help": { AppNavigation.shared.helpOpen = true; return AnyView(AppShellView(page: .home)) },
         "onboarding": { AnyView(OnboardingView().environmentObject(AppState())) },
+        "onboarding-2": { AnyView(OnboardingView(initialStep: .model).environmentObject(AppState())) },
+        "onboarding-3": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
+        "onboarding-4": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
         "settings-textAndAI-ai": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             return scrolled(.textAndAI, to: "Format with AI")
@@ -37,6 +40,10 @@ enum UISnapshotProbe {
         "settings-textAndAI-insertion": { scrolled(.textAndAI, to: "Warn when no field is focused") },
         "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
         "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
+        "agent-panel": { AgentPanelSnapshot.make(focused: true) },
+        "agent-panel-draft": { AgentPanelSnapshot.make(draft: "Yes, open it and ask for a review.") },
+        "agent-panel-permission": { AgentPanelSnapshot.make(showing: .permission) },
+        "agent-panel-question": { AgentPanelSnapshot.make(showing: .question) },
     ]
 
     /// A rubric with Advanced on, scrolled to one of its rows, for the parts below the fold.
