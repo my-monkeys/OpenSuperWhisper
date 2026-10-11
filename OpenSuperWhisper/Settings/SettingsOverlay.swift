@@ -26,6 +26,7 @@ struct SettingsOverlay: View {
     let rubric: SettingsRubric
     @ObservedObject private var navigation = AppNavigation.shared
     @State private var search = ""
+    @Environment(\.textScaleFactor) private var textScale
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -83,7 +84,7 @@ struct SettingsOverlay: View {
         .padding(.horizontal, 12)
         .padding(.top, 24)
         .padding(.bottom, 18)
-        .frame(width: 220)
+        .frame(width: 220 * min(max(textScale, 1), 1.45))
         .frame(maxHeight: .infinity, alignment: .top)
         .background(STheme.sidebarBg)
     }

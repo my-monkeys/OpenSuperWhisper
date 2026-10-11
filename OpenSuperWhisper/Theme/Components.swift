@@ -337,12 +337,15 @@ enum SButtonKind {
 
 struct SButtonStyle: ButtonStyle {
     var kind: SButtonKind = .secondary
+    /// Lets the title wrap onto several lines in a narrow column instead of keeping its width.
+    var wraps = false
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaledFont(size: 13, weight: .semibold)
-            .lineLimit(1)
+            .lineLimit(wraps ? nil : 1)
+            .multilineTextAlignment(.leading)
             .foregroundColor(foreground)
             .padding(.horizontal, 12).padding(.vertical, 7)
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -351,7 +354,7 @@ struct SButtonStyle: ButtonStyle {
                 .stroke(borderColor, lineWidth: kind == .quiet || kind == .primary ? 0 : 1))
             .opacity(isEnabled ? 1 : 0.5)
             .contentShape(Rectangle())
-            .fixedSize()
+            .fixedSize(horizontal: !wraps, vertical: true)
     }
 
     private var foreground: Color {

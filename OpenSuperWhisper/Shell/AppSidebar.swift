@@ -8,6 +8,7 @@ struct AppSidebar: View {
     @ObservedObject var permissions: PermissionsManager
     @ObservedObject private var navigation = AppNavigation.shared
     @State private var availableUpdateTag: String?
+    @Environment(\.textScaleFactor) private var textScale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -34,7 +35,8 @@ struct AppSidebar: View {
         .padding(.horizontal, 14)
         .padding(.top, 44)
         .padding(.bottom, 16)
-        .frame(width: 232)
+        // Grows with the text size, so labels and the readiness card's button keep fitting.
+        .frame(width: 232 * min(max(textScale, 1), 1.45))
         .frame(maxHeight: .infinity, alignment: .top)
         .background(STheme.sidebarBg.ignoresSafeArea())
         .task {

@@ -65,7 +65,7 @@ struct StatusCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let action {
                 Button(action.title, action: action.run)
-                    .buttonStyle(.sSecondary)
+                    .buttonStyle(SButtonStyle(kind: .secondary, wraps: true))
                     .padding(.top, 4)
             }
         }
