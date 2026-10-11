@@ -22,6 +22,7 @@ struct AppShellView: View {
             Rectangle().fill(STheme.border).frame(width: 1).ignoresSafeArea()
             VStack(spacing: 0) {
                 TopBar()
+                    .zIndex(1)
                 pageStack
                     .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .clipped()
@@ -128,7 +129,7 @@ struct TopBar: View {
                 Image(systemName: "magnifyingglass")
                     .scaledFont(size: 12)
                     .foregroundColor(STheme.hint)
-                TextField("Search dictations", text: $navigation.searchText)
+                TextField("Search dictations, words, settings", text: $navigation.searchText)
                     .textFieldStyle(.plain)
                     .scaledFont(size: 13)
                     .foregroundColor(STheme.textBright)
@@ -153,6 +154,12 @@ struct TopBar: View {
             .frame(width: 300)
             .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(STheme.inputBg))
             .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(STheme.border, lineWidth: 1))
+            .overlay(alignment: .topLeading) {
+                if searchFocused {
+                    SearchSuggestions(query: navigation.searchText) { searchFocused = false }
+                        .offset(y: 40)
+                }
+            }
             .background(
                 Group {
                     Button("") { searchFocused = true }
@@ -170,5 +177,89 @@ struct TopBar: View {
         .onReceive(NotificationCenter.default.publisher(for: .focusTranscriptionSearch)) { _ in
             searchFocused = true
         }
+    }
+}
+
+/// Under the window's search field: the settings and dictionary words that match, while the
+/// Home feed below filters the dictations themselves.
+private struct SearchSuggestions: View {
+    let query: String
+    let dismiss: () -> Void
+    @ObservedObject private var navigation = AppNavigation.shared
+
+    private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
+
+    private var settings: [SettingsSearchEntry] {
+        Array(SettingsSearchIndex.entries.filter { $0.matches(trimmed) }.prefix(5))
+    }
+
+    private var words: [CustomDictionaryEntry] {
+        Array(AppPreferences.shared.customDictionaryEntries.filter { entry in
+            entry.replacement.localizedCaseInsensitiveContains(trimmed)
+                || entry.triggers.contains { $0.localizedCaseInsensitiveContains(trimmed) }
+        }.prefix(3))
+    }
+
+    var body: some View {
+        if trimmed.count >= 2, !(settings.isEmpty && words.isEmpty) {
+            VStack(alignment: .leading, spacing: 2) {
+                if !settings.isEmpty {
+                    sectionTitle("Settings")
+                    ForEach(settings) { entry in
+                        suggestion(title: Text(LocalizedStringKey(entry.title)), detail: Text(entry.rubric.title)) {
+                            if entry.advanced { AdvancedRubrics.shared.set(entry.rubric.rawValue, true) }
+                            navigation.searchText = ""
+                            navigation.openSettings(entry.rubric, focusing: entry.title)
+                        }
+                    }
+                }
+                if !words.isEmpty {
+                    sectionTitle("Dictionary")
+                    ForEach(words) { entry in
+                        suggestion(title: Text(verbatim: entry.replacement),
+                                   detail: Text(verbatim: entry.triggers.joined(separator: ", "))) {
+                            navigation.searchText = ""
+                            navigation.go(.dictionary)
+                        }
+                    }
+                }
+            }
+            .padding(6)
+            .frame(width: 300, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.cardBg))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(STheme.border, lineWidth: 1))
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        }
+    }
+
+    private func sectionTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .scaledFont(size: 11, weight: .bold)
+            .textCase(.uppercase)
+            .tracking(0.8)
+            .foregroundColor(STheme.hint)
+            .padding(.horizontal, 8).padding(.top, 6).padding(.bottom, 2)
+    }
+
+    private func suggestion(title: Text, detail: Text, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            dismiss()
+        } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                title
+                    .scaledFont(size: 13, weight: .semibold)
+                    .foregroundColor(STheme.textBright)
+                    .lineLimit(1)
+                detail
+                    .scaledFont(size: 12)
+                    .foregroundColor(STheme.hint)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

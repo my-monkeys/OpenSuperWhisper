@@ -5,7 +5,8 @@ import SwiftUI
 /// `GET /v1/models`. The model list UI is the very same `RemoteModelListBox` the
 /// Remote transcription engine uses — here it prefers chat models and just sets the
 /// cleanup model (no engine activation). Connection status is published to
-/// `viewModel.llmStatus`, rendered by the parent next to the fields.
+/// `viewModel.llmStatus`, rendered by the parent next to the fields. Drawn as `SettingRow`s, so
+/// it belongs inside a `SettingsGroup` card.
 struct RemoteCleanupSettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var availableModels: [RemoteModelInfo] = []
@@ -14,22 +15,18 @@ struct RemoteCleanupSettingsView: View {
     @State private var autoTestTask: Task<Void, Never>?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SRow(title: "Server",
-                 hint: "Without a scheme, plain http:// (unencrypted) is used — type https:// explicitly for TLS.",
-                 indented: true) {
-                TextField("", text: $viewModel.aiRemoteEndpoint,
-                          prompt: Text("https://api.groq.com/openai/v1"))
-                    .textFieldStyle(.plain)
-                    .scaledFont(size: 12, design: .monospaced)
+        VStack(alignment: .leading, spacing: 0) {
+            SettingRow("Server",
+                       hint: "Unencrypted http:// unless you type https://.",
+                       indented: true) {
+                STextField("https://api.groq.com/openai/v1", text: $viewModel.aiRemoteEndpoint,
+                           monospaced: true, width: 260)
                     .autocorrectionDisabled(true)
-                    .padding(.horizontal, 9).padding(.vertical, 5)
-                    .frame(width: 260)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
             }
 
-            SRow(title: "API key", hint: "Optional — only auth servers (Groq, OpenAI…) need one. Stored in your Keychain.", indented: true) {
+            SettingRow("API key",
+                       hint: "Only for servers with accounts (Groq, OpenAI…). Kept in your Keychain.",
+                       indented: true) {
                 HStack(spacing: 8) {
                     Group {
                         if revealKey {
@@ -39,38 +36,40 @@ struct RemoteCleanupSettingsView: View {
                         }
                     }
                     .textFieldStyle(.plain)
-                    .scaledFont(size: 12, design: .monospaced)
+                    .scaledFont(size: 13, design: .monospaced)
+                    .foregroundColor(STheme.textBright)
                     .autocorrectionDisabled(true)
-                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .padding(.horizontal, 10).padding(.vertical, 7)
                     .frame(width: 220)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
-                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.inputBg))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(STheme.border, lineWidth: 1))
                     Button { revealKey.toggle() } label: {
                         Image(systemName: revealKey ? "eye.slash" : "eye")
-                            .scaledFont(size: 11)
+                            .scaledFont(size: 13)
                             .foregroundColor(STheme.hint)
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(revealKey ? "Hide key" : "Reveal key")
                 }
             }
 
-            HStack(spacing: 12) {
-                Button("Test Connection") { runTest() }
-                    .controlSize(.small)
-                    .disabled(viewModel.aiRemoteEndpoint.trimmingCharacters(in: .whitespaces).isEmpty
-                              || viewModel.llmStatus == .checking)
-                if viewModel.hasRemoteEngineConfig {
-                    Button("Copy from Remote engine") { viewModel.copyRemoteEngineConfig() }
-                        .controlSize(.small)
-                        .help("Fill the server and API key from your Remote transcription engine")
+            SettingRow("Connection", indented: true) {
+                HStack(spacing: 8) {
+                    if viewModel.hasRemoteEngineConfig {
+                        Button("Copy from Remote engine") { viewModel.copyRemoteEngineConfig() }
+                            .buttonStyle(.sSecondary)
+                            .help("Fill the server and API key from your Remote transcription engine")
+                    }
+                    Button("Test Connection") { runTest() }
+                        .buttonStyle(.sSecondary)
+                        .disabled(viewModel.aiRemoteEndpoint.trimmingCharacters(in: .whitespaces).isEmpty
+                                  || viewModel.llmStatus == .checking)
                 }
-                Spacer()
             }
-            .padding(.leading, 16)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Model").scaledFont(size: 11).foregroundColor(STheme.hint)
+            SettingRow("Server model", stacked: true, indented: true) {
                 RemoteModelListBox(
                     models: availableModels,
                     isCustom: $isCustomModel,
@@ -84,7 +83,6 @@ struct RemoteCleanupSettingsView: View {
                     onPickCustom: { }
                 )
             }
-            .padding(.leading, 16)
         }
         // Auto-fill the list on open and after edits settle, like the Remote engine.
         .onAppear { if !viewModel.aiRemoteEndpoint.isEmpty { runTest() } }
