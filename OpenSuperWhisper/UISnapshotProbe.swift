@@ -13,6 +13,7 @@ import OpenSuperWhisperCore
 enum UISnapshotProbe {
     static let screens: [String: () -> AnyView] = [
         "home": { AnyView(AppShellView(page: .home)) },
+        "home-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return AnyView(AppShellView(page: .home)) },
         "dictionary": { AnyView(AppShellView(page: .dictionary)) },
         "style": { AnyView(AppShellView(page: .style)) },
         "help": { AppNavigation.shared.helpOpen = true; return AnyView(AppShellView(page: .home)) },

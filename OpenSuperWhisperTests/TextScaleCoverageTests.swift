@@ -36,6 +36,14 @@ final class TextScaleCoverageTests: XCTestCase {
     /// Every window's own text, in the files that draw it.
     private static let userFacingViews = [
         "ContentView.swift",
+        "Pages/HomePage.swift",
+        "Pages/Home/CollapsibleTranscript.swift",
+        "Pages/Home/FeedRow.swift",
+        "Pages/Home/HomeFeed.swift",
+        "Pages/Home/HomeFilterBar.swift",
+        "Pages/Home/HomeHeader.swift",
+        "Pages/Home/HomeRecordControl.swift",
+        "Pages/Home/HomeTriggerSummary.swift",
         "Settings.swift",
         "Indicator/IndicatorWindow.swift",
         "Indicator/IndicatorElementView.swift",
