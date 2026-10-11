@@ -5,19 +5,21 @@ import XCTest
 @testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
-/// Every control in the Settings window has to sit inside the window, in every shipped language.
+/// Every control of the main window and of the settings has to sit inside the window, in every
+/// shipped language.
 ///
 /// #138: one segmented control, 606pt wide at the default window, pushed the whole content out on
 /// both sides, sidebar included. Nothing failed and nothing was logged; only a screenshot showed
-/// it. This renders the real `SettingsView` in an off-screen window and fails on either of two
+/// it. This renders the real `AppShellView` in an off-screen window, on each page and with each
+/// settings rubric open (every Advanced switch on, so every row shows), and fails on either of two
 /// signals. Any view whose frame leaves the window: every view rather than only `NSControl`s,
 /// because on recent macOS the menus and buttons SwiftUI draws itself are not controls, though
 /// each still has a focus-ring view the size of what it draws. And any row `SPaneStack` had to lay
 /// out wider than its pane, which is the only way to see text SwiftUI draws with no view at all.
 ///
 /// Not covered: the Models > Remote fallback-model picker, which needs a downloaded model with a
-/// long name, and whatever opens in a window of its own (the dictionary rule popover, the
-/// punctuation calibration sheet).
+/// long name, and whatever opens on demand (the dictionary entry editor, the punctuation
+/// calibration sheet, the per-app detail).
 ///
 /// Set `OSW_LAYOUT_SNAPSHOTS` to a directory (through `TEST_RUNNER_OSW_LAYOUT_SNAPSHOTS` with
 /// xcodebuild) to also get a PNG of every render.
@@ -25,9 +27,9 @@ import XCTest
 final class SettingsLayoutTests: XCTestCase {
 
     private static let languages = ["en", "de", "es", "fr", "it", "pt-BR", "vi"]
-    private static let defaultSize = CGSize(width: 780, height: 600)
+    private static let defaultSize = CGSize(width: 1080, height: 760)
     /// The root view's own minimum; the window cannot be made narrower than this.
-    private static let minimumSize = CGSize(width: 720, height: 540)
+    private static let minimumSize = CGSize(width: 840, height: 640)
 
     /// Names with no length limit, long enough that only a cap keeps their row inside the pane.
     private static let longName = String(repeating: "Home LiteLLM behind the office VPN ", count: 5)
@@ -36,6 +38,7 @@ final class SettingsLayoutTests: XCTestCase {
 
     private var realMicrophones: [MicrophoneService.AudioDevice] = []
     private var realSelection: MicrophoneService.AudioDevice?
+    private var realAdvanced: [String] = []
 
     private let preset = RemoteUserPreset(id: UUID(), name: longName,
                                           serverURL: "https://layout-test.invalid/v1",
@@ -79,6 +82,9 @@ final class SettingsLayoutTests: XCTestCase {
             DictationModelOption(engine: "remote", identifier: Self.longModelID,
                                  displayName: Self.longModelID),
             for: Self.ruleBundleID)
+        // Every advanced row showing: the widest each rubric gets.
+        realAdvanced = AppPreferences.shared.settingsAdvancedRubrics
+        for rubric in SettingsRubric.allCases { AdvancedRubrics.shared.set(rubric.rawValue, true) }
     }
 
     override func tearDown() async throws {
@@ -87,6 +93,11 @@ final class SettingsLayoutTests: XCTestCase {
         AppContextModelRules.remove(bundleID: Self.ruleBundleID)
         MicrophoneService.shared.availableMicrophones = realMicrophones
         MicrophoneService.shared.selectedMicrophone = realSelection
+        for rubric in SettingsRubric.allCases {
+            AdvancedRubrics.shared.set(rubric.rawValue, realAdvanced.contains(rubric.rawValue))
+        }
+        AppNavigation.shared.closeSettings()
+        AppNavigation.shared.page = .home
         for key in ["aiPostProcessingEnabled", "appContextFormattingEnabled", "retentionMaxCountEnabled",
                     "retentionMaxCount", "textScale", "remoteServerURL", "remoteServerModel", "aiBackend",
                     "selectedEngine", "customDictionaryEnabled", "customDictionaryData",
@@ -109,22 +120,33 @@ final class SettingsLayoutTests: XCTestCase {
 
     // MARK: - Cases
 
+    /// One render: a page of the main window, or a settings rubric open over Home.
     private struct Case {
-        let tab: SettingsTab
-        /// The Output pane changes with the cleanup backend, the Models pane with the engine.
+        var page: AppPage = .home
+        var rubric: SettingsRubric?
+        /// Text & AI changes with the cleanup backend, Models with the engine.
         var backend = "builtin"
         var engine = "whisper"
-        var name: String { "\(tab.rawValue)-\(tab == .models ? engine : backend)" }
+        var name: String {
+            guard let rubric else { return page.rawValue }
+            switch rubric {
+            case .models: return "\(rubric.rawValue)-\(engine)"
+            case .textAndAI: return "\(rubric.rawValue)-\(backend)"
+            default: return rubric.rawValue
+            }
+        }
     }
 
     private static var cases: [Case] {
-        SettingsTab.allCases.flatMap { tab -> [Case] in
-            switch tab {
-            case .output: return ["builtin", "ollama", "remote"].map { Case(tab: tab, backend: $0) }
-            case .models: return ["whisper", "remote"].map { Case(tab: tab, engine: $0) }
-            default: return [Case(tab: tab)]
+        let pages = AppPage.allCases.filter(\.isAvailable).map { Case(page: $0) }
+        let rubrics = SettingsRubric.allCases.flatMap { rubric -> [Case] in
+            switch rubric {
+            case .textAndAI: return ["builtin", "ollama", "remote"].map { Case(rubric: rubric, backend: $0) }
+            case .models: return ["whisper", "remote"].map { Case(rubric: rubric, engine: $0) }
+            default: return [Case(rubric: rubric)]
             }
         }
+        return pages + rubrics
     }
 
     // MARK: - Rendering
@@ -138,7 +160,7 @@ final class SettingsLayoutTests: XCTestCase {
                 AppPreferences.shared.selectedEngine = testCase.engine
                 let name = "\(testCase.name)-\(language)-\(Int(size.width))-\(Int(scale * 100))"
                 SPaneStack.overflows.removeAll()
-                let (host, window) = try await render(tab: testCase.tab, language: language,
+                let (host, window) = try await render(testCase, language: language,
                                                       size: size, snapshot: name)
                 // Closed as soon as it has been checked: a window left open keeps laying out, and
                 // would report its own overflows under the name of the next render.
@@ -158,9 +180,9 @@ final class SettingsLayoutTests: XCTestCase {
         XCTAssert(failures.isEmpty, "Outside the window:\n" + failures.joined(separator: "\n"))
     }
 
-    private func render(tab: SettingsTab, language: String, size: CGSize,
+    private func render(_ testCase: Case, language: String, size: CGSize,
                         snapshot name: String) async throws -> (NSView, NSWindow) {
-        let root = SettingsView(initialTab: tab)
+        let root = AppShellView(page: testCase.page, settings: testCase.rubric)
             .environment(\.locale, Locale(identifier: language))
         let host = NSHostingView(rootView: root)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
