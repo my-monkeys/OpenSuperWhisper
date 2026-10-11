@@ -96,7 +96,10 @@ enum UISnapshotProbe {
     }
 
     private static func render(_ view: AnyView, size: CGSize, dark: Bool, to url: URL) {
-        let host = NSHostingView(rootView: view.environment(\.appTextScale, TextScale.default))
+        let locale = Locale(identifier: ProcessInfo.processInfo.environment["OSW_SNAPSHOT_LOCALE"] ?? "en")
+        let host = NSHostingView(rootView: view
+            .environment(\.appTextScale, TextScale.default)
+            .environment(\.locale, locale))
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
         window.titlebarAppearsTransparent = true

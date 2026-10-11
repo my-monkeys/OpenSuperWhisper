@@ -69,7 +69,7 @@ struct AppSidebar: View {
             navigation.helpOpen = false
             navigation.go(page)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: page.symbol)
                     .scaledFont(size: 14, weight: .medium)
                     .frame(width: 20)
@@ -77,6 +77,9 @@ struct AppSidebar: View {
                 Text(page.title)
                     .scaledFont(size: 15, weight: selected ? .bold : .medium)
                     .foregroundColor(selected ? STheme.accent : page.isAvailable ? STheme.textSecondary : STheme.faint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .layoutPriority(1)
                 Spacer(minLength: 0)
                 if !page.isAvailable { SoonBadge() }
             }
