@@ -96,6 +96,13 @@ extension OpenSuperWhisperApp {
             RecordingStore.shared.startRetentionScheduler()
         }
     }
+
+    static func preloadWhisperEngine() {
+        guard !DefaultsStore.isRunningTests else { return }
+        Task { @MainActor in
+            await TranscriptionService.shared.preloadWhisperEngine()
+        }
+    }
 }
 
 class AppState: ObservableObject {
@@ -167,6 +174,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         OpenSuperWhisperApp.startTranscriptionQueue()
         OpenSuperWhisperApp.startRetentionScheduler()
+        OpenSuperWhisperApp.preloadWhisperEngine()
         AgentBridge.registerRunningApp()
         AgentInbox.shared.start()
         observeMicrophoneChanges()
