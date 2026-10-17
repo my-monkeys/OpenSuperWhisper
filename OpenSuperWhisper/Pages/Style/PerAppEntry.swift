@@ -13,11 +13,13 @@ struct PerAppEntry: Identifiable, Equatable {
     var insertion: AppInsertionRule?
     var profiles: [AppContextProfile] = []
     var model: DictationModelOption?
+    /// The writing style id this app always gets, nil to follow the default style.
+    var style: String?
 
     var id: String { PerAppEntry.groupKey(bundleID) + (host.map { "|\($0)" } ?? "") }
     var isSite: Bool { host != nil }
     var hasBundle: Bool { !bundleID.isEmpty }
-    var isEmpty: Bool { insertion == nil && profiles.isEmpty && model == nil }
+    var isEmpty: Bool { insertion == nil && profiles.isEmpty && model == nil && style == nil }
 
     var title: String { host.map { "\(appName) · \($0)" } ?? appName }
 
@@ -31,6 +33,7 @@ enum PerAppEntries {
     static func build(insertionRules: [AppInsertionRule],
                       profiles: [AppContextProfile],
                       modelRules: [String: DictationModelOption],
+                      styles: [String: String] = [:],
                       pending: [InstalledApp]) -> [PerAppEntry] {
         var apps: [String: PerAppEntry] = [:]
         var sites: [PerAppEntry] = []
@@ -62,6 +65,11 @@ enum PerAppEntries {
             var entry = app(profile.bundleIdentifier, name: profile.appName)
             entry.profiles.append(profile)
             apps[PerAppEntry.groupKey(profile.bundleIdentifier)] = entry
+        }
+        for (bundleID, style) in styles {
+            var entry = app(bundleID, name: nil)
+            entry.style = style
+            apps[PerAppEntry.groupKey(bundleID)] = entry
         }
         for installed in pending where apps[PerAppEntry.groupKey(installed.bundleIdentifier)] == nil {
             apps[PerAppEntry.groupKey(installed.bundleIdentifier)] =
@@ -128,6 +136,11 @@ struct PerAppStore {
         }
     }
 
+    /// nil removes the app's style, so it follows the default one.
+    func setStyle(_ styleID: String?, for entry: PerAppEntry) {
+        viewModel.appWritingStyles[PerAppEntry.groupKey(entry.bundleID)] = styleID
+    }
+
     func addProfile(for entry: PerAppEntry) {
         viewModel.appContextProfiles.append(
             AppContextProfile(bundleIdentifier: entry.bundleID, appName: entry.appName, instructions: ""))
@@ -142,6 +155,7 @@ struct PerAppStore {
         if !entry.isSite {
             viewModel.appInsertionRules.removeAll { matches($0.bundleIdentifier, entry) }
             viewModel.appContextProfiles.removeAll { matches($0.bundleIdentifier, entry) }
+            viewModel.appWritingStyles[PerAppEntry.groupKey(entry.bundleID)] = nil
         }
         if entry.hasBundle && (entry.isSite || entry.model != nil) {
             AppContextModelRules.remove(bundleID: entry.bundleID, host: entry.host)
@@ -157,6 +171,10 @@ struct PerAppStore {
         for index in viewModel.appContextProfiles.indices where matches(viewModel.appContextProfiles[index].bundleIdentifier, entry) {
             viewModel.appContextProfiles[index].bundleIdentifier = app.bundleIdentifier
             viewModel.appContextProfiles[index].appName = app.name
+        }
+        if let style = entry.style {
+            viewModel.appWritingStyles[PerAppEntry.groupKey(entry.bundleID)] = nil
+            viewModel.appWritingStyles[PerAppEntry.groupKey(app.bundleIdentifier)] = style
         }
         if entry.hasBundle, let model = entry.model {
             AppContextModelRules.remove(bundleID: entry.bundleID)

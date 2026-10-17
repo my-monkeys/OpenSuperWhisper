@@ -250,7 +250,8 @@ final class DictationPipeline: ObservableObject {
             } else {
                 text = await LLMPostProcessor.process(
                     text, bundleID: item.context.bundleID, translating: settings.translateToEnglish,
-                    writesLists: RichListPaste.cleanupWritesLists(into: item.context.bundleID))
+                    writesLists: RichListPaste.cleanupWritesLists(into: item.context.bundleID),
+                    style: AppPreferences.shared.writingStyle(for: item.context.bundleID).instructions)
             }
 
             // Trailing "press enter" voice command (opt-in): strip it and remember to press Return

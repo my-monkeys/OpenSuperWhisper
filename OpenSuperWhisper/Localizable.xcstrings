@@ -15537,22 +15537,6 @@
         }
       }
     },
-    "Exactly what you say, without the hesitations.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exactement ce que vous dites, sans les hésitations."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "原样记录你说的内容，仅去掉语气词。"
-          }
-        }
-      }
-    },
     "Extra logging and diagnostic output.": {
       "localizations": {
         "fr": {
@@ -20209,22 +20193,6 @@
         }
       }
     },
-    "See you Thursday for the demo?": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "On se voit jeudi pour la démo ?"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "周四演示见？"
-          }
-        }
-      }
-    },
     "Selected": {
       "localizations": {
         "fr": {
@@ -21133,38 +21101,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "样式 →"
-          }
-        }
-      }
-    },
-    "Styles are coming. Today, AI cleanup uses the instruction set in Settings → Text & AI.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les styles arrivent. Pour l'instant, le nettoyage IA utilise l'instruction définie dans Réglages → Texte & IA."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "写作样式即将推出。目前，AI 清理会使用“设置 → 文本与 AI”中设定的指令。"
-          }
-        }
-      }
-    },
-    "Styles per app are coming": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les styles par app arrivent"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "按应用样式即将推出"
           }
         }
       }
@@ -23325,38 +23261,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "秒"
-          }
-        }
-      }
-    },
-    "see you thursday for the demo?": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "on se voit jeudi pour la démo ?"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "周四演示见？"
-          }
-        }
-      }
-    },
-    "um see you thursday for the demo": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "euh on se voit jeudi pour la démo"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "呃，周四演示见"
           }
         }
       }
@@ -27417,6 +27321,342 @@
           "stringUnit": {
             "state": "translated",
             "value": "从未发送"
+          }
+        }
+      }
+    },
+    "Added to the AI cleanup instruction. Describe the tone, the spelling and the words to use.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouté à l'instruction du nettoyage IA. Décrivez le ton, l'orthographe et les mots à employer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会添加到 AI 清理的指令中。描述语气、拼写方式和要使用的词语。"
+          }
+        }
+      }
+    },
+    "Delete style": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除样式"
+          }
+        }
+      }
+    },
+    "Edit style": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier le style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑样式"
+          }
+        }
+      }
+    },
+    "Edit this style": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier ce style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑此样式"
+          }
+        }
+      }
+    },
+    "Friendly and encouraging, plain British English. Say “volunteers”, never “staff”. Keep every fact as said.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chaleureux et encourageant, en français simple. Dire « bénévoles », jamais « personnel ». Garder chaque fait tel quel."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "友好、鼓励的语气，使用简明的中文。说“志愿者”，不要说“员工”。所有事实保持原样。"
+          }
+        }
+      }
+    },
+    "How to write": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comment écrire"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写作方式"
+          }
+        }
+      }
+    },
+    "Name": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nom"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名称"
+          }
+        }
+      }
+    },
+    "New style": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建样式"
+          }
+        }
+      }
+    },
+    "See you Thursday for the demo!": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À jeudi pour la démo !"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "周四演示见！"
+          }
+        }
+      }
+    },
+    "See you on Thursday for the demo.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rendez-vous jeudi pour la démonstration."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我们周四演示时见。"
+          }
+        }
+      }
+    },
+    "Shorter instructions work better, especially with small models.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des instructions plus courtes marchent mieux, surtout avec les petits modèles."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指令越短效果越好，尤其是使用小模型时。"
+          }
+        }
+      }
+    },
+    "So see you Thursday for the demo, right?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Donc on se voit jeudi pour la démo, c'est ça ?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "那周四演示见，对吧？"
+          }
+        }
+      }
+    },
+    "Style: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Style : %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "样式：%@"
+          }
+        }
+      }
+    },
+    "Styles shape AI cleanup, which is off. Raw stays as it is either way.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les styles agissent sur le nettoyage IA, qui est désactivé. Brut ne change rien de toute façon."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "样式作用于 AI 清理，而 AI 清理目前已关闭。“原始”在任何情况下都保持不变。"
+          }
+        }
+      }
+    },
+    "Styles shape AI cleanup. An app can have its own style in its row below. Pro, Personal and your own styles follow their instructions best with Apple Intelligence or a 7B model.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les styles agissent sur le nettoyage IA. Une app peut avoir son propre style dans sa ligne ci-dessous. Pro, Perso et vos styles suivent mieux leurs instructions avec Apple Intelligence ou un modèle 7B."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "样式作用于 AI 清理。每个应用都可以在下方对应的行中设置自己的样式。使用 Apple Intelligence 或 7B 模型时，Pro、个人以及你自定义的样式最能遵循指令。"
+          }
+        }
+      }
+    },
+    "Turn on AI cleanup": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activer le nettoyage IA"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启 AI 清理"
+          }
+        }
+      }
+    },
+    "Untitled style": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Style sans nom"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名样式"
+          }
+        }
+      }
+    },
+    "Work, Charity, Family…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Travail, Asso, Famille…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作、公益、家庭…"
+          }
+        }
+      }
+    },
+    "Your words, corrected. Nothing reworded.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos mots, corrigés. Rien de reformulé."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的原话，经过纠正，不做改写。"
+          }
+        }
+      }
+    },
+    "AI cleanup is off": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nettoyage IA désactivé"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 清理已关闭"
+          }
+        }
+      }
+    },
+    "The voice AI cleanup writes in for this app": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voix dans laquelle le nettoyage IA écrit pour cette app"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 清理为此应用采用的写作语气"
           }
         }
       }

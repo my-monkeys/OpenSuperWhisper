@@ -784,6 +784,36 @@ final class AppPreferences {
         }
     }
 
+    // MARK: - Writing styles (#160)
+
+    /// The style AI cleanup writes in wherever no app rule picks one. Raw by default, which adds
+    /// nothing to the prompt and so keeps cleanup exactly as it was before styles.
+    @UserDefault(key: "writingStyleID", defaultValue: WritingStyle.rawID)
+    var writingStyleID: String
+
+    @OptionalUserDefault(key: "customWritingStylesData")
+    private var customWritingStylesData: Data?
+
+    /// The styles the user wrote, after the three built-in ones.
+    var customWritingStyles: [WritingStyle] {
+        get {
+            guard let data = customWritingStylesData,
+                  let styles = try? JSONDecoder().decode([WritingStyle].self, from: data) else { return [] }
+            return styles
+        }
+        set { customWritingStylesData = try? JSONEncoder().encode(newValue) }
+    }
+
+    /// Bundle identifier, lowercased, to style id: an app that always gets the same voice.
+    @UserDefault(key: "appWritingStyles", defaultValue: [String: String]())
+    var appWritingStyles: [String: String]
+
+    /// The style for a dictation into `bundleID`: the app's own if it has one, else the default.
+    func writingStyle(for bundleID: String?) -> WritingStyle {
+        let appStyle = bundleID.flatMap { appWritingStyles[$0.lowercased()] }
+        return WritingStyle.resolve(appStyle ?? writingStyleID, custom: customWritingStyles)
+    }
+
     /// Flips true once the bundled presets have been seeded, so a user who deletes them keeps
     /// them deleted (we never re-seed). See `seedAppContextPresetsIfNeeded`.
     @UserDefault(key: "didSeedAppContextPresets", defaultValue: false)

@@ -916,6 +916,18 @@ class SettingsViewModel: ObservableObject {
         didSet { AppPreferences.shared.appInsertionRules = appInsertionRules }
     }
 
+    @Published var writingStyleID: String {
+        didSet { AppPreferences.shared.writingStyleID = writingStyleID }
+    }
+
+    @Published var customWritingStyles: [WritingStyle] {
+        didSet { AppPreferences.shared.customWritingStyles = customWritingStyles }
+    }
+
+    @Published var appWritingStyles: [String: String] {
+        didSet { AppPreferences.shared.appWritingStyles = appWritingStyles }
+    }
+
     @Published var appContextProfiles: [AppContextProfile] {
         didSet {
             AppPreferences.shared.appContextProfiles = appContextProfiles
@@ -1102,6 +1114,9 @@ class SettingsViewModel: ObservableObject {
         self.typingPaceMilliseconds = prefs.typingPaceMilliseconds
         self.appInsertionRules = prefs.appInsertionRules
         self.appContextProfiles = prefs.appContextProfiles
+        self.writingStyleID = prefs.writingStyleID
+        self.customWritingStyles = prefs.customWritingStyles
+        self.appWritingStyles = prefs.appWritingStyles
         self.pauseMediaOnRecord = prefs.pauseMediaOnRecord
         self.reduceVolumeOnRecord = prefs.reduceVolumeOnRecord
         self.reduceVolumeLevel = prefs.reduceVolumeLevel

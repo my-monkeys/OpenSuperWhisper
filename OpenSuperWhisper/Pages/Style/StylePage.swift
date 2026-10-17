@@ -1,7 +1,7 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// How text is formatted: the three styles (not built yet) and everything set per app, merged
+/// How text is formatted: the writing styles and everything set per app, merged
 /// from what used to be Settings → Rules and Output → Insertion by app.
 struct StylePage: View {
     @ObservedObject var viewModel: SettingsViewModel
@@ -35,6 +35,7 @@ struct StylePage: View {
         PerAppEntries.build(insertionRules: viewModel.appInsertionRules,
                             profiles: viewModel.appContextProfiles,
                             modelRules: modelRules,
+                            styles: viewModel.appWritingStyles,
                             pending: pendingApps)
     }
 
@@ -42,7 +43,7 @@ struct StylePage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 PageHeader("Style", subtitle: "How your text is formatted. Pick a style, then say where it applies.")
-                StyleCards()
+                WritingStyleCards(viewModel: viewModel)
                 StyleRulesGroup(viewModel: viewModel, hasModelChoice: availableModels.count > 1)
                 VStack(alignment: .leading, spacing: 12) {
                     perAppHeader
@@ -154,73 +155,5 @@ struct StylePage: View {
         if expandedID == entry.id { expandedID = nil }
         pendingRemoval = nil
         reload()
-    }
-}
-
-/// The three styles of the design. Not built yet: shown disabled, with the place today's AI
-/// cleanup instruction is set.
-private struct StyleCards: View {
-    private struct Sample: Identifiable {
-        let id: String
-        let name: LocalizedStringKey
-        let detail: LocalizedStringKey
-        let example: LocalizedStringKey
-    }
-
-    private let samples = [
-        Sample(id: "raw", name: "Raw", detail: "Exactly what you say, without the hesitations.",
-               example: "um see you thursday for the demo"),
-        Sample(id: "pro", name: "Pro", detail: "Full sentences, careful punctuation.",
-               example: "See you Thursday for the demo?"),
-        Sample(id: "personal", name: "Personal", detail: "Relaxed tone, short sentences.",
-               example: "see you thursday for the demo?"),
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(samples) { card($0) }
-            }
-            .disabled(true)
-            .accessibilityElement(children: .contain)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                SoonBadge()
-                Text("Styles are coming. Today, AI cleanup uses the instruction set in Settings → Text & AI.")
-                    .scaledFont(size: 13)
-                    .foregroundColor(STheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .layoutPriority(1)
-                Button("Open") { AppNavigation.shared.openSettings(.textAndAI) }
-                    .buttonStyle(.plain)
-                    .scaledFont(size: 13, weight: .semibold)
-                    .foregroundColor(STheme.accent)
-                    .fixedSize()
-            }
-        }
-    }
-
-    private func card(_ sample: Sample) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(sample.name)
-                .scaledFont(size: 17, weight: .bold)
-                .foregroundColor(STheme.textBright)
-            Text(sample.detail)
-                .scaledFont(size: 13)
-                .foregroundColor(STheme.hint)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(sample.example)
-                .scaledFont(size: 14)
-                .foregroundColor(STheme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12).padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(STheme.inputBg))
-                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(STheme.border, lineWidth: 1))
-        }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(STheme.cardBg))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(STheme.border, lineWidth: 1))
-        .opacity(0.6)
     }
 }

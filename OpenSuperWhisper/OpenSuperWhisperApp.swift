@@ -143,6 +143,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private var languageSubmenu: NSMenu?
     private var modelSubmenu: NSMenu?
     private var recentSubmenu: NSMenu?
+    private var styleSubmenu: NSMenu?
 
     /// Rows for the "Recent" submenu, kept current by `recordingsDidUpdateNotification` and by
     /// the end of a rerun (`recordingProgressDidUpdateNotification`) rather than fetched when the
@@ -352,6 +353,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         modelMenuItem.submenu = modelMenu
         menu.addItem(modelMenuItem)
 
+        // The writing style AI cleanup uses by default, switchable without opening the window
+        // (#160). Rebuilt on open, so a style written meanwhile appears.
+        let styleMenuItem = NSMenuItem(title: NSLocalizedString("Style", comment: ""), action: nil, keyEquivalent: "")
+        let styleMenu = NSMenu()
+        styleMenu.delegate = self
+        styleSubmenu = styleMenu
+        populateStyleSubmenu()
+        styleMenuItem.submenu = styleMenu
+        menu.addItem(styleMenuItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Reaching an earlier dictation otherwise means opening the main window and copying out
@@ -475,6 +486,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         if menu === recentSubmenu {
             populateRecentSubmenu()
         }
+        if menu === styleSubmenu {
+            populateStyleSubmenu()
+        }
+    }
+
+    private func populateStyleSubmenu() {
+        guard let submenu = styleSubmenu else { return }
+        submenu.removeAllItems()
+        let prefs = AppPreferences.shared
+        for style in WritingStyle.builtIns + prefs.customWritingStyles {
+            let item = NSMenuItem(title: WritingStyleText.name(style),
+                                  action: #selector(selectWritingStyle(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = style.id
+            item.state = style.id == prefs.writingStyleID ? .on : .off
+            submenu.addItem(item)
+        }
+        if !prefs.aiPostProcessingEnabled {
+            submenu.addItem(.separator())
+            let off = NSMenuItem(title: NSLocalizedString("AI cleanup is off", comment: ""), action: nil, keyEquivalent: "")
+            off.isEnabled = false
+            submenu.addItem(off)
+        }
+    }
+
+    @objc private func selectWritingStyle(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        AppPreferences.shared.writingStyleID = id
+        NotificationCenter.default.post(name: WritingStyle.didChangeNotification, object: nil)
     }
 
     private func populateRecentSubmenu() {

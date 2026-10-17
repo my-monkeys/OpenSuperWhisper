@@ -37,6 +37,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "appContextProfilesData",
         "appInsertionRulesData",
         "appModelRules",
+        "appWritingStyles",
         "autoCopyToClipboard",
         "autoPasteTranscription",
         "beamSize",
@@ -47,6 +48,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "customDictionaryBoostEnabled",
         "customDictionaryData",
         "customDictionaryEnabled",
+        "customWritingStylesData",
         "debugMode",
         "dictionaryRefusedWords",
         "dictionarySuggestionsData",
@@ -132,6 +134,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "useBeamSearch",
         "useSurroundingTextAsContext",
         "whisperLanguage",
+        "writingStyleID",
     ]
 
     private var scratch: ScratchPreferences!
@@ -193,6 +196,11 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("selectedWhisperModelPath") { prefs.selectedWhisperModelPath = "/m.bin" }
         assertWrites("fluidAudioModelVersion") { prefs.fluidAudioModelVersion = "v2" }
         assertWrites("whisperLanguage") { prefs.whisperLanguage = "fr" }
+        assertWrites("writingStyleID") { prefs.writingStyleID = WritingStyle.proID }
+        assertWrites("customWritingStylesData") {
+            prefs.customWritingStyles = [WritingStyle(name: "Charity", instructions: "Warm.")]
+        }
+        assertWrites("appWritingStyles") { prefs.appWritingStyles = ["com.apple.mail": WritingStyle.proID] }
         assertWrites("translateToEnglish") { prefs.translateToEnglish = true }
         assertWrites("suppressBlankAudio") { prefs.suppressBlankAudio = false }
         assertWrites("showTimestamps") { prefs.showTimestamps = true }

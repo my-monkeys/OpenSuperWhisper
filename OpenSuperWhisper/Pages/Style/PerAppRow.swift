@@ -15,6 +15,7 @@ struct PerAppRow: View {
 
     private static let insertionWidth: CGFloat = 150
     private static let modelWidth: CGFloat = 170
+    private static let styleWidth: CGFloat = 145
 
     private var store: PerAppStore { PerAppStore(viewModel: viewModel) }
     private var showsModelMenu: Bool { models.count > 1 && entry.hasBundle }
@@ -87,11 +88,11 @@ struct PerAppRow: View {
     }
 
     @ViewBuilder private var controls: some View {
-        StyleSoonPill()
         if !entry.isSite && entry.hasBundle {
+            styleMenu
             insertionMenu
         } else {
-            Color.clear.frame(width: Self.insertionWidth, height: 1)
+            Color.clear.frame(width: Self.styleWidth + 10 + Self.insertionWidth, height: 1)
         }
         if showsModelMenu {
             modelMenu
@@ -109,6 +110,24 @@ struct PerAppRow: View {
         }
         .buttonStyle(.plain)
         .help(expanded ? "Hide details" : "Show details")
+    }
+
+    /// A site row has no style: like insertion, it follows the app.
+    private var styleMenu: some View {
+        let selection = Binding<String?>(get: { entry.style }, set: { store.setStyle($0, for: entry) })
+        let styles = WritingStyle.builtIns + viewModel.customWritingStyles
+        let label = entry.style.map { WritingStyleText.name(WritingStyle.resolve($0, custom: viewModel.customWritingStyles)) }
+        return RowMenu(label: label.map { Text(verbatim: $0) } ?? Text("Default style"), width: Self.styleWidth) {
+            Picker("", selection: selection) {
+                Text("Default style").tag(String?.none)
+                ForEach(styles) { style in
+                    Text(verbatim: WritingStyleText.name(style)).tag(String?.some(style.id))
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
+        .help(String(localized: "The voice AI cleanup writes in for this app"))
     }
 
     private var insertionMenu: some View {
@@ -172,6 +191,10 @@ struct PerAppRow: View {
                 }
             }
         }
+        if let style = entry.style {
+            let name = WritingStyleText.name(WritingStyle.resolve(style, custom: viewModel.customWritingStyles))
+            parts.append(String(localized: "Style: \(name)"))
+        }
         if entry.profiles.contains(where: { !$0.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
             parts.append(String(localized: "Formatting instructions"))
         }
@@ -217,24 +240,5 @@ private struct RowMenu<Content: View>: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-    }
-}
-
-/// The per-app style column, drawn but not built yet.
-private struct StyleSoonPill: View {
-    var body: some View {
-        HStack(spacing: 6) {
-            Text("Style")
-                .scaledFont(size: 13, weight: .semibold)
-                .foregroundColor(STheme.hint)
-            SoonBadge()
-        }
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.controlBg))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(STheme.border, lineWidth: 1))
-        .opacity(0.7)
-        .fixedSize()
-        .help("Styles per app are coming")
-        .accessibilityLabel(Text("Style per app, coming soon"))
     }
 }

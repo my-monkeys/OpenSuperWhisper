@@ -72,8 +72,11 @@ public enum LLMPostProcessor {
     /// will make bullets of them (#166). A reply that grew instead of being reshaped kept the
     /// sentence and added the list after it, which Apple's model does on some opinions and
     /// options; that pass is run again without the request.
+    ///
+    /// `style` is the writing style's instructions, empty for Raw. It only shapes a pass general
+    /// cleanup runs: a style is a way of cleaning up, not a reason to send the text to a model.
     public static func process(_ text: String, bundleID: String?, translating: Bool = false,
-                               writesLists: Bool = false) async -> String {
+                               writesLists: Bool = false, style: String = "") async -> String {
         let prefs = CoreAccess.preferences
         let general = prefs.aiPostProcessingEnabled
         let formatting = prefs.appContextFormattingEnabled
@@ -91,7 +94,8 @@ public enum LLMPostProcessor {
                                                 translating: translating,
                                                 translationPrompt: prefs.aiPostProcessingTranslation,
                                                 vocabulary: vocabulary,
-                                                writesLists: writesLists)
+                                                writesLists: writesLists,
+                                                style: style)
         else { return text }
 
         let backend = currentBackend()
@@ -119,7 +123,8 @@ public enum LLMPostProcessor {
                                               translating: translating,
                                               translationPrompt: prefs.aiPostProcessingTranslation,
                                               vocabulary: vocabulary,
-                                              writesLists: writesLists)
+                                              writesLists: writesLists,
+                                              style: style)
             if echoesPrompt(output: result, system: shipped, input: text) {
                 print("AI post-processing returned its own instructions, using the raw transcription")
                 return text
@@ -130,7 +135,7 @@ public enum LLMPostProcessor {
             }
             if writesLists, listRepeatsText(input: text, output: result) {
                 print("AI post-processing kept the sentence next to its list, running it again without lists")
-                return await process(text, bundleID: bundleID, translating: translating)
+                return await process(text, bundleID: bundleID, translating: translating, style: style)
             }
             return result
         } catch {
@@ -249,7 +254,8 @@ public enum LLMPostProcessor {
                                     translating: Bool,
                                     translationPrompt: String,
                                     vocabulary: [String] = [],
-                                    writesLists: Bool = false) -> String {
+                                    writesLists: Bool = false,
+                                    style: String = "") -> String {
         func isShipped(_ text: String, _ shipped: [String]) -> Bool {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             return shipped.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed }
@@ -257,6 +263,9 @@ public enum LLMPostProcessor {
         var sections: [String] = []
         if generalCleanup, isShipped(generalPrompt, [defaultInstruction]) {
             sections.append(generalPrompt)
+        }
+        if generalCleanup, !style.isEmpty, isShipped(style, WritingStyle.builtIns.map(\.instructions)) {
+            sections.append(style)
         }
         if translating, isShipped(translationPrompt, [defaultTranslationInstruction]) {
             sections.append(translationPrompt)
@@ -283,13 +292,17 @@ public enum LLMPostProcessor {
                                      translating: Bool = false,
                                      translationPrompt: String = "",
                                      vocabulary: [String] = [],
-                                     writesLists: Bool = false) -> String? {
+                                     writesLists: Bool = false,
+                                     style: String = "") -> String? {
         guard generalCleanup || profile != nil else { return nil }
 
         var sections: [String] = []
 
         if generalCleanup {
             sections.append(generalPrompt)
+            // Right after the contract it adjusts: the style says how to clean up, so it belongs
+            // to general cleanup and goes with it. App rules still come later and win on format.
+            sections.append(style)
         }
         // Early, next to the contract it qualifies, and gone entirely when translation is off:
         // that disappearance is the whole request. Instructions about translating, left in the

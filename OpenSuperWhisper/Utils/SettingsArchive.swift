@@ -79,7 +79,8 @@ enum SettingsArchive {
         "suggestDictionaryWords", "suppressBlankAudio", "temperature", "textScale",
         "translateToEnglish", "typingPaceMilliseconds", "uiTheme", "unloadBuiltInModelWhenIdle",
         "unloadWhisperModelWhenIdle", "useAsianAutocorrect", "useBeamSearch",
-        "useSurroundingTextAsContext", "whisperLanguage",
+        "useSurroundingTextAsContext", "whisperLanguage", "writingStyleID", "customWritingStylesData",
+        "appWritingStyles",
     ]
 
     /// The portable preferences set in `defaults`, as the file's bytes. Keys left at their
