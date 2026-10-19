@@ -53,6 +53,58 @@
         }
       }
     },
+    "NSAudioCaptureUsageDescription": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper nimmt die Seite der anderen Teilnehmer eines Meetings aus dem Ton deines Macs auf, nur während du ein Meeting aufnimmst."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper records the other people's side of a meeting from your Mac's sound, only while you record a meeting."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper graba la parte de los demás participantes de una reunión desde el sonido de tu Mac, solo mientras grabas una reunión."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper enregistre la partie des autres participants d'une réunion depuis le son de votre Mac, uniquement pendant que vous enregistrez une réunion."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper registra la parte degli altri partecipanti a una riunione dall'audio del tuo Mac, solo mentre registri una riunione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O OpenSuperWhisper grava a parte dos outros participantes de uma reunião a partir do som do seu Mac, só enquanto você grava uma reunião."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper ghi lại phần của những người khác trong cuộc họp từ âm thanh của máy Mac, chỉ khi bạn đang ghi một cuộc họp."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper 会从你的 Mac 声音中录制会议中其他人的发言，仅在你录制会议时进行。"
+          }
+        }
+      }
+    },
     "NSLocalNetworkUsageDescription": {
       "localizations": {
         "de": {

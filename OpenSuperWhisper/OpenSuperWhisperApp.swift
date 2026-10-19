@@ -144,6 +144,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private var modelSubmenu: NSMenu?
     private var recentSubmenu: NSMenu?
     private var styleSubmenu: NSMenu?
+    private var meetingMenuItem: NSMenuItem?
 
     /// Rows for the "Recent" submenu, kept current by `recordingsDidUpdateNotification` and by
     /// the end of a rerun (`recordingProgressDidUpdateNotification`) rather than fetched when the
@@ -281,6 +282,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
             object: nil)
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(meetingStateChanged),
+            name: MeetingController.didChangeNotification,
+            object: nil)
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(recordingProgressChanged(_:)),
             name: RecordingStore.recordingProgressDidUpdateNotification,
             object: nil)
@@ -362,6 +368,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         populateStyleSubmenu()
         styleMenuItem.submenu = styleMenu
         menu.addItem(styleMenuItem)
+
+        // Records you and the call as two tracks, then writes a transcript to Home (#159).
+        let meetingItem = NSMenuItem(title: "", action: #selector(toggleMeeting), keyEquivalent: "")
+        meetingItem.target = self
+        meetingMenuItem = meetingItem
+        refreshMeetingItem()
+        menu.addItem(meetingItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -475,6 +488,36 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     // the one the cursor is in.
     func menuWillOpen(_ menu: NSMenu) {
         RecordingContext.shared.captureFrontmost(forRecording: false)
+        // The elapsed time is only worth computing when someone looks at it.
+        refreshMeetingItem()
+    }
+
+    @objc private func toggleMeeting() {
+        MainActor.assumeIsolated { MeetingController.shared.toggle() }
+    }
+
+    @objc private func meetingStateChanged() {
+        refreshMeetingItem()
+    }
+
+    /// The meeting item's words, and a red menu bar icon for as long as a meeting is recorded:
+    /// the other people are being recorded, and that should never be easy to forget.
+    private func refreshMeetingItem() {
+        let state = MainActor.assumeIsolated { MeetingController.shared.state }
+        switch state {
+        case .idle:
+            meetingMenuItem?.title = NSLocalizedString("Record a meeting", comment: "")
+            meetingMenuItem?.isEnabled = true
+        case .recording(let since):
+            let elapsed = MeetingTranscript.clock(Date().timeIntervalSince(since))
+            meetingMenuItem?.title = String(format: NSLocalizedString("Stop the meeting (%@)", comment: ""), elapsed)
+            meetingMenuItem?.isEnabled = true
+        case .transcribing(let done, let total):
+            meetingMenuItem?.title = String(format: NSLocalizedString("Transcribing the meeting… %lld of %lld", comment: ""), done, total)
+            meetingMenuItem?.isEnabled = false
+        }
+        let recording: Bool = { if case .recording = state { return true }; return false }()
+        statusItem?.button?.contentTintColor = recording ? .systemRed : nil
     }
 
     // Rebuild the Model submenu just before it opens, so it reflects the latest

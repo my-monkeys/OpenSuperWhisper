@@ -44,6 +44,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>OpenSuperWhisper records the other people's side of a meeting from your Mac's sound, only while you record a meeting.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>OpenSuperWhisper connects to remote transcription servers on your local network (e.g. a self-hosted Whisper/LiteLLM endpoint).</string>
 </dict>

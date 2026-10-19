@@ -26,6 +26,8 @@ struct DictationRubric: View {
               keywords: "latch space hands-free verrouiller espace mains libres"),
         .init(title: "Dictate and send", rubric: .dictation, advanced: true,
               keywords: "submit return enter send envoyer entrée"),
+        .init(title: "Record a meeting", rubric: .dictation, advanced: true,
+              keywords: "meeting call zoom teams meet transcript réunion appel visio enregistrer"),
         .init(title: "Paste the last dictation", rubric: .dictation, advanced: true,
               keywords: "paste last transcription again coller dernière dictée"),
         .init(title: "Confirm before cancelling", rubric: .dictation, advanced: true,
@@ -137,6 +139,16 @@ struct DictationRubric: View {
                        hint: "Inserts your latest dictation again wherever the cursor is.",
                        advanced: true) {
                 TriggerRecorderField(name: .pasteLastTranscription,
+                                     mouseButton: $viewModel.pasteMouseButtonUnused,
+                                     modifierKey: $viewModel.pasteModifierUnused,
+                                     allowsMouse: false,
+                                     allowsModifier: false,
+                                     style: .chips)
+            }
+            SettingRow("Record a meeting",
+                       hint: "Starts or stops recording a meeting: you and the call on two tracks, turned into a timestamped transcript on Home. Also in the menu bar.",
+                       advanced: true) {
+                TriggerRecorderField(name: .toggleMeeting,
                                      mouseButton: $viewModel.pasteMouseButtonUnused,
                                      modifierKey: $viewModel.pasteModifierUnused,
                                      allowsMouse: false,
