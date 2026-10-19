@@ -18,6 +18,8 @@ extension KeyboardShortcuts.Name {
     /// mouse button. Unbound by default: claiming a global combination for everyone isn't
     /// ours to do. (#50)
     static let toggleRecordAndSubmit = Self("toggleRecordAndSubmit")
+    /// Starts or stops recording a meeting (#159). Unbound by default.
+    static let toggleMeeting = Self("toggleMeeting")
 
     /// One registration handle per recorded key combination. Names are dynamic because the
     /// number of triggers is: the combinations themselves live in `recordingTriggers`, and
@@ -204,6 +206,10 @@ class ShortcutManager {
             Task { @MainActor in
                 await PasteLastTranscript.run()
             }
+        }
+
+        KeyboardShortcuts.onKeyUp(for: .toggleMeeting) {
+            Task { @MainActor in MeetingController.shared.toggle() }
         }
 
         KeyboardShortcuts.onKeyUp(for: .escape) { [weak self] in
