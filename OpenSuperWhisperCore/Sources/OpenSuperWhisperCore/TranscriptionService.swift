@@ -24,7 +24,9 @@ public class TranscriptionService: ObservableObject {
 
     private var currentEngine: TranscriptionEngine?
     private var loadedEngineKind: String?
+    private var engineGeneration = 0
     private var totalDuration: Float = 0.0
+    private let engineBuilder: (EngineKind) async -> TranscriptionEngine
 
     /// The model that actually produced the most recent transcription, and whether it
     /// came from the remote local-fallback. Read by the recording-save paths so history
@@ -34,7 +36,8 @@ public class TranscriptionService: ObservableObject {
     private var transcriptionTask: Task<String, Error>? = nil
     private var isCancelled = false
     
-    init() {
+    init(engineBuilder: @escaping (EngineKind) async -> TranscriptionEngine = TranscriptionService.buildEngine) {
+        self.engineBuilder = engineBuilder
         // Engines load lazily on first transcription (see ensureEngineLoaded), so
         // merely selecting an engine in Settings — or launching the app — never
         // triggers a model download. The download happens only when you actually
@@ -54,20 +57,23 @@ public class TranscriptionService: ObservableObject {
     }
     
     /// Initialize the engine matching the current preference if it isn't already
-    /// active. Called lazily from transcribeAudio, so selecting an engine in
-    /// Settings only records the choice — the model isn't downloaded/loaded until
-    /// you actually transcribe with it. Heavy work runs off the main actor.
-    private func ensureEngineLoaded() async {
+    /// active, and return it. Called lazily from transcribeAudio, so selecting an
+    /// engine in Settings only records the choice — the model isn't downloaded/loaded
+    /// until you actually transcribe with it. Heavy work runs off the main actor.
+    /// When `reloadEngine` runs during the load, the engine still goes to this caller,
+    /// whose model it is, but isn't kept: the next caller loads the current choice.
+    private func ensureEngineLoaded() async -> TranscriptionEngine? {
         let selectedEngine = CoreAccess.preferences.selectedEngine
-        if currentEngine != nil, loadedEngineKind == selectedEngine { return }
+        if let currentEngine, loadedEngineKind == selectedEngine { return currentEngine }
 
         isLoading = true
         engineError = nil
         print("Loading engine: \(selectedEngine)")
 
+        let generation = engineGeneration
         let kind = Self.engineKind(forSelectedEngine: selectedEngine)
-        let result = await Task.detached(priority: .userInitiated) { () -> Result<TranscriptionEngine?, Error> in
-            let engine: TranscriptionEngine? = await Self.buildEngine(kind)
+        let result = await Task.detached(priority: .userInitiated) { [engineBuilder] () -> Result<TranscriptionEngine?, Error> in
+            let engine: TranscriptionEngine? = await engineBuilder(kind)
 
             do {
                 try await engine?.initialize()
@@ -76,6 +82,11 @@ public class TranscriptionService: ObservableObject {
                 return .failure(error)
             }
         }.value
+
+        guard generation == engineGeneration else {
+            isLoading = false
+            return try? result.get()
+        }
 
         switch result {
         case .success(let engine):
@@ -89,6 +100,7 @@ public class TranscriptionService: ObservableObject {
             print("Failed to load engine: \(error)")
         }
         isLoading = false
+        return currentEngine
     }
 
     /// The engines `ensureEngineLoaded` can build. Named apart from the classes so the choice can
@@ -177,7 +189,9 @@ public class TranscriptionService: ObservableObject {
     /// (used when the engine selection or model changes). Intentionally does NOT
     /// load or download anything — that's deferred to next use. Clears any stale
     /// load error, since the invalidated engine gets a fresh attempt next time.
+    /// An engine still loading is invalidated too: it serves only the caller waiting on it.
     public func reloadEngine() {
+        engineGeneration += 1
         currentEngine = nil
         loadedEngineKind = nil
         engineError = nil
@@ -287,12 +301,12 @@ public class TranscriptionService: ObservableObject {
         } else {
             // Lazily initialize the selected engine on first use (downloads a local
             // model only now, never on mere engine selection in Settings).
-            await ensureEngineLoaded()
-            guard let loaded = currentEngine else {
+            let activeOption = ModelCatalog.activeOption()
+            guard let loaded = await ensureEngineLoaded() else {
                 throw TranscriptionError.contextInitializationFailed
             }
             engine = loaded
-            lastUsedModel = ModelCatalog.activeOption()
+            lastUsedModel = activeOption
             lastUsedFallback = false
         }
 
