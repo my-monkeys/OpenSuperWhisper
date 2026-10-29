@@ -66,6 +66,10 @@ final class DictationPipeline: ObservableObject {
     @Published private(set) var pendingCount = 0
     /// True while the background loop is draining the queue.
     @Published private(set) var isProcessing = false
+    /// True while a clip is waiting for the engine or in its file pass. Unlike `isProcessing`,
+    /// it is false during the cleanup model and the insertion, which don't touch the engine, so
+    /// the next dictation's live preview can start then (#250).
+    var isTranscribing: Bool { filePassRunning || !queue.isEmpty }
 
     /// Set by `discardEverything()` and cleared once the queue drains.
     ///
@@ -103,6 +107,7 @@ final class DictationPipeline: ObservableObject {
 
     private var queue: [PendingDictation] = []
     private var inFlight = false
+    private var filePassRunning = false
     private var seqCounter = 0
     private var loopTask: Task<Void, Never>?
 
@@ -184,6 +189,8 @@ final class DictationPipeline: ObservableObject {
         do {
             let rawText: String
             if let clip = item.tempURL {
+                filePassRunning = true
+                defer { filePassRunning = false }
                 rawText = try await Self.retryingOnce(stop: { self.discarding }, onRetry: {
                     IndicatorWindowManager.shared.flash(.info(String(localized: "Transcription failed, trying once more…")))
                 }) {
