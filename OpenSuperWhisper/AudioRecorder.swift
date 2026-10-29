@@ -108,6 +108,15 @@ class AudioRecorder: NSObject, ObservableObject {
         // The hosted test runner launches the app under another code signature, so preparing a
         // recorder there makes macOS ask for the microphone and the runner hangs on the prompt.
         guard !DefaultsStore.isRunningTests else { return }
+        // A warm recorder holds the default input open, which pins a Bluetooth headset to its HFP
+        // "call" profile (mono, low quality) for as long as we keep it. Music on that headset then
+        // stays degraded until the app quits (#247). Don't keep it warm for Bluetooth: the headset
+        // stays in A2DP while idle and returns to it right after a take, at the cost of a slightly
+        // slower first word, which the Bluetooth connection wait already absorbs.
+        guard !MicrophoneService.shared.isActiveMicrophoneBluetooth() else {
+            primedRecorder = nil
+            return
+        }
         let primedURL = temporaryDirectory.appendingPathComponent("primed.wav")
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatLinearPCM),
