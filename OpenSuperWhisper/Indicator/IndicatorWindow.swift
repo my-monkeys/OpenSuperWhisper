@@ -177,11 +177,13 @@ class IndicatorViewModel: ObservableObject {
 
         // Live transcription (Parakeet only): stream in parallel with the WAV recorder so the
         // indicator can show the text as the user speaks. Falls back to the file pass on stop.
-        // Skipped while ANY transcription is in flight — the background dictation pipeline OR the
-        // file-drop `TranscriptionQueue` (`isTranscriptionBusy`) — since the live stream and that
-        // pass would otherwise contend on the same engine. The file pass on stop still produces
-        // the text; only the on-bubble preview is dropped for this clip. (parallel-recording review)
-        if Self.shouldUseLiveStreaming && !DictationPipeline.shared.isProcessing && !isTranscriptionBusy {
+        // Skipped while ANY transcription is in flight — a dictation still waiting for or in its
+        // file pass, OR the file-drop `TranscriptionQueue` (`isTranscriptionBusy`) — since the live
+        // stream and that pass would otherwise contend on the same engine. The file pass on stop
+        // still produces the text; only the on-bubble preview is dropped for this clip. A previous
+        // dictation that is only in its cleanup model or insertion doesn't count: skipping there
+        // left back-to-back dictations without a preview (#250). (parallel-recording review)
+        if Self.shouldUseLiveStreaming && !DictationPipeline.shared.isTranscribing && !isTranscriptionBusy {
             liveStreamingActive = true
             let terms = RecognitionBoost.terms(dictionary: AppPreferences.shared.dictionaryBoostTerms,
                                                snippets: AppPreferences.shared.dictationSnippetTriggers)

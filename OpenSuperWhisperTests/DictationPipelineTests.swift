@@ -130,6 +130,52 @@ final class DictationPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.pendingCount, 0, "pendingCount returns to zero once drained")
     }
 
+    private final class PhaseRun { var duringFilePass: Bool?; var duringCleanup: Bool?; var processingInCleanup: Bool? }
+
+    /// `isTranscribing` covers the clip's wait and file pass, not the cleanup model after it: a
+    /// dictation started while the previous one is only being cleaned up still gets its live
+    /// preview (#250).
+    func testIsTranscribingCoversTheFilePassButNotTheCleanup() async {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = false
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+
+        let pipeline = DictationPipeline.shared
+        let run = PhaseRun()
+        pipeline.transcribeOverride = { _, _ in
+            run.duringFilePass = pipeline.isTranscribing
+            return "heard"
+        }
+        pipeline.cleanupOverride = { text in
+            run.duringCleanup = pipeline.isTranscribing
+            run.processingInCleanup = pipeline.isProcessing
+            return text
+        }
+        pipeline.deliverOverride = { _, _ in .inserted }
+        defer {
+            pipeline.transcribeOverride = nil
+            pipeline.cleanupOverride = nil
+            pipeline.deliverOverride = nil
+        }
+
+        pipeline.enqueue(tempURL: URL(fileURLWithPath: "/tmp/osw-pipeline-phase.wav"), startedAt: Date(),
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(), modelOption: nil)
+        XCTAssertTrue(pipeline.isTranscribing, "a queued clip is still waiting for the engine")
+        var waited = 0
+        while pipeline.isProcessing && waited < 500 {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            waited += 1
+        }
+
+        XCTAssertEqual(run.duringFilePass, true)
+        XCTAssertEqual(run.duringCleanup, false)
+        XCTAssertEqual(run.processingInCleanup, true, "the cleanup is still part of processing")
+        XCTAssertFalse(pipeline.isTranscribing)
+    }
+
     /// A dictation the recorder never captured, rescued from the live preview. The tap and the
     /// recorder are separate consumers of the microphone, so one can come back empty while the
     /// other heard everything, and the words should not be thrown away for want of a file (#128).
