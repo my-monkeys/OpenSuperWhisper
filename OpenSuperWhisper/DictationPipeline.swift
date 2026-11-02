@@ -256,14 +256,16 @@ final class DictationPipeline: ObservableObject {
             // RECORDED — the app the user was dictating into — not whatever is frontmost now that
             // the background queue got to it. (parallel-recording)
             let style = AppPreferences.shared.writingStyle(for: item.context.bundleID)
+            let cleanup: CleanupOutcome
             if let cleanupOverride {
-                text = await cleanupOverride(text)
+                cleanup = CleanupOutcome(text: await cleanupOverride(text), status: .notRun)
             } else {
-                text = await LLMPostProcessor.process(
+                cleanup = await LLMPostProcessor.processWithOutcome(
                     text, bundleID: item.context.bundleID, translating: settings.translateToEnglish,
                     writesLists: RichListPaste.cleanupWritesLists(into: item.context.bundleID),
                     style: style.instructions)
             }
+            text = cleanup.text
 
             // Trailing "press enter" voice command (opt-in): strip it and remember to press Return
             // after insertion, submitting the message/prompt.
@@ -314,7 +316,7 @@ final class DictationPipeline: ObservableObject {
                     finalURL: finalURL, transcription: text, rawTranscription: original.isEmpty ? nil : original,
                     status: .completed, progress: 1.0, context: item.context,
                     modelUsed: modelUsed, wasFallback: wasFallback,
-                    styleUsed: HistoryRestyle.label(for: style))
+                    styleUsed: HistoryRestyle.label(for: style), cleanup: cleanup)
             } else {
                 discardAudio(item.tempURL)
             }
@@ -431,7 +433,8 @@ final class DictationPipeline: ObservableObject {
                                 transcription: String, rawTranscription: String?,
                                 status: RecordingStatus, progress: Float,
                                 context: ContextSnapshot,
-                                modelUsed: String?, wasFallback: Bool, styleUsed: String? = nil) async {
+                                modelUsed: String?, wasFallback: Bool, styleUsed: String? = nil,
+                                cleanup: CleanupOutcome? = nil) async {
         // `modelUsed`/`wasFallback` are captured by the caller right after `transcribeAudio`
         // returns — NOT read here, because the `await` below can suspend long enough for another
         // transcription to overwrite them on the shared service. (parallel-recording review)
@@ -451,7 +454,9 @@ final class DictationPipeline: ObservableObject {
             modelUsed: modelUsed,
             wasFallback: wasFallback,
             rawTranscription: rawTranscription,
-            styleUsed: styleUsed))
+            styleUsed: styleUsed,
+            cleanupModel: cleanup?.model,
+            cleanupError: cleanup?.failureReason))
     }
 
     /// Move a temp recording to its permanent location after a FAILED transcription so the audio

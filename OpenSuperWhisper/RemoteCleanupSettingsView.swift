@@ -123,7 +123,7 @@ struct RemoteCleanupSettingsView: View {
                     if (200..<300).contains(code) {
                         viewModel.llmStatus = .ok
                     } else if code == 401 || code == 403 {
-                        viewModel.llmStatus = .authFailed
+                        viewModel.llmStatus = .authFailed(nil)
                     } else {
                         viewModel.llmStatus = .unreachable
                     }

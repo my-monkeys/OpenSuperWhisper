@@ -43,6 +43,12 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
     /// The writing style AI cleanup wrote this text in, by name, as it was called then (#160).
     /// Nil when no style shaped it: Raw, cleanup off, or a row older than the column.
     public var styleUsed: String? = nil
+    /// The model of the AI cleanup pass that ran, or was attempted, on this text (#266). Nil when
+    /// no pass was due, and on a row older than the column.
+    public var cleanupModel: String? = nil
+    /// Why that pass failed and the engine's text was used instead (#264). Set only alongside
+    /// `cleanupModel`; nil when the pass worked.
+    public var cleanupError: String? = nil
 
     public var isRegeneration: Bool = false
 
@@ -51,7 +57,8 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
                 sourceFileURL: String? = nil, sourceAppName: String? = nil,
                 sourceWindowTitle: String? = nil, sourceURL: String? = nil,
                 modelUsed: String? = nil, wasFallback: Bool = false, rawTranscription: String? = nil,
-                styleUsed: String? = nil, isRegeneration: Bool = false) {
+                styleUsed: String? = nil, cleanupModel: String? = nil, cleanupError: String? = nil,
+                isRegeneration: Bool = false) {
         self.id = id
         self.timestamp = timestamp
         self.fileName = fileName
@@ -67,13 +74,15 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
         self.wasFallback = wasFallback
         self.rawTranscription = rawTranscription
         self.styleUsed = styleUsed
+        self.cleanupModel = cleanupModel
+        self.cleanupError = cleanupError
         self.isRegeneration = isRegeneration
     }
 
     enum CodingKeys: String, CodingKey {
         case id, timestamp, fileName, transcription, duration, status, progress, sourceFileURL
         case sourceAppName, sourceWindowTitle, sourceURL, modelUsed, wasFallback, rawTranscription
-        case styleUsed
+        case styleUsed, cleanupModel, cleanupError
     }
 
     public static func == (lhs: Recording, rhs: Recording) -> Bool {
@@ -83,6 +92,8 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
                lhs.transcription == rhs.transcription &&
                lhs.rawTranscription == rhs.rawTranscription &&
                lhs.styleUsed == rhs.styleUsed &&
+               lhs.cleanupModel == rhs.cleanupModel &&
+               lhs.cleanupError == rhs.cleanupError &&
                lhs.isRegeneration == rhs.isRegeneration
     }
 
@@ -124,6 +135,8 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
         static let modelUsed = Column(CodingKeys.modelUsed)
         static let wasFallback = Column(CodingKeys.wasFallback)
         static let rawTranscription = Column(CodingKeys.rawTranscription)
+        static let cleanupModel = Column(CodingKeys.cleanupModel)
+        static let cleanupError = Column(CodingKeys.cleanupError)
     }
 }
 
@@ -262,11 +275,15 @@ public class RecordingStore: ObservableObject {
     }
     
     /// Replaces a row's text with the same dictation rewritten in another writing style, from
-    /// the history (#160). The engine's original stays as it was.
-    public func restyle(_ recording: Recording, transcription: String, styleUsed: String?) async throws {
+    /// the history (#160). The engine's original stays as it was. The pass that just ran replaces
+    /// the outcome the row kept from the previous one.
+    public func restyle(_ recording: Recording, transcription: String, styleUsed: String?,
+                        cleanup: CleanupOutcome) async throws {
         var updated = recording
         updated.transcription = transcription
         updated.styleUsed = styleUsed
+        updated.cleanupModel = cleanup.model
+        updated.cleanupError = cleanup.failureReason
         try await updateRecordingSync(updated)
     }
 
@@ -304,6 +321,9 @@ public class RecordingStore: ObservableObject {
                 }
                 if let rawTranscription {
                     assignments.append(Recording.Columns.rawTranscription.set(to: rawTranscription))
+                    // The new text is the engine's own, with no cleanup pass behind it.
+                    assignments.append(Recording.Columns.cleanupModel.set(to: nil))
+                    assignments.append(Recording.Columns.cleanupError.set(to: nil))
                 }
                 return try Recording
                     .filter(Recording.Columns.id == id)
@@ -325,6 +345,8 @@ public class RecordingStore: ObservableObject {
                 }
                 if let rawTranscription {
                     updated.rawTranscription = rawTranscription
+                    updated.cleanupModel = nil
+                    updated.cleanupError = nil
                 }
                 recordings[index] = updated
             }

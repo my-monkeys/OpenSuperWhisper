@@ -183,6 +183,8 @@ class ContentViewModel: ObservableObject {
             }
             if let rawTranscription {
                 recordings[index].rawTranscription = rawTranscription
+                recordings[index].cleanupModel = nil
+                recordings[index].cleanupError = nil
             }
         }
         if status == .failed || status == .completed {
@@ -299,14 +301,14 @@ class ContentViewModel: ObservableObject {
                     // App-aware formatting keys off the app captured at record-start, not the
                     // frontmost app: recording from the main window makes OSW itself frontmost, so
                     // asking the workspace here would never match a profile.
-                    let cleanedUp = await LLMPostProcessor.process(
+                    let cleanup = await LLMPostProcessor.processWithOutcome(
                         cleanedText, bundleID: RecordingContext.shared.bundleID,
                         translating: AppPreferences.shared.translateToEnglish,
                         writesLists: RichListPaste.cleanupWritesLists(into: RecordingContext.shared.bundleID),
                         style: AppPreferences.shared.writingStyle(for: RecordingContext.shared.bundleID).instructions)
                     // After the cleanup, as in the dictation pipeline, so the model cannot rewrite
                     // a snippet's text. (#167)
-                    let text = AppPreferences.shared.expandSnippets(cleanedUp)
+                    let text = AppPreferences.shared.expandSnippets(cleanup.text)
 
                     if AppPreferences.shared.saveTranscriptionHistory {
                         // Capture the current recording duration
@@ -355,7 +357,9 @@ class ContentViewModel: ObservableObject {
                                 sourceURL: ctx.fullURL,
                                 modelUsed: modelUsed,
                                 wasFallback: wasFallback,
-                                rawTranscription: original.isEmpty ? nil : original
+                                rawTranscription: original.isEmpty ? nil : original,
+                                cleanupModel: cleanup.model,
+                                cleanupError: cleanup.failureReason
                             )
                             self.recordingStore.addRecording(newRecording)
 

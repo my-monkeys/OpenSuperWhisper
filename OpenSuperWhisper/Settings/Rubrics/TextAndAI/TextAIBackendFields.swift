@@ -145,8 +145,14 @@ struct TextAIBackendFields: View {
                            ? "Reachable, but “\(model)” isn't in the server's model list"
                            : "Reachable, but “\(model)” isn't pulled. Run: ollama pull \(model)",
                            color: STheme.warn)
-        case .authFailed:
-            TextAIFootnote("✕ The server rejected the API key", color: STheme.danger)
+        case .authFailed(let message):
+            if let message {
+                TextAIFootnote("✕ The server rejected the API key: \(message)", color: STheme.danger)
+            } else {
+                TextAIFootnote("✕ The server rejected the API key", color: STheme.danger)
+            }
+        case .requestFailed(let message):
+            TextAIFootnote("✕ A test request failed: \(message)", color: STheme.danger)
         case .unreachable:
             TextAIFootnote(isRemote
                            ? "✕ Can't reach the server. Check the URL."

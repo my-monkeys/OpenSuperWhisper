@@ -64,7 +64,8 @@ final class RecordingMigrationTests: CoreTestCase {
     func testMigrationIdentifiersInOrder() {
         XCTAssertEqual(RecordingStore.makeMigrator().migrations,
                        ["v1", "v2_add_status", "v3_add_source_context", "v4_add_model_used", "v5_add_was_fallback",
-                        "v6_add_raw_transcription", "v7_add_transcription_reports", "v8_add_style_used"])
+                        "v6_add_raw_transcription", "v7_add_transcription_reports", "v8_add_style_used",
+                        "v9_add_cleanup_outcome"])
     }
 
     // MARK: - Schema
@@ -202,6 +203,8 @@ final class RecordingMigrationTests: CoreTestCase {
         var recording = RecordingMigrationFixture.rows[3]
         recording.rawTranscription = "hello world ça marche"
         recording.styleUsed = "Pro"
+        recording.cleanupModel = "google/gemini-2.5-flash-lite"
+        recording.cleanupError = "401 Invalid API key"
         recording.isRegeneration = true
         try await queue.write { db in try recording.insert(db) }
 
@@ -299,6 +302,8 @@ final class RecordingMigrationTests: CoreTestCase {
         "12|wasFallback|BOOLEAN|1|0|0",
         "13|rawTranscription|TEXT|0||0",
         "14|styleUsed|TEXT|0||0",
+        "15|cleanupModel|TEXT|0||0",
+        "16|cleanupError|TEXT|0||0",
     ]
 
     /// Index name, uniqueness, and indexed columns with their collation.
@@ -316,7 +321,8 @@ final class RecordingMigrationTests: CoreTestCase {
         "duration" DOUBLE NOT NULL, "status" TEXT NOT NULL DEFAULT 'completed', \
         "progress" DOUBLE NOT NULL DEFAULT 1.0, "sourceFileURL" TEXT, "sourceAppName" TEXT, \
         "sourceWindowTitle" TEXT, "sourceURL" TEXT, "modelUsed" TEXT, \
-        "wasFallback" BOOLEAN NOT NULL DEFAULT 0, "rawTranscription" TEXT, "styleUsed" TEXT)
+        "wasFallback" BOOLEAN NOT NULL DEFAULT 0, "rawTranscription" TEXT, "styleUsed" TEXT, \
+        "cleanupModel" TEXT, "cleanupError" TEXT)
         """
 
     // MARK: - Helpers
@@ -398,6 +404,8 @@ final class RecordingMigrationTests: CoreTestCase {
         XCTAssertEqual(actual.wasFallback, expected.wasFallback, label, file: file, line: line)
         XCTAssertEqual(actual.rawTranscription, expected.rawTranscription, label, file: file, line: line)
         XCTAssertEqual(actual.styleUsed, expected.styleUsed, label, file: file, line: line)
+        XCTAssertEqual(actual.cleanupModel, expected.cleanupModel, label, file: file, line: line)
+        XCTAssertEqual(actual.cleanupError, expected.cleanupError, label, file: file, line: line)
         XCTAssertEqual(actual.isRegeneration, expected.isRegeneration, label, file: file, line: line)
     }
 }
