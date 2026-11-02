@@ -110,6 +110,9 @@ final class LLMCleanupRequestTests: XCTestCase {
         prefs.aiPostProcessingEnabled = true
         prefs.aiPostProcessingPrompt = "OPEN"
         prefs.aiPostProcessingClosing = "CLOSE"
+        // These pin the wire format around the two halves; whether the spoken punctuation
+        // section joins the prompt is `SpokenFormattingPromptTests`' business.
+        prefs.aiSpokenFormattingEnabled = false
         prefs.aiOllamaEndpoint = Self.endpoint
         prefs.aiOllamaModel = "llama3.2:3b"
         prefs.aiRemoteEndpoint = "\(LLMStubProtocol.host)/v1/"
