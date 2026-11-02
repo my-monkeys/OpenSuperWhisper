@@ -40,6 +40,11 @@ public enum AppleSpeechSupport {
     /// listing a model in the menu must never start one).
     public static var hasInstalledModel: Bool { !cachedInstalledLanguages.isEmpty }
 
+    /// Same, for the language a run would use: another language's assets cannot transcribe it.
+    public static func hasInstalledModel(forLanguage language: String) -> Bool {
+        cachedInstalledLanguages.contains(effectiveLanguageCode(for: language))
+    }
+
     @available(macOS 26.0, iOS 26.0, *)
     public static func refreshCaches() async {
         let supported = languageCodes(from: await SpeechTranscriber.supportedLocales)
