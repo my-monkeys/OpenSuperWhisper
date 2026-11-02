@@ -125,4 +125,37 @@ final class ICloudSettingsBackupTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "whisperLanguage"), "it")
         XCTAssertEqual(try Data(contentsOf: studio.fileURL), before, "the restored settings are the backup's own")
     }
+
+    /// Optimize Mac Storage leaves a hidden `.<name>.icloud` stub where the file will land.
+    func testAPlaceholderIsABackupThatIsNotHereYetAndIsNeverOverwritten() throws {
+        let backup = makeBackup()
+        let folder = backup.folder
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let placeholder = folder.appendingPathComponent(".\(SettingsArchive.fileName).icloud")
+        try Data("stub".utf8).write(to: placeholder)
+        defaults.set("fr", forKey: "whisperLanguage")
+
+        XCTAssertTrue(backup.isDownloadPending)
+        XCTAssertFalse(try backup.writeIfChanged())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: backup.fileURL.path))
+        XCTAssertNil(try backup.backup())
+
+        try FileManager.default.removeItem(at: placeholder)
+        XCTAssertFalse(backup.isDownloadPending)
+        XCTAssertTrue(try backup.writeIfChanged())
+    }
+
+    func testSwitchingOnWaitsForADownloadingBackup() throws {
+        let backup = makeBackup()
+        try FileManager.default.createDirectory(at: backup.folder, withIntermediateDirectories: true)
+        try Data().write(to: backup.folder.appendingPathComponent(".\(SettingsArchive.fileName).icloud"))
+        defaults.set(false, forKey: ICloudSettingsBackup.enabledKey)
+
+        let model = ICloudBackupModel(backup: backup)
+        model.refresh()
+        model.setEnabled(true)
+
+        XCTAssertTrue(model.isDownloading)
+        XCTAssertFalse(backup.isEnabled)
+    }
 }

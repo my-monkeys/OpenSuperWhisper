@@ -8,6 +8,8 @@ import SwiftUI
 final class ICloudBackupModel: ObservableObject {
     @Published private(set) var isAvailable = false
     @Published private(set) var isEnabled = false
+    /// A backup is in iCloud Drive but not downloaded to this Mac yet.
+    @Published private(set) var isDownloading = false
     /// When and where the backup in iCloud Drive was last written. Nil when there is none.
     @Published private(set) var lastBackup: SettingsArchive.Origin?
     /// Another Mac's backup found when the switch was turned on; the person decides its fate.
@@ -23,12 +25,19 @@ final class ICloudBackupModel: ObservableObject {
     func refresh() {
         isAvailable = backup.isAvailable
         isEnabled = backup.isEnabled && isAvailable
+        isDownloading = isAvailable && backup.isDownloadPending
         lastBackup = (try? backup.backup())?.origin
     }
 
     func setEnabled(_ on: Bool) {
         errorMessage = nil
         guard on else { return turnOff() }
+        // Its author is unknown until it lands, and writing now could replace a good backup.
+        guard !backup.isDownloadPending else {
+            isDownloading = true
+            errorMessage = String(localized: "Downloading the backup from iCloud…")
+            return
+        }
         if let other = backup.backupFromAnotherMac() {
             conflict = other
         } else {

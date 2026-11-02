@@ -53,6 +53,20 @@ final class ICloudSettingsBackup {
             && isDirectory.boolValue
     }
 
+    /// With Optimize Mac Storage, a backup another Mac made can exist here only as a hidden
+    /// `.<name>.icloud` placeholder, or as a file iCloud has not downloaded yet. Either way a
+    /// backup exists, just not readable: it must never be taken for "no backup" and overwritten.
+    /// Asking iCloud to fetch it is repeated at each check until it lands.
+    var isDownloadPending: Bool {
+        let placeholder = folder.appendingPathComponent(".\(SettingsArchive.fileName).icloud")
+        let status = try? fileURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+            .ubiquitousItemDownloadingStatus
+        guard FileManager.default.fileExists(atPath: placeholder.path) || (status != nil && status != .current)
+        else { return false }
+        try? FileManager.default.startDownloadingUbiquitousItem(at: fileURL)
+        return true
+    }
+
     var isEnabled: Bool { defaults.bool(forKey: Self.enabledKey) }
 
     // MARK: - Writing
@@ -84,7 +98,7 @@ final class ICloudSettingsBackup {
     /// travels, such as a local preference.
     @discardableResult
     func writeIfChanged() throws -> Bool {
-        guard isAvailable, !isRestoring else { return false }
+        guard isAvailable, !isRestoring, !isDownloadPending else { return false }
         let data = try SettingsArchive.export(from: defaults, appVersion: appVersion, host: hostName)
         if let existing = try? Data(contentsOf: fileURL),
            let old = try? SettingsArchive.read(existing),
@@ -102,7 +116,7 @@ final class ICloudSettingsBackup {
 
     /// The backup in the folder, nil when there is none.
     func backup() throws -> Backup? {
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        guard !isDownloadPending, let data = try? Data(contentsOf: fileURL) else { return nil }
         let values = try SettingsArchive.read(data)
         guard let origin = SettingsArchive.origin(of: data) else { throw SettingsArchive.ReadError.notASettingsFile }
         return Backup(origin: origin, values: values)

@@ -61,6 +61,7 @@ struct SettingsTransferGroup: View {
                 .buttonStyle(.sSecondary)
                 .disabled(model.isBusy || icloud.lastBackup == nil)
             }
+            if let error = icloud.errorMessage { SettingNotice(LocalizedStringKey(error)) }
         }
     }
 
@@ -71,6 +72,7 @@ struct SettingsTransferGroup: View {
     }
 
     private var lastBackupHint: LocalizedStringKey {
+        if icloud.isDownloading { return "Downloading the backup from iCloud…" }
         guard let last = icloud.lastBackup, let date = last.exportedAt else { return "No backup in iCloud Drive yet." }
         let when = date.formatted(.relative(presentation: .named))
         guard let host = last.host else { return "Last backup: \(when)" }
