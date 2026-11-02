@@ -31,6 +31,9 @@ final class CleanupExplicitBackendTests: CoreTestCase {
         prefs.aiPostProcessingPrompt = "OPEN"
         prefs.aiPostProcessingClosing = "CLOSE"
         prefs.appContextFormattingEnabled = false
+        // These pin where the extra instruction sits between the halves; the spoken punctuation
+        // section has its own tests (`SpokenFormattingPromptTests`).
+        prefs.aiSpokenFormattingEnabled = false
     }
 
     func testThePassRunsOnTheGivenBackendAndNamesIt() async {
