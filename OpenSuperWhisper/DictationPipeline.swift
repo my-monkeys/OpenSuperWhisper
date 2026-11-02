@@ -59,6 +59,10 @@ final class DictationPipeline: ObservableObject {
         /// of speech the recorder caught before stopping. The text is cut at its last
         /// occurrence rather than only stripped from the very end (#145).
         let endedByStopPhrase: Bool
+        /// Set for a clip recovered from `unfinished/`: the app it was dictated into is long gone,
+        /// so the text goes here instead of being inserted anywhere. Everything before the
+        /// insertion runs as for any dictation.
+        let onRecovered: ((String) -> Void)?
     }
 
     /// Dictations waiting in the queue plus the one currently being processed. Drives optional
@@ -107,6 +111,7 @@ final class DictationPipeline: ObservableObject {
 
     private var queue: [PendingDictation] = []
     private var inFlight = false
+    private var inFlightClip: URL?
     private var filePassRunning = false
     private var seqCounter = 0
     private var loopTask: Task<Void, Never>?
@@ -122,7 +127,8 @@ final class DictationPipeline: ObservableObject {
     /// `seq` is monotonic and assigned here, so append order == recording-start order.
     func enqueue(tempURL: URL?, startedAt: Date, streamedFallback: String,
                  context: ContextSnapshot, modelOption: DictationModelOption?,
-                 submitAfterInsert: Bool = false, endedByStopPhrase: Bool = false) {
+                 submitAfterInsert: Bool = false, endedByStopPhrase: Bool = false,
+                 onRecovered: ((String) -> Void)? = nil) {
         seqCounter += 1
         queue.append(PendingDictation(
             id: UUID(),
@@ -133,7 +139,8 @@ final class DictationPipeline: ObservableObject {
             context: context,
             modelOption: modelOption,
             submitAfterInsert: submitAfterInsert,
-            endedByStopPhrase: endedByStopPhrase))
+            endedByStopPhrase: endedByStopPhrase,
+            onRecovered: onRecovered))
         refreshPendingCount()
         startLoopIfNeeded()
     }
@@ -145,8 +152,10 @@ final class DictationPipeline: ObservableObject {
             guard let self else { return }
             while let next = self.dequeue() {
                 self.inFlight = true
+                self.inFlightClip = next.tempURL
                 await self.process(next)
                 self.inFlight = false
+                self.inFlightClip = nil
                 self.refreshPendingCount()
             }
             self.isProcessing = false
@@ -173,6 +182,12 @@ final class DictationPipeline: ObservableObject {
     private func discardAudio(_ url: URL?) {
         guard let url else { return }
         try? FileManager.default.removeItem(at: url)
+    }
+
+    /// File names of the clips queued or being transcribed: the ones the startup scan and the
+    /// Home banner must not offer, since they are about to be transcribed already.
+    var ownedClipNames: Set<String> {
+        Set((queue.compactMap(\.tempURL) + [inFlightClip].compactMap { $0 }).map(\.lastPathComponent))
     }
 
     private func refreshPendingCount() {
@@ -315,8 +330,16 @@ final class DictationPipeline: ObservableObject {
                     status: .completed, progress: 1.0, context: item.context,
                     modelUsed: modelUsed, wasFallback: wasFallback,
                     styleUsed: HistoryRestyle.label(for: style))
-            } else {
+            } else if item.onRecovered == nil {
                 discardAudio(item.tempURL)
+            }
+
+            // A recovered clip has no field to go back to. The text is safe on the clipboard
+            // before its audio goes, so nothing is lost if the app dies in between.
+            if let onRecovered = item.onRecovered {
+                if hasText { onRecovered(text) }
+                discardAudio(item.tempURL)
+                return
             }
 
             // An answer to a waiting agent goes back to it, not into whatever has the cursor.
@@ -377,7 +400,10 @@ final class DictationPipeline: ObservableObject {
             Diag.mark("dictation failed: \(reason)")
             // Don't lose the audio on failure. When history is on, keep the recording with a .failed
             // status + retry message so it shows in the log and can be re-run with the regenerate (↻)
-            // button. Otherwise discard. Either way, surface the failure — silent loss is worse.
+            // button. Otherwise the clip stays in `unfinished/`, offered by Home until it is
+            // transcribed, discarded or a week old. Either way, surface the failure — silent loss
+            // is worse.
+            var keptForRecovery = false
             if AppPreferences.shared.saveTranscriptionHistory,
                let clip = item.tempURL,
                let saved = persistFailedRecording(timestamp: item.startedAt, tempURL: clip) {
@@ -387,10 +413,14 @@ final class DictationPipeline: ObservableObject {
                     transcription: String(localized: "Transcription failed: \(reason). Click ↻ to try again."),
                     rawTranscription: nil, status: .failed, progress: 0, context: item.context,
                     modelUsed: nil, wasFallback: false)
-            } else {
+            } else if discarding {
                 discardAudio(item.tempURL)
+            } else {
+                keptForRecovery = item.tempURL != nil
             }
-            IndicatorWindowManager.shared.flash(.error(String(localized: "Transcription failed: \(reason)")))
+            IndicatorWindowManager.shared.flash(.error(keptForRecovery
+                ? String(localized: "Transcription failed: \(reason). Kept in Home to try again.")
+                : String(localized: "Transcription failed: \(reason)")))
         }
     }
 
