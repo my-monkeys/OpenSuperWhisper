@@ -223,8 +223,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         // The Apple Speech locale lists are async-only; refresh the sync caches the
         // model catalog and language picker read (menu must never trigger a download).
+        // Not in a test host: the write lands seconds later, in the middle of whichever test is
+        // running, and a test that counts the keys it writes sees one it never wrote.
 #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, *), !DefaultsStore.isRunningTests {
             Task.detached(priority: .utility) { await AppleSpeechSupport.refreshCaches() }
         }
 #endif
