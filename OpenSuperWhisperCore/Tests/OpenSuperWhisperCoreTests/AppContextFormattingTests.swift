@@ -133,6 +133,7 @@ final class AppContextFormattingTests: CoreTestCase {
     /// Stand-in for an external backend (Ollama / Remote), which must inherit the opt-out.
     private struct StubBackend: LLMCleanupBackend {
         var isReady = true
+        var modelLabel = "stub"
         func generate(system: String, user: String) async throws -> String { "" }
     }
 

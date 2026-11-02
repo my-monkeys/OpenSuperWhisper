@@ -166,7 +166,19 @@ private struct FeedRowMeta: View {
             .scaledFont(size: 12)
             .foregroundColor(STheme.hint)
             .lineLimit(2)
-            .help(recording.wasFallback ? String(localized: "Local fallback — the remote server was unreachable") : "")
+            .help(tooltip)
+    }
+
+    /// What the line cannot fit: why the model is tinted, and which model cleaned the text or why
+    /// it failed.
+    private var tooltip: String {
+        var lines: [String] = []
+        if recording.wasFallback { lines.append(String(localized: "Local fallback — the remote server was unreachable")) }
+        if let model = recording.cleanupModel {
+            lines.append(recording.cleanupError.map { String(localized: "Cleanup with \(model) failed: \($0). The text is what the engine heard.") }
+                         ?? String(localized: "Cleaned up with \(model)"))
+        }
+        return lines.joined(separator: "\n")
     }
 
     private var line: Text {
@@ -176,6 +188,11 @@ private struct FeedRowMeta: View {
             parts.append(recording.wasFallback ? Text(model).foregroundColor(STheme.warn) : Text(model))
         }
         if let style = recording.styleUsed { parts.append(Text(style)) }
+        if recording.cleanupModel != nil {
+            parts.append(recording.cleanupError == nil
+                         ? Text("Cleaned up")
+                         : Text("Cleanup failed").foregroundColor(STheme.warn))
+        }
         if recording.duration > 0 { parts.append(Text(TextUtil.formatDuration(recording.duration))) }
         guard var line = parts.first else { return Text(verbatim: "") }
         for part in parts.dropFirst() {

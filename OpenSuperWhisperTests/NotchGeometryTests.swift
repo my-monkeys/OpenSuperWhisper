@@ -24,6 +24,22 @@ final class NotchGeometryTests: XCTestCase {
                               topRadius: topRadius, bottomRadius: 14)!
     }
 
+    // MARK: - The label's stages
+
+    /// The label is a fixed frame sized from "Transcribing…", so a stage word wider than that gets
+    /// clipped by the notch. "Cleaning up…" (#269) and its translations have to stay under it.
+    func testNoStageWordIsWiderThanTranscribing() {
+        let font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        func width(_ word: String) -> CGFloat { (word as NSString).size(withAttributes: [.font: font]).width }
+        let reserved = width("Transcribing…")
+        let cleaning = ["Cleaning up…", "Nettoyage…", "Bereinige…", "Limpiando…", "Pulizia…",
+                        "Limpando…", "Dọn dẹp…", "清理中…"]
+        for word in cleaning {
+            XCTAssertLessThanOrEqual(width(word), reserved, word)
+        }
+        XCTAssertLessThanOrEqual(reserved, NotchGeometry.elementWidth(.label, textScale: 1))
+    }
+
     // MARK: - There has to be hardware
 
     /// The whole point of the optional. A screen without a cutout draws a pill because someone

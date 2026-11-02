@@ -752,6 +752,10 @@ struct IndicatorWindow: View {
     private var glassLabel: String {
         let queued = pipeline.pendingCount
         if viewModel.state == .decoding {
+            if pipeline.isCleaningUp {
+                return queued > 1 ? String(localized: "Cleaning up… · \(queued - 1) queued")
+                                  : String(localized: "Cleaning up…")
+            }
             return queued > 1 ? String(localized: "Transcribing… · \(queued - 1) queued")
                               : String(localized: "Transcribing…")
         }
@@ -937,7 +941,8 @@ struct IndicatorWindow: View {
                         IndicatorElementView(element: element,
                                              meterHeight: meterHeight,
                                              queued: pipeline.pendingCount,
-                                             isDecoding: true)
+                                             isDecoding: true,
+                                             isCleaningUp: pipeline.isCleaningUp)
                     }
                     if !layout.trailing.isEmpty {
                         Spacer(minLength: 8)
@@ -946,7 +951,8 @@ struct IndicatorWindow: View {
                                 IndicatorElementView(element: element,
                                                      meterHeight: meterHeight,
                                                      queued: pipeline.pendingCount,
-                                                     isDecoding: true)
+                                                     isDecoding: true,
+                                                     isCleaningUp: pipeline.isCleaningUp)
                             }
                         }
                     }
@@ -1180,7 +1186,8 @@ struct IndicatorWindow: View {
                                      isBlinking: viewModel.isBlinking,
                                      isLatched: viewModel.isLatched,
                                      queued: pipeline.pendingCount,
-                                     isDecoding: viewModel.state == .decoding)
+                                     isDecoding: viewModel.state == .decoding,
+                                     isCleaningUp: pipeline.isCleaningUp)
             }
         }
     }

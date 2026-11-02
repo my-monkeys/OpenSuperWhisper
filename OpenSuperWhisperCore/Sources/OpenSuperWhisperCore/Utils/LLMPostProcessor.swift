@@ -14,6 +14,9 @@ public protocol LLMCleanupBackend {
     /// the blank-output and prompt-echo checks, so a user who repurposed the instruction on a big
     /// model (condensing, expanding) isn't second-guessed.
     var enforcesLengthRatio: Bool { get }
+    /// Short name of the model that answers, for the notices and the history row: "Apple
+    /// Intelligence", or the model id as the user configured it.
+    var modelLabel: String { get }
     func generate(system: String, user: String) async throws -> String
 }
 
@@ -27,8 +30,9 @@ public enum LLMStatus: Equatable, Sendable {
     case checking
     case ok                     // reachable and the configured model is present
     case modelMissing(String)   // reachable, but the model isn't available there
-    case authFailed             // reachable, but the server rejected the API key
+    case authFailed(String?)    // reachable, but the server rejected the API key (its message, if any)
     case unreachable            // server not running / wrong endpoint
+    case requestFailed(String)  // reachable, but a real chat request failed (the server's message)
 }
 
 /// Cleans up a transcription with a local LLM, behind a single `process` entry point so the
@@ -37,6 +41,7 @@ public enum LLMStatus: Equatable, Sendable {
 ///
 /// `process` never throws and never loses the transcription: if post-processing is disabled
 /// or the LLM call fails (server down, bad model, timeout, bad key…), it returns the input text.
+/// `processWithOutcome` says which of those happened.
 public enum LLMPostProcessor {
     /// The backend someone gets when they never picked one: Apple Intelligence where it can run
     /// (nothing to download or set up), Ollama, the long-standing default, everywhere else.
@@ -77,12 +82,27 @@ public enum LLMPostProcessor {
     /// cleanup runs: a style is a way of cleaning up, not a reason to send the text to a model.
     public static func process(_ text: String, bundleID: String?, translating: Bool = false,
                                writesLists: Bool = false, style: String = "") async -> String {
+        await processWithOutcome(text, bundleID: bundleID, translating: translating,
+                                 writesLists: writesLists, style: style).text
+    }
+
+    /// `process`, with what happened to the text: a pass that failed and a pass that changed
+    /// nothing both hand back the input, and only the status tells them apart.
+    public static func processWithOutcome(_ text: String, bundleID: String?, translating: Bool = false,
+                                          writesLists: Bool = false, style: String = "") async -> CleanupOutcome {
+        await run(text, bundleID: bundleID, translating: translating, writesLists: writesLists,
+                  style: style, backend: currentBackend())
+    }
+
+    static func run(_ text: String, bundleID: String?, translating: Bool, writesLists: Bool,
+                    style: String, backend: LLMCleanupBackend) async -> CleanupOutcome {
         let prefs = CoreAccess.preferences
         let general = prefs.aiPostProcessingEnabled
         let formatting = prefs.appContextFormattingEnabled
+        let notRun = CleanupOutcome(text: text, status: .notRun)
 
-        guard general || formatting else { return text }
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+        guard general || formatting else { return notRun }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return notRun }
 
         let prof = formatting ? profile(for: bundleID, in: prefs.appContextProfiles) : nil
         let vocabulary = prefs.customDictionaryEnabled
@@ -96,12 +116,15 @@ public enum LLMPostProcessor {
                                                 vocabulary: vocabulary,
                                                 writesLists: writesLists,
                                                 style: style)
-        else { return text }
+        else { return notRun }
 
-        let backend = currentBackend()
+        let model = backend.modelLabel
+        func failed(_ reason: String) -> CleanupOutcome {
+            CleanupOutcome(text: text, status: .failed(model: model, reason: reason))
+        }
         guard backend.isReady else {
             print("AI post-processing skipped, \(backend) is not ready: using the raw transcription")
-            return text
+            return failed("Backend not ready")
         }
 
         do {
@@ -113,7 +136,7 @@ public enum LLMPostProcessor {
             // on top of that runs only for backends that ask for it (the small built-in model), and
             // an active app profile relaxes its shrink floor because those rules condense on
             // purpose — see `passesLengthGuard`.
-            guard !result.isEmpty else { return text }
+            guard !result.isEmpty else { return failed("Empty reply") }
             // Every backend, whatever the input length: a model with next to nothing to correct
             // can answer with its own instructions, which would then be pasted (#147).
             let shipped = shippedInstructions(generalCleanup: general,
@@ -127,20 +150,21 @@ public enum LLMPostProcessor {
                                               style: style)
             if echoesPrompt(output: result, system: shipped, input: text) {
                 print("AI post-processing returned its own instructions, using the raw transcription")
-                return text
+                return failed("The model repeated its instructions")
             }
             if backend.enforcesLengthRatio,
                !passesLengthGuard(input: text, output: result, condensingAllowed: prof != nil) {
-                return text
+                return failed("The reply was too long or too short")
             }
             if writesLists, listRepeatsText(input: text, output: result) {
                 print("AI post-processing kept the sentence next to its list, running it again without lists")
-                return await process(text, bundleID: bundleID, translating: translating, style: style)
+                return await run(text, bundleID: bundleID, translating: translating, writesLists: false,
+                                 style: style, backend: backend)
             }
-            return result
+            return CleanupOutcome(text: result, status: .cleaned(model: model))
         } catch {
             print("AI post-processing failed, using the raw transcription: \(error)")
-            return text
+            return failed(error.localizedDescription)
         }
     }
 
@@ -520,6 +544,12 @@ public enum LLMPostProcessor {
     /// Probes the Ollama server for the settings "Test" button. Forwards to `OllamaBackend`.
     public static func checkOllamaConnection(endpoint: String, model: String) async -> LLMStatus {
         await OllamaBackend.checkConnection(endpoint: endpoint, model: model)
+    }
+
+    /// Sends a minimal chat request to a Remote cleanup server for the settings "Test Connection".
+    /// Forwards to `RemoteBackend`.
+    public static func checkRemoteChat(endpoint: String, model: String, apiKey: String) async -> LLMStatus {
+        await RemoteBackend.probe(endpoint: endpoint, model: model, apiKey: apiKey)
     }
 
     // MARK: - Remote (OpenAI-compatible) endpoint helpers

@@ -23,11 +23,12 @@ enum HistoryRestyle {
     static func run(_ recording: Recording, in style: WritingStyle) async {
         let prefs = AppPreferences.shared
         let engineText = recording.rawTranscription ?? recording.transcription
-        let cleaned = await LLMPostProcessor.process(prefs.cleanTranscription(engineText), bundleID: nil,
-                                                     style: style.instructions)
-        let text = prefs.expandSnippets(cleaned)
+        let cleanup = await LLMPostProcessor.processWithOutcome(prefs.cleanTranscription(engineText), bundleID: nil,
+                                                                style: style.instructions)
+        let text = prefs.expandSnippets(cleanup.text)
         do {
-            try await RecordingStore.shared.restyle(recording, transcription: text, styleUsed: label(for: style))
+            try await RecordingStore.shared.restyle(recording, transcription: text, styleUsed: label(for: style),
+                                                    cleanup: cleanup)
         } catch {
             IndicatorWindowManager.shared.flash(.error(String(localized: "Couldn't save the rewritten text")))
         }
