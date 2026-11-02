@@ -5245,52 +5245,6 @@
         }
       }
     },
-    "Names, jargon, product names: OpenSuperWhisper spells them right and recognises them better.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Namen, Fachbegriffe, Produktnamen: OpenSuperWhisper schreibt sie richtig und erkennt sie besser."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nombres, jerga, nombres de productos: OpenSuperWhisper los escribe bien y los reconoce mejor."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Noms, jargon, noms de produits : OpenSuperWhisper les orthographie correctement et les reconnaît mieux."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nomi, gergo, nomi di prodotti: OpenSuperWhisper li scrive correttamente e li riconosce meglio."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nomes, jargões, nomes de produtos: o OpenSuperWhisper os escreve certo e os reconhece melhor."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tên riêng, thuật ngữ, tên sản phẩm: OpenSuperWhisper sẽ viết đúng và nhận dạng tốt hơn."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "人名、行话、产品名:OpenSuperWhisper 会正确拼写,并且识别得更准。"
-          }
-        }
-      }
-    },
     "Near cursor": {
       "localizations": {
         "fr": {
@@ -56521,6 +56475,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "未检测到声音。麦克风打开了吗？"
+          }
+        }
+      }
+    },
+    "Names, jargon, product names: OpenSuperWhisper writes them the way you spell them.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noms, jargon, noms de produits : OpenSuperWhisper les écrit comme vous les écrivez."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Namen, Fachbegriffe, Produktnamen: OpenSuperWhisper schreibt sie so, wie Sie sie schreiben."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombres, jerga, nombres de productos: OpenSuperWhisper los escribe como usted los escribe."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomi, gergo, nomi di prodotti: OpenSuperWhisper li scrive come li scrivi tu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomes, jargões, nomes de produtos: o OpenSuperWhisper escreve do jeito que você escreve."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên riêng, thuật ngữ, tên sản phẩm: OpenSuperWhisper viết đúng như cách bạn viết."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "人名、行话、产品名：OpenSuperWhisper 会按你的写法来写。"
           }
         }
       }

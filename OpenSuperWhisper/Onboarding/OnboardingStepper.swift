@@ -42,7 +42,7 @@ enum OnboardingStep: Int, CaseIterable, Comparable {
         switch self {
         case .shortcut: return "Pick the gesture that feels natural."
         case .model: return "One download, then dictation runs on your Mac."
-        case .words: return "Names, jargon, product names: OpenSuperWhisper spells them right and recognises them better."
+        case .words: return "Names, jargon, product names: OpenSuperWhisper writes them the way you spell them."
         case .permissions: return "Each permission has a reason. You stay in control."
         case .firstTry: return "Say whatever comes to mind."
         }
