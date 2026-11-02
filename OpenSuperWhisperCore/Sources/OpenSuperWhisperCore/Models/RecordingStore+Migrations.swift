@@ -94,7 +94,7 @@ extension RecordingStore {
 
         // Nullable for the same reason as v6: older rows never recorded a cleanup pass, and an older
         // build that opens the file afterwards still writes without knowing the columns.
-        migrator.registerMigration("v9_add_cleanup_outcome") { db in
+        migrator.registerMigration("v10_add_cleanup_outcome") { db in
             let columnNames = try db.columns(in: Recording.databaseTableName).map { $0.name }
             for column in ["cleanupModel", "cleanupError"] where !columnNames.contains(column) {
                 try db.alter(table: Recording.databaseTableName) { t in
