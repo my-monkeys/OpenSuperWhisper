@@ -69,6 +69,12 @@ final class RichListPasteTests: XCTestCase {
         XCTAssertFalse(RichListPaste.writesPlainLists(nil))
     }
 
+    /// Notion turns plain "- [ ] " lines into to-do blocks; bullets would show the brackets.
+    func testTaskItemsArePastedPlain() {
+        XCTAssertNil(RichListPaste.richText(for: "Today:\n- [ ] call Anna\n- [ ] book the room",
+                                            into: "notion.id"))
+    }
+
     func testTextWithoutAListStaysPlain() {
         XCTAssertNil(RichListPaste.blocks(of: "Bread, chips and ice cream."))
         XCTAssertNil(RichListPaste.blocks(of: "First line\nsecond line"))

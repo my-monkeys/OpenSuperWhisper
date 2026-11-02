@@ -152,6 +152,9 @@ struct AppShellView: View {
             case .style:
                 StylePage(viewModel: viewModel)
                     .background(STheme.windowBg)
+            case .perApp:
+                PerAppPage(viewModel: viewModel)
+                    .background(STheme.windowBg)
             }
         }
     }

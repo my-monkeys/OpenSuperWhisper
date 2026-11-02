@@ -1,7 +1,7 @@
 import AppKit
 import OpenSuperWhisperCore
 
-/// One row of Style → Per app: everything customised for one app, or the model chosen for one
+/// One row of the Per app page: everything customised for one app, or the model chosen for one
 /// site. Built from the three stores that already existed (insertion rules, formatting profiles,
 /// model rules), which keep their formats; the row is only a view over them.
 struct PerAppEntry: Identifiable, Equatable {

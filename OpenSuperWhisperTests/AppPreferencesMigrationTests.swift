@@ -48,7 +48,8 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         XCTAssertEqual(scratch.writtenKeys,
                        ["appContextProfilesData", "appInsertionRulesData", "didSeedAppContextPresets",
-                        "didSeedTerminalInsertionRules", "indicatorLayout", "recordingTriggers"])
+                        "didSeedTerminalInsertionRules", "indicatorLayout", "offeredAppContextPresets",
+                        "recordingTriggers"])
         XCTAssertEqual(prefs.selectedEngine, "whisper")
         XCTAssertNil(defaults.object(forKey: "aiBackend"))
     }
@@ -354,17 +355,84 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
     // MARK: - App-context presets
 
-    func testPresetsAreSeededOnceIntoAnEmptyList() {
+    func testAFreshInstallGetsEveryBuiltInProfile() {
         prefs.runMigrations()
 
-        XCTAssertEqual(prefs.appContextProfiles.map(\.bundleIdentifier),
-                       ["com.tinyspeck.slackmacgap", "com.apple.Terminal"])
+        XCTAssertEqual(prefs.appContextProfiles, AppContextProfile.defaultPresets)
+        XCTAssertEqual(prefs.offeredAppContextPresets, AppContextProfile.defaultPresets.map(\.bundleIdentifier))
         XCTAssertTrue(prefs.didSeedAppContextPresets)
 
         prefs.appContextProfiles = []
         prefs.runMigrations()
 
         XCTAssertEqual(prefs.appContextProfiles, [], "deleted presets stay deleted")
+    }
+
+    /// An install from before #271: seeded with Slack and Terminal, nothing recorded.
+    private func seedAsBeforeTheListGrew(_ profiles: [AppContextProfile]) {
+        prefs.appContextProfiles = profiles
+        prefs.didSeedAppContextPresets = true
+    }
+
+    func testAnExistingInstallGetsOnlyTheNewProfilesAfterItsOwn() {
+        seedAsBeforeTheListGrew(AppContextProfile.firstShippedPresets)
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.appContextProfiles, AppContextProfile.defaultPresets)
+        XCTAssertEqual(prefs.offeredAppContextPresets, AppContextProfile.defaultPresets.map(\.bundleIdentifier))
+    }
+
+    func testAnEditedProfileIsLeftAsTheUserWroteIt() {
+        var slack = AppContextProfile.slackPreset
+        slack.instructions = "Only mentions."
+        seedAsBeforeTheListGrew([slack, .terminalPreset])
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.appContextProfiles.first, slack)
+        XCTAssertEqual(prefs.appContextProfiles.count, AppContextProfile.defaultPresets.count)
+    }
+
+    func testADeletedProfileDoesNotComeBack() {
+        seedAsBeforeTheListGrew([.slackPreset])
+
+        prefs.runMigrations()
+
+        XCTAssertFalse(prefs.appContextProfiles.contains { $0.bundleIdentifier == "com.apple.Terminal" })
+        XCTAssertEqual(prefs.appContextProfiles.count, AppContextProfile.defaultPresets.count - 1)
+    }
+
+    func testAProfileDeletedAfterTheMigrationStaysDeletedOnTheNextLaunch() {
+        seedAsBeforeTheListGrew(AppContextProfile.firstShippedPresets)
+        prefs.runMigrations()
+        prefs.appContextProfiles.removeAll { $0.bundleIdentifier == "com.apple.Notes" }
+
+        prefs.runMigrations()
+
+        XCTAssertFalse(prefs.appContextProfiles.contains { $0.bundleIdentifier == "com.apple.Notes" })
+    }
+
+    func testAUsersOwnProfileForAnAppKeepsItsBuiltInOneFromBeingAddedBesideIt() {
+        let own = AppContextProfile(bundleIdentifier: "com.apple.notes", appName: "Notes", instructions: "mine")
+        seedAsBeforeTheListGrew(AppContextProfile.firstShippedPresets + [own])
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.appContextProfiles.filter {
+            $0.bundleIdentifier.lowercased() == "com.apple.notes"
+        }, [own])
+    }
+
+    func testAPresetAddedLaterIsOfferedOnceToAnInstallThatRecordedTheOthers() {
+        let all = AppContextProfile.defaultPresets
+        seedAsBeforeTheListGrew(Array(all.dropLast()))
+        prefs.offeredAppContextPresets = all.dropLast().map(\.bundleIdentifier)
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.appContextProfiles, all)
+        XCTAssertEqual(prefs.offeredAppContextPresets, all.map(\.bundleIdentifier))
     }
 
     func testPresetsNeverClobberUserProfiles() {
@@ -375,6 +443,8 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         XCTAssertEqual(prefs.appContextProfiles, [own])
         XCTAssertTrue(prefs.didSeedAppContextPresets)
+        XCTAssertEqual(prefs.offeredAppContextPresets, AppContextProfile.defaultPresets.map(\.bundleIdentifier),
+                       "never seeded here, so nothing is added later either")
     }
 
     // MARK: - Terminal insertion rules (#85)

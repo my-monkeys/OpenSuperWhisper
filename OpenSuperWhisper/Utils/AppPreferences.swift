@@ -452,6 +452,11 @@ final class AppPreferences {
     @UserDefault(key: "feedbackPromptLaunches", defaultValue: 0)
     var feedbackPromptLaunches: Int
 
+    /// Keep a copy of the portable settings in iCloud Drive (`ICloudSettingsBackup`). Local to
+    /// this Mac: a backup that switched itself on elsewhere would overwrite the one it came from.
+    @UserDefault(key: "iCloudSettingsBackupEnabled", defaultValue: false)
+    var iCloudSettingsBackupEnabled: Bool
+
     /// Raw store for `crashReportMode`. A plain string so an unknown value from a newer build reads
     /// as the default rather than failing to decode.
     @UserDefault(key: "crashReportMode", defaultValue: CrashReportMode.default.rawValue)
@@ -839,14 +844,39 @@ final class AppPreferences {
     @UserDefault(key: "didSeedAppContextPresets", defaultValue: false)
     var didSeedAppContextPresets: Bool
 
-    /// One-time seed of the bundled app-context presets (Slack). Only populates an empty list so
-    /// it never clobbers user-authored profiles, and only runs once (the flag persists the choice).
+    /// Bundle identifiers of the built-in profiles this install has been offered, whether the
+    /// user kept, edited or deleted them. A profile in `AppContextProfile.defaultPresets` that is
+    /// not listed here is new to this install and gets added; one that is listed never comes back.
+    @UserDefault(key: "offeredAppContextPresets", defaultValue: [String]())
+    var offeredAppContextPresets: [String]
+
+    /// Seeds the bundled app-context presets. The first run only populates an empty list, so it
+    /// never clobbers user-authored profiles. Every later run appends the presets added to the app
+    /// since, once each: existing profiles are left as they are, and a user's own profile for an
+    /// app keeps the app's built-in one from being added next to it.
     private func seedAppContextPresetsIfNeeded() {
-        guard !didSeedAppContextPresets else { return }
-        if appContextProfiles.isEmpty {
-            appContextProfiles = AppContextProfile.defaultPresets
+        if !didSeedAppContextPresets {
+            if appContextProfiles.isEmpty {
+                appContextProfiles = AppContextProfile.defaultPresets
+            }
+            offeredAppContextPresets = AppContextProfile.defaultPresets.map(\.bundleIdentifier)
+            didSeedAppContextPresets = true
+            return
         }
-        didSeedAppContextPresets = true
+        if offeredAppContextPresets.isEmpty {
+            // Seeded by a build from before the list was recorded: it offered the first two.
+            offeredAppContextPresets = AppContextProfile.firstShippedPresets.map(\.bundleIdentifier)
+        }
+        let fresh = AppContextProfile.defaultPresets.filter { !offeredAppContextPresets.contains($0.bundleIdentifier) }
+        guard !fresh.isEmpty else { return }
+        var profiles = appContextProfiles
+        for preset in fresh where !profiles.contains(where: {
+            $0.bundleIdentifier.caseInsensitiveCompare(preset.bundleIdentifier) == .orderedSame
+        }) {
+            profiles.append(preset)
+        }
+        appContextProfiles = profiles
+        offeredAppContextPresets += fresh.map(\.bundleIdentifier)
     }
 
     /// Flips true once the terminal paste rules have been seeded, so a user who deletes them keeps

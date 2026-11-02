@@ -91,17 +91,8 @@ public class TranscriptionQueue: ObservableObject {
 
         let recordingsToDelete = await Task.detached(priority: .utility) {
             var toDelete: [Recording] = []
-            for recording in pendingRecordings {
-                guard let sourceURLString = recording.sourceFileURL,
-                      !sourceURLString.isEmpty else {
-                    toDelete.append(recording)
-                    continue
-                }
-
-                let sourceURL = URL(fileURLWithPath: sourceURLString)
-                if !FileManager.default.fileExists(atPath: sourceURL.path) {
-                    toDelete.append(recording)
-                }
+            for recording in pendingRecordings where Self.existingAudioSource(of: recording) == nil {
+                toDelete.append(recording)
             }
             return toDelete
         }.value
@@ -154,18 +145,11 @@ public class TranscriptionQueue: ObservableObject {
         if let model {
             modelOverrides[recording.id] = model
         }
-        let sourceURL: URL? = await Task.detached(priority: .userInitiated) {
-            if let existingSource = recording.sourceFileURL,
-               !existingSource.isEmpty,
-               FileManager.default.fileExists(atPath: existingSource) {
-                return URL(fileURLWithPath: existingSource)
-            } else if FileManager.default.fileExists(atPath: recording.url.path) {
-                return recording.url
-            }
-            return nil
+        let sourceURL = await Task.detached(priority: .userInitiated) {
+            Self.existingAudioSource(of: recording)
         }.value
-        
-        guard let sourceURL = sourceURL else {
+
+        guard sourceURL != nil else {
             await recordingStore.updateRecordingProgressOnlySync(
                 recording.id,
                 transcription: "Cannot regenerate: audio file not found",
@@ -182,13 +166,18 @@ public class TranscriptionQueue: ObservableObject {
             isRegeneration: true
         )
 
-        do {
-            try await recordingStore.updateSourceFileURL(recording.id, sourceURL: sourceURL.path)
-        } catch {
-            print("Failed to update source URL: \(error)")
-        }
-
         startProcessingQueue()
+    }
+
+    /// Where a recording's audio can be read now. An import keeps its original file; a dictation
+    /// has no `sourceFileURL` and is read from its own file. The rerun must not save that file as
+    /// the source, or Home would show the dictation as an imported file named after its .wav.
+    nonisolated static func existingAudioSource(of recording: Recording) -> URL? {
+        if let source = recording.sourceFileURL, !source.isEmpty,
+           FileManager.default.fileExists(atPath: source) {
+            return URL(fileURLWithPath: source)
+        }
+        return FileManager.default.fileExists(atPath: recording.url.path) ? recording.url : nil
     }
 
     private func processQueue() async {
@@ -225,24 +214,11 @@ public class TranscriptionQueue: ObservableObject {
             return
         }
 
-        guard let sourceURLString = recording.sourceFileURL,
-              !sourceURLString.isEmpty else {
-            await recordingStore.updateRecordingProgressOnlySync(
-                recording.id,
-                transcription: "Source file not found",
-                progress: 0.0,
-                status: .failed
-            )
-            return
-        }
-
-        let sourceURL = URL(fileURLWithPath: sourceURLString)
-
-        let sourceExists = await Task.detached(priority: .userInitiated) {
-            FileManager.default.fileExists(atPath: sourceURL.path)
+        let sourceURL = await Task.detached(priority: .userInitiated) {
+            Self.existingAudioSource(of: recording)
         }.value
-        
-        guard sourceExists else {
+
+        guard let sourceURL else {
             await recordingStore.updateRecordingProgressOnlySync(
                 recording.id,
                 transcription: "Source file not found",

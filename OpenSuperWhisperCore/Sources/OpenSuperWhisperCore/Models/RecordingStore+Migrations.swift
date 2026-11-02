@@ -92,6 +92,16 @@ extension RecordingStore {
             }
         }
 
+        // Regenerating used to save a dictation's own recordings/<fileName> as its source file,
+        // which made Home show it as an imported file titled with the .wav name (#274). Matched
+        // on the path's tail because the storage root differs between machines.
+        migrator.registerMigration("v9_clear_own_recording_source") { db in
+            try db.execute(sql: """
+                UPDATE recordings SET sourceFileURL = NULL
+                WHERE substr(sourceFileURL, -length('/recordings/' || fileName)) = '/recordings/' || fileName
+                """)
+        }
+
         // Nullable for the same reason as v6: older rows never recorded a cleanup pass, and an older
         // build that opens the file afterwards still writes without knowing the columns.
         migrator.registerMigration("v10_add_cleanup_outcome") { db in
