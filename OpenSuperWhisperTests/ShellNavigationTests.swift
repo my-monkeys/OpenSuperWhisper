@@ -41,6 +41,16 @@ final class ShellNavigationTests: XCTestCase {
         XCTAssertEqual(navigation.settingsRubric, .appearance)
     }
 
+    /// Per app was the lower half of Style (#257); the links that used to land on Style for it go
+    /// to its own tab, which sits right after Style.
+    func testPerAppIsItsOwnPageRightAfterStyle() {
+        let pages = AppPage.allCases
+        XCTAssertEqual(pages.firstIndex(of: .perApp), pages.firstIndex(of: .style).map { $0 + 1 })
+
+        navigation.go(.perApp)
+        XCTAssertEqual(navigation.page, .perApp)
+    }
+
     func testTheSettingsStayOpenWhileTheTextSizeChanges() async throws {
         // Advanced on and the smallest window, so the rubric is long enough to scroll.
         AdvancedRubrics.shared.set(SettingsRubric.appearance.rawValue, true)

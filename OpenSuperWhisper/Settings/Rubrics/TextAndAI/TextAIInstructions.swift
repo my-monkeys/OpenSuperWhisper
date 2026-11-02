@@ -1,7 +1,7 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// The cleanup instruction: two halves the user owns, with the matching per-app rule from Style
+/// The cleanup instruction: two halves the user owns, with the matching per-app rule
 /// and the dictionary's words (#169) sandwiched between them, and nothing else wrapped around
 /// either.
 ///
@@ -14,7 +14,7 @@ struct TextAIInstructions: View {
     var body: some View {
         if viewModel.aiPostProcessingEnabled {
             promptRow("Opening instruction",
-                      hint: "Any matching per-app rule from Style is inserted after it.",
+                      hint: "Any matching per-app rule is inserted after it.",
                       half: .opening,
                       text: $viewModel.aiPostProcessingPrompt,
                       defaultText: LLMPostProcessor.defaultInstruction,
@@ -36,7 +36,7 @@ struct TextAIInstructions: View {
     private var explanation: LocalizedStringKey {
         viewModel.aiPostProcessingEnabled
             ? "Together these two are the system prompt. Nothing goes between them but any app rule and, while the dictionary is on, its words that are in the dictation, so the model keeps them spelled your way. The closing half stays the model's last word. A small model tends to answer in the language the prompt is written in, so write it in the language you dictate."
-            : "Sent after your per-app rules from Style, as the model's last word. It is the only thing standing between a dictated question and a model that answers it, so keep something in it. A small model tends to answer in the language the prompt is written in, so write it in the language you dictate."
+            : "Sent after your per-app rules, as the model's last word. It is the only thing standing between a dictated question and a model that answers it, so keep something in it. A small model tends to answer in the language the prompt is written in, so write it in the language you dictate."
     }
 
     @ViewBuilder private var failureLine: some View {

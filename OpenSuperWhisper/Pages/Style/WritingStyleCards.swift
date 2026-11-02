@@ -106,7 +106,7 @@ struct WritingStyleCards: View {
 
     @ViewBuilder private var footer: some View {
         if viewModel.aiPostProcessingEnabled {
-            Text("Styles shape AI cleanup. An app can have its own style in its row below. Pro, Personal and your own styles follow their instructions best with Apple Intelligence or a 7B model.")
+            Text("Styles shape AI cleanup. An app can have its own style on the Per app page. Pro, Personal and your own styles follow their instructions best with Apple Intelligence or a 7B model.")
                 .scaledFont(size: 13)
                 .foregroundColor(STheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

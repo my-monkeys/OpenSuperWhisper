@@ -3,7 +3,7 @@ import OpenSuperWhisperCore
 
 /// The global switches behind the per-app list: whether model rules apply, whether per-app
 /// formatting runs, and the default typing pace.
-struct StyleRulesGroup: View {
+struct PerAppRulesGroup: View {
     @ObservedObject var viewModel: SettingsViewModel
     /// Context-aware model selection only makes sense with two or more usable models.
     let hasModelChoice: Bool

@@ -41,8 +41,19 @@ enum UISnapshotProbe {
         },
         "dictionary-suggestion-notice": { suggestionNotice() },
         "dictionary-suggestion-notice-large-text": { suggestionNotice(textScale: TextScale.maximum) },
-        "style": { seedStyle(); return AnyView(AppShellView(page: .style)) },
-        "style-expanded": { seedStyle(expandFirst: true); return AnyView(AppShellView(page: .style)) },
+        "style": { AnyView(AppShellView(page: .style)) },
+        "style-large-text": {
+            AppPreferences.shared.textScale = TextScale.maximum
+            return AnyView(AppShellView(page: .style))
+        },
+        "per-app": { seedPerApp(); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-expanded": { seedPerApp(expandFirst: true); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-empty": { AnyView(AppShellView(page: .perApp)) },
+        "per-app-large-text": {
+            seedPerApp()
+            AppPreferences.shared.textScale = TextScale.maximum
+            return AnyView(AppShellView(page: .perApp))
+        },
         "settings-models-remote": {
             let prefs = AppPreferences.shared
             prefs.selectedEngine = "remote"

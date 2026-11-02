@@ -8,7 +8,7 @@ struct TextAICleanupGroup: View {
     /// The stock pattern, as `AppPreferences` declares it. Kept here to tell a customised one apart.
     static let defaultFillerPattern = "\\b(um|uh|uh huh|er|ah|hmm|mm)\\b,?\\s*"
 
-    /// One backend serves both this prose cleanup and the per-app formatting rules in Style, so
+    /// One backend serves both this prose cleanup and the per-app formatting rules, so
     /// its fields stay visible while either is on: someone using formatting only would otherwise
     /// have nowhere to pick a backend or download a model.
     private var showsEngine: Bool {
@@ -28,7 +28,7 @@ struct TextAICleanupGroup: View {
             }
             if showsEngine {
                 if !viewModel.aiPostProcessingEnabled {
-                    SettingNotice("The engine below is used by the per-app formatting rules in Style.")
+                    SettingNotice("The engine below is used by the per-app formatting rules.")
                 }
                 engineRow
                 TextAIBackendFields(viewModel: viewModel)
