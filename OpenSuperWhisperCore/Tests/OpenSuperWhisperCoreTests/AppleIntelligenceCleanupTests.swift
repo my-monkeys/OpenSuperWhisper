@@ -53,6 +53,9 @@ final class AppleIntelligenceCleanupTests: CoreTestCase {
         prefs.aiPostProcessingEnabled = true
         prefs.aiPostProcessingPrompt = "OPEN"
         prefs.aiPostProcessingClosing = "CLOSE"
+        // The instructions here are the two halves; the spoken punctuation section has its own
+        // tests (`SpokenFormattingPromptTests`).
+        prefs.aiSpokenFormattingEnabled = false
     }
 
     override func tearDown() {
