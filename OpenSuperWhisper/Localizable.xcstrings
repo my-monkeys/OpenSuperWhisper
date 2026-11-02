@@ -41953,7 +41953,7 @@
         }
       }
     },
-    "Will be chosen on the Style page.": {
+    "Chosen on the Style page.": {
       "localizations": {
         "de": {
           "stringUnit": {
@@ -41964,37 +41964,37 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Se elegirá en la página Estilo."
+            "value": "Se elige en la página Estilo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sera choisi sur la page Style."
+            "value": "À choisir sur la page Style."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verrà scelto nella pagina Stile."
+            "value": "Si sceglie nella pagina Stile."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Será escolhido na página Estilo."
+            "value": "Escolhido na página Estilo."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sẽ được chọn trong trang Phong cách."
+            "value": "Chọn trong trang Phong cách."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将在“样式”页面中选择。"
+            "value": "在“样式”页面中选择。"
           }
         }
       }

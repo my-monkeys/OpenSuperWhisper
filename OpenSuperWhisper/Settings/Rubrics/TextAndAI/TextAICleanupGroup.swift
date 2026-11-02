@@ -41,7 +41,7 @@ struct TextAICleanupGroup: View {
                         .foregroundColor(STheme.hint)
                 }
             }
-            SettingRow("Default style", hint: "Will be chosen on the Style page.", badge: ("Soon", .soon)) {
+            SettingRow("Default style", hint: "Chosen on the Style page.") {
                 Button("Style →") {
                     AppNavigation.shared.closeSettings()
                     AppNavigation.shared.go(.style)

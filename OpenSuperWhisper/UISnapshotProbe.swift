@@ -92,6 +92,7 @@ enum UISnapshotProbe {
             AppPreferences.shared.aiPostProcessingEnabled = true
             return scrolled(.textAndAI, to: "Format with AI")
         },
+        "settings-textAndAI-default-style": { scrolled(.textAndAI, to: "Default style") },
         "settings-textAndAI-prompts": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             AppPreferences.shared.aiBackend = "builtin"
