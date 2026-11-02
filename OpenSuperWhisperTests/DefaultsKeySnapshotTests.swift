@@ -33,6 +33,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "aiRemoteDisableReasoning",
         "aiRemoteEndpoint",
         "aiRemoteModel",
+        "aiSpokenFormattingEnabled",
         "appAppearance",
         "appContextFormattingEnabled",
         "appContextProfilesData",
@@ -278,6 +279,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("aiPostProcessingPrompt") { prefs.aiPostProcessingPrompt = "open" }
         assertWrites("aiPostProcessingClosing") { prefs.aiPostProcessingClosing = "close" }
         assertWrites("aiPostProcessingTranslation") { prefs.aiPostProcessingTranslation = "translate" }
+        assertWrites("aiSpokenFormattingEnabled") { prefs.aiSpokenFormattingEnabled = false }
         assertWrites("appContextFormattingEnabled") { prefs.appContextFormattingEnabled = true }
         assertWrites("typingPaceMilliseconds") { prefs.typingPaceMilliseconds = 9 }
         assertWrites("appInsertionRulesData") {
@@ -460,6 +462,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.aiPostProcessingPrompt, ShippedCleanupPrompts.opening)
         XCTAssertEqual(prefs.aiPostProcessingClosing, ShippedCleanupPrompts.closing)
         XCTAssertEqual(prefs.aiPostProcessingTranslation, ShippedCleanupPrompts.translation)
+        XCTAssertEqual(prefs.aiSpokenFormattingEnabled, true)
         XCTAssertEqual(prefs.appContextFormattingEnabled, false)
         XCTAssertEqual(prefs.typingPaceMilliseconds, 2)
         XCTAssertEqual(prefs.appInsertionRules, [])

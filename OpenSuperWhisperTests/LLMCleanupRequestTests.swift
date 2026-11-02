@@ -110,6 +110,9 @@ final class LLMCleanupRequestTests: XCTestCase {
         prefs.aiPostProcessingEnabled = true
         prefs.aiPostProcessingPrompt = "OPEN"
         prefs.aiPostProcessingClosing = "CLOSE"
+        // These pin the wire format around the two halves; whether the spoken punctuation
+        // section joins the prompt is `SpokenFormattingPromptTests`' business.
+        prefs.aiSpokenFormattingEnabled = false
         prefs.aiOllamaEndpoint = Self.endpoint
         prefs.aiOllamaModel = "llama3.2:3b"
         prefs.aiRemoteEndpoint = "\(LLMStubProtocol.host)/v1/"
@@ -181,7 +184,8 @@ final class LLMCleanupRequestTests: XCTestCase {
     }
 
     /// What a fresh install sends once cleanup is switched on and nothing else is touched: both
-    /// shipped halves, joined by one blank line.
+    /// shipped halves with the spoken punctuation section between them (#265), joined by blank
+    /// lines.
     func testOllamaRequestWithTheShippedPrompts() async throws {
         scratch.wipe()
         prefs.aiPostProcessingEnabled = true
@@ -194,7 +198,8 @@ final class LLMCleanupRequestTests: XCTestCase {
         let messages = try XCTUnwrap(try onlyRequest().json["messages"] as? [[String: String]])
         XCTAssertEqual(messages.first?["role"], "system")
         XCTAssertEqual(messages.first?["content"],
-                       ShippedCleanupPrompts.opening + "\n\n" + ShippedCleanupPrompts.closing)
+                       ShippedCleanupPrompts.opening + "\n\n" + LLMPostProcessor.spokenFormattingInstruction
+                       + "\n\n" + ShippedCleanupPrompts.closing)
     }
 
     /// The dictionary's words in the dictation go between the two halves while the dictionary is

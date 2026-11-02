@@ -108,6 +108,7 @@ public enum LLMPostProcessor {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return notRun }
 
         let prof = formatting ? profile(for: bundleID, in: prefs.appContextProfiles) : nil
+        let spokenFormatting = general && prefs.aiSpokenFormattingEnabled
         let vocabulary = prefs.customDictionaryEnabled
             ? cleanupVocabulary(CustomDictionary.boostTerms(entries: prefs.customDictionaryEntries), in: text) : []
         guard let system = assembleSystemPrompt(generalCleanup: general,
@@ -118,6 +119,7 @@ public enum LLMPostProcessor {
                                                 translationPrompt: prefs.aiPostProcessingTranslation,
                                                 vocabulary: vocabulary,
                                                 writesLists: writesLists,
+                                                spokenFormatting: spokenFormatting,
                                                 style: style)
         else { return notRun }
 
@@ -150,6 +152,7 @@ public enum LLMPostProcessor {
                                               translationPrompt: prefs.aiPostProcessingTranslation,
                                               vocabulary: vocabulary,
                                               writesLists: writesLists,
+                                              spokenFormatting: spokenFormatting,
                                               style: style)
             if echoesPrompt(output: result, system: shipped, input: text) {
                 print("AI post-processing returned its own instructions, using the raw transcription")
@@ -237,6 +240,22 @@ public enum LLMPostProcessor {
         came from: never write both. Questions, opinions and stories stay as sentences.
         """
 
+    /// Added while "Spoken punctuation" is on (#265). People who dictate say "comma" or "entre
+    /// parenthèses" out of habit, from the dictation tools that always took those as commands,
+    /// and the plain cleanup contract writes them out as words. The last sentence keeps a word
+    /// that only sounds like a command ("le point de départ") a word.
+    public static let spokenFormattingInstruction = """
+        The speaker may dictate punctuation and layout as words, in any language. When such a \
+        word is meant as a command, write what it asks for instead of the word: "comma" or \
+        "virgule" is ",", "period", "full stop" or "point" ending a sentence is ".", "question \
+        mark" or "point d'interrogation" is "?", "colon" or "deux-points" is ":", "open \
+        parenthesis ... close parenthesis", "ouvrez la parenthèse ... fermez la parenthèse", "in \
+        parentheses ..." or "entre parenthèses ..." put the words they enclose in "( )", "new \
+        line" or "à la ligne" starts a new line, and "new paragraph" or "nouveau paragraphe" \
+        leaves a blank line. When the word is part of the sentence, as in "le point de départ" \
+        or "a comma-separated list", keep it as a word.
+        """
+
     /// A list written in place of the sentence has about as many words as the dictation, often
     /// fewer ("and", "then" go). Every reply that kept the sentence too came out at 1.7x or more,
     /// every reshaped one at 1.15x or less.
@@ -282,6 +301,7 @@ public enum LLMPostProcessor {
                                     translationPrompt: String,
                                     vocabulary: [String] = [],
                                     writesLists: Bool = false,
+                                    spokenFormatting: Bool = false,
                                     style: String = "") -> String {
         func isShipped(_ text: String, _ shipped: [String]) -> Bool {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -299,6 +319,9 @@ public enum LLMPostProcessor {
         }
         if let spellings = vocabularySection(vocabulary) {
             sections.append(spellings)
+        }
+        if spokenFormatting {
+            sections.append(spokenFormattingInstruction)
         }
         if writesLists {
             sections.append(listInstruction)
@@ -320,6 +343,7 @@ public enum LLMPostProcessor {
                                      translationPrompt: String = "",
                                      vocabulary: [String] = [],
                                      writesLists: Bool = false,
+                                     spokenFormatting: Bool = false,
                                      style: String = "") -> String? {
         guard generalCleanup || profile != nil else { return nil }
 
@@ -342,6 +366,11 @@ public enum LLMPostProcessor {
         // the translation note, and one the closing guardrail must still come after.
         if let spellings = vocabularySection(vocabulary) {
             sections.append(spellings)
+        }
+        // Commands said in the dictation, and so a part of general cleanup: next to the list
+        // request, which shapes the text the same way and may follow from a dictated line break.
+        if spokenFormatting {
+            sections.append(spokenFormattingInstruction)
         }
         // A request about the shape of the text, like the spellings: the app's own rules and the
         // closing guardrail still come after it.

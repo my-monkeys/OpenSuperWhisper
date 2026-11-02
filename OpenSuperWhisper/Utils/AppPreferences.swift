@@ -756,6 +756,12 @@ final class AppPreferences {
     // Sent only while "Translate to English" is on. Kept apart from the general instruction
     // because a prompt that mentions translating confuses the model on every dictation that
     // isn't one (#86).
+    // Spoken punctuation and layout ("virgule", "à la ligne", "entre parenthèses") written as
+    // what they ask for during the cleanup pass (#265). On by default: it is what anyone who
+    // says them expects, and it only acts while cleanup itself is on.
+    @UserDefault(key: "aiSpokenFormattingEnabled", defaultValue: true)
+    var aiSpokenFormattingEnabled: Bool
+
     @UserDefault(key: "aiPostProcessingTranslation",
                  defaultValue: LLMPostProcessor.defaultTranslationInstruction)
     var aiPostProcessingTranslation: String

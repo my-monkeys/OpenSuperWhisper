@@ -48107,52 +48107,6 @@
         }
       }
     },
-    "A pasted list becomes real bullets or numbers in apps that take formatted text, like Notes, Mail, Slack, Notion, Word and browsers. Everywhere else, terminals and code editors included, it stays as “- ” lines. With AI cleanup on, a spoken enumeration is written as a list for those apps.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eine eingefügte Liste wird zu echten Aufzählungspunkten oder Nummern in Apps, die formatierten Text annehmen, etwa Notizen, Mail, Slack, Notion, Word und Browser. Überall sonst, auch in Terminals und Code-Editoren, bleibt sie als „- “-Zeilen. Mit aktiver KI-Bereinigung wird eine gesprochene Aufzählung für diese Apps als Liste geschrieben."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Una lista pegada se convierte en viñetas o números reales en apps que admiten texto con formato, como Notas, Mail, Slack, Notion, Word y los navegadores. En el resto, terminales y editores de código incluidos, se queda en líneas “- ”. Con la limpieza con IA activada, una enumeración dictada se escribe como lista para esas apps."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Une liste collée devient de vraies puces ou de vrais numéros dans les apps qui acceptent le texte mis en forme, comme Notes, Mail, Slack, Notion, Word et les navigateurs. Partout ailleurs, terminaux et éditeurs de code compris, elle reste en lignes « - ». Avec le nettoyage IA, une énumération dictée est écrite en liste pour ces apps."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un elenco incollato diventa un vero elenco puntato o numerato nelle app che accettano testo formattato, come Note, Mail, Slack, Notion, Word e i browser. Altrove, terminali ed editor di codice compresi, resta come righe “- ”. Con la pulizia IA attiva, un'enumerazione dettata viene scritta come elenco per quelle app."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uma lista colada vira marcadores ou números de verdade em apps que aceitam texto formatado, como Notas, Mail, Slack, Notion, Word e navegadores. Em todos os outros, incluindo terminais e editores de código, fica como linhas “- ”. Com a limpeza por IA ativada, uma enumeração falada é escrita como lista para esses apps."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Danh sách được dán sẽ thành dấu đầu dòng hoặc số thật trong ứng dụng nhận văn bản có định dạng, như Ghi chú, Mail, Slack, Notion, Word và trình duyệt. Ở mọi nơi khác, kể cả terminal và trình soạn mã, nó vẫn là các dòng “- ”. Khi bật Dọn dẹp AI, phần liệt kê bằng lời sẽ được viết thành danh sách cho các ứng dụng đó."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在支持格式化文本的应用（如备忘录、邮件、Slack、Notion、Word 和浏览器）中，粘贴的列表会变成真正的项目符号或编号。在其他所有地方（包括终端和代码编辑器），则保持为“- ”行。开启 AI 清理后，口述的列举内容会在这些应用中写成列表。"
-          }
-        }
-      }
-    },
     "Long prompts in pieces": {
       "localizations": {
         "de": {
@@ -59051,6 +59005,144 @@
           "stringUnit": {
             "state": "translated",
             "value": "只改写匹配到的内容，不影响识别。"
+          }
+        }
+      }
+    },
+    "A pasted list becomes real bullets or numbers in apps that take formatted text, like Notes, Mail, Slack, Notion, Word and browsers. Everywhere else, terminals and code editors included, it stays as “- ” lines. With AI cleanup on, a spoken enumeration is written as a list for those apps, and in terminals and code editors too.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine eingefügte Liste wird zu echten Aufzählungspunkten oder Nummern in Apps, die formatierten Text annehmen, etwa Notizen, Mail, Slack, Notion, Word und Browser. Überall sonst, auch in Terminals und Code-Editoren, bleibt sie als „- “-Zeilen. Mit aktiver KI-Bereinigung wird eine gesprochene Aufzählung für diese Apps als Liste geschrieben, ebenso in Terminals und Code-Editoren."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una lista pegada se convierte en viñetas o números reales en apps que admiten texto con formato, como Notas, Mail, Slack, Notion, Word y los navegadores. En el resto, terminales y editores de código incluidos, se queda en líneas “- ”. Con la limpieza con IA activada, una enumeración dictada se escribe como lista para esas apps, y también en terminales y editores de código."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une liste collée devient de vraies puces ou de vrais numéros dans les apps qui acceptent le texte mis en forme, comme Notes, Mail, Slack, Notion, Word et les navigateurs. Partout ailleurs, terminaux et éditeurs de code compris, elle reste en lignes « - ». Avec le nettoyage IA, une énumération dictée est écrite en liste pour ces apps, ainsi que dans les terminaux et les éditeurs de code."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un elenco incollato diventa un vero elenco puntato o numerato nelle app che accettano testo formattato, come Note, Mail, Slack, Notion, Word e i browser. Altrove, terminali ed editor di codice compresi, resta come righe “- ”. Con la pulizia IA attiva, un'enumerazione dettata viene scritta come elenco per quelle app, e anche nei terminali e negli editor di codice."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uma lista colada vira marcadores ou números de verdade em apps que aceitam texto formatado, como Notas, Mail, Slack, Notion, Word e navegadores. Em todos os outros, incluindo terminais e editores de código, fica como linhas “- ”. Com a limpeza por IA ativada, uma enumeração falada é escrita como lista para esses apps, e também em terminais e editores de código."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách được dán sẽ thành dấu đầu dòng hoặc số thật trong ứng dụng nhận văn bản có định dạng, như Ghi chú, Mail, Slack, Notion, Word và trình duyệt. Ở mọi nơi khác, kể cả terminal và trình soạn mã, nó vẫn là các dòng “- ”. Khi bật Dọn dẹp AI, phần liệt kê bằng lời sẽ được viết thành danh sách cho các ứng dụng đó, cũng như trong terminal và trình soạn mã."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在支持格式化文本的应用（如备忘录、邮件、Slack、Notion、Word 和浏览器）中，粘贴的列表会变成真正的项目符号或编号。在其他所有地方（包括终端和代码编辑器），则保持为“- ”行。开启 AI 清理后，口述的列举内容会在这些应用以及终端和代码编辑器中写成列表。"
+          }
+        }
+      }
+    },
+    "Spoken punctuation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ponctuation dictée"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesprochene Satzzeichen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puntuación dictada"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punteggiatura dettata"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pontuação ditada"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dấu câu đọc ra"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "口述标点"
+          }
+        }
+      }
+    },
+    "Say “comma”, “new line” or “in parentheses” and get the punctuation instead of the word.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dites « virgule », « à la ligne » ou « entre parenthèses » et obtenez la ponctuation au lieu du mot."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sagen Sie „Komma“, „neue Zeile“ oder „in Klammern“ und erhalten Sie das Satzzeichen statt des Worts."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diga “coma”, “nueva línea” o “entre paréntesis” y obtenga la puntuación en lugar de la palabra."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dite “virgola”, “a capo” o “tra parentesi” e ottenete la punteggiatura al posto della parola."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diga “vírgula”, “nova linha” ou “entre parênteses” e receba a pontuação no lugar da palavra."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nói “dấu phẩy”, “xuống dòng” hoặc “trong ngoặc đơn” để có dấu câu thay vì chữ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "说“逗号”“换行”或“括号里”，即可得到标点而不是文字。"
           }
         }
       }
