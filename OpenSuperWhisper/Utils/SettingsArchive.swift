@@ -56,7 +56,7 @@ enum SettingsArchive {
         "addSpaceAfterSentence", "agentAskOnPermission", "agentAskOnQuestion", "agentAskOnStop",
         "agentEnabledKinds", "agentWaitSeconds", "aiBackend", "aiOllamaEndpoint", "aiOllamaModel",
         "aiPostProcessingClosing", "aiPostProcessingEnabled", "aiPostProcessingPrompt",
-        "aiPostProcessingTranslation", "aiRemoteEndpoint", "aiRemoteModel", "appAppearance",
+        "aiPostProcessingTranslation", "aiRemoteEndpoint", "aiSpokenFormattingEnabled", "aiRemoteModel", "appAppearance",
         "appContextFormattingEnabled", "appContextProfilesData", "appInsertionRulesData",
         "appModelRules", "autoCopyToClipboard", "autoPasteTranscription", "beamSize",
         "builtInModelFileName", "clipboardRestoreDelayMs", "contextAwareModelMode",

@@ -48,6 +48,7 @@ public protocol CorePreferences: AnyObject, Sendable {
     var aiPostProcessingPrompt: String { get }
     var aiPostProcessingClosing: String { get }
     var aiPostProcessingTranslation: String { get }
+    var aiSpokenFormattingEnabled: Bool { get }
     var builtInModelFileName: String { get }
     var unloadBuiltInModelWhenIdle: Bool { get }
 }

@@ -48,6 +48,7 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var aiPostProcessingPrompt = LLMPostProcessor.defaultInstruction
         var aiPostProcessingClosing = LLMPostProcessor.defaultClosingInstruction
         var aiPostProcessingTranslation = LLMPostProcessor.defaultTranslationInstruction
+        var aiSpokenFormattingEnabled = true
         var builtInModelFileName = LLMModelManager.defaultModel.fileName
         var unloadBuiltInModelWhenIdle = true
     }
@@ -201,6 +202,10 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
     var aiPostProcessingTranslation: String {
         get { self[\.aiPostProcessingTranslation] }
         set { self[\.aiPostProcessingTranslation] = newValue }
+    }
+    var aiSpokenFormattingEnabled: Bool {
+        get { self[\.aiSpokenFormattingEnabled] }
+        set { self[\.aiSpokenFormattingEnabled] = newValue }
     }
     var builtInModelFileName: String {
         get { self[\.builtInModelFileName] }

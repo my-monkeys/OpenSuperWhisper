@@ -67,7 +67,7 @@ struct TextAIInsertionGroup: View {
                 SSwitch(isOn: $viewModel.matchTextAroundCaret)
             }
             SettingRow("Lists as bullets",
-                       hint: "A pasted list becomes real bullets or numbers in apps that take formatted text, like Notes, Mail, Slack, Notion, Word and browsers. Everywhere else, terminals and code editors included, it stays as “- ” lines. With AI cleanup on, a spoken enumeration is written as a list for those apps.",
+                       hint: "A pasted list becomes real bullets or numbers in apps that take formatted text, like Notes, Mail, Slack, Notion, Word and browsers. Everywhere else, terminals and code editors included, it stays as “- ” lines. With AI cleanup on, a spoken enumeration is written as a list for those apps, and in terminals and code editors too.",
                        advanced: true) {
                 SSwitch(isOn: $viewModel.pasteListsAsRichText)
             }

@@ -43,10 +43,29 @@ enum RichListPaste {
     /// Fewer items than this and a leading dash is more likely punctuation than a list.
     static let minimumItems = 2
 
-    /// Whether AI cleanup should write a dictation's enumerations as "- " lines: only when the
-    /// paste will turn them into bullets, so nowhere else gets a new line break it did not ask for.
+    /// Whether AI cleanup should write a dictation's enumerations as "- " lines: when the paste
+    /// will turn them into bullets, and in the terminals and editors where "- " lines are how a
+    /// list is written anyway (#265), so a chat box never gets line breaks it did not ask for.
     static func cleanupWritesLists(into bundleID: String?) -> Bool {
-        AppPreferences.shared.pasteListsAsRichText && acceptsRichText(bundleID)
+        AppPreferences.shared.pasteListsAsRichText
+            && (acceptsRichText(bundleID) || writesPlainLists(bundleID))
+    }
+
+    /// Terminals and code editors: a prompt to Claude Code or a comment reads a "- " list as one.
+    /// Their paste is plain, so the lines go in as written.
+    static let plainListApps: Set<String> = [
+        "com.apple.terminal",
+        "com.googlecode.iterm2",
+        "dev.warp.warp-stable",
+        "com.mitchellh.ghostty",
+        "com.microsoft.vscode",
+        "com.todesktop.230313mt0mtn5",
+        "dev.zed.zed",
+    ]
+
+    static func writesPlainLists(_ bundleID: String?) -> Bool {
+        guard let bundleID else { return false }
+        return plainListApps.contains(bundleID.lowercased())
     }
 
     static func acceptsRichText(_ bundleID: String?) -> Bool {

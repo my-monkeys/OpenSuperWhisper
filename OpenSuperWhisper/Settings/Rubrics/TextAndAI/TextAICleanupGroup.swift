@@ -33,6 +33,12 @@ struct TextAICleanupGroup: View {
                 engineRow
                 TextAIBackendFields(viewModel: viewModel)
                 TextAIInstructions(viewModel: viewModel)
+                if viewModel.aiPostProcessingEnabled {
+                    SettingRow("Spoken punctuation",
+                               hint: "Say “comma”, “new line” or “in parentheses” and get the punctuation instead of the word.") {
+                        SSwitch(isOn: $viewModel.aiSpokenFormattingEnabled)
+                    }
+                }
                 SettingRow("If the AI fails, paste the raw text",
                            hint: "If the model errors or returns nothing usable, the transcription is inserted as it is.",
                            advanced: true) {

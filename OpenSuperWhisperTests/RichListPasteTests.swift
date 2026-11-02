@@ -61,6 +61,14 @@ final class RichListPasteTests: XCTestCase {
         ])
     }
 
+    /// A prompt to Claude Code in Warp reads "- " lines as a list, and its paste is plain (#265).
+    func testTerminalsAndEditorsGetPlainLists() {
+        XCTAssertTrue(RichListPaste.writesPlainLists("dev.warp.Warp-Stable"))
+        XCTAssertTrue(RichListPaste.writesPlainLists("com.apple.Terminal"))
+        XCTAssertFalse(RichListPaste.writesPlainLists("com.apple.MobileSMS"))
+        XCTAssertFalse(RichListPaste.writesPlainLists(nil))
+    }
+
     func testTextWithoutAListStaysPlain() {
         XCTAssertNil(RichListPaste.blocks(of: "Bread, chips and ice cream."))
         XCTAssertNil(RichListPaste.blocks(of: "First line\nsecond line"))
