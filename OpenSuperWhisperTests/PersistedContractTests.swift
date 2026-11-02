@@ -35,7 +35,6 @@ final class PersistedContractTests: XCTestCase {
             (.appPreferencesLanguageChanged, "AppPreferencesLanguageChanged"),
             (.hotkeySettingsChanged, "HotkeySettingsChanged"),
             (.focusTranscriptionSearch, "FocusTranscriptionSearch"),
-            (.showSettingsPane, "ShowSettingsPane"),
             (.showTranscriptions, "ShowTranscriptions"),
             (.indicatorWindowDidHide, "IndicatorWindowDidHide"),
             (.modelSelectionDidChange, "ModelSelectionDidChange"),

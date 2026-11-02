@@ -73,16 +73,16 @@ enum SettingsRubric: String, CaseIterable, Identifiable {
     }
 }
 
-/// Where the main window is: which page, whether the settings, Help or Feedback are open over
-/// it, and which setting to bring into view. One shared instance so the menu bar, ⌘, and other
-/// windows can route the main window without holding a reference to it.
+/// Where the app's windows are: which page the dashboard shows, whether Help or Feedback are
+/// open over it, and which rubric and setting the Settings window shows. One shared instance so
+/// the menu bar, ⌘, and the two windows can route each other without holding a reference.
 @MainActor
 final class AppNavigation: ObservableObject {
     static let shared = AppNavigation()
 
     @Published var page: AppPage = .home
-    /// The open settings rubric; nil when the settings are closed.
-    @Published var settingsRubric: SettingsRubric?
+    /// The rubric the Settings window shows, kept when it is closed and opened again.
+    @Published var settingsRubric: SettingsRubric = .dictation
     /// A row title to scroll to once its rubric is showing (set by the settings search).
     @Published var settingsFocusRow: String?
     @Published var helpOpen = false
@@ -99,17 +99,47 @@ final class AppNavigation: ObservableObject {
     /// Text of the window's search field. Filters the Home feed.
     @Published var searchText = ""
 
+    /// How the two windows come forward. Swapped by the tests; a test host must not open real
+    /// windows or reopen its own app bundle.
+    var presentSettingsWindow: @MainActor () -> Void = {
+        guard !DefaultsStore.isRunningTests else { return }
+        SettingsWindowController.shared.show()
+    }
+    var presentDashboardWindow: @MainActor () -> Void = {
+        guard !DefaultsStore.isRunningTests else { return }
+        (NSApplication.shared.delegate as? AppDelegate)?.showMainWindow()
+    }
+
     func openSettings(_ rubric: SettingsRubric = .dictation, focusing row: String? = nil) {
+        settingsRubric = rubric
+        settingsFocusRow = row
+        presentSettingsWindow()
+    }
+
+    /// ⌘, and the menu bar's "Settings…": the window as it was left.
+    func showSettings() {
+        openSettings(settingsRubric)
+    }
+
+    /// The dashboard on `page`, from a window that is not the dashboard. The cards go: they
+    /// would hide the page it was asked to show.
+    func showDashboard(_ page: AppPage) {
         helpOpen = false
         feedbackOpen = false
         closeReports()
-        settingsRubric = rubric
-        settingsFocusRow = row
+        go(page)
+        presentDashboardWindow()
     }
 
-    /// One card at a time: Feedback replaces the settings or Help when it opens.
+    func openHelp() {
+        closeReports()
+        feedbackOpen = false
+        helpOpen = true
+        presentDashboardWindow()
+    }
+
+    /// One card at a time: Feedback replaces Help when it opens.
     func openFeedback() {
-        closeSettings()
         closeReports()
         helpOpen = false
         feedbackAsked = false
@@ -117,7 +147,6 @@ final class AppNavigation: ObservableObject {
     }
 
     func openReport(for recording: Recording) {
-        closeSettings()
         helpOpen = false
         feedbackOpen = false
         reportsOpen = false
@@ -125,7 +154,6 @@ final class AppNavigation: ObservableObject {
     }
 
     func openReports() {
-        closeSettings()
         helpOpen = false
         feedbackOpen = false
         reporting = nil
@@ -142,11 +170,6 @@ final class AppNavigation: ObservableObject {
     func askForFeedback() {
         openFeedback()
         feedbackAsked = true
-    }
-
-    func closeSettings() {
-        settingsRubric = nil
-        settingsFocusRow = nil
     }
 
     func go(_ page: AppPage) {

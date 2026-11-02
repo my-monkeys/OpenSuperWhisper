@@ -5,23 +5,28 @@ import XCTest
 @testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
-/// The main window keeps its page, its open card and the card's scroll position when the scene
-/// redraws (#207).
+/// The windows keep their page, rubric and scroll position when the scene redraws (#207), and
+/// the settings are routed to their own window (#252).
 ///
 /// The scene's body runs again on every step of the Text size slider, since it reads the scale
 /// through @AppStorage, and each run builds a new `AppShellView` value. Building one used to write
-/// a page and a closed settings card into `AppNavigation`, so the settings closed under the slider
-/// at its first step.
+/// the page into `AppNavigation`, so the settings card closed under the slider at its first step.
 @MainActor
 final class ShellNavigationTests: XCTestCase {
 
     private var preferences: ScratchPreferences!
     private var appearanceAdvanced = false
     private let navigation = AppNavigation.shared
+    private var settingsWindowShown = 0
+    private var dashboardShown = 0
 
     override func setUp() async throws {
         appearanceAdvanced = AdvancedRubrics.shared.isOn(SettingsRubric.appearance.rawValue)
         preferences = ScratchPreferences()
+        settingsWindowShown = 0
+        dashboardShown = 0
+        navigation.presentSettingsWindow = { [unowned self] in settingsWindowShown += 1 }
+        navigation.presentDashboardWindow = { [unowned self] in dashboardShown += 1 }
         reset()
     }
 
@@ -29,6 +34,47 @@ final class ShellNavigationTests: XCTestCase {
         reset()
         AdvancedRubrics.shared.set(SettingsRubric.appearance.rawValue, appearanceAdvanced)
         preferences.restore()
+    }
+
+    func testOpeningTheSettingsShowsTheWindowOnTheRubricAndRow() {
+        navigation.openSettings(.privacy, focusing: "Suggest words from your corrections")
+
+        XCTAssertEqual(settingsWindowShown, 1)
+        XCTAssertEqual(navigation.settingsRubric, .privacy)
+        XCTAssertEqual(navigation.settingsFocusRow, "Suggest words from your corrections")
+        XCTAssertEqual(dashboardShown, 0, "the settings do not need the dashboard")
+    }
+
+    func testShowingTheSettingsAgainKeepsTheRubricTheyWereLeftOn() {
+        navigation.openSettings(.models, focusing: "Server")
+
+        navigation.showSettings()
+
+        XCTAssertEqual(settingsWindowShown, 2)
+        XCTAssertEqual(navigation.settingsRubric, .models)
+        XCTAssertNil(navigation.settingsFocusRow, "a stale row would scroll the pane again")
+    }
+
+    func testLeavingTheSettingsForAPageBringsTheDashboardAndClearsItsCards() {
+        navigation.helpOpen = true
+        navigation.feedbackOpen = true
+
+        navigation.showDashboard(.style)
+
+        XCTAssertEqual(navigation.page, .style)
+        XCTAssertFalse(navigation.helpOpen)
+        XCTAssertFalse(navigation.feedbackOpen)
+        XCTAssertEqual(dashboardShown, 1)
+    }
+
+    func testReleaseNotesOpenHelpOnTheDashboard() {
+        navigation.feedbackOpen = true
+
+        navigation.openHelp()
+
+        XCTAssertTrue(navigation.helpOpen)
+        XCTAssertFalse(navigation.feedbackOpen)
+        XCTAssertEqual(dashboardShown, 1)
     }
 
     func testBuildingTheShellLeavesTheNavigationAlone() {
@@ -51,21 +97,21 @@ final class ShellNavigationTests: XCTestCase {
         XCTAssertEqual(navigation.page, .perApp)
     }
 
-    func testTheSettingsStayOpenWhileTheTextSizeChanges() async throws {
+    func testTheSettingsKeepTheirRubricAndScrollWhileTheTextSizeChanges() async throws {
         // Advanced on and the smallest window, so the rubric is long enough to scroll.
         AdvancedRubrics.shared.set(SettingsRubric.appearance.rawValue, true)
-        let host = NSHostingView(rootView: SceneContent())
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 840, height: 640),
+        let viewModel = SettingsViewModel()
+        navigation.settingsRubric = .appearance
+        let host = NSHostingView(rootView: SettingsWindowView(viewModel: viewModel))
+        let size = SettingsWindowController.minimumSize
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
-        host.frame = NSRect(x: 0, y: 0, width: 840, height: 640)
+        host.frame = NSRect(origin: .zero, size: size)
         defer { window.close() }
         try await settle(host)
 
-        navigation.go(.dictionary)
-        navigation.openSettings(.appearance)
-        try await settle(host)
         let scroll = tallestScrollView(in: host)
         XCTAssertNotNil(scroll, "no scrollable view with the Appearance rubric open")
         scroll?.contentView.scroll(to: NSPoint(x: 0, y: 60))
@@ -76,12 +122,11 @@ final class ShellNavigationTests: XCTestCase {
 
         // What the slider writes on each step of a drag.
         for scale in stride(from: TextScale.default + 0.05, through: TextScale.default + 0.3, by: 0.05) {
-            AppPreferences.shared.textScale = scale
+            viewModel.textScale = scale
             try await settle(host)
-            XCTAssertEqual(navigation.settingsRubric, .appearance, "the settings closed at \(scale)")
+            XCTAssertEqual(navigation.settingsRubric, .appearance, "the rubric changed at \(scale)")
         }
 
-        XCTAssertEqual(navigation.page, .dictionary)
         if let scroll {
             XCTAssertTrue(scroll.isDescendant(of: host), "the rubric was rebuilt, losing its scroll position")
             XCTAssertEqual(scroll.contentView.bounds.origin.y, offset, accuracy: 1,
@@ -92,7 +137,8 @@ final class ShellNavigationTests: XCTestCase {
     // MARK: - Helpers
 
     private func reset() {
-        navigation.closeSettings()
+        navigation.settingsRubric = .dictation
+        navigation.settingsFocusRow = nil
         navigation.helpOpen = false
         navigation.feedbackOpen = false
         navigation.closeReports()
@@ -118,17 +164,5 @@ final class ShellNavigationTests: XCTestCase {
         }
         visit(root)
         return found.max { ($0.documentView?.frame.height ?? 0) < ($1.documentView?.frame.height ?? 0) }
-    }
-}
-
-/// The window's content as `OpenSuperWhisperApp` builds it once onboarding is done: the scale
-/// read through @AppStorage above the shell, so a change redraws this body and builds a new
-/// `AppShellView`.
-private struct SceneContent: View {
-    @AppStorage("textScale", store: DefaultsStore.current) private var textScale: Double = TextScale.default
-
-    var body: some View {
-        AppShellView()
-            .environment(\.appTextScale, textScale)
     }
 }

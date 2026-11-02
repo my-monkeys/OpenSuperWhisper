@@ -240,8 +240,7 @@ struct ModelsRubric: View {
 
     private var perAppLink: some View {
         Button {
-            navigation.closeSettings()
-            navigation.go(.perApp)
+            navigation.showDashboard(.perApp)
         } label: {
             HStack(spacing: 4) {
                 Text("Change the model per app")

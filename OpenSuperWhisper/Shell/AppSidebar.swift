@@ -32,9 +32,7 @@ struct AppSidebar: View {
             }
             footerRow(title: "Help & what's new", symbol: "questionmark.circle", shortcut: nil,
                       dot: availableUpdateTag != nil) {
-                navigation.closeSettings()
-                navigation.feedbackOpen = false
-                navigation.helpOpen = true
+                navigation.openHelp()
             }
         }
         .padding(.horizontal, 14)
@@ -74,9 +72,8 @@ struct AppSidebar: View {
     }
 
     private func pageRow(_ page: AppPage) -> some View {
-        let selected = navigation.page == page && navigation.settingsRubric == nil
+        let selected = navigation.page == page
         return Button {
-            navigation.closeSettings()
             navigation.helpOpen = false
             navigation.feedbackOpen = false
             navigation.go(page)
