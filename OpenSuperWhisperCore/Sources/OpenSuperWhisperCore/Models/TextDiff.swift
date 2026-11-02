@@ -44,9 +44,14 @@ public enum TextDiff {
         var tokens: [String] = []
         var current = ""
         var currentClass: Class?
-        for character in text {
-            let next = classify(character)
-            if let currentClass, next == currentClass, next != .mark {
+        let characters = Array(text)
+        for (index, character) in characters.enumerated() {
+            // An apostrophe inside a word ("i'll", "l'été") belongs to it: split there, "I'll"
+            // would show as three changed pieces for one capital letter.
+            let insideWord = currentClass == .word && (character == "'" || character == "\u{2019}")
+                && index + 1 < characters.count && characters[index + 1].isLetter
+            let next = insideWord ? .word : classify(character)
+            if let currentClass, next == currentClass, next != .mark || insideWord {
                 current.append(character)
             } else {
                 if !current.isEmpty { tokens.append(current) }

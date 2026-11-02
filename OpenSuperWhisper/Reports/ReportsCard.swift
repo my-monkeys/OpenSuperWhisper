@@ -183,7 +183,7 @@ private struct ReportRow: View {
                 }
             }
             if showsOriginal, let original = report.distinctRawText {
-                FeedRowOriginalText(original: original)
+                FeedRowOriginalText(original: original, cleaned: report.finalText, cleanupModel: nil)
             }
         }
         .padding(.vertical, 14)

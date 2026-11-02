@@ -42,7 +42,7 @@ extension UISnapshotProbe {
     }
 
     /// The seeded dictation the cleanup changed, read back from the store.
-    private static var reportedRecording: Recording? {
+    static var reportedRecording: Recording? {
         let recent = try? waitFor { try await RecordingStore.shared.fetchRecordings(limit: 20, offset: 0) }
         return recent?.first { $0.distinctOriginal != nil }
     }

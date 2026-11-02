@@ -55,6 +55,11 @@ final class TextDiffTests: XCTestCase {
                        [.init(.unchanged, "c'est déjà "), .init(.removed, "fait"), .init(.added, "fini")])
     }
 
+    func testAnApostropheStaysInsideItsWord() {
+        XCTAssertEqual(TextDiff.tokens(of: "i'll l\u{2019}été 'quoted'"), ["i'll", " ", "l\u{2019}été", " ", "'", "quoted", "'"])
+        XCTAssertEqual(diff("i'll go", "I'll go"), [.init(.removed, "i'll"), .init(.added, "I'll"), .init(.unchanged, " go")])
+    }
+
     func testHugeTextsFallBackToOneReplacement() {
         let old = Array(repeating: "word", count: TextDiff.tokenLimit).joined(separator: " ")
         XCTAssertEqual(diff(old, "short").map(\.kind), [.removed, .added])
