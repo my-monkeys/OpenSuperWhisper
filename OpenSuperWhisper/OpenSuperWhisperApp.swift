@@ -60,6 +60,21 @@ struct OpenSuperWhisperApp: App {
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            // ⌘Q must not end dictation: the menu bar item and the global shortcut are the app,
+            // the windows are only its interface (#254). Nothing here calls terminate, so the
+            // quits that matter (menu bar "Quit", Dock, Sparkle's relaunch, logout and shutdown,
+            // `osascript`) reach AppKit untouched and need no applicationShouldTerminate veto
+            // that could stall a logout.
+            CommandGroup(replacing: .appTermination) {
+                Button("Quit to Menu Bar") {
+                    (NSApplication.shared.delegate as? AppDelegate)?.closeInterfaceWindows()
+                }
+                .keyboardShortcut("q", modifiers: .command)
+                Button("Quit OpenSuperWhisper") {
+                    NSApplication.shared.terminate(nil)
+                }
+                .keyboardShortcut("q", modifiers: [.command, .option])
+            }
             CommandGroup(replacing: .appSettings) {
                 // The window is the settings UI too: bring it forward on a settings pane
                 // (showMainWindow also re-creates the window if macOS dropped it).
@@ -737,6 +752,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         }
     }
     
+    /// ⌘Q: the dashboard and Settings go away, the app stays in the menu bar. Closing them is
+    /// what `windowWillClose` already turns into the accessory policy.
+    func closeInterfaceWindows() {
+        mainWindow?.close()
+    }
+
     func showMainWindow() {
         NSApplication.shared.setActivationPolicy(.regular)
 
