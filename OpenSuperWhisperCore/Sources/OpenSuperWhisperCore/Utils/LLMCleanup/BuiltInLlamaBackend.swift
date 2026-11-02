@@ -44,6 +44,8 @@ public final class BuiltInLlamaBackend: LLMCleanupBackend {
     /// Ready once the selected model is on disk. The context itself loads on first `generate`.
     public var isReady: Bool { manager.isModelDownloaded(name: selectedModel.fileName) }
 
+    public var modelLabel: String { selectedModel.displayName }
+
     /// Even the larger built-in model is small next to a hosted one, so this backend keeps the
     /// length-ratio sanity check on its output.
     public var enforcesLengthRatio: Bool { true }

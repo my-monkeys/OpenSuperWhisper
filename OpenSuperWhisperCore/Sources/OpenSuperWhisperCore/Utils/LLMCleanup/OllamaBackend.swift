@@ -12,6 +12,8 @@ struct OllamaBackend: LLMCleanupBackend {
     /// The settings UI uses `checkConnection` for an explicit, user-triggered probe.
     var isReady: Bool { true }
 
+    var modelLabel: String { model.trimmingCharacters(in: .whitespaces) }
+
     func generate(system: String, user: String) async throws -> String {
         guard let base = URL(string: endpoint.trimmingCharacters(in: .whitespaces)) else {
             throw URLError(.badURL)
@@ -32,7 +34,7 @@ struct OllamaBackend: LLMCleanupBackend {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
+            throw CleanupHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
         }
         return try JSONDecoder().decode(ChatResponse.self, from: data).message.content
     }
