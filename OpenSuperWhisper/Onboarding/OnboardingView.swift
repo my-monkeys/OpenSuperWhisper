@@ -9,9 +9,10 @@ import CoreGraphics
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// First launch, shown full window in place of the app: shortcut, model, permissions, then a
-/// first dictation. Only the model is required, so nobody reaches the app with no way to
-/// transcribe; permissions can be granted later, the main window's status card asks for them.
+/// First launch, shown full window in place of the app: shortcut, model, the user's words,
+/// permissions, then a first dictation. Only the model is required, so nobody reaches the app
+/// with no way to transcribe; the words are optional and permissions can be granted later, the
+/// main window's status card asks for them.
 struct OnboardingView: View {
     @StateObject private var viewModel: OnboardingViewModel
     @StateObject private var permissions = PermissionsManager()
@@ -120,6 +121,8 @@ struct OnboardingView: View {
             OnboardingShortcutStep(viewModel: viewModel, layoutInfo: keyboardLayoutInfo)
         case .model:
             OnboardingModelStep(viewModel: viewModel)
+        case .words:
+            OnboardingWordsStep(viewModel: viewModel)
         case .permissions:
             OnboardingPermissionsStep(permissions: permissions,
                                       needsInputMonitoring: viewModel.needsInputMonitoring,
@@ -156,6 +159,10 @@ struct OnboardingView: View {
                 .buttonStyle(.sSecondary)
             Button("Finish", action: finish)
                 .buttonStyle(.sPrimary)
+        case .words:
+            Button("Skip") { if let next = step.next { step = next } }
+                .buttonStyle(.sSecondary)
+            continueButton(Text("Continue"))
         case .permissions where !permissionsGranted:
             continueButton(Text("Continue without"))
         default:
@@ -165,6 +172,7 @@ struct OnboardingView: View {
 
     private func continueButton(_ label: Text) -> some View {
         Button {
+            if step == .words { viewModel.commitWords() }
             if let next = step.next { step = next }
         } label: {
             HStack(spacing: 6) {
@@ -186,7 +194,7 @@ struct OnboardingView: View {
     private func isPassable(_ step: OnboardingStep) -> Bool {
         switch step {
         case .model: return viewModel.canContinue && !viewModel.isDownloading
-        case .shortcut, .permissions, .firstTry: return true
+        case .shortcut, .words, .permissions, .firstTry: return true
         }
     }
 

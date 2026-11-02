@@ -30,6 +30,12 @@ extension UISnapshotProbe {
         "onboarding-shortcut-custom-large-text": {
             onboarding(.shortcut, custom: .modifier(.rightCommand), textScale: TextScale.maximum)
         },
+        "onboarding-words": { onboarding(.words, words: ["Figma", "Marie-Claire"]) },
+        "onboarding-words-empty": { onboarding(.words) },
+        "onboarding-words-large-text": {
+            onboarding(.words, words: ["Figma", "Marie-Claire", "Villeurbanne", "Kubernetes"],
+                       textScale: TextScale.maximum)
+        },
         "onboarding-permissions-custom-modifier": { onboarding(.permissions, custom: .modifier(.rightCommand)) },
         "onboarding-first-try-keycaps": { onboarding(.firstTry, choice: .keyCombination) },
         "onboarding-first-try-keycaps-modifier": { onboarding(.firstTry, choice: .rightOption) },
@@ -45,6 +51,7 @@ extension UISnapshotProbe {
                                    downloadedUltra: Bool = false,
                                    choice: OnboardingShortcutOption = .keyCombination,
                                    custom: RecordingTrigger? = nil,
+                                   words: [String] = [],
                                    textScale: Double = TextScale.default) -> AnyView {
         PermissionsManager.snapshotGrantsAll = true
         // A fresh install's list, whatever the previous screen of the run recorded.
@@ -58,10 +65,12 @@ extension UISnapshotProbe {
                 return false
             },
             appleSpeech: { _ in appleSpeech },
-            appLanguage: language)
+            appLanguage: language,
+            fullUserName: "Maxim Costa")
         let viewModel = OnboardingViewModel(system: system)
         viewModel.selectedShortcut = choice
         if let custom { viewModel.customTrigger = custom }
+        viewModel.words = words
         return AnyView(OnboardingView(initialStep: step, viewModel: viewModel)
             .environmentObject(AppState())
             .environment(\.appTextScale, textScale))
