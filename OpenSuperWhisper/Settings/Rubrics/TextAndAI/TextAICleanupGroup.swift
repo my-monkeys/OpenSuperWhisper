@@ -43,8 +43,7 @@ struct TextAICleanupGroup: View {
             }
             SettingRow("Default style", hint: "Will be chosen on the Style page.", badge: ("Soon", .soon)) {
                 Button("Style →") {
-                    AppNavigation.shared.closeSettings()
-                    AppNavigation.shared.go(.style)
+                    AppNavigation.shared.showDashboard(.style)
                 }
                 .buttonStyle(.sSecondary)
             }

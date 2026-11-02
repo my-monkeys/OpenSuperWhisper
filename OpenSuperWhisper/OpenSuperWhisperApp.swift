@@ -76,13 +76,8 @@ struct OpenSuperWhisperApp: App {
                 .keyboardShortcut("q", modifiers: [.command, .option])
             }
             CommandGroup(replacing: .appSettings) {
-                // The window is the settings UI too: bring it forward on a settings pane
-                // (showMainWindow also re-creates the window if macOS dropped it).
                 Button("Settings...") {
-                    if let delegate = NSApplication.shared.delegate as? AppDelegate {
-                        delegate.showMainWindow()
-                    }
-                    NotificationCenter.default.post(name: .showSettingsPane, object: nil)
+                    AppNavigation.shared.showSettings()
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
@@ -153,7 +148,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     /// The app's own window, looked up rather than remembered: SwiftUI creates it after
     /// `applicationDidFinishLaunching` has run, and owns it from then on.
     private var mainWindow: NSWindow? {
-        NSApplication.shared.windows.first { $0.styleMask.contains(.titled) }
+        let settings = MainActor.assumeIsolated { SettingsWindowController.shared.window }
+        return NSApplication.shared.windows.first { $0.styleMask.contains(.titled) && $0 !== settings }
     }
     private var languageSubmenu: NSMenu?
     private var modelSubmenu: NSMenu?
@@ -305,7 +301,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private func updateStatusBarMenu() {
         let menu = NSMenu()
 
-        // One window, two ways in: this one opens on the list, "Settings…" below on the settings.
+        // The dashboard on its list; "Settings…" below opens the Settings window.
         let transcriptionsItem = NSMenuItem(title: NSLocalizedString("Transcriptions", comment: ""),
                                             action: #selector(openTranscriptions), keyEquivalent: "o")
         transcriptionsItem.target = self   // without a target macOS disables the item
@@ -708,8 +704,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     }
     
     @objc private func openSettings() {
-        showMainWindow()
-        NotificationCenter.default.post(name: .showSettingsPane, object: nil)
+        MainActor.assumeIsolated { AppNavigation.shared.showSettings() }
     }
 
     @objc private func openTranscriptions() {
@@ -756,6 +751,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     /// what `windowWillClose` already turns into the accessory policy.
     func closeInterfaceWindows() {
         mainWindow?.close()
+        MainActor.assumeIsolated { SettingsWindowController.shared.close() }
     }
 
     func showMainWindow() {

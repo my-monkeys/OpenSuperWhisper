@@ -93,7 +93,6 @@ final class FeedbackPromptAskTests: XCTestCase {
     override func tearDown() async throws {
         navigation.feedbackOpen = false
         navigation.helpOpen = false
-        navigation.closeSettings()
         scratch.restore()
     }
 
@@ -118,13 +117,6 @@ final class FeedbackPromptAskTests: XCTestCase {
         FeedbackPromptScheduler.ask(prefs: .shared, navigation: navigation)
         navigation.openFeedback()
         XCTAssertTrue(navigation.feedbackOpen)
-        XCTAssertFalse(navigation.feedbackAsked)
-    }
-
-    func testTheSettingsReplaceTheAskedCard() {
-        FeedbackPromptScheduler.ask(prefs: .shared, navigation: navigation)
-        navigation.openSettings(.general)
-        XCTAssertFalse(navigation.feedbackOpen)
         XCTAssertFalse(navigation.feedbackAsked)
     }
 

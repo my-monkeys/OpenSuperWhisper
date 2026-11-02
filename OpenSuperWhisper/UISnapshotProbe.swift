@@ -50,7 +50,7 @@ enum UISnapshotProbe {
             prefs.remoteServerModel = "whisper-large-v3-turbo"
             prefs.cachedRemoteModels = ["whisper-large-v3", "whisper-large-v3-turbo", "distil-whisper-large-v3-en"]
             ModelSelectionStore.shared.refresh()
-            return AnyView(AppShellView(page: .home, settings: .models))
+            return settingsWindow(.models)
         },
         "help": { AppNavigation.shared.helpOpen = true; return AnyView(AppShellView(page: .home)) },
         "feedback-form": { feedbackCard() },
@@ -183,10 +183,16 @@ enum UISnapshotProbe {
         }
     }
 
+    /// The Settings window's content on `rubric`, rendered directly: no window is opened.
+    private static func settingsWindow(_ rubric: SettingsRubric) -> AnyView {
+        AppNavigation.shared.settingsRubric = rubric
+        return AnyView(SettingsWindowView(viewModel: SettingsViewModel()))
+    }
+
     /// A rubric with Advanced on, scrolled to one of its rows, for the parts below the fold.
     private static func scrolled(_ rubric: SettingsRubric, to row: String) -> AnyView {
         AdvancedRubrics.shared.set(rubric.rawValue, true)
-        let view = AnyView(AppShellView(page: .home, settings: rubric))
+        let view = settingsWindow(rubric)
         AppNavigation.shared.settingsFocusRow = row
         return view
     }
@@ -242,16 +248,22 @@ enum UISnapshotProbe {
         for rubric in SettingsRubric.allCases {
             all["settings-\(rubric.rawValue)"] = {
                 AdvancedRubrics.shared.set(rubric.rawValue, false)
-                return AnyView(AppShellView(page: .home, settings: rubric))
+                return settingsWindow(rubric)
             }
             all["settings-\(rubric.rawValue)-advanced"] = {
                 AdvancedRubrics.shared.set(rubric.rawValue, true)
-                return AnyView(AppShellView(page: .home, settings: rubric))
+                return settingsWindow(rubric)
             }
         }
         let wanted = names.isEmpty ? all.keys.sorted() : names
-        let size = CGSize(width: Double(ProcessInfo.processInfo.environment["OSW_SNAPSHOT_WIDTH"] ?? "") ?? 1080,
-                          height: Double(ProcessInfo.processInfo.environment["OSW_SNAPSHOT_HEIGHT"] ?? "") ?? 760)
+        let environment = ProcessInfo.processInfo.environment
+        func size(_ name: String) -> CGSize {
+            // The settings are their own window, with their own default size.
+            let fallback = name.hasPrefix("settings-") ? SettingsWindowController.defaultSize
+                                                       : CGSize(width: 1080, height: 760)
+            return CGSize(width: Double(environment["OSW_SNAPSHOT_WIDTH"] ?? "") ?? fallback.width,
+                          height: Double(environment["OSW_SNAPSHOT_HEIGHT"] ?? "") ?? fallback.height)
+        }
         for name in wanted {
             guard let make = all[name] else {
                 print("ui-snapshot: unknown screen \(name)")
@@ -265,7 +277,7 @@ enum UISnapshotProbe {
                 AppPreferences.shared.textScale = TextScale.default
                 let view = make()
                 let file = dir.appendingPathComponent("\(name)-\(dark ? "dark" : "light").png")
-                render(view, size: size, dark: dark, to: file)
+                render(view, size: size(name), dark: dark, to: file)
                 print("ui-snapshot: \(file.path)")
             }
         }

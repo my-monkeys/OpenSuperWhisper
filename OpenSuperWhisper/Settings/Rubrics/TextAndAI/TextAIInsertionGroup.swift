@@ -79,8 +79,7 @@ struct TextAIInsertionGroup: View {
             whisperRows
             SettingRow("Per-app exceptions", hint: perAppHint, advanced: true) {
                 Button("Open →") {
-                    AppNavigation.shared.closeSettings()
-                    AppNavigation.shared.go(.style)
+                    AppNavigation.shared.showDashboard(.style)
                 }
                 .buttonStyle(.sSecondary)
             }

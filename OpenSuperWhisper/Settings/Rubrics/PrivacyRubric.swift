@@ -131,8 +131,7 @@ struct PrivacyRubric: View {
             }
             SettingRow("Suggest words from your corrections", hint: suggestionsHint) {
                 Button("Open the Dictionary") {
-                    AppNavigation.shared.closeSettings()
-                    AppNavigation.shared.go(.dictionary)
+                    AppNavigation.shared.showDashboard(.dictionary)
                 }
                 .buttonStyle(.sSecondary)
             }

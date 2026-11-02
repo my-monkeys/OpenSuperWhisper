@@ -64,17 +64,14 @@ final class FeedbackLinksTests: XCTestCase {
         defer {
             navigation.feedbackOpen = false
             navigation.helpOpen = false
-            navigation.closeSettings()
         }
         navigation.helpOpen = true
         navigation.openFeedback()
         XCTAssertFalse(navigation.helpOpen)
         XCTAssertTrue(navigation.feedbackOpen)
 
+        // The settings are a window of their own now, not a card to replace.
         navigation.openSettings(.general)
-        XCTAssertFalse(navigation.feedbackOpen, "Feedback stayed open under the settings")
-
-        navigation.openFeedback()
-        XCTAssertNil(navigation.settingsRubric, "the settings stayed open under Feedback")
+        XCTAssertTrue(navigation.feedbackOpen, "opening the settings closed Feedback")
     }
 }

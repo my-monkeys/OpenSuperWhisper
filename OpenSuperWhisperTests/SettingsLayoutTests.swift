@@ -111,7 +111,7 @@ final class SettingsLayoutTests: XCTestCase {
         for rubric in SettingsRubric.allCases {
             AdvancedRubrics.shared.set(rubric.rawValue, realAdvanced.contains(rubric.rawValue))
         }
-        AppNavigation.shared.closeSettings()
+        AppNavigation.shared.settingsRubric = .dictation
         AppNavigation.shared.page = .home
         AppleIntelligence.replaceModelForTesting(nil)
         for key in ["aiPostProcessingEnabled", "appContextFormattingEnabled", "retentionMaxCountEnabled",
@@ -123,15 +123,15 @@ final class SettingsLayoutTests: XCTestCase {
     }
 
     func testEveryPaneFitsAtTheDefaultSizeInEveryLanguage() async throws {
-        try await assertFits(size: Self.defaultSize, scale: TextScale.default)
+        try await assertFits(size: Self.defaultSize, settingsSize: SettingsWindowController.defaultSize, scale: TextScale.default)
     }
 
     func testEveryPaneFitsAtTheMinimumSizeInEveryLanguage() async throws {
-        try await assertFits(size: Self.minimumSize, scale: TextScale.default)
+        try await assertFits(size: Self.minimumSize, settingsSize: SettingsWindowController.minimumSize, scale: TextScale.default)
     }
 
     func testEveryPaneFitsAtTheLargestTextSize() async throws {
-        try await assertFits(size: Self.defaultSize, scale: TextScale.maximum)
+        try await assertFits(size: Self.defaultSize, settingsSize: SettingsWindowController.defaultSize, scale: TextScale.maximum)
     }
 
     // MARK: - Cases
@@ -175,7 +175,8 @@ final class SettingsLayoutTests: XCTestCase {
 
     // MARK: - Rendering
 
-    private func assertFits(size: CGSize, scale: Double) async throws {
+    /// `size` is the dashboard's window, for its pages; `settingsSize` the Settings window's.
+    private func assertFits(size: CGSize, settingsSize: CGSize, scale: Double) async throws {
         AppPreferences.shared.textScale = scale
         var failures: [String] = []
         for language in Self.languages {
@@ -183,6 +184,7 @@ final class SettingsLayoutTests: XCTestCase {
                 AppPreferences.shared.aiBackend = testCase.backend
                 AppleIntelligence.replaceModelForTesting(FixedOnDeviceModel(availability: testCase.appleIntelligence))
                 AppPreferences.shared.selectedEngine = testCase.engine
+                let size = testCase.rubric == nil ? size : settingsSize
                 let name = "\(testCase.name)-\(language)-\(Int(size.width))-\(Int(scale * 100))"
                 SPaneStack.overflows.removeAll()
                 let (host, window) = try await render(testCase, language: language,
@@ -211,8 +213,14 @@ final class SettingsLayoutTests: XCTestCase {
 
     private func render(_ testCase: Case, language: String, size: CGSize,
                         snapshot name: String) async throws -> (NSView, NSWindow) {
-        let root = AppShellView(page: testCase.page, settings: testCase.rubric)
-            .environment(\.locale, Locale(identifier: language))
+        let content: AnyView
+        if let rubric = testCase.rubric {
+            AppNavigation.shared.settingsRubric = rubric
+            content = AnyView(SettingsWindowView(viewModel: SettingsViewModel()))
+        } else {
+            content = AnyView(AppShellView(page: testCase.page))
+        }
+        let root = content.environment(\.locale, Locale(identifier: language))
         let host = NSHostingView(rootView: root)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)

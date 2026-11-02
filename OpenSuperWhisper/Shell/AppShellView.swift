@@ -2,9 +2,10 @@ import SwiftUI
 import OpenSuperWhisperCore
 
 /// The main window once onboarding is done: the sidebar with the everyday pages, the page
-/// itself, and the settings, Help and Feedback opening over it as cards.
+/// itself, and Help and Feedback opening over it as cards. The settings have their own window.
 struct AppShellView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    /// Shared with the Settings window: the pages here show what it edits.
+    @ObservedObject private var viewModel: SettingsViewModel
     @StateObject private var permissions = PermissionsManager()
     @ObservedObject private var navigation = AppNavigation.shared
     @ObservedObject private var fileDrop = FileDropHandler.shared
@@ -16,18 +17,19 @@ struct AppShellView: View {
 
     /// The window as `AppNavigation` has it. The scene builds this again on every redraw, one per
     /// step of the Text size slider among others, so it must leave the navigation alone: writing
-    /// the page and a closed settings card here shut the settings under the slider (#207).
+    /// the page here put it back under the slider (#207).
     init(feedback: @autoclosure @escaping () -> FeedbackFormModel = FeedbackFormModel()) {
+        viewModel = .shared
         _feedback = StateObject(wrappedValue: feedback())
     }
 
-    /// Opens the window on `page`, with the settings on `rubric`, for the layout tests, which
-    /// open each rubric in turn, and the snapshot probe, which also hands in a Feedback draft it
-    /// staged. Only for a view built once: every rebuild puts this page and card back.
-    init(page: AppPage, settings rubric: SettingsRubric? = nil,
-         feedback: @autoclosure @escaping () -> FeedbackFormModel = FeedbackFormModel()) {
+    /// Opens the window on `page`, for the layout tests, which open each page in turn, and the
+    /// snapshot probe, which also hands in a Feedback draft it staged. Only for a view built
+    /// once: every rebuild puts this page back. It gets a view model of its own, read fresh
+    /// from the preferences the test just set.
+    init(page: AppPage, feedback: @autoclosure @escaping () -> FeedbackFormModel = FeedbackFormModel()) {
         AppNavigation.shared.page = page
-        AppNavigation.shared.settingsRubric = rubric
+        viewModel = SettingsViewModel()
         _feedback = StateObject(wrappedValue: feedback())
     }
 
@@ -48,10 +50,7 @@ struct AppShellView: View {
         // starts at the window's edge, as in the design.
         .ignoresSafeArea(.container, edges: .top)
         .overlay {
-            if let rubric = navigation.settingsRubric {
-                SettingsOverlay(viewModel: viewModel, rubric: rubric)
-                    .transition(.opacity)
-            } else if navigation.helpOpen {
+            if navigation.helpOpen {
                 HelpOverlay(viewModel: viewModel)
                     .transition(.opacity)
             } else if navigation.feedbackOpen {
@@ -71,7 +70,6 @@ struct AppShellView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: navigation.settingsRubric)
         .animation(.easeOut(duration: 0.15), value: navigation.helpOpen)
         .animation(.easeOut(duration: 0.15), value: navigation.feedbackOpen)
         .animation(.easeOut(duration: 0.15), value: navigation.reporting?.id)
@@ -87,15 +85,10 @@ struct AppShellView: View {
         .fileDropHandler()
         .onChange(of: fileDrop.isDragging) { _, dragging in
             if dragging {
-                navigation.closeSettings()
                 navigation.page = .home
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .showSettingsPane)) { _ in
-            if navigation.settingsRubric == nil { navigation.openSettings(.dictation) }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .showTranscriptions)) { _ in
-            navigation.closeSettings()
             navigation.closeReports()
             navigation.helpOpen = false
             navigation.feedbackOpen = false
@@ -105,23 +98,6 @@ struct AppShellView: View {
             previousModelURL = viewModel.selectedModelURL
             if viewModel.selectedEngine == "fluidaudio" {
                 viewModel.initializeFluidAudioModels()
-            }
-        }
-        .onChange(of: viewModel.selectedEngine) { _, newEngine in
-            if newEngine == "fluidaudio" {
-                viewModel.initializeFluidAudioModels()
-            }
-        }
-        .onChange(of: viewModel.fluidAudioModelVersion) { _, _ in
-            Task { @MainActor in
-                TranscriptionService.shared.reloadEngine()
-            }
-        }
-        .onChange(of: viewModel.selectedModelURL) { _, newURL in
-            if viewModel.selectedEngine == "whisper", let modelPath = newURL?.path {
-                Task { @MainActor in
-                    TranscriptionService.shared.reloadModel(with: modelPath)
-                }
             }
         }
         // Injected from the view model rather than read from preferences at window
