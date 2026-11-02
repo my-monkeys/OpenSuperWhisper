@@ -3037,6 +3037,52 @@
         }
       }
     },
+    "Give an app its own profile: the writing rules AI cleanup follows there, and how the text is inserted.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Donnez à une app son propre profil : les règles d'écriture que le nettoyage IA y suit, et la façon dont le texte est inséré."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gib einer App ihr eigenes Profil: die Schreibregeln, denen die KI-Bereinigung dort folgt, und wie der Text eingefügt wird."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dale a una app su propio perfil: las reglas de escritura que la limpieza con IA sigue allí y cómo se inserta el texto."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dai a un'app il suo profilo: le regole di scrittura che la pulizia IA segue lì e come viene inserito il testo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dê a um app o seu próprio perfil: as regras de escrita que a limpeza por IA segue nele e como o texto é inserido."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cho mỗi ứng dụng một hồ sơ riêng: quy tắc viết mà Dọn dẹp AI tuân theo ở đó và cách chèn văn bản."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为应用设置专属配置：AI 清理在该应用中遵循的书写规则，以及文本的插入方式。"
+          }
+        }
+      }
+    },
     "Grant Access": {
       "localizations": {
         "fr": {
@@ -8235,6 +8281,52 @@
         }
       }
     },
+    "Site rules pick a model for one website in Safari, Arc and other supported browsers. Create them from the menu-bar “Model” submenu while the site is open.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les règles de site choisissent un modèle pour un site web dans Safari, Arc et d'autres navigateurs pris en charge. Créez-les depuis le sous-menu « Modèle » de la barre de menus pendant que le site est ouvert."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Website-Regeln wählen ein Modell für eine Website in Safari, Arc und anderen unterstützten Browsern. Lege sie über das Untermenü „Modell“ in der Menüleiste an, während die Website geöffnet ist."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las reglas de sitio eligen un modelo para un sitio web en Safari, Arc y otros navegadores compatibles. Créalas desde el submenú “Modelo” de la barra de menús con el sitio abierto."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le regole di sito scelgono un modello per un sito web in Safari, Arc e altri browser supportati. Creale dal sottomenu “Modello” della barra dei menu mentre il sito è aperto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As regras de site escolhem um modelo para um site no Safari, Arc e outros navegadores compatíveis. Crie-as pelo submenu “Modelo” da barra de menus com o site aberto."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quy tắc theo trang web chọn một mô hình cho một trang web trong Safari, Arc và các trình duyệt được hỗ trợ khác. Tạo chúng từ menu con “Mô hình” trên thanh menu khi trang web đang mở."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网站规则可为 Safari、Arc 及其他受支持浏览器中的某个网站指定模型。请在该网站打开时，通过菜单栏的“模型”子菜单创建。"
+          }
+        }
+      }
+    },
     "Speech Recognition Engine": {
       "localizations": {
         "fr": {
@@ -13065,48 +13157,48 @@
         }
       }
     },
-    "%lld apps. Set on the Style page, under Per app.": {
+    "%lld apps. Set on the Per app page.": {
       "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld apps. À régler sur la page Par application."
+          }
+        },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld Apps. Festgelegt auf der Seite „Stil“ unter „Pro App“."
+            "value": "%lld Apps. Festgelegt auf der Seite „Pro App“."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld apps. Se ajusta en la página Estilo, en Por app."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld apps. À régler sur la page Style, sous Par application."
+            "value": "%lld apps. Se ajusta en la página Por app."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld app. Impostale nella pagina Stile, in Per app."
+            "value": "%lld app. Impostale nella pagina Per app."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld apps. Defina na página Estilo, em Por app."
+            "value": "%lld apps. Defina na página Por app."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld ứng dụng. Đặt trong trang Phong cách, mục Theo ứng dụng."
+            "value": "%lld ứng dụng. Đặt trong trang Theo ứng dụng."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个应用。在“样式”页面的“按应用”中设置。"
+            "value": "%lld 个应用。可在“按应用”页面设置。"
           }
         }
       }
@@ -15871,48 +15963,48 @@
         }
       }
     },
-    "Any matching per-app rule from Style is inserted after it.": {
+    "Any matching per-app rule is inserted after it.": {
       "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toute règle par application correspondante est insérée après."
+          }
+        },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Passende App-Regeln aus „Stil“ werden danach eingefügt."
+            "value": "Passende App-Regeln werden danach eingefügt."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cualquier regla por app de Estilo que coincida se inserta después."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Toute règle par application correspondante, définie dans Style, est insérée après."
+            "value": "Cualquier regla por app que coincida se inserta después."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le regole per app di Stile corrispondenti vengono inserite dopo."
+            "value": "Le regole per app corrispondenti vengono inserite dopo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Qualquer regra por app correspondente, definida em Estilo, é inserida depois."
+            "value": "Qualquer regra por app correspondente é inserida depois."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mọi quy tắc theo ứng dụng khớp trong Phong cách sẽ được chèn sau nó."
+            "value": "Mọi quy tắc theo ứng dụng khớp sẽ được chèn sau nó."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "“样式”中匹配的应用规则会接在其后插入。"
+            "value": "匹配的应用规则会接在其后插入。"
           }
         }
       }
@@ -17389,48 +17481,48 @@
         }
       }
     },
-    "Change the model per app in Style → Per app": {
+    "Change the model per app": {
       "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changez le modèle par app"
+          }
+        },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ändere das Modell pro App unter Stil → Pro App"
+            "value": "Ändere das Modell pro App"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cambia el modelo por app en Estilo → Por app"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Changez le modèle par app dans Style → Par application"
+            "value": "Cambia el modelo por app"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cambia il modello per app in Stile → Per app"
+            "value": "Cambia il modello per app"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Troque o modelo por app em Estilo → Por app"
+            "value": "Troque o modelo por app"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đổi mô hình theo ứng dụng trong Phong cách → Theo ứng dụng"
+            "value": "Đổi mô hình theo ứng dụng"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 样式 → 按应用中更改各应用的模型"
+            "value": "更改各应用的模型"
           }
         }
       }
@@ -24151,52 +24243,6 @@
         }
       }
     },
-    "Insertion, model and formatting for one app, on one line. Apps with an insertion mode ignore the global “Paste instead of typing” switch.\n\nSite rules pick a model for one website in Safari, Arc and other supported browsers. Create them from the menu-bar “Model” submenu while the site is open.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einfügemethode, Modell und Formatierung für eine App, in einer Zeile. Apps mit eigener Einfügemethode ignorieren den globalen Schalter „Einfügen statt Tippen“.\n\nWebsite-Regeln wählen ein Modell für eine Website in Safari, Arc und anderen unterstützten Browsern. Erstelle sie über das Untermenü „Modell“ in der Menüleiste, während die Website geöffnet ist."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inserción, modelo y formato para una app, en una sola línea. Las apps con un modo de inserción ignoran el ajuste global “Pegar en lugar de escribir”.\n\nLas reglas de sitio eligen un modelo para un sitio web en Safari, Arc y otros navegadores compatibles. Créalas desde el submenú “Modelo” de la barra de menús con el sitio abierto."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Insertion, modèle et mise en forme pour une app, sur une seule ligne. Les apps qui ont un mode d'insertion ignorent le réglage global « Coller au lieu de taper ».\n\nLes règles de site choisissent un modèle pour un site web dans Safari, Arc et les autres navigateurs pris en charge. Créez-les depuis le sous-menu « Modèle » de la barre de menus pendant que le site est ouvert."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inserimento, modello e formattazione per un'app, su una sola riga. Le app con una modalità di inserimento ignorano l'opzione globale “Incolla invece di digitare”.\n\nLe regole per sito scelgono un modello per un sito web in Safari, Arc e negli altri browser supportati. Creale dal sottomenu “Modello” della barra dei menu mentre il sito è aperto."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inserção, modelo e formatação de um app, em uma linha. Apps com modo de inserção ignoram a opção global “Colar em vez de digitar”.\n\nRegras de site escolhem um modelo para um site no Safari, Arc e outros navegadores compatíveis. Crie-as no submenu “Modelo” da barra de menus com o site aberto."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cách chèn, mô hình và định dạng cho một ứng dụng, trên một dòng. Ứng dụng có chế độ chèn riêng sẽ bỏ qua công tắc chung “Dán thay vì gõ”.\n\nQuy tắc trang web chọn mô hình cho một trang web trong Safari, Arc và các trình duyệt được hỗ trợ khác. Tạo chúng từ menu con “Mô hình” trên thanh menu khi trang đang mở."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一行配置一个应用的插入方式、模型和格式。设置了插入模式的应用会忽略全局的“粘贴而非键入”开关。\n\n站点规则可为 Safari、Arc 等受支持浏览器中的某个网站指定模型。打开该网站时，可从菜单栏“模型”子菜单创建。"
-          }
-        }
-      }
-    },
     "Inserts confirmed words at the cursor while you dictate. Dictionary and style apply at the end.": {
       "localizations": {
         "de": {
@@ -27601,48 +27647,48 @@
         }
       }
     },
-    "None yet. Set on the Style page, under Per app.": {
+    "None yet. Set on the Per app page.": {
       "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune pour l'instant. À régler sur la page Par application."
+          }
+        },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Noch keine. Festgelegt auf der Seite „Stil“ unter „Pro App“."
+            "value": "Noch keine. Festgelegt auf der Seite „Pro App“."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ninguna todavía. Se ajusta en la página Estilo, en Por app."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune pour l'instant. À régler sur la page Style, sous Par application."
+            "value": "Ninguna todavía. Se ajusta en la página Por app."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ancora nessuna. Impostale nella pagina Stile, in Per app."
+            "value": "Ancora nessuna. Impostale nella pagina Per app."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nenhuma ainda. Defina na página Estilo, em Por app."
+            "value": "Nenhuma ainda. Defina na página Por app."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chưa có. Đặt trong trang Phong cách, mục Theo ứng dụng."
+            "value": "Chưa có. Đặt trong trang Theo ứng dụng."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "暂无。可在“样式”页面的“按应用”下设置。"
+            "value": "暂无。可在“按应用”页面设置。"
           }
         }
       }
@@ -34823,48 +34869,48 @@
         }
       }
     },
-    "Sent after your per-app rules from Style, as the model's last word. It is the only thing standing between a dictated question and a model that answers it, so keep something in it. A small model tends to answer in the language the prompt is written in, so write it in the language you dictate.": {
+    "Sent after your per-app rules, as the model's last word. It is the only thing standing between a dictated question and a model that answers it, so keep something in it. A small model tends to answer in the language the prompt is written in, so write it in the language you dictate.": {
       "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoyé après vos règles par app, comme dernier mot adressé au modèle. C'est la seule chose qui sépare une question dictée d'un modèle qui y répond : gardez-y donc quelque chose. Un petit modèle a tendance à répondre dans la langue de l'invite, alors rédigez-la dans la langue que vous dictez."
+          }
+        },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wird nach deinen App-Regeln aus „Stil“ gesendet, als letztes Wort an das Modell. Nur das hält ein Modell davon ab, eine diktierte Frage zu beantworten, also lass etwas darin stehen. Ein kleines Modell antwortet meist in der Sprache des Prompts, schreib ihn also in der Sprache, in der du diktierst."
+            "value": "Wird nach deinen App-Regeln gesendet, als letztes Wort an das Modell. Nur das hält ein Modell davon ab, eine diktierte Frage zu beantworten, also lass etwas darin stehen. Ein kleines Modell antwortet meist in der Sprache des Prompts, schreib ihn also in der Sprache, in der du diktierst."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Se envía tras tus reglas por app de Estilo, como última palabra para el modelo. Es lo único que separa una pregunta dictada de un modelo que la responde, así que no lo dejes vacío. Un modelo pequeño tiende a responder en el idioma del prompt, así que escríbelo en el idioma en que dictas."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Envoyé après vos règles par app de Style, comme dernier mot adressé au modèle. C'est la seule chose qui sépare une question dictée d'un modèle qui y répond : gardez-y donc quelque chose. Un petit modèle a tendance à répondre dans la langue de l'invite, alors rédigez-la dans la langue que vous dictez."
+            "value": "Se envía tras tus reglas por app, como última palabra para el modelo. Es lo único que separa una pregunta dictada de un modelo que la responde, así que no lo dejes vacío. Un modelo pequeño tiende a responder en el idioma del prompt, así que escríbelo en el idioma en que dictas."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inviata dopo le tue regole per app di Stile, come ultima parola al modello. È l'unica cosa che separa una domanda dettata da un modello che le risponde, quindi non lasciarla vuota. Un modello piccolo tende a rispondere nella lingua in cui è scritto il prompt, quindi scrivila nella lingua in cui detti."
+            "value": "Inviata dopo le tue regole per app, come ultima parola al modello. È l'unica cosa che separa una domanda dettata da un modello che le risponde, quindi non lasciarla vuota. Un modello piccolo tende a rispondere nella lingua in cui è scritto il prompt, quindi scrivila nella lingua in cui detti."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enviado depois das suas regras por app de Estilo, como a última palavra para o modelo. É a única coisa entre uma pergunta ditada e um modelo que a responde, então mantenha algo aqui. Um modelo pequeno tende a responder no idioma em que o prompt está escrito, então escreva-o no idioma em que você dita."
+            "value": "Enviado depois das suas regras por app, como a última palavra para o modelo. É a única coisa entre uma pergunta ditada e um modelo que a responde, então mantenha algo aqui. Um modelo pequeno tende a responder no idioma em que o prompt está escrito, então escreva-o no idioma em que você dita."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Được gửi sau các quy tắc theo ứng dụng trong Phong cách, như lời cuối gửi đến mô hình. Đây là thứ duy nhất ngăn mô hình trả lời một câu hỏi được đọc chính tả, nên hãy giữ nội dung ở đây. Mô hình nhỏ thường trả lời bằng ngôn ngữ của lời nhắc, nên hãy viết bằng ngôn ngữ bạn đọc chính tả."
+            "value": "Được gửi sau các quy tắc theo ứng dụng, như lời cuối gửi đến mô hình. Đây là thứ duy nhất ngăn mô hình trả lời một câu hỏi được đọc chính tả, nên hãy giữ nội dung ở đây. Mô hình nhỏ thường trả lời bằng ngôn ngữ của lời nhắc, nên hãy viết bằng ngôn ngữ bạn đọc chính tả."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在“样式”的按应用规则之后发送，是发给模型的最后一句话。它是防止你听写的问题被直接作答的唯一一道防线，所以里面请务必留点内容。小模型倾向于用提示词所用的语言作答，因此请用你听写的语言来写。"
+            "value": "在按应用规则之后发送，是发给模型的最后一句话。它是防止你听写的问题被直接作答的唯一一道防线，所以里面请务必留点内容。小模型倾向于用提示词所用的语言作答，因此请用你听写的语言来写。"
           }
         }
       }
@@ -38043,48 +38089,48 @@
         }
       }
     },
-    "The engine below is used by the per-app formatting rules in Style.": {
+    "The engine below is used by the per-app formatting rules.": {
       "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur ci-dessous sert aux règles de mise en forme par app."
+          }
+        },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Engine unten wird von den Formatierungsregeln pro App in „Stil“ verwendet."
+            "value": "Die Engine unten wird von den Formatierungsregeln pro App verwendet."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El motor de abajo lo usan las reglas de formato por app de Estilo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le moteur ci-dessous sert aux règles de mise en forme par app de Style."
+            "value": "El motor de abajo lo usan las reglas de formato por app."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il motore qui sotto viene usato dalle regole di formattazione per app di Stile."
+            "value": "Il motore qui sotto viene usato dalle regole di formattazione per app."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O motor abaixo é usado pelas regras de formatação por app de Estilo."
+            "value": "O motor abaixo é usado pelas regras de formatação por app."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Công cụ dưới đây được dùng cho các quy tắc định dạng theo ứng dụng trong Phong cách."
+            "value": "Công cụ dưới đây được dùng cho các quy tắc định dạng theo ứng dụng."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "下方引擎供“样式”里的按应用格式规则使用。"
+            "value": "下方引擎供按应用格式规则使用。"
           }
         }
       }
@@ -55283,48 +55329,48 @@
         }
       }
     },
-    "Styles shape AI cleanup. An app can have its own style in its row below. Pro, Personal and your own styles follow their instructions best with Apple Intelligence or a 7B model.": {
+    "Styles shape AI cleanup. An app can have its own style on the Per app page. Pro, Personal and your own styles follow their instructions best with Apple Intelligence or a 7B model.": {
       "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les styles agissent sur le nettoyage IA. Une app peut avoir son propre style dans Par application. Pro, Perso et vos styles suivent mieux leurs instructions avec Apple Intelligence ou un modèle 7B."
+          }
+        },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Stile prägen die KI-Bereinigung. Eine App kann in ihrer Zeile unten einen eigenen Stil haben. Pro, Privat und deine eigenen Stile folgen ihren Anweisungen am besten mit Apple Intelligence oder einem 7B-Modell."
+            "value": "Stile prägen die KI-Bereinigung. Eine App kann unter „Pro App“ einen eigenen Stil haben. Pro, Privat und deine eigenen Stile folgen ihren Anweisungen am besten mit Apple Intelligence oder einem 7B-Modell."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Los estilos dan forma a la limpieza con IA. Una app puede tener su propio estilo en su fila de abajo. Pro, Personal y tus propios estilos siguen mejor sus instrucciones con Apple Intelligence o un modelo 7B."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les styles agissent sur le nettoyage IA. Une app peut avoir son propre style dans sa ligne ci-dessous. Pro, Perso et vos styles suivent mieux leurs instructions avec Apple Intelligence ou un modèle 7B."
+            "value": "Los estilos dan forma a la limpieza con IA. Una app puede tener su propio estilo en la página Por app. Pro, Personal y tus propios estilos siguen mejor sus instrucciones con Apple Intelligence o un modelo 7B."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gli stili agiscono sulla pulizia IA. Un'app può avere il suo stile nella sua riga qui sotto. Pro, Personale e i tuoi stili seguono meglio le istruzioni con Apple Intelligence o un modello 7B."
+            "value": "Gli stili agiscono sulla pulizia IA. Un'app può avere il suo stile nella pagina Per app. Pro, Personale e i tuoi stili seguono meglio le istruzioni con Apple Intelligence o un modello 7B."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Os estilos moldam a limpeza por IA. Um app pode ter seu próprio estilo na linha dele abaixo. Pro, Pessoal e seus próprios estilos seguem melhor as instruções com o Apple Intelligence ou um modelo 7B."
+            "value": "Os estilos moldam a limpeza por IA. Um app pode ter seu próprio estilo na página Por app. Pro, Pessoal e seus próprios estilos seguem melhor as instruções com o Apple Intelligence ou um modelo 7B."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Phong cách định hình Dọn dẹp AI. Mỗi ứng dụng có thể có phong cách riêng trong dòng của nó bên dưới. Pro, Cá nhân và các phong cách của bạn làm theo chỉ dẫn tốt nhất với Apple Intelligence hoặc mô hình 7B."
+            "value": "Phong cách định hình Dọn dẹp AI. Mỗi ứng dụng có thể có phong cách riêng trong trang Theo ứng dụng. Pro, Cá nhân và các phong cách của bạn làm theo chỉ dẫn tốt nhất với Apple Intelligence hoặc mô hình 7B."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "样式作用于 AI 清理。每个应用都可以在下方对应的行中设置自己的样式。使用 Apple Intelligence 或 7B 模型时，Pro、个人以及你自定义的样式最能遵循指令。"
+            "value": "样式作用于 AI 清理。每个应用都可以在“按应用”页面中设置自己的样式。使用 Apple Intelligence 或 7B 模型时，Pro、个人以及你自定义的样式最能遵循指令。"
           }
         }
       }

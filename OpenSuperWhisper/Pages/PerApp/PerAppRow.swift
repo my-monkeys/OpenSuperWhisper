@@ -1,7 +1,7 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// One app (or site) in Style → Per app: what is customised on the left, the quick choices on
+/// One app (or site) in the Per app page: what is customised on the left, the quick choices on
 /// the right, and the full set of options under "›".
 struct PerAppRow: View {
     let entry: PerAppEntry
