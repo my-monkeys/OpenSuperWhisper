@@ -81,11 +81,19 @@ struct RetentionSummary: View {
     @AppStorage("retentionMaxAgeUnit", store: DefaultsStore.current) private var ageUnit = "days"
     @AppStorage("retentionMaxCountEnabled", store: DefaultsStore.current) private var countEnabled = false
     @AppStorage("retentionMaxCount", store: DefaultsStore.current) private var count = 100
+    @ObservedObject private var usage = RecordingsDiskUsage.shared
+    @Environment(\.locale) private var locale
 
     var body: some View {
         HStack(spacing: 4) {
             summary
                 .foregroundColor(STheme.hint)
+            if let size {
+                Text(verbatim: "·")
+                    .foregroundColor(STheme.hint)
+                Text(verbatim: size)
+                    .foregroundColor(STheme.hint)
+            }
             Text(verbatim: "·")
                 .foregroundColor(STheme.hint)
             Button {
@@ -101,7 +109,10 @@ struct RetentionSummary: View {
         .scaledFont(size: 13)
         .lineLimit(1)
         .fixedSize()
+        .task { await usage.loadIfNeeded() }
     }
+
+    private var size: String? { RecordingsSizeLabel.size(usage.total, locale: locale) }
 
     private var ageLimited: Bool { ageEnabled && ageValue > 0 }
     private var countLimited: Bool { countEnabled && count > 0 }

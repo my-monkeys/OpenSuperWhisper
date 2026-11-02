@@ -132,6 +132,7 @@ enum UISnapshotProbe {
             AppPreferences.shared.suggestDictionaryWords = true
             return scrolled(.privacy, to: "Suggest words from your corrections")
         },
+        "settings-privacy-history": { scrolled(.privacy, to: "Transcriptions folder") },
         "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
         "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
         "agent-panel": { AgentPanelSnapshot.make(focused: true) },
@@ -346,6 +347,7 @@ enum UISnapshotProbe {
         // The first was cleaned up; the second hit a refused key and kept the engine's text.
         let cleanups: [Int: (String, String?)] = [0: ("google/gemini-2.5-flash-lite", nil),
                                                    1: ("google/gemini-2.5-flash-lite", "401 Invalid API key")]
+        try? FileManager.default.createDirectory(at: Recording.recordingsDirectory, withIntermediateDirectories: true)
         for (index, (offset, text, app, model, status, source)) in samples.enumerated() {
             let recording = Recording(id: UUID(), timestamp: now.addingTimeInterval(offset),
                                       fileName: "\(Int(now.timeIntervalSince1970 + offset)).wav",
@@ -353,8 +355,16 @@ enum UISnapshotProbe {
                                       sourceFileURL: source, sourceAppName: app, modelUsed: model,
                                       rawTranscription: originals[index] ?? (source == nil ? text : nil),
                                       cleanupModel: cleanups[index]?.0, cleanupError: cleanups[index]?.1)
+            if index < 3 {
+                // Real files, so the weight shown on Home and in Privacy is the folder's.
+                try? Data(count: 4_200_000).write(to: recording.url)
+            }
             RecordingStore.shared.addRecording(recording)
         }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        // The off-screen window never runs the views' .task, so count the folder here, once the
+        // inserts above have landed (each one adds its file to a count that already exists).
+        Task { await RecordingsDiskUsage.shared.refresh() }
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
     }
 }
