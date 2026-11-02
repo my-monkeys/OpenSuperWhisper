@@ -152,7 +152,7 @@ final class DictationPipelineTests: XCTestCase {
         pipeline.cleanupOverride = { text in
             run.duringCleanup = pipeline.isTranscribing
             run.processingInCleanup = pipeline.isProcessing
-            return text
+            return CleanupOutcome(text: text, status: .notRun)
         }
         pipeline.deliverOverride = { _, _ in .inserted }
         defer {
@@ -174,6 +174,51 @@ final class DictationPipelineTests: XCTestCase {
         XCTAssertEqual(run.duringCleanup, false)
         XCTAssertEqual(run.processingInCleanup, true, "the cleanup is still part of processing")
         XCTAssertFalse(pipeline.isTranscribing)
+    }
+
+    private final class StageRun { var cleaningUpDuringPass: Bool?; var cleaningUpDuringFilePass: Bool? }
+
+    /// The bubble says "Cleaning up…" only while the model is working (#269), and a pass that
+    /// worked clears the failure the Settings were showing (#264).
+    func testTheCleanupStageIsPublishedOnlyWhileTheModelRuns() async {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = false
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = true
+        CleanupSessionStatus.shared.record(CleanupOutcome(text: "", status: .failed(model: "m", reason: "boom")))
+
+        let pipeline = DictationPipeline.shared
+        let run = StageRun()
+        pipeline.transcribeOverride = { _, _ in
+            run.cleaningUpDuringFilePass = pipeline.isCleaningUp
+            return "heard"
+        }
+        pipeline.cleanupOverride = { text in
+            run.cleaningUpDuringPass = pipeline.isCleaningUp
+            return CleanupOutcome(text: text, status: .cleaned(model: "m"))
+        }
+        pipeline.deliverOverride = { _, _ in .inserted }
+        defer {
+            pipeline.transcribeOverride = nil
+            pipeline.cleanupOverride = nil
+            pipeline.deliverOverride = nil
+        }
+
+        pipeline.enqueue(tempURL: URL(fileURLWithPath: "/tmp/osw-pipeline-stage.wav"), startedAt: Date(),
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(), modelOption: nil)
+        var waited = 0
+        while pipeline.isProcessing && waited < 500 {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            waited += 1
+        }
+
+        XCTAssertEqual(run.cleaningUpDuringFilePass, false)
+        XCTAssertEqual(run.cleaningUpDuringPass, true)
+        XCTAssertFalse(pipeline.isCleaningUp)
+        XCTAssertNil(CleanupSessionStatus.shared.lastFailure, "a pass that worked clears the failure")
     }
 
     /// A dictation the recorder never captured, rescued from the live preview. The tap and the
@@ -252,7 +297,7 @@ final class DictationPipelineTests: XCTestCase {
         pipeline.transcribeOverride = { _, _ in heard }
         pipeline.cleanupOverride = { text in
             run.cleanupSaw.append(text)
-            return cleaned
+            return CleanupOutcome(text: cleaned, status: .notRun)
         }
         pipeline.agentReplyOverride = { run.agentReplies.append(($0, $1, $2)) }
         pipeline.deliverOverride = { text, _ in

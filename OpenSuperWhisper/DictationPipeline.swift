@@ -70,6 +70,9 @@ final class DictationPipeline: ObservableObject {
     /// it is false during the cleanup model and the insertion, which don't touch the engine, so
     /// the next dictation's live preview can start then (#250).
     var isTranscribing: Bool { filePassRunning || !queue.isEmpty }
+    /// True while the AI cleanup model is working on a dictation. The bubble stays up through it
+    /// (it hides when the pipeline drains) and says so instead of still saying "Transcribing…" (#269).
+    @Published private(set) var isCleaningUp = false
 
     /// Set by `discardEverything()` and cleared once the queue drains.
     ///
@@ -85,7 +88,7 @@ final class DictationPipeline: ObservableObject {
     /// order of the steps without a language model, an agent or a focused field: the cleanup
     /// model's pass, the hand-off to a waiting agent (text, request id, send), and the insertion
     /// (text, submitting). nil in production.
-    var cleanupOverride: ((String) async -> String)?
+    var cleanupOverride: ((String) async -> CleanupOutcome)?
     var agentReplyOverride: ((String, String, Bool) -> Void)?
     var deliverOverride: ((String, Bool) async -> Delivery)?
 
@@ -257,14 +260,18 @@ final class DictationPipeline: ObservableObject {
             // the background queue got to it. (parallel-recording)
             let style = AppPreferences.shared.writingStyle(for: item.context.bundleID)
             let cleanup: CleanupOutcome
+            isCleaningUp = AppPreferences.shared.aiPostProcessingEnabled
+                || AppPreferences.shared.appContextFormattingEnabled
             if let cleanupOverride {
-                cleanup = CleanupOutcome(text: await cleanupOverride(text), status: .notRun)
+                cleanup = await cleanupOverride(text)
             } else {
                 cleanup = await LLMPostProcessor.processWithOutcome(
                     text, bundleID: item.context.bundleID, translating: settings.translateToEnglish,
                     writesLists: RichListPaste.cleanupWritesLists(into: item.context.bundleID),
                     style: style.instructions)
             }
+            isCleaningUp = false
+            CleanupSessionStatus.shared.record(cleanup)
             text = cleanup.text
 
             // Trailing "press enter" voice command (opt-in): strip it and remember to press Return
@@ -364,6 +371,13 @@ final class DictationPipeline: ObservableObject {
                 && !discarding {
                 try? await Task.sleep(nanoseconds: 120_000_000)
                 TextInserter.pressReturn()
+            }
+
+            // Said after the insertion, so the notice never delays the words, and before the
+            // clipboard one below, which takes the bubble over because it asks for an action.
+            if let reason = cleanup.failureReason {
+                IndicatorWindowManager.shared.flash(
+                    .error(String(localized: "Cleanup failed: \(reason). Pasted as dictated.")))
             }
 
             // No editable target was found, or the app it was dictated into has gone — the text is
