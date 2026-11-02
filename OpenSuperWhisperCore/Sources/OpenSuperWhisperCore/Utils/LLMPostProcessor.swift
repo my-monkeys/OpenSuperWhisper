@@ -55,17 +55,25 @@ public enum LLMPostProcessor {
 
     /// Selects the configured backend. Falls back to Ollama for any unknown value.
     public static func currentBackend() -> LLMCleanupBackend {
+        backend(CoreAccess.preferences.aiBackend)
+    }
+
+    /// The backend named `tag` ("builtin", "apple", "remote", anything else is Ollama), with the
+    /// endpoint and key the user configured. `model` replaces the configured model id for one
+    /// pass of Ollama or Remote, which is how the history tries another model without touching
+    /// the preference; the other two have no model id to replace.
+    public static func backend(_ tag: String, model: String? = nil) -> LLMCleanupBackend {
         let prefs = CoreAccess.preferences
-        switch prefs.aiBackend {
+        switch tag {
         case "builtin":
             return BuiltInLlamaBackend.shared
         case "apple":
             return AppleIntelligenceBackend(model: AppleIntelligence.model)
         case "remote":
-            return RemoteBackend(endpoint: prefs.aiRemoteEndpoint, model: prefs.aiRemoteModel,
+            return RemoteBackend(endpoint: prefs.aiRemoteEndpoint, model: model ?? prefs.aiRemoteModel,
                                   apiKey: prefs.aiRemoteAPIKey ?? "")
         default:
-            return OllamaBackend(endpoint: prefs.aiOllamaEndpoint, model: prefs.aiOllamaModel)
+            return OllamaBackend(endpoint: prefs.aiOllamaEndpoint, model: model ?? prefs.aiOllamaModel)
         }
     }
 
@@ -88,14 +96,21 @@ public enum LLMPostProcessor {
 
     /// `process`, with what happened to the text: a pass that failed and a pass that changed
     /// nothing both hand back the input, and only the status tells them apart.
+    ///
+    /// `backend` runs the pass on another backend than the configured one, and `extraInstruction`
+    /// adds a request for this pass alone, after the style: what the history's regenerate panel
+    /// offers to compare two models on a real dictation.
     public static func processWithOutcome(_ text: String, bundleID: String?, translating: Bool = false,
-                                          writesLists: Bool = false, style: String = "") async -> CleanupOutcome {
+                                          writesLists: Bool = false, style: String = "",
+                                          extraInstruction: String = "",
+                                          backend: LLMCleanupBackend? = nil) async -> CleanupOutcome {
         await run(text, bundleID: bundleID, translating: translating, writesLists: writesLists,
-                  style: style, backend: currentBackend())
+                  style: style, extraInstruction: extraInstruction, backend: backend ?? currentBackend())
     }
 
     static func run(_ text: String, bundleID: String?, translating: Bool, writesLists: Bool,
-                    style: String, backend: LLMCleanupBackend) async -> CleanupOutcome {
+                    style: String, extraInstruction: String = "",
+                    backend: LLMCleanupBackend) async -> CleanupOutcome {
         let prefs = CoreAccess.preferences
         let general = prefs.aiPostProcessingEnabled
         let formatting = prefs.appContextFormattingEnabled
@@ -115,7 +130,8 @@ public enum LLMPostProcessor {
                                                 translationPrompt: prefs.aiPostProcessingTranslation,
                                                 vocabulary: vocabulary,
                                                 writesLists: writesLists,
-                                                style: style)
+                                                style: style,
+                                                extraInstruction: extraInstruction)
         else { return notRun }
 
         let model = backend.modelLabel
@@ -159,7 +175,7 @@ public enum LLMPostProcessor {
             if writesLists, listRepeatsText(input: text, output: result) {
                 print("AI post-processing kept the sentence next to its list, running it again without lists")
                 return await run(text, bundleID: bundleID, translating: translating, writesLists: false,
-                                 style: style, backend: backend)
+                                 style: style, extraInstruction: extraInstruction, backend: backend)
             }
             return CleanupOutcome(text: result, status: .cleaned(model: model))
         } catch {
@@ -317,7 +333,8 @@ public enum LLMPostProcessor {
                                      translationPrompt: String = "",
                                      vocabulary: [String] = [],
                                      writesLists: Bool = false,
-                                     style: String = "") -> String? {
+                                     style: String = "",
+                                     extraInstruction: String = "") -> String? {
         guard generalCleanup || profile != nil else { return nil }
 
         var sections: [String] = []
@@ -328,6 +345,9 @@ public enum LLMPostProcessor {
             // to general cleanup and goes with it. App rules still come later and win on format.
             sections.append(style)
         }
+        // A one-off request of the person rerunning the pass: it refines the style, so it sits
+        // right after it, and the app rules and the closing guardrail still come after.
+        sections.append(extraInstruction)
         // Early, next to the contract it qualifies, and gone entirely when translation is off:
         // that disappearance is the whole request. Instructions about translating, left in the
         // general prompt where they apply to every dictation, are what sent a small model into
