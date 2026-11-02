@@ -48,6 +48,7 @@ enum SettingsArchive {
         "indicatorCustomAnchor",
         "lastModifierOnlyHotkey",
         "lastMouseButtonHotkey",
+        "offeredAppContextPresets",
         "selectedMicrophoneData",
         "selectedWhisperModelPath",
     ]

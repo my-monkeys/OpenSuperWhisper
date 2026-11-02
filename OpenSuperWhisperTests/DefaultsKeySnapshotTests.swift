@@ -79,6 +79,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "mouseButtonHotkey",
         "noSpeechThreshold",
         "notifyWhenNoPasteTarget",
+        "offeredAppContextPresets",
         "pasteAgentPromptsInPieces",
         "pasteInsteadOfTyping",
         "pasteIntoOriginalField",
@@ -282,6 +283,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
             prefs.appContextProfiles = [AppContextProfile(bundleIdentifier: "com.example")]
         }
         assertWrites("didSeedAppContextPresets") { prefs.didSeedAppContextPresets = true }
+        assertWrites("offeredAppContextPresets") { prefs.offeredAppContextPresets = ["com.example"] }
         assertWrites("didSeedTerminalInsertionRules") { prefs.didSeedTerminalInsertionRules = true }
         assertWrites("crashReportMode") { prefs.crashReportMode = .auto }
         assertWrites("autoCopyToClipboard") { prefs.autoCopyToClipboard = false }
@@ -458,6 +460,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.appInsertionRules, [])
         XCTAssertEqual(prefs.appContextProfiles, [])
         XCTAssertEqual(prefs.didSeedAppContextPresets, false)
+        XCTAssertEqual(prefs.offeredAppContextPresets, [])
         XCTAssertEqual(prefs.didSeedTerminalInsertionRules, false)
         XCTAssertEqual(prefs.crashReportMode, .ask)
         XCTAssertEqual(prefs.autoCopyToClipboard, true)
