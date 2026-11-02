@@ -452,6 +452,11 @@ final class AppPreferences {
     @UserDefault(key: "feedbackPromptLaunches", defaultValue: 0)
     var feedbackPromptLaunches: Int
 
+    /// Keep a copy of the portable settings in iCloud Drive (`ICloudSettingsBackup`). Local to
+    /// this Mac: a backup that switched itself on elsewhere would overwrite the one it came from.
+    @UserDefault(key: "iCloudSettingsBackupEnabled", defaultValue: false)
+    var iCloudSettingsBackupEnabled: Bool
+
     /// Raw store for `crashReportMode`. A plain string so an unknown value from a newer build reads
     /// as the default rather than failing to decode.
     @UserDefault(key: "crashReportMode", defaultValue: CrashReportMode.default.rawValue)

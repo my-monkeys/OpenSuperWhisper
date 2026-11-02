@@ -99,6 +99,14 @@ extension OpenSuperWhisperApp {
         }
     }
 
+    static func startICloudSettingsBackup() {
+        // A test host must not write into the user's iCloud Drive.
+        guard !DefaultsStore.isRunningTests else { return }
+        Task { @MainActor in
+            ICloudSettingsBackup.shared.start()
+        }
+    }
+
     static func preloadCleanupModel() {
         guard !DefaultsStore.isRunningTests else { return }
         let preferences = AppPreferences.shared
@@ -186,6 +194,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         OpenSuperWhisperApp.startTranscriptionQueue()
         OpenSuperWhisperApp.startRetentionScheduler()
+        OpenSuperWhisperApp.startICloudSettingsBackup()
         OpenSuperWhisperApp.preloadCleanupModel()
         AgentBridge.registerRunningApp()
         AgentInbox.shared.start()

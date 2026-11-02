@@ -133,6 +133,7 @@ enum UISnapshotProbe {
             return scrolled(.privacy, to: "Suggest words from your corrections")
         },
         "settings-privacy-history": { scrolled(.privacy, to: "Transcriptions folder") },
+        "settings-general-backup": { scrolled(.general, to: "Back up to iCloud Drive") },
         "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
         "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
         "agent-panel": { AgentPanelSnapshot.make(focused: true) },
