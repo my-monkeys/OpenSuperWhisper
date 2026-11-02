@@ -13,7 +13,7 @@ struct PerAppRow: View {
     let onRemove: () -> Void
     let onChangeApp: () -> Void
 
-    private static let insertionWidth: CGFloat = 150
+    private static let insertionWidth: CGFloat = 170
     private static let modelWidth: CGFloat = 170
     private static let styleWidth: CGFloat = 110
 
