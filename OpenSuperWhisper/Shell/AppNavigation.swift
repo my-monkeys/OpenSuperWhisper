@@ -3,7 +3,7 @@ import OpenSuperWhisperCore
 
 /// The pages of the main window's sidebar.
 enum AppPage: String, CaseIterable, Identifiable {
-    case home, dictionary, snippets, style
+    case home, dictionary, snippets, style, perApp
     var id: String { rawValue }
 
     var title: LocalizedStringKey {
@@ -12,6 +12,7 @@ enum AppPage: String, CaseIterable, Identifiable {
         case .dictionary: return "Dictionary"
         case .snippets: return "Snippets"
         case .style: return "Style"
+        case .perApp: return "Per app"
         }
     }
 
@@ -21,6 +22,7 @@ enum AppPage: String, CaseIterable, Identifiable {
         case .dictionary: return "textformat"
         case .snippets: return "quote.opening"
         case .style: return "pencil.tip"
+        case .perApp: return "app.dashed"
         }
     }
 }

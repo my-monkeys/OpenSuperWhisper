@@ -12,22 +12,27 @@ struct OnboardingSystem {
     /// The localization the app is running in ("fr").
     var appLanguage: String?
     var preferredLanguages: [String]
+    /// The Mac account's full name, offered as a word to add. Empty when the account has none.
+    var fullUserName: String
 
     static let live = OnboardingSystem(
         isDownloaded: isDownloadedOnDisk,
         appleSpeech: currentAppleSpeechOffer,
         appLanguage: Bundle.main.preferredLocalizations.first,
-        preferredLanguages: Locale.preferredLanguages)
+        preferredLanguages: Locale.preferredLanguages,
+        fullUserName: NSFullUserName())
 
     /// Fixed answers, nothing read from disk or from the system. Apple's offer is asked per
     /// language, so a test can switch to one it does not speak.
     static func staged(downloaded: @escaping (OnboardingModelType) -> Bool = { _ in false },
                        appleSpeech: @escaping (_ language: String) -> AppleSpeechOffer = { _ in .unavailable },
-                       appLanguage: String? = "en") -> OnboardingSystem {
+                       appLanguage: String? = "en",
+                       fullUserName: String = "") -> OnboardingSystem {
         OnboardingSystem(isDownloaded: downloaded,
                          appleSpeech: { appleSpeech($0) },
                          appLanguage: appLanguage,
-                         preferredLanguages: [appLanguage ?? "en"])
+                         preferredLanguages: [appLanguage ?? "en"],
+                         fullUserName: fullUserName)
     }
 
     private static func isDownloadedOnDisk(_ type: OnboardingModelType) -> Bool {

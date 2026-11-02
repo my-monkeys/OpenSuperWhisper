@@ -38,8 +38,8 @@ enum TranscriptInserter {
         case done
         /// No field to put it in: it is on the clipboard, and the user is to be told ⌘V.
         case onClipboard
-        /// A paste in pieces stopped part way (#165), and Return must not follow: it would send
-        /// half a prompt. What was left is held for the paste-last shortcut when a piece missed
+        /// A paste in pieces stopped part way (#165), or the keys typed into a remote session
+        /// (#255), and Return must not follow: it would send half a prompt. What was left is held for the paste-last shortcut when a piece missed
         /// or another window came to the front, and dropped when a newer transcription took over
         /// or the dictation was thrown away.
         case cutShort
@@ -62,7 +62,8 @@ enum TranscriptInserter {
     ///     (#166, see `richText(for:into:submitting:)`).
     ///   - windowTitle: the title of the window it goes to, which tells Claude Code and Codex in a
     ///     terminal from a shell (#165). Taken when `targetBundleID` was, for the same reason.
-    ///   - wanted: `false` once the dictation was thrown away, which stops a paste in pieces.
+    ///   - wanted: `false` once the dictation was thrown away, which stops a paste in pieces and
+    ///     the keys typed into a remote session.
     /// - Returns: once the text is in, so Return can follow: for a paste in pieces, once the
     ///   last piece has been read.
     @MainActor
@@ -79,8 +80,13 @@ enum TranscriptInserter {
         CorrectionWatch.endCurrent()
 
         let inserting = prefs.autoPasteTranscription || !honorAutoPastePreference
+        // Above any rule: neither of the two modes a rule can pick gets through to the other
+        // machine (#255).
+        let remoteSession = RemoteSession.isRemoteSession(
+            targetBundleID ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
         // A rule for this app wins over the global switch, which is the whole point of having one.
-        let pasting = inserting && (rule.map { $0.mode == .paste } ?? prefs.pasteInsteadOfTyping)
+        let pasting = inserting && !remoteSession
+            && (rule.map { $0.mode == .paste } ?? prefs.pasteInsteadOfTyping)
 
         // Optional, independent clipboard stash. A paste leaves the text there itself once the
         // app has taken it; stashing first as well would hand clipboard histories a second copy.
@@ -99,6 +105,11 @@ enum TranscriptInserter {
             TextInserter.logInsertion(payload: text, mechanism: mechanism,
                                       dictatedInto: targetBundleID, rule: rule,
                                       chunks: chunks, pause: pause, pasteKeyCode: pasteKeyCode)
+        }
+
+        if remoteSession {
+            return await pressKeys(text, pace: rule?.typingPaceMilliseconds, wanted: wanted,
+                                   log: { log(mechanism: "keystrokes", chunks: $0, pause: $1) })
         }
 
         if pasting {
@@ -145,6 +156,27 @@ enum TranscriptInserter {
             TextInserter.type(text, paceMilliseconds: pace)
         }
         return .done
+    }
+
+    /// Types into a remote session key by key (#255). No editable-field check: the field is on
+    /// the other machine, and accessibility only ever sees the window that shows it.
+    @MainActor
+    private static func pressKeys(_ text: String, pace: Int?, wanted: () -> Bool,
+                                  log: (_ strokes: Int, _ pause: useconds_t) -> Void) async -> Insertion {
+        guard let map = KeystrokeMap.current() else {
+            Diag.mark("remote session: keyboard layout unreadable, nothing typed")
+            ClipboardUtil.copyToClipboard(text)
+            return .onClipboard
+        }
+        let plan = map.plan(text)
+        if !plan.skipped.isEmpty {
+            Diag.mark("remote session: \(plan.skipped.count) characters no key of this layout types")
+        }
+        let pauseMilliseconds = pace ?? RemoteSession.defaultStrokePauseMilliseconds
+        log(plan.strokes.count, TextInserter.microseconds(fromMilliseconds: pauseMilliseconds))
+        let finished = await TextInserter.press(plan.strokes, pauseMilliseconds: pauseMilliseconds,
+                                                wanted: wanted)
+        return finished ? .done : .cutShort
     }
 
     /// The text exactly as it goes into the field: the post-processing every dictation gets,

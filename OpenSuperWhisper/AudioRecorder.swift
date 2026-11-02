@@ -19,7 +19,8 @@ class AudioRecorder: NSObject, ObservableObject {
     /// first, or the duck would fire after the restore and leave the Mac turned down.
     private var pendingDuck: DispatchWorkItem?
     private let temporaryDirectory: URL
-    private var currentRecordingURL: URL?
+    /// The take being written, which nothing else may touch until it is stopped.
+    private(set) var currentRecordingURL: URL?
     private var notificationObserver: Any?
     private var microphoneChangeObserver: Any?
     private var connectionCheckTimer: DispatchSourceTimer?
@@ -132,6 +133,9 @@ class AudioRecorder: NSObject, ObservableObject {
     private func createTemporaryDirectoryIfNeeded() {
         do {
             try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+            // Takes are recorded here rather than in the system temp folder, so a crash leaves
+            // them where the next launch looks.
+            try FileManager.default.createDirectory(at: UnfinishedDictations.directory, withIntermediateDirectories: true)
         } catch {
             print("Failed to create temporary recordings directory: \(error)")
         }
@@ -242,7 +246,7 @@ class AudioRecorder: NSObject, ObservableObject {
         // it to transcribe. (parallel-recording)
         let timestamp = Int(Date().timeIntervalSince1970)
         let filename = "rec-\(timestamp)-\(UUID().uuidString.prefix(8)).wav"
-        let fileURL = temporaryDirectory.appendingPathComponent(filename)
+        let fileURL = UnfinishedDictations.directory.appendingPathComponent(filename)
         currentRecordingURL = fileURL
 
         print("start record file to \(fileURL)")

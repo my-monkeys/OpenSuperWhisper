@@ -301,11 +301,11 @@ private struct FeedRowActions: View {
             if canRegenerate {
                 Menu {
                     Button("Current model") { onRegenerate(nil) }
-                    let models = ModelCatalog.allAvailable()
+                    let models = RegenerationModels.current()
                     if !models.isEmpty {
                         Divider()
                         ForEach(models.indices, id: \.self) { i in
-                            Button(models[i].displayName) { onRegenerate(models[i]) }
+                            Button(models[i].option.displayName) { onRegenerate(models[i].option) }
                         }
                     }
                     if HistoryRestyle.isAvailable(for: recording) {

@@ -99,6 +99,23 @@ extension OpenSuperWhisperApp {
         }
     }
 
+    static func startICloudSettingsBackup() {
+        // A test host must not write into the user's iCloud Drive.
+        guard !DefaultsStore.isRunningTests else { return }
+        Task { @MainActor in
+            ICloudSettingsBackup.shared.start()
+        }
+    }
+
+    /// Looks in `unfinished/` for takes an earlier run left behind, before the first dictation.
+    static func startUnfinishedRecovery() {
+        // A test host has its own storage root and its own recordings to look after.
+        guard !DefaultsStore.isRunningTests else { return }
+        Task { @MainActor in
+            UnfinishedDictations.shared.start()
+        }
+    }
+
     static func preloadCleanupModel() {
         guard !DefaultsStore.isRunningTests else { return }
         let preferences = AppPreferences.shared
@@ -186,6 +203,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         OpenSuperWhisperApp.startTranscriptionQueue()
         OpenSuperWhisperApp.startRetentionScheduler()
+        OpenSuperWhisperApp.startICloudSettingsBackup()
+        OpenSuperWhisperApp.startUnfinishedRecovery()
         OpenSuperWhisperApp.preloadCleanupModel()
         AgentBridge.registerRunningApp()
         AgentInbox.shared.start()

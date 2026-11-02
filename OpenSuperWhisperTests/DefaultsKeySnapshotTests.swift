@@ -66,6 +66,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "hasCompletedOnboarding",
         "holdRecordingTriggers",
         "holdToRecord",
+        "iCloudSettingsBackupEnabled",
         "indicatorCustomAnchor",
         "indicatorLayout",
         "indicatorMeterMode",
@@ -80,6 +81,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "mouseButtonHotkey",
         "noSpeechThreshold",
         "notifyWhenNoPasteTarget",
+        "offeredAppContextPresets",
         "pasteAgentPromptsInPieces",
         "pasteInsteadOfTyping",
         "pasteIntoOriginalField",
@@ -234,6 +236,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("hasCompletedOnboarding") { prefs.hasCompletedOnboarding = true }
         assertWrites("feedbackPromptDone") { prefs.feedbackPromptDone = true }
         assertWrites("feedbackPromptLaunches") { prefs.feedbackPromptLaunches = 2 }
+        assertWrites("iCloudSettingsBackupEnabled") { prefs.iCloudSettingsBackupEnabled = true }
         assertWrites("useAsianAutocorrect") { prefs.useAsianAutocorrect = false }
         assertWrites("selectedMicrophoneData") { prefs.selectedMicrophoneData = Data([1]) }
         assertWrites("modifierOnlyHotkey") { prefs.modifierOnlyHotkey = "rightOption" }
@@ -284,6 +287,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
             prefs.appContextProfiles = [AppContextProfile(bundleIdentifier: "com.example")]
         }
         assertWrites("didSeedAppContextPresets") { prefs.didSeedAppContextPresets = true }
+        assertWrites("offeredAppContextPresets") { prefs.offeredAppContextPresets = ["com.example"] }
         assertWrites("didSeedTerminalInsertionRules") { prefs.didSeedTerminalInsertionRules = true }
         assertWrites("crashReportMode") { prefs.crashReportMode = .auto }
         assertWrites("autoCopyToClipboard") { prefs.autoCopyToClipboard = false }
@@ -461,6 +465,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.appInsertionRules, [])
         XCTAssertEqual(prefs.appContextProfiles, [])
         XCTAssertEqual(prefs.didSeedAppContextPresets, false)
+        XCTAssertEqual(prefs.offeredAppContextPresets, [])
         XCTAssertEqual(prefs.didSeedTerminalInsertionRules, false)
         XCTAssertEqual(prefs.crashReportMode, .ask)
         XCTAssertEqual(prefs.autoCopyToClipboard, true)

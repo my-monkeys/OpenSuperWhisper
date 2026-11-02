@@ -8,6 +8,7 @@ struct HomePage: View {
     @EnvironmentObject private var permissions: PermissionsManager
     @ObservedObject private var navigation = AppNavigation.shared
     @ObservedObject private var transcription = TranscriptionService.shared
+    @ObservedObject private var unfinished = UnfinishedDictations.shared
     @State private var debouncedSearchText = ""
     @State private var searchTask: Task<Void, Never>?
 
@@ -20,6 +21,7 @@ struct HomePage: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         HomePermissionBanners(permissions: permissions)
+                        UnfinishedDictationsBanner(model: unfinished)
                         HomeGreeting(trigger: trigger)
                         HomeSummaryTiles(trigger: trigger)
                         HomeFilterBar(viewModel: viewModel)
