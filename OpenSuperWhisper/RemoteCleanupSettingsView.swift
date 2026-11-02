@@ -149,6 +149,8 @@ struct RemoteCleanupSettingsView: View {
     /// Probe GET /v1/models: publish reachability to `llmStatus` and fill the model list. With
     /// `probesChat`, a reachable server is then sent a tiny real chat request with the chosen
     /// model and key, because the listing proves neither (OpenRouter answers it without a key).
+    /// A missing key is no reason to skip it: a server that needs one says so with a 401, and a
+    /// local server that does not answers like any other.
     private func runTest(probesChat: Bool = false) {
         viewModel.llmStatus = .checking
         let urlString = viewModel.aiRemoteEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -168,7 +170,7 @@ struct RemoteCleanupSettingsView: View {
                 await MainActor.run {
                     if !models.isEmpty { applyFetched(models) }
                     if (200..<300).contains(code) {
-                        if probesChat, !model.isEmpty, !apiKey.isEmpty {
+                        if probesChat, !model.isEmpty {
                             probeChat(endpoint: urlString, model: model, apiKey: apiKey)
                         } else {
                             viewModel.llmStatus = .ok
