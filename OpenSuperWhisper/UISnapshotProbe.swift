@@ -86,8 +86,9 @@ enum UISnapshotProbe {
         "settings-dictation-fixed-volume": { microphoneSettings(.tooQuiet, volume: .fixed) },
         "onboarding": { AnyView(OnboardingView().environmentObject(AppState())) },
         "onboarding-2": { AnyView(OnboardingView(initialStep: .model).environmentObject(AppState())) },
-        "onboarding-3": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
-        "onboarding-4": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
+        "onboarding-3": { AnyView(OnboardingView(initialStep: .words).environmentObject(AppState())) },
+        "onboarding-4": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
+        "onboarding-5": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
         "settings-textAndAI-ai": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             return scrolled(.textAndAI, to: "Format with AI")
