@@ -102,6 +102,17 @@ enum UISnapshotProbe {
             AppPreferences.shared.aiBackend = "remote"
             return scrolled(.textAndAI, to: "Server")
         },
+        "settings-textAndAI-server-failed": {
+            AppPreferences.shared.aiPostProcessingEnabled = true
+            AppPreferences.shared.aiBackend = "remote"
+            AppPreferences.shared.aiRemoteEndpoint = "https://openrouter.ai/api/v1"
+            AppPreferences.shared.aiRemoteModel = "google/gemini-2.5-flash-lite"
+            AppPreferences.shared.aiRemoteAPIKey = "sk-or-v1-0000demo-a1b2"
+            CleanupSessionStatus.shared.record(CleanupOutcome(
+                text: "", status: .failed(model: "google/gemini-2.5-flash-lite", reason: "401 Invalid API key")),
+                at: Date().addingTimeInterval(-120))
+            return scrolled(.textAndAI, to: "Server")
+        },
         "settings-textAndAI-insertion": { scrolled(.textAndAI, to: "Warn when no field is focused") },
         "settings-privacy-context": {
             AppPreferences.shared.customDictionaryEnabled = true
@@ -319,12 +330,16 @@ enum UISnapshotProbe {
         ]
         // What the engine wrote before the cleanup, for the first one: the history offers it back.
         let originals = [0: "i'll send you the mock ups tomorrow morning thanks for the feedback shall we meet on thursday"]
+        // The first was cleaned up; the second hit a refused key and kept the engine's text.
+        let cleanups: [Int: (String, String?)] = [0: ("google/gemini-2.5-flash-lite", nil),
+                                                   1: ("google/gemini-2.5-flash-lite", "401 Invalid API key")]
         for (index, (offset, text, app, model, status, source)) in samples.enumerated() {
             let recording = Recording(id: UUID(), timestamp: now.addingTimeInterval(offset),
                                       fileName: "\(Int(now.timeIntervalSince1970 + offset)).wav",
                                       transcription: text, duration: 6, status: status, progress: 1,
                                       sourceFileURL: source, sourceAppName: app, modelUsed: model,
-                                      rawTranscription: originals[index] ?? (source == nil ? text : nil))
+                                      rawTranscription: originals[index] ?? (source == nil ? text : nil),
+                                      cleanupModel: cleanups[index]?.0, cleanupError: cleanups[index]?.1)
             RecordingStore.shared.addRecording(recording)
         }
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
