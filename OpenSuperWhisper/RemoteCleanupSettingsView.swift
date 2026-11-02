@@ -50,6 +50,9 @@ struct RemoteCleanupSettingsView: View {
             SettingRow("API key",
                        hint: "Only for servers with accounts (Groq, OpenAI…). Kept in your Keychain.",
                        indented: true) {
+                // The saved badge and the key link go under the field: beside it they left the
+                // row's label a column too narrow for its hint, five lines tall in French.
+                VStack(alignment: .trailing, spacing: 6) {
                 HStack(spacing: 8) {
                     Group {
                         if revealKey {
@@ -75,8 +78,13 @@ struct RemoteCleanupSettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .help(revealKey ? "Hide key" : "Reveal key")
-                    if storedKey != nil { savedBadge }
-                    if let service { ServiceKeyLink(service: service) }
+                }
+                if storedKey != nil || service != nil {
+                    HStack(spacing: 10) {
+                        if storedKey != nil { savedBadge }
+                        if let service { ServiceKeyLink(service: service) }
+                    }
+                }
                 }
             }
 
