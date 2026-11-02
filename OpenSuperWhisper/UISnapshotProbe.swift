@@ -108,6 +108,7 @@ enum UISnapshotProbe {
             AppPreferences.shared.suggestDictionaryWords = true
             return scrolled(.privacy, to: "Suggest words from your corrections")
         },
+        "settings-privacy-history": { scrolled(.privacy, to: "Transcriptions folder") },
         "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
         "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
         "agent-panel": { AgentPanelSnapshot.make(focused: true) },
@@ -319,14 +320,23 @@ enum UISnapshotProbe {
         ]
         // What the engine wrote before the cleanup, for the first one: the history offers it back.
         let originals = [0: "i'll send you the mock ups tomorrow morning thanks for the feedback shall we meet on thursday"]
+        try? FileManager.default.createDirectory(at: Recording.recordingsDirectory, withIntermediateDirectories: true)
         for (index, (offset, text, app, model, status, source)) in samples.enumerated() {
             let recording = Recording(id: UUID(), timestamp: now.addingTimeInterval(offset),
                                       fileName: "\(Int(now.timeIntervalSince1970 + offset)).wav",
                                       transcription: text, duration: 6, status: status, progress: 1,
                                       sourceFileURL: source, sourceAppName: app, modelUsed: model,
                                       rawTranscription: originals[index] ?? (source == nil ? text : nil))
+            if index < 3 {
+                // Real files, so the weight shown on Home and in Privacy is the folder's.
+                try? Data(count: 4_200_000).write(to: recording.url)
+            }
             RecordingStore.shared.addRecording(recording)
         }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        // The off-screen window never runs the views' .task, so count the folder here, once the
+        // inserts above have landed (each one adds its file to a count that already exists).
+        Task { await RecordingsDiskUsage.shared.refresh() }
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
     }
 }

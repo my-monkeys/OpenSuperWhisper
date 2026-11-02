@@ -223,6 +223,7 @@ public class RecordingStore: ObservableObject {
             do {
                 try await insertRecording(recording)
                 await MainActor.run {
+                    RecordingsDiskUsage.shared.recordingSaved(at: recording.url)
                     NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
                 }
                 // Keep the store within the retention limit right after a new
@@ -238,6 +239,7 @@ public class RecordingStore: ObservableObject {
     func addRecordingSync(_ recording: Recording) async throws {
         try await insertRecording(recording)
         await MainActor.run {
+            RecordingsDiskUsage.shared.recordingSaved(at: recording.url)
             NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
         }
     }
@@ -417,8 +419,10 @@ public class RecordingStore: ObservableObject {
         Task {
             do {
                 try await deleteRecordingFromDB(recording)
+                let removed = RecordingsDiskUsage.measure([recording.url])
                 try? FileManager.default.removeItem(at: recording.url)
                 await MainActor.run {
+                    RecordingsDiskUsage.shared.recordingsRemoved(removed)
                     NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
                 }
             } catch {
@@ -442,6 +446,7 @@ public class RecordingStore: ObservableObject {
                 }
                 try await deleteAllRecordingsFromDB()
                 await MainActor.run {
+                    RecordingsDiskUsage.shared.allRecordingsRemoved()
                     NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
                 }
             } catch {
@@ -478,11 +483,14 @@ public class RecordingStore: ObservableObject {
         guard !deleted.isEmpty else { return 0 }
 
         // Remove the stored audio files off the main actor.
-        await Task.detached(priority: .utility) {
+        let removed = await Task.detached(priority: .utility) {
+            let sizes = RecordingsDiskUsage.measure(deleted.map(\.url))
             for recording in deleted {
                 try? FileManager.default.removeItem(at: recording.url)
             }
+            return sizes
         }.value
+        RecordingsDiskUsage.shared.recordingsRemoved(removed)
 
         let deletedIds = Set(deleted.map { $0.id })
         recordings.removeAll { deletedIds.contains($0.id) }
