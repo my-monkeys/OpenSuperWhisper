@@ -34,14 +34,16 @@ final class SpokenFormattingPromptTests: CoreTestCase {
 
     func testAskedForWhileCleanupIsOn() async throws {
         prefs.aiPostProcessingEnabled = true
-        let system = try await XCTUnwrap(sentPrompt())
+        let sent = await sentPrompt()
+        let system = try XCTUnwrap(sent)
         XCTAssertTrue(system.contains(LLMPostProcessor.spokenFormattingInstruction))
     }
 
     func testNotAskedForWhenTheSwitchIsOff() async throws {
         prefs.aiPostProcessingEnabled = true
         prefs.aiSpokenFormattingEnabled = false
-        let system = try await XCTUnwrap(sentPrompt())
+        let sent = await sentPrompt()
+        let system = try XCTUnwrap(sent)
         XCTAssertFalse(system.contains(LLMPostProcessor.spokenFormattingInstruction))
     }
 
@@ -50,7 +52,8 @@ final class SpokenFormattingPromptTests: CoreTestCase {
         prefs.aiPostProcessingEnabled = false
         prefs.appContextFormattingEnabled = true
         prefs.appContextProfiles = [slack]
-        let system = try await XCTUnwrap(sentPrompt())
+        let sent = await sentPrompt()
+        let system = try XCTUnwrap(sent)
         XCTAssertFalse(system.contains(LLMPostProcessor.spokenFormattingInstruction))
     }
 
