@@ -84,8 +84,34 @@ struct RemoteModelListBox: View {
     // label stays truthful while a search is active.
     private var hiddenModelCount: Int { models.count - preferredModels.count }
 
+    /// The live selection stays visible even when it is scrolled away or filtered out (#263).
+    /// Custom models have no listed id, so use their field only when Custom is active.
+    private var activeModelID: String? {
+        let id = customSelected ? customText : selectedID
+        guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return id
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let activeModelID {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Active model")
+                        .scaledFont(size: 11, weight: .semibold)
+                        .foregroundColor(STheme.accent)
+                    Text(verbatim: activeModelID)
+                        .scaledFont(size: 13, design: .monospaced)
+                        .foregroundColor(STheme.textBright)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                        .help(activeModelID)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 9).fill(STheme.accentSoft))
+            }
+
             // Aggregators (LiteLLM, gateways) can list hundreds of models — a filter
             // box beats scrolling. Hidden for short lists.
             if models.count > 5 {
