@@ -65,6 +65,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "hasCompletedOnboarding",
         "holdRecordingTriggers",
         "holdToRecord",
+        "iCloudSettingsBackupEnabled",
         "indicatorCustomAnchor",
         "indicatorLayout",
         "indicatorMeterMode",
@@ -233,6 +234,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("hasCompletedOnboarding") { prefs.hasCompletedOnboarding = true }
         assertWrites("feedbackPromptDone") { prefs.feedbackPromptDone = true }
         assertWrites("feedbackPromptLaunches") { prefs.feedbackPromptLaunches = 2 }
+        assertWrites("iCloudSettingsBackupEnabled") { prefs.iCloudSettingsBackupEnabled = true }
         assertWrites("useAsianAutocorrect") { prefs.useAsianAutocorrect = false }
         assertWrites("selectedMicrophoneData") { prefs.selectedMicrophoneData = Data([1]) }
         assertWrites("modifierOnlyHotkey") { prefs.modifierOnlyHotkey = "rightOption" }

@@ -5,6 +5,7 @@ import OpenSuperWhisperCore
 /// kept in a secret gist for moving between Macs.
 struct SettingsTransferGroup: View {
     @StateObject private var model = SettingsTransferModel()
+    @StateObject private var icloud = ICloudBackupModel()
 
     var body: some View {
         SettingsGroup("Backup and sync") {
@@ -17,10 +18,23 @@ struct SettingsTransferGroup: View {
                 .buttonStyle(.sSecondary)
                 .disabled(model.isBusy)
             }
+            iCloudRows
             githubRow
             notices
         }
-        .onAppear { model.refreshGitHub() }
+        .onAppear {
+            model.refreshGitHub()
+            icloud.refresh()
+        }
+        .confirmationDialog("A backup from another Mac is in iCloud Drive", isPresented: Binding(
+            get: { icloud.conflict != nil },
+            set: { if !$0 { icloud.conflict = nil } })) {
+            Button("Restore it") { restoreFromConflict() }
+            Button("Replace it with this Mac's settings") { icloud.replaceBackup() }
+            Button("Cancel", role: .cancel) { icloud.conflict = nil }
+        } message: {
+            Text(conflictMessage)
+        }
         .confirmationDialog(importTitle, isPresented: Binding(
             get: { model.pendingImport != nil },
             set: { if !$0 { model.pendingImport = nil } })) {
@@ -29,6 +43,49 @@ struct SettingsTransferGroup: View {
         } message: {
             Text("Settings that are not in the file stay as they are. A relaunch applies the new ones.")
         }
+    }
+
+    @ViewBuilder
+    private var iCloudRows: some View {
+        SettingRow("Back up to iCloud Drive", hint: iCloudHint) {
+            SSwitch(isOn: Binding(
+                get: { icloud.isEnabled },
+                set: { icloud.setEnabled($0) }))
+                .disabled(!icloud.isAvailable)
+        }
+        if icloud.isAvailable {
+            SettingRow("Restore from iCloud Drive", hint: lastBackupHint) {
+                Button("Restore…") {
+                    if let pending = icloud.restoreRequest() { model.pendingImport = pending }
+                }
+                .buttonStyle(.sSecondary)
+                .disabled(model.isBusy || icloud.lastBackup == nil)
+            }
+        }
+    }
+
+    private var iCloudHint: LocalizedStringKey {
+        icloud.isAvailable
+            ? "Keeps your settings up to date in iCloud Drive, to restore on another Mac. Nothing is sent to other Macs on its own."
+            : "iCloud Drive is off on this Mac. Turn it on in System Settings to use this."
+    }
+
+    private var lastBackupHint: LocalizedStringKey {
+        guard let last = icloud.lastBackup, let date = last.exportedAt else { return "No backup in iCloud Drive yet." }
+        let when = date.formatted(.relative(presentation: .named))
+        guard let host = last.host else { return "Last backup: \(when)" }
+        return "Last backup: \(when) from \(host)"
+    }
+
+    private var conflictMessage: LocalizedStringKey {
+        guard let host = icloud.conflict?.host else { return "Restore it to use those settings here, or replace it with this Mac's." }
+        return "\(host) already saved its settings there. Restore them here, or replace them with this Mac's."
+    }
+
+    private func restoreFromConflict() {
+        guard let pending = icloud.restoreFromConflict() else { return }
+        model.pendingImport = pending
+        model.confirmImport()
     }
 
     @ViewBuilder
@@ -109,6 +166,9 @@ struct SettingsTransferGroup: View {
 
     private var importTitle: LocalizedStringKey {
         guard let savedAt = model.pendingImport?.savedAt else { return "Replace your settings with this file?" }
+        if let host = model.pendingImport?.host {
+            return "Replace your settings with the backup from \(host), saved \(savedAt.formatted(.relative(presentation: .named)))?"
+        }
         return "Replace your settings with the copy saved \(savedAt.formatted(.relative(presentation: .named)))?"
     }
 }

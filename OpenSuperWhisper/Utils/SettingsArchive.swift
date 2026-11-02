@@ -45,6 +45,7 @@ enum SettingsArchive {
         "feedbackPromptLaunches",
         "groqModel",
         "hasCompletedOnboarding",
+        "iCloudSettingsBackupEnabled",
         "indicatorCustomAnchor",
         "lastModifierOnlyHotkey",
         "lastMouseButtonHotkey",
@@ -87,19 +88,20 @@ enum SettingsArchive {
 
     /// The portable preferences set in `defaults`, as the file's bytes. Keys left at their
     /// default are absent, so importing the file leaves them alone on the other Mac.
-    static func export(from defaults: UserDefaults, appVersion: String, now: Date = Date()) throws -> Data {
+    static func export(from defaults: UserDefaults, appVersion: String, host: String? = nil, now: Date = Date()) throws -> Data {
         var settings: [String: Any] = [:]
         for key in portableKeys {
             guard let value = defaults.object(forKey: key) else { continue }
             settings[key] = jsonValue(value)
         }
-        let file: [String: Any] = [
+        var file: [String: Any] = [
             "format": format,
             "version": version,
             "app": appVersion,
             "exportedAt": ISO8601DateFormatter().string(from: now),
             "settings": settings,
         ]
+        if let host { file["host"] = host }
         return try JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -118,6 +120,22 @@ enum SettingsArchive {
             if let stored = storedValue(value) { values[key] = stored }
         }
         return values
+    }
+
+    /// Who wrote a settings file and when, for the places that show it before importing.
+    struct Origin: Equatable {
+        let exportedAt: Date?
+        let host: String?
+        let app: String?
+    }
+
+    static func origin(of data: Data) -> Origin? {
+        guard let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              file["format"] as? String == format
+        else { return nil }
+        return Origin(exportedAt: (file["exportedAt"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) },
+                      host: file["host"] as? String,
+                      app: file["app"] as? String)
     }
 
     static func apply(_ values: [String: Any], to defaults: UserDefaults) {
