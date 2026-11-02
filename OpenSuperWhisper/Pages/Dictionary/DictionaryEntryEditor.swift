@@ -233,9 +233,9 @@ struct DictionaryEntryEditor: View {
                 }
             }
             EditorOptionRow("Also help recognition of this word",
-                            hint: "For now this follows “Help recognition of these words”, for every entry.",
-                            soon: true) {
-                SSwitch(isOn: .constant(false))
+                            hint: boostHint) {
+                SSwitch(isOn: $draft.boostsRecognition)
+                    .disabled(!AppPreferences.shared.customDictionaryBoostEnabled || draft.isRegex)
             }
             EditorOptionRow("Applies", soon: true) {
                 SMenu(Text("Everywhere")) { EmptyView() }
@@ -244,6 +244,14 @@ struct DictionaryEntryEditor: View {
         .background(STheme.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(STheme.border, lineWidth: 1))
+    }
+
+    private var boostHint: LocalizedStringKey {
+        if draft.isRegex { return "A pattern writes a template, which teaches the model nothing." }
+        if !AppPreferences.shared.customDictionaryBoostEnabled {
+            return "Turn on “Help recognition of these words” on the Dictionary page first."
+        }
+        return "Turn off for a short or common word the model starts hearing everywhere, like “Maxim” written for “Mais”. The replacement still applies."
     }
 
     private func fieldLabel(_ text: LocalizedStringKey) -> some View {
