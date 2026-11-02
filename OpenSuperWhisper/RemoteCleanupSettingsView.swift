@@ -16,9 +16,29 @@ struct RemoteCleanupSettingsView: View {
     @State private var autoTestTask: Task<Void, Never>?
     @State private var storedKey: String?
     @State private var confirmsCopy = false
+    /// The user's own choice for the reasoning switch, nil until they make one.
+    @State private var storedDisableReasoning: Bool?
+
+    private var service: RemoteService? { RemoteService.detect(url: viewModel.aiRemoteEndpoint) }
+
+    private var disablesReasoning: Bool {
+        RemoteService.disablesReasoning(stored: storedDisableReasoning, service: service)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            SettingRow("Service",
+                       hint: "A built-in service fills in the address and a fast model. Custom takes any other server.",
+                       indented: true) {
+                SMenu(Text(verbatim: service?.displayName ?? String(localized: "Custom"))) {
+                    ForEach(RemoteService.allCases) { service in
+                        Button(service.displayName) { pick(service) }
+                    }
+                    Divider()
+                    Button("Custom") { pickCustom() }
+                }
+            }
+
             SettingRow("Server",
                        hint: "Unencrypted http:// unless you type https://.",
                        indented: true) {
@@ -56,7 +76,18 @@ struct RemoteCleanupSettingsView: View {
                     .buttonStyle(.plain)
                     .help(revealKey ? "Hide key" : "Reveal key")
                     if storedKey != nil { savedBadge }
+                    if let service { ServiceKeyLink(service: service) }
                 }
+            }
+
+            KeyMismatchNotice(service: service, key: viewModel.aiRemoteAPIKey, indented: true)
+
+            SettingRow("Disable reasoning",
+                       hint: "Asks the model not to think before it answers, which a cleanup does not need and which takes seconds. A model that refuses shows its error under Test Connection.",
+                       indented: true) {
+                SSwitch(isOn: Binding(
+                    get: { disablesReasoning },
+                    set: { storedDisableReasoning = $0; AppPreferences.shared.aiRemoteDisableReasoning = $0 }))
             }
 
             SettingRow("Connection", indented: true) {
@@ -91,9 +122,11 @@ struct RemoteCleanupSettingsView: View {
         // Auto-fill the list on open and after edits settle, like the Remote engine.
         .onAppear {
             storedKey = AppPreferences.shared.aiRemoteAPIKey
+            storedDisableReasoning = AppPreferences.shared.aiRemoteDisableReasoning
             if !viewModel.aiRemoteEndpoint.isEmpty { runTest(probesChat: true) }
         }
         .onChange(of: viewModel.aiRemoteEndpoint) { _, _ in scheduleAutoTest() }
+        .onChange(of: disablesReasoning) { _, _ in runTest(probesChat: true) }
         .onChange(of: viewModel.aiRemoteAPIKey) { _, _ in
             // The field writes the Keychain on every keystroke before this runs, so reading it
             // back shows what is really stored.
@@ -122,6 +155,30 @@ struct RemoteCleanupSettingsView: View {
         .foregroundColor(STheme.ok)
         .lineLimit(1)
         .fixedSize()
+    }
+
+    /// A built-in service fills the address and its default model, leaving only the key, and
+    /// sets the reasoning switch the way it works best there.
+    private func pick(_ service: RemoteService) {
+        viewModel.aiRemoteEndpoint = service.baseURL
+        viewModel.aiRemoteModel = service.defaultCleanupModel
+        setDisablesReasoning(true)
+        runTest(probesChat: true)
+    }
+
+    /// Leaving a built-in service clears its address and model, as the Remote engine does, so
+    /// the user types their own; Custom never gets reasoning fields unless asked.
+    private func pickCustom() {
+        guard service != nil else { return }
+        viewModel.aiRemoteEndpoint = ""
+        viewModel.aiRemoteModel = ""
+        setDisablesReasoning(false)
+        viewModel.llmStatus = .unknown
+    }
+
+    private func setDisablesReasoning(_ value: Bool) {
+        storedDisableReasoning = value
+        AppPreferences.shared.aiRemoteDisableReasoning = value
     }
 
     private func copyFromRemoteEngine() {
@@ -189,7 +246,8 @@ struct RemoteCleanupSettingsView: View {
 
     private func probeChat(endpoint: String, model: String, apiKey: String) {
         Task {
-            let status = await LLMPostProcessor.checkRemoteChat(endpoint: endpoint, model: model, apiKey: apiKey)
+            let status = await LLMPostProcessor.checkRemoteChat(
+                endpoint: endpoint, model: model, apiKey: apiKey, disableReasoning: disablesReasoning)
             await MainActor.run { viewModel.llmStatus = status }
         }
     }

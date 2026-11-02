@@ -62,8 +62,11 @@ public enum LLMPostProcessor {
         case "apple":
             return AppleIntelligenceBackend(model: AppleIntelligence.model)
         case "remote":
+            let service = RemoteService.detect(url: prefs.aiRemoteEndpoint)
             return RemoteBackend(endpoint: prefs.aiRemoteEndpoint, model: prefs.aiRemoteModel,
-                                  apiKey: prefs.aiRemoteAPIKey ?? "")
+                                 apiKey: prefs.aiRemoteAPIKey ?? "",
+                                 disableReasoning: RemoteService.disablesReasoning(
+                                     stored: prefs.aiRemoteDisableReasoning, service: service))
         default:
             return OllamaBackend(endpoint: prefs.aiOllamaEndpoint, model: prefs.aiOllamaModel)
         }
@@ -548,8 +551,10 @@ public enum LLMPostProcessor {
 
     /// Sends a minimal chat request to a Remote cleanup server for the settings "Test Connection".
     /// Forwards to `RemoteBackend`.
-    public static func checkRemoteChat(endpoint: String, model: String, apiKey: String) async -> LLMStatus {
-        await RemoteBackend.probe(endpoint: endpoint, model: model, apiKey: apiKey)
+    public static func checkRemoteChat(endpoint: String, model: String, apiKey: String,
+                                       disableReasoning: Bool) async -> LLMStatus {
+        await RemoteBackend.probe(endpoint: endpoint, model: model, apiKey: apiKey,
+                                  disableReasoning: disableReasoning)
     }
 
     // MARK: - Remote (OpenAI-compatible) endpoint helpers
@@ -557,24 +562,10 @@ public enum LLMPostProcessor {
     // Pure and unit-tested; shared by `RemoteBackend` (actual cleanup calls) and
     // `RemoteCleanupSettingsView` (the settings "Test Connection" probe).
 
-    /// `<base>/v1/chat/completions`, tolerating a base that may lack a scheme or already
-    /// include `/v1` or a trailing slash.
+    /// `<base>/chat/completions` under the base's own version segment, or `/v1` for a bare host
+    /// (see `OpenAICompatibleURL`).
     static func chatEndpoint(base: String) -> URL? {
-        normalizedBase(base).flatMap { URL(string: $0 + "/v1/chat/completions") }
-    }
-
-    /// Normalize an OpenAI-compatible base URL: add http:// if no scheme, drop a trailing
-    /// slash and a trailing `/v1` (callers append their own `/v1/...`).
-    private static func normalizedBase(_ raw: String) -> String? {
-        var base = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !base.isEmpty else { return nil }
-        let lower = base.lowercased()
-        if !lower.hasPrefix("http://") && !lower.hasPrefix("https://") {
-            base = "http://" + base
-        }
-        while base.hasSuffix("/") { base.removeLast() }
-        if base.hasSuffix("/v1") { base.removeLast(3) }
-        return base
+        OpenAICompatibleURL.endpoint(base: base, resource: "chat/completions")
     }
 
     /// OpenAI chat completions: `{"choices":[{"message":{"content":"…"}}]}`.

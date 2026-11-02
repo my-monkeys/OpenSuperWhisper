@@ -40,6 +40,8 @@ public protocol CorePreferences: AnyObject, Sendable {
     var aiRemoteEndpoint: String { get }
     var aiRemoteModel: String { get }
     var aiRemoteAPIKey: String? { get }
+    /// nil until the user chooses: then on for a known service, off for Custom.
+    var aiRemoteDisableReasoning: Bool? { get }
     var aiOllamaEndpoint: String { get }
     var aiOllamaModel: String { get }
     var aiPostProcessingEnabled: Bool { get }

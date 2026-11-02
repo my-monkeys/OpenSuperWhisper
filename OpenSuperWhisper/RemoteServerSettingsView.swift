@@ -5,7 +5,7 @@ import OpenSuperWhisperCore
 /// Configuration UI for a custom remote (OpenAI-compatible) transcription server.
 /// Shown under the "Custom" preset of the Remote engine section: free-text URL,
 /// optional API key, a model list fetched from GET /v1/models, and a request
-/// timeout. The Groq preset uses its own curated UI (see RemoteSettingsSection).
+/// timeout. The service picker above it (see RemoteSettingsSection) pre-fills URL and model.
 struct RemoteServerSettingsView<PresetRow: View>: View {
     @ObservedObject var viewModel: SettingsViewModel
     /// The Preset row (menu + save/delete) — owned by RemoteSettingsSection, rendered
@@ -19,6 +19,8 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
     // focus once configured. Server opens by default only when nothing is set yet.
     @State private var revealKey = false
     @State private var autoTestTask: Task<Void, Never>?
+
+    private var service: RemoteService? { RemoteService.detect(url: viewModel.remoteServerURL) }
 
     private var hasKey: Bool { !viewModel.remoteServerAPIKey.isEmpty }
 
@@ -39,8 +41,12 @@ struct RemoteServerSettingsView<PresetRow: View>: View {
                     serverURLField
                 }
                 SettingRow("API key", hint: "Optional, only servers with authentication need one. Stored in your Keychain.") {
-                    apiKeyField
+                    HStack(spacing: 12) {
+                        apiKeyField
+                        if let service { ServiceKeyLink(service: service) }
+                    }
                 }
+                KeyMismatchNotice(service: service, key: viewModel.remoteServerAPIKey)
                 SettingRow("Connection") {
                     HStack(spacing: 10) {
                         statusLabel

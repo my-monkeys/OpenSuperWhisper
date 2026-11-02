@@ -22633,52 +22633,6 @@
         }
       }
     },
-    "Groq fills in the address and models. Custom takes any OpenAI-compatible server.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Groq füllt Adresse und Modelle aus. „Eigene“ nimmt jeden OpenAI-kompatiblen Server."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Groq rellena la dirección y los modelos. Personalizado admite cualquier servidor compatible con OpenAI."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Groq remplit l'adresse et les modèles. Personnalisé accepte n'importe quel serveur compatible OpenAI."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Groq compila indirizzo e modelli. Personalizzato accetta qualsiasi server compatibile con OpenAI."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Groq preenche o endereço e os modelos. Personalizado aceita qualquer servidor compatível com OpenAI."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Groq tự điền địa chỉ và mô hình. Tùy chỉnh nhận mọi máy chủ tương thích OpenAI."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选 Groq 会自动填入地址和模型；自定义可用任何兼容 OpenAI 的服务器。"
-          }
-        }
-      }
-    },
     "Hello": {
       "localizations": {
         "de": {
@@ -56751,6 +56705,328 @@
           "stringUnit": {
             "state": "translated",
             "value": "替换"
+          }
+        }
+      }
+    },
+    "A built-in service fills in the address and models. Custom takes any OpenAI-compatible server.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un service intégré renseigne l'adresse et les modèles. Personnalisé accepte tout serveur compatible OpenAI."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein integrierter Dienst füllt Adresse und Modelle aus. Eigene akzeptiert jeden OpenAI-kompatiblen Server."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un servicio integrado rellena la dirección y los modelos. Personalizado admite cualquier servidor compatible con OpenAI."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un servizio integrato compila indirizzo e modelli. Personalizzato accetta qualsiasi server compatibile con OpenAI."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um serviço integrado preenche o endereço e os modelos. Personalizado aceita qualquer servidor compatível com OpenAI."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dịch vụ có sẵn tự điền địa chỉ và mô hình. Tùy chỉnh dùng được với mọi máy chủ tương thích OpenAI."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置服务会自动填写地址和模型。自定义可用于任何兼容 OpenAI 的服务器。"
+          }
+        }
+      }
+    },
+    "A built-in service fills in the address and a fast model. Custom takes any other server.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un service intégré renseigne l'adresse et un modèle rapide. Personnalisé accepte tout autre serveur."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein integrierter Dienst füllt Adresse und ein schnelles Modell aus. Eigene akzeptiert jeden anderen Server."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un servicio integrado rellena la dirección y un modelo rápido. Personalizado admite cualquier otro servidor."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un servizio integrato compila indirizzo e un modello veloce. Personalizzato accetta qualsiasi altro server."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um serviço integrado preenche o endereço e um modelo rápido. Personalizado aceita qualquer outro servidor."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dịch vụ có sẵn tự điền địa chỉ và một mô hình nhanh. Tùy chỉnh dùng được với mọi máy chủ khác."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置服务会自动填写地址和一个快速模型。自定义可用于任何其他服务器。"
+          }
+        }
+      }
+    },
+    "Get a key": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obtenir une clé"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schlüssel holen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obtener una clave"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ottieni una chiave"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obter uma chave"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lấy khóa"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "获取密钥"
+          }
+        }
+      }
+    },
+    "Open %@'s API key page": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir la page des clés d'API de %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die API-Schlüssel-Seite von %@ öffnen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir la página de claves de API de %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri la pagina delle chiavi API di %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir a página de chaves de API de %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở trang khóa API của %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 %@ 的 API 密钥页面"
+          }
+        }
+      }
+    },
+    "This doesn't look like a %@ key: they start with %@. Check that you pasted the right one.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cela ne ressemble pas à une clé %@ : elles commencent par %@. Vérifiez que vous avez collé la bonne."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das sieht nicht nach einem %@-Schlüssel aus: Sie beginnen mit %@. Prüfen Sie, ob Sie den richtigen eingefügt haben."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esto no parece una clave de %@: empiezan por %@. Comprueba que has pegado la correcta."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non sembra una chiave %@: iniziano con %@. Controlla di aver incollato quella giusta."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Isso não parece uma chave %@: elas começam com %@. Confira se você colou a correta."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đây không giống khóa %@: khóa bắt đầu bằng %@. Hãy kiểm tra xem bạn đã dán đúng khóa chưa."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这看起来不是 %@ 的密钥：其密钥以 %@ 开头。请确认粘贴的是正确的密钥。"
+          }
+        }
+      }
+    },
+    "Disable reasoning": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désactiver le raisonnement"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reasoning deaktivieren"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desactivar el razonamiento"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattiva il ragionamento"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desativar o raciocínio"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tắt suy luận"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭推理"
+          }
+        }
+      }
+    },
+    "Asks the model not to think before it answers, which a cleanup does not need and which takes seconds. A model that refuses shows its error under Test Connection.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande au modèle de ne pas réfléchir avant de répondre : un nettoyage n'en a pas besoin et cela prend plusieurs secondes. Un modèle qui refuse affiche son erreur dans Tester la connexion."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bittet das Modell, vor der Antwort nicht nachzudenken: Eine Bereinigung braucht das nicht und es kostet Sekunden. Lehnt ein Modell ab, erscheint der Fehler unter Verbindung testen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pide al modelo que no piense antes de responder: una limpieza no lo necesita y tarda segundos. Si un modelo lo rechaza, el error aparece en Probar conexión."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiede al modello di non ragionare prima di rispondere: una pulizia non ne ha bisogno e richiede secondi. Se un modello rifiuta, l'errore compare in Prova connessione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pede ao modelo que não pense antes de responder: uma limpeza não precisa disso e leva segundos. Se um modelo recusar, o erro aparece em Testar conexão."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yêu cầu mô hình không suy nghĩ trước khi trả lời: việc dọn dẹp không cần điều này và mất vài giây. Nếu mô hình từ chối, lỗi sẽ hiện ở Kiểm tra kết nối."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要求模型在回答前不要思考：清理用不到，而且要多花几秒。若模型拒绝，错误会显示在“测试连接”下。"
           }
         }
       }
