@@ -243,7 +243,8 @@ final class PersistedContractTests: XCTestCase {
     /// `alternates`, `spacing` and `isRegex` existed.
     func testCustomDictionaryEntryKeys() throws {
         XCTAssertEqual(try jsonKeys(CustomDictionaryEntry(original: "a", replacement: "b")),
-                       ["id", "original", "replacement", "alternates", "spacing", "isRegex"])
+                       ["id", "original", "replacement", "alternates", "spacing", "isRegex",
+                        "boostsRecognition"])
 
         let legacy = Data(#"[{"id":"6F1C2B3A-0000-4000-8000-000000000002","original":"osw","replacement":"OSW"}]"#.utf8)
         let entries = try JSONDecoder().decode([CustomDictionaryEntry].self, from: legacy)
@@ -251,6 +252,7 @@ final class PersistedContractTests: XCTestCase {
         XCTAssertEqual(entries.first?.alternates, [])
         XCTAssertEqual(entries.first?.spacing, .standalone)
         XCTAssertEqual(entries.first?.isRegex, false)
+        XCTAssertEqual(entries.first?.boostsRecognition, true)
     }
 
     /// Stored in `snippetsData` (#167).

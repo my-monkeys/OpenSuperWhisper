@@ -43,14 +43,26 @@ public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable,
     /// apply, since the pattern already says what it wants to consume.
     public var isRegex: Bool
 
+    /// Whether the replacement also steers what the engine hears while "Help recognition of
+    /// these words" is on: the Whisper prompt, Parakeet's vocabulary boost, the cleanup model's
+    /// spellings. Off, the entry only rewrites what it matches.
+    ///
+    /// Boosting is fuzzy, and a short word pulls in whatever sounds a little like it: an entry
+    /// meant to turn "Maxime" into "Maxim" had Parakeet write "Maxim" for every "Mais". One switch
+    /// for the whole dictionary left the choice between that and losing the boost for the rare
+    /// words that need it.
+    public var boostsRecognition: Bool
+
     public init(id: UUID = UUID(), original: String = "", replacement: String = "",
-         alternates: [String] = [], spacing: Spacing = .standalone, isRegex: Bool = false) {
+         alternates: [String] = [], spacing: Spacing = .standalone, isRegex: Bool = false,
+         boostsRecognition: Bool = true) {
         self.id = id
         self.original = original
         self.replacement = replacement
         self.alternates = alternates
         self.spacing = spacing
         self.isRegex = isRegex
+        self.boostsRecognition = boostsRecognition
     }
 
     /// Hand-written so dictionaries saved before `alternates` and `spacing` existed still load;
@@ -63,6 +75,7 @@ public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable,
         alternates = try container.decodeIfPresent([String].self, forKey: .alternates) ?? []
         spacing = try container.decodeIfPresent(Spacing.self, forKey: .spacing) ?? .standalone
         isRegex = try container.decodeIfPresent(Bool.self, forKey: .isRegex) ?? false
+        boostsRecognition = try container.decodeIfPresent(Bool.self, forKey: .boostsRecognition) ?? true
     }
 
     /// Every phrasing this rule matches, the primary one first.
@@ -255,7 +268,15 @@ public enum CustomDictionary {
     /// the single source of the words we boost on both engines: Whisper via the
     /// initial prompt (`promptBoost`) and Parakeet via custom-vocabulary boosting
     /// (`FluidAudioEngine`). Order is preserved; de-duplication is case-insensitive.
+    /// The words the entries that steer recognition write, for the engines and the cleanup
+    /// prompt. An entry with `boostsRecognition` off still rewrites, and is left out here only.
     public static func boostTerms(entries: [CustomDictionaryEntry]) -> [String] {
+        spellings(entries: entries.filter(\.boostsRecognition))
+    }
+
+    /// Every word the dictionary writes, whether or not it steers recognition: the spellings the
+    /// insertion keeps as they are ("Maxim" keeps its capital mid-sentence).
+    public static func spellings(entries: [CustomDictionaryEntry]) -> [String] {
         var seen = Set<String>()
         return entries
             // A regex replacement is a template, not a word. Boosting "$1," would teach the
