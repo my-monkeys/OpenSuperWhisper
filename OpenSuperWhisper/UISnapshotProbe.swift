@@ -13,6 +13,8 @@ import OpenSuperWhisperCore
 enum UISnapshotProbe {
     static let screens: [String: () -> AnyView] = [
         "home": { AnyView(AppShellView(page: .home)) },
+        "home-unfinished": { seedUnfinished(); return AnyView(AppShellView(page: .home)) },
+        "home-unfinished-recovered": { seedUnfinished(recovered: true); return AnyView(AppShellView(page: .home)) },
         "home-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return AnyView(AppShellView(page: .home)) },
         "dictionary": { seedDictionary(); return AnyView(AppShellView(page: .dictionary)) },
         "dictionary-editor": { seedDictionary(openEditor: true); return AnyView(AppShellView(page: .dictionary)) },
