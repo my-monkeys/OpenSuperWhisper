@@ -128,6 +128,14 @@ enum UISnapshotProbe {
                 at: Date().addingTimeInterval(-120))
             return scrolled(.textAndAI, to: "Server")
         },
+        "settings-textAndAI-server-openrouter": {
+            AppPreferences.shared.aiPostProcessingEnabled = true
+            AppPreferences.shared.aiBackend = "remote"
+            AppPreferences.shared.aiRemoteEndpoint = "https://openrouter.ai/api/v1"
+            AppPreferences.shared.aiRemoteModel = "google/gemini-2.5-flash-lite"
+            AppPreferences.shared.aiRemoteAPIKey = "gsk_demo0000000000a1b2"
+            return scrolled(.textAndAI, to: "Server")
+        },
         "settings-textAndAI-insertion": { scrolled(.textAndAI, to: "Warn when no field is focused") },
         "settings-privacy-context": {
             AppPreferences.shared.customDictionaryEnabled = true

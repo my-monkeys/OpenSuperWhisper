@@ -240,6 +240,40 @@ final class LLMCleanupRequestTests: XCTestCase {
 
     // MARK: - Remote request
 
+    func testCustomServerGetsNoReasoningFieldByDefault() async throws {
+        prefs.aiBackend = "remote"
+        LLMStubProtocol.reset(replying: remoteReply("Cleaned."))
+
+        _ = await LLMPostProcessor.process(Self.input, bundleID: nil)
+
+        let (_, json) = try onlyRequest()
+        XCTAssertNil(json["reasoning_effort"])
+        XCTAssertNil(json["reasoning"])
+        XCTAssertNil(json["provider"])
+    }
+
+    func testCustomServerGetsReasoningEffortWhenTheUserTurnsItOn() async throws {
+        prefs.aiBackend = "remote"
+        prefs.aiRemoteDisableReasoning = true
+        LLMStubProtocol.reset(replying: remoteReply("Cleaned."))
+
+        _ = await LLMPostProcessor.process(Self.input, bundleID: nil)
+
+        let (_, json) = try onlyRequest()
+        XCTAssertEqual(json["reasoning_effort"] as? String, "none")
+        XCTAssertNil(json["reasoning"])
+    }
+
+    func testChatProbeCarriesTheReasoningFieldsToo() async throws {
+        LLMStubProtocol.reset(replying: remoteReply("pong"))
+
+        _ = await RemoteBackend.probe(endpoint: "\(LLMStubProtocol.host)/v1/", model: "m", apiKey: "",
+                                      disableReasoning: true)
+
+        let (_, json) = try onlyRequest()
+        XCTAssertEqual(json["reasoning_effort"] as? String, "none")
+    }
+
     func testRemoteRequestWithAKey() async throws {
         prefs.aiBackend = "remote"
         prefs.aiRemoteAPIKey = "  gsk-test  "

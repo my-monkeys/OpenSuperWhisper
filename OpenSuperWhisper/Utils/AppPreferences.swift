@@ -720,6 +720,12 @@ final class AppPreferences {
     @UserDefault(key: "aiRemoteModel", defaultValue: "llama-3.1-8b-instant")
     var aiRemoteModel: String
 
+    /// Asks the server not to reason before answering: a dictation cleanup gains nothing from it
+    /// and waits seconds for it. Nil until the user chooses; `RemoteService.disablesReasoning`
+    /// then resolves it, on for a known service and off for a Custom server.
+    @OptionalUserDefault(key: "aiRemoteDisableReasoning")
+    var aiRemoteDisableReasoning: Bool?
+
     /// Remote-LLM cleanup API key — Keychain-backed (a secret), not UserDefaults.
     /// nil/empty means send no Authorization header (no-auth/local servers).
     var aiRemoteAPIKey: String? {

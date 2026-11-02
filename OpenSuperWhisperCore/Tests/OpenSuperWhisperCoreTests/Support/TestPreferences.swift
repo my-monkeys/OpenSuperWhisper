@@ -40,6 +40,7 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var aiRemoteEndpoint = ""
         var aiRemoteModel = ""
         var aiRemoteAPIKey: String?
+        var aiRemoteDisableReasoning: Bool?
         var aiOllamaEndpoint = ""
         var aiOllamaModel = ""
         var aiPostProcessingEnabled = false
@@ -169,6 +170,10 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
     var aiRemoteAPIKey: String? {
         get { self[\.aiRemoteAPIKey] }
         set { self[\.aiRemoteAPIKey] = newValue }
+    }
+    var aiRemoteDisableReasoning: Bool? {
+        get { self[\.aiRemoteDisableReasoning] }
+        set { self[\.aiRemoteDisableReasoning] = newValue }
     }
     var aiOllamaEndpoint: String {
         get { self[\.aiOllamaEndpoint] }

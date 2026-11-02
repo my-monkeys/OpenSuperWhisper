@@ -194,21 +194,11 @@ final class RemoteEngine: TranscriptionEngine {
         Self.endpoint(base: serverURL, action: action)
     }
 
-    /// Build `<base>/v1/audio/<action>` (action = "transcriptions" | "translations"),
-    /// tolerating a base URL that may or may not already include a scheme, a
-    /// trailing slash, or an existing `/v1` segment. Pure (no instance state) so
-    /// the normalization is unit-testable.
+    /// Build `<base>/audio/<action>` (action = "transcriptions" | "translations") under the
+    /// base's own version segment, or `/v1` for a bare host (see `OpenAICompatibleURL`). Pure
+    /// (no instance state) so the normalization is unit-testable.
     static func endpoint(base: String, action: String) -> URL? {
-        var base = base
-        // Default to http:// when no scheme is given (LAN servers like
-        // speaches/LiteLLM are commonly plain HTTP); leave explicit https alone.
-        let lower = base.lowercased()
-        if !lower.hasPrefix("http://") && !lower.hasPrefix("https://") {
-            base = "http://" + base
-        }
-        while base.hasSuffix("/") { base.removeLast() }
-        if base.hasSuffix("/v1") { base.removeLast(3) }
-        return URL(string: base + "/v1/audio/\(action)")
+        OpenAICompatibleURL.endpoint(base: base, resource: "audio/\(action)")
     }
 
     func makeRequest(

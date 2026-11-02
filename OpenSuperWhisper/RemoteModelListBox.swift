@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenSuperWhisperCore
 
 /// One model from an OpenAI-compatible `GET /v1/models`.
 struct RemoteModelInfo: Identifiable, Equatable {
@@ -10,18 +11,9 @@ struct RemoteModelInfo: Identifiable, Equatable {
 /// URL normalization and JSON parsing are unit-testable and identical everywhere
 /// (the Remote transcription engine and the Remote LLM-cleanup both use it).
 enum RemoteModelsAPI {
-    /// `<base>/v1/models`, tolerating a base that lacks a scheme, has a trailing
-    /// slash, or already includes `/v1`.
+    /// `<base>/models` under the base's own version segment, or `/v1` for a bare host.
     static func modelsEndpoint(base: String) -> URL? {
-        var base = base.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !base.isEmpty else { return nil }
-        let lower = base.lowercased()
-        if !lower.hasPrefix("http://") && !lower.hasPrefix("https://") {
-            base = "http://" + base
-        }
-        while base.hasSuffix("/") { base.removeLast() }
-        if base.hasSuffix("/v1") { base.removeLast(3) }
-        return URL(string: base + "/v1/models")
+        OpenAICompatibleURL.endpoint(base: base, resource: "models")
     }
 
     /// OpenAI shape: `{"data":[{"id":"…","owned_by":"…"}]}`, sorted by id.
@@ -84,6 +76,14 @@ struct RemoteModelListBox: View {
     // label stays truthful while a search is active.
     private var hiddenModelCount: Int { models.count - preferredModels.count }
 
+    /// The model in use, whatever the filter and the scroll position say: a list of several
+    /// hundred (OpenRouter) otherwise hides it.
+    private var pinnedModel: String? {
+        if !isCustom, let selectedID { return selectedID }
+        let typed = customText.trimmingCharacters(in: .whitespaces)
+        return customSelected && !typed.isEmpty ? typed : nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Aggregators (LiteLLM, gateways) can list hundreds of models — a filter
@@ -109,6 +109,14 @@ struct RemoteModelListBox: View {
                 .padding(.horizontal, 9).padding(.vertical, 5)
                 .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
+            }
+
+            if let pinnedModel {
+                modelRow(name: pinnedModel, selected: true) { }
+                    .allowsHitTesting(false)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.accent.opacity(0.5), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
             }
 
             // Bounded scroll box: shows a handful and scrolls for more, so a server
