@@ -1,6 +1,5 @@
 import LiquidGlass
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// The recording bubble's layout while it is being edited. One instance is shared by the preview,
 /// the element list and the waveform slider, so a change in one shows in the others at once.
@@ -187,19 +186,26 @@ struct IndicatorBubblePreview: View {
 /// The bubble's elements in order, each with its switch. The handle reorders, including elements
 /// that are switched off; the buttons have none because they always sit at the trailing edge.
 /// `upcoming` rows (elements announced but not built) are drawn between the two.
+///
+/// The reorder is a drag gesture on the handle, not system drag and drop. The system version
+/// greyed the row from `onDrag` but depended on a drop target in the row (under the shell's own
+/// audio-file `.onDrop`) to move it and to clear the grey, and neither happened. A gesture reports
+/// the pointer on every step and ends wherever it is released, so both are in this view's hands.
 struct IndicatorElementList<Upcoming: View>: View {
     @ObservedObject var model: IndicatorLayoutModel
     @ViewBuilder var upcoming: () -> Upcoming
     @State private var dragging: IndicatorElement?
+    @State private var rowFrames: [IndicatorElement: CGRect] = [:]
 
     var body: some View {
         VStack(spacing: 6) {
             ForEach(model.layout.order.filter { !$0.isTrailingControl }) { element in
                 row(for: element)
                     .opacity(dragging == element ? 0.4 : 1)
-                    .onDrop(of: [.text], delegate: ReorderDropDelegate(
-                        target: element, layout: $model.layout,
-                        dragging: $dragging, onChange: model.persist))
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: RowFramesKey.self,
+                                               value: [element: proxy.frame(in: .named(indicatorListSpace))])
+                    })
             }
             upcoming()
             // Listed last because that is where they render, whatever their place in `order`.
@@ -207,6 +213,8 @@ struct IndicatorElementList<Upcoming: View>: View {
                 row(for: element)
             }
         }
+        .coordinateSpace(name: indicatorListSpace)
+        .onPreferenceChange(RowFramesKey.self) { rowFrames = $0 }
     }
 
     private func row(for element: IndicatorElement) -> some View {
@@ -215,14 +223,25 @@ struct IndicatorElementList<Upcoming: View>: View {
                                 title: LocalizedStringKey(element.title),
                                 subtitle: LocalizedStringKey(element.subtitle),
                                 active: visible,
-                                handle: element.isTrailingControl ? .none : .drag {
-                                    dragging = element
-                                    return NSItemProvider(object: element.rawValue as NSString)
-                                }) {
+                                handle: element.isTrailingControl ? .none : .drag(
+                                    onMove: { pointerY in drag(element, toPointerY: pointerY) },
+                                    onEnd: endDrag)) {
             SSwitch(isOn: Binding(get: { visible },
                                   set: { model.setVisible($0, for: element) }))
                 .controlSize(.small)
         }
+    }
+
+    private func drag(_ element: IndicatorElement, toPointerY pointerY: CGFloat) {
+        dragging = element
+        withAnimation(.easeOut(duration: 0.15)) {
+            model.layout.move(element, toPointerY: pointerY, rows: rowFrames)
+        }
+    }
+
+    private func endDrag() {
+        dragging = nil
+        model.persist()
     }
 
     init(model: IndicatorLayoutModel, @ViewBuilder upcoming: @escaping () -> Upcoming) {
@@ -237,6 +256,15 @@ extension IndicatorElementList where Upcoming == EmptyView {
     }
 }
 
+private let indicatorListSpace = "indicatorElementList"
+
+private struct RowFramesKey: PreferenceKey {
+    static let defaultValue: [IndicatorElement: CGRect] = [:]
+    static func reduce(value: inout [IndicatorElement: CGRect], nextValue: () -> [IndicatorElement: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
 /// One line of the element list: handle, icon, name and description, then its control.
 struct IndicatorListRow<Trailing: View>: View {
     enum Handle {
@@ -244,7 +272,8 @@ struct IndicatorListRow<Trailing: View>: View {
         case none
         /// A handle drawn faded that does nothing (an element not built yet).
         case inert
-        case drag(() -> NSItemProvider)
+        /// `onMove` gets the pointer's y in the enclosing list's coordinate space.
+        case drag(onMove: (CGFloat) -> Void, onEnd: () -> Void)
     }
 
     let symbol: String
@@ -291,11 +320,13 @@ struct IndicatorListRow<Trailing: View>: View {
             Color.clear.frame(width: 16, height: 22)
         case .inert:
             lines.foregroundColor(STheme.faint)
-        case .drag(let provider):
+        case .drag(let onMove, let onEnd):
             lines
                 .foregroundColor(STheme.hint)
                 .contentShape(Rectangle())
-                .onDrag(provider)
+                .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named(indicatorListSpace))
+                    .onChanged { onMove($0.location.y) }
+                    .onEnded { _ in onEnd() })
                 .pointerCursorOnHover()
         }
     }
@@ -319,32 +350,5 @@ struct IndicatorWaveformHeightSlider: View {
                 .foregroundColor(STheme.textSecondary)
                 .frame(minWidth: 52, alignment: .trailing)
         }
-    }
-}
-
-/// Moves the dragged element to the position of the row it is dropped on.
-private struct ReorderDropDelegate: DropDelegate {
-    let target: IndicatorElement
-    @Binding var layout: IndicatorLayout
-    @Binding var dragging: IndicatorElement?
-    let onChange: () -> Void
-
-    /// Reorder as the pointer passes over a row, so the list rearranges under the drag
-    /// instead of only committing on release.
-    func dropEntered(info: DropInfo) {
-        guard let dragged = dragging, dragged != target else { return }
-        withAnimation(.easeOut(duration: 0.15)) {
-            layout.move(dragged, before: target)
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        dragging = nil
-        onChange()
-        return true
     }
 }

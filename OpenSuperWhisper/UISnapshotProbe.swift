@@ -13,6 +13,8 @@ import OpenSuperWhisperCore
 enum UISnapshotProbe {
     static let screens: [String: () -> AnyView] = [
         "home": { AnyView(AppShellView(page: .home)) },
+        "home-unfinished": { seedUnfinished(); return AnyView(AppShellView(page: .home)) },
+        "home-unfinished-recovered": { seedUnfinished(recovered: true); return AnyView(AppShellView(page: .home)) },
         "home-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return AnyView(AppShellView(page: .home)) },
         "dictionary": { seedDictionary(); return AnyView(AppShellView(page: .dictionary)) },
         "dictionary-editor": { seedDictionary(openEditor: true); return AnyView(AppShellView(page: .dictionary)) },
@@ -41,8 +43,19 @@ enum UISnapshotProbe {
         },
         "dictionary-suggestion-notice": { suggestionNotice() },
         "dictionary-suggestion-notice-large-text": { suggestionNotice(textScale: TextScale.maximum) },
-        "style": { seedStyle(); return AnyView(AppShellView(page: .style)) },
-        "style-expanded": { seedStyle(expandFirst: true); return AnyView(AppShellView(page: .style)) },
+        "style": { AnyView(AppShellView(page: .style)) },
+        "style-large-text": {
+            AppPreferences.shared.textScale = TextScale.maximum
+            return AnyView(AppShellView(page: .style))
+        },
+        "per-app": { seedPerApp(); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-expanded": { seedPerApp(expandFirst: true); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-empty": { AnyView(AppShellView(page: .perApp)) },
+        "per-app-large-text": {
+            seedPerApp()
+            AppPreferences.shared.textScale = TextScale.maximum
+            return AnyView(AppShellView(page: .perApp))
+        },
         "settings-models-remote": {
             let prefs = AppPreferences.shared
             prefs.selectedEngine = "remote"
@@ -86,12 +99,14 @@ enum UISnapshotProbe {
         "settings-dictation-fixed-volume": { microphoneSettings(.tooQuiet, volume: .fixed) },
         "onboarding": { AnyView(OnboardingView().environmentObject(AppState())) },
         "onboarding-2": { AnyView(OnboardingView(initialStep: .model).environmentObject(AppState())) },
-        "onboarding-3": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
-        "onboarding-4": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
+        "onboarding-3": { AnyView(OnboardingView(initialStep: .words).environmentObject(AppState())) },
+        "onboarding-4": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
+        "onboarding-5": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
         "settings-textAndAI-ai": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             return scrolled(.textAndAI, to: "Format with AI")
         },
+        "settings-textAndAI-default-style": { scrolled(.textAndAI, to: "Default style") },
         "settings-textAndAI-prompts": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             AppPreferences.shared.aiBackend = "builtin"
@@ -119,6 +134,8 @@ enum UISnapshotProbe {
             AppPreferences.shared.suggestDictionaryWords = true
             return scrolled(.privacy, to: "Suggest words from your corrections")
         },
+        "settings-privacy-history": { scrolled(.privacy, to: "Transcriptions folder") },
+        "settings-general-backup": { scrolled(.general, to: "Back up to iCloud Drive") },
         "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
         "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
         "agent-panel": { AgentPanelSnapshot.make(focused: true) },
@@ -334,6 +351,7 @@ enum UISnapshotProbe {
         // The first was cleaned up; the second hit a refused key and kept the engine's text.
         let cleanups: [Int: (String, String?)] = [0: ("google/gemini-2.5-flash-lite", nil),
                                                    1: ("google/gemini-2.5-flash-lite", "401 Invalid API key")]
+        try? FileManager.default.createDirectory(at: Recording.recordingsDirectory, withIntermediateDirectories: true)
         for (index, (offset, text, app, model, status, source)) in samples.enumerated() {
             let recording = Recording(id: UUID(), timestamp: now.addingTimeInterval(offset),
                                       fileName: "\(Int(now.timeIntervalSince1970 + offset)).wav",
@@ -341,8 +359,16 @@ enum UISnapshotProbe {
                                       sourceFileURL: source, sourceAppName: app, modelUsed: model,
                                       rawTranscription: originals[index] ?? (source == nil ? text : nil),
                                       cleanupModel: cleanups[index]?.0, cleanupError: cleanups[index]?.1)
+            if index < 3 {
+                // Real files, so the weight shown on Home and in Privacy is the folder's.
+                try? Data(count: 4_200_000).write(to: recording.url)
+            }
             RecordingStore.shared.addRecording(recording)
         }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        // The off-screen window never runs the views' .task, so count the folder here, once the
+        // inserts above have landed (each one adds its file to a count that already exists).
+        Task { await RecordingsDiskUsage.shared.refresh() }
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
     }
 }

@@ -54,12 +54,24 @@ enum InstalledApps {
         NSWorkspace.shared.icon(forFile: url.path)
     }
 
+    static func isInstalled(bundleIdentifier: String) -> Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil
+    }
+
+    /// The icon shipped in the asset catalog for an app that has a built-in profile, so the
+    /// profile still shows it on a Mac that does not have the app. Named after the lowercased
+    /// bundle identifier, like the matching of rules. nil for any other app.
+    static func bundledIcon(forBundleIdentifier bundleIdentifier: String) -> NSImage? {
+        NSImage(named: "app-" + bundleIdentifier.lowercased())
+    }
+
     /// Best-effort icon for an already-stored bundle id (so existing profiles show the app icon
-    /// even though they only persist the identifier). Falls back to a generic app icon.
+    /// even though they only persist the identifier): the installed app's own, else the bundled
+    /// one of a built-in profile, else a generic app icon.
     static func icon(forBundleIdentifier bundleIdentifier: String) -> NSImage {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
             return NSWorkspace.shared.icon(forFile: url.path)
         }
-        return NSWorkspace.shared.icon(for: .applicationBundle)
+        return bundledIcon(forBundleIdentifier: bundleIdentifier) ?? NSWorkspace.shared.icon(for: .applicationBundle)
     }
 }

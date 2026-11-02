@@ -80,7 +80,7 @@ struct TextAIInsertionGroup: View {
             SettingRow("Per-app exceptions", hint: perAppHint, advanced: true) {
                 Button("Open →") {
                     AppNavigation.shared.closeSettings()
-                    AppNavigation.shared.go(.style)
+                    AppNavigation.shared.go(.perApp)
                 }
                 .buttonStyle(.sSecondary)
             }
@@ -105,8 +105,8 @@ struct TextAIInsertionGroup: View {
     private var perAppHint: LocalizedStringKey {
         let count = viewModel.appInsertionRules.count
         return count == 0
-            ? "None yet. Set on the Style page, under Per app."
-            : "\(count) apps. Set on the Style page, under Per app."
+            ? "None yet. Set on the Per app page."
+            : "\(count) apps. Set on the Per app page."
     }
 
     private var typingPace: Binding<Double> {

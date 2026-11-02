@@ -5,7 +5,7 @@ import OpenSuperWhisperCore
 /// hints, cleanup (hesitations, AI formatting and its engine), and how the text is inserted.
 ///
 /// The language moved to Dictation, the dictionary to its own page, and the per-app insertion
-/// rules to Style → Per app; this rubric links to the last one.
+/// rules to the Per app page; this rubric links to the last one.
 struct TextAndAIRubric: View {
     @ObservedObject var viewModel: SettingsViewModel
 

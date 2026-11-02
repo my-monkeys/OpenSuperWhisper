@@ -71,6 +71,95 @@ extension AppContextProfile {
         "cat readme dot md" → cat readme.md
         """)
 
-    /// The presets seeded into a fresh install (one-time; see `AppPreferences.seedAppContextPresetsIfNeeded`).
-    public static let defaultPresets: [AppContextProfile] = [slackPreset, terminalPreset]
+    static let notesPreset = AppContextProfile(
+        bundleIdentifier: "com.apple.Notes",
+        appName: "Notes",
+        instructions: """
+        Write the dictation as a note. A title that is dictated goes on its own line, with no \
+        period. When the speaker enumerates things to do, to buy or to remember, write one item \
+        per line starting with "- ". Otherwise keep short paragraphs. Do not use Markdown \
+        symbols (no #, no **, no checkboxes, no tables) and do not add, remove or rephrase \
+        anything else.
+        """)
+
+    static let mailPreset = AppContextProfile(
+        bundleIdentifier: "com.apple.mail",
+        appName: "Mail",
+        instructions: emailInstructions)
+
+    static let outlookPreset = AppContextProfile(
+        bundleIdentifier: "com.microsoft.Outlook",
+        appName: "Microsoft Outlook",
+        instructions: emailInstructions)
+
+    private static let emailInstructions = """
+        Write the dictation as an email. Put the greeting ("Hello Anna,") on its own line, then \
+        the body in short paragraphs separated by a blank line, then the sign-off ("Best \
+        regards,") and the name each on their own line. Keep the speaker's words and tone. No \
+        Markdown symbols.
+        """
+
+    static let messagesPreset = AppContextProfile(
+        bundleIdentifier: "com.apple.MobileSMS",
+        appName: "Messages",
+        instructions: chatInstructions)
+
+    static let whatsAppPreset = AppContextProfile(
+        bundleIdentifier: "net.whatsapp.WhatsApp",
+        appName: "WhatsApp",
+        instructions: chatInstructions)
+
+    private static let chatInstructions = """
+        Write the dictation as a chat message: short sentences, casual tone kept as spoken, no \
+        greeting or sign-off added. No formatting of any kind: no Markdown, no bullets, no \
+        headings. Do not add, remove or rephrase anything else.
+        """
+
+    static let notionPreset = AppContextProfile(
+        bundleIdentifier: "notion.id",
+        appName: "Notion",
+        instructions: markdownNotesInstructions)
+
+    static let obsidianPreset = AppContextProfile(
+        bundleIdentifier: "md.obsidian",
+        appName: "Obsidian",
+        instructions: markdownNotesInstructions)
+
+    private static let markdownNotesInstructions = """
+        Write the dictation as Markdown. A spoken to-do list becomes "- [ ] " lines, one task per \
+        line. Any other enumeration becomes "- " lines, or "1. " lines when the speaker \
+        numbered it. A title that is dictated becomes a "# " heading on its own line. Keep \
+        everything else as plain paragraphs and do not add, remove or rephrase anything.
+        """
+
+    static let pagesPreset = AppContextProfile(
+        bundleIdentifier: "com.apple.Pages",
+        appName: "Pages",
+        instructions: documentInstructions)
+
+    static let wordPreset = AppContextProfile(
+        bundleIdentifier: "com.microsoft.Word",
+        appName: "Microsoft Word",
+        instructions: documentInstructions)
+
+    private static let documentInstructions = """
+        Write the dictation as document text: clean paragraphs with full sentences and correct \
+        punctuation. When the speaker enumerates items, write one per line starting with "- ". A \
+        title that is dictated goes on its own line, with no period. Do not use Markdown symbols \
+        (no #, no **, no tables) and do not add, remove or rephrase anything else.
+        """
+
+    /// The built-in profiles, in the order they are offered. A fresh install gets them all; an
+    /// existing install gets the ones it was not offered yet (see
+    /// `AppPreferences.seedAppContextPresetsIfNeeded`). Append new ones at the end and never
+    /// reuse a bundle identifier: it is what remembers a preset was already offered.
+    public static let defaultPresets: [AppContextProfile] = [
+        slackPreset, terminalPreset,
+        notesPreset, mailPreset, outlookPreset, messagesPreset, whatsAppPreset,
+        notionPreset, obsidianPreset, pagesPreset, wordPreset,
+    ]
+
+    /// The two presets every install seeded before the list grew. An install that has seeded and
+    /// recorded nothing else was offered exactly these.
+    public static let firstShippedPresets: [AppContextProfile] = [slackPreset, terminalPreset]
 }

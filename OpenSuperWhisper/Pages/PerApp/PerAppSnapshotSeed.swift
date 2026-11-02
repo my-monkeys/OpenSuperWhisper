@@ -3,9 +3,9 @@ import Foundation
 import OpenSuperWhisperCore
 
 extension UISnapshotProbe {
-    /// Made-up per-app rules for the Style screens, written to the isolated preferences before
+    /// Made-up per-app rules for the Per app screens, written to the isolated preferences before
     /// the page's view model reads them.
-    static func seedStyle(expandFirst: Bool = false) {
+    static func seedPerApp(expandFirst: Bool = false) {
         let prefs = AppPreferences.shared
         prefs.appInsertionRules = [
             AppInsertionRule(bundleIdentifier: "com.apple.mail", appName: "Mail", mode: .paste),
@@ -21,7 +21,7 @@ extension UISnapshotProbe {
             "com.apple.mail": turbo,
             "com.apple.Safari|github.com": parakeet,
         ])) ?? Data()
-        StylePage.snapshotExpandsFirstRow = expandFirst
+        PerAppPage.snapshotExpandsFirstRow = expandFirst
     }
 }
 #endif

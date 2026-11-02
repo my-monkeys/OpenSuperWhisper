@@ -65,9 +65,8 @@ struct HomeSummaryTiles: View {
                 Text(modelValue)
             }
             .help("Choose the model in Settings")
-            SummaryTile(label: "Style", soon: true, action: nil) {
+            SummaryTile(label: "Style", action: { AppNavigation.shared.go(.style) }) {
                 Text("Writing styles")
-                    .foregroundColor(STheme.faint)
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -90,32 +89,22 @@ struct HomeSummaryTiles: View {
 
 private struct SummaryTile<Value: View>: View {
     let label: LocalizedStringKey
-    var soon = false
-    let action: (() -> Void)?
+    let action: () -> Void
     @ViewBuilder let value: () -> Value
     @State private var hovered = false
 
     var body: some View {
-        Group {
-            if let action {
-                Button(action: action) { tile }
-                    .buttonStyle(.plain)
-                    .onHover { hovered = $0 }
-            } else {
-                tile
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Button(action: action) { tile }
+            .buttonStyle(.plain)
+            .onHover { hovered = $0 }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var tile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text(label)
-                    .scaledFont(size: 12)
-                    .foregroundColor(STheme.hint)
-                if soon { SoonBadge() }
-            }
+            Text(label)
+                .scaledFont(size: 12)
+                .foregroundColor(STheme.hint)
             value()
                 .scaledFont(size: 17, weight: .semibold)
                 .foregroundColor(STheme.textBright)

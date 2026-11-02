@@ -116,14 +116,21 @@ struct IndicatorLayout: Codable, Equatable {
         if visible { hidden.remove(element) } else { hidden.insert(element) }
     }
 
-    /// Moves `dragged` to sit where `target` currently is.
-    mutating func move(_ dragged: IndicatorElement, before target: IndicatorElement) {
-        guard dragged != target,
-              let from = order.firstIndex(of: dragged),
-              let to = order.firstIndex(of: target)
-        else { return }
-        order.remove(at: from)
-        order.insert(dragged, at: to)
+    /// Moves `dragged` to where a pointer at `pointerY` would drop it among the other `rows`
+    /// (their frames, in the list's own coordinates): after every row whose middle it has passed.
+    /// Comparing with the other rows rather than the dragged one keeps the result steady when
+    /// the rows differ in height, instead of swapping back and forth under a still pointer.
+    mutating func move(_ dragged: IndicatorElement, toPointerY pointerY: CGFloat,
+                       rows: [IndicatorElement: CGRect]) {
+        let others = order.filter { $0 != dragged && rows[$0] != nil }
+        guard !others.isEmpty, order.contains(dragged) else { return }
+        let passed = others.filter { rows[$0]!.midY < pointerY }.count
+        var reordered = order.filter { $0 != dragged }
+        let index = passed < others.count
+            ? reordered.firstIndex(of: others[passed])!
+            : reordered.firstIndex(of: others[passed - 1])! + 1
+        reordered.insert(dragged, at: index)
+        order = reordered
     }
 
     // MARK: - Persistence
