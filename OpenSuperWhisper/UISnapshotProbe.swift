@@ -281,6 +281,7 @@ enum UISnapshotProbe {
 
         var all = screens.merging(onboardingScreens) { current, _ in current }
             .merging(reportScreens) { current, _ in current }
+            .merging(regenerateScreens) { current, _ in current }
         for rubric in SettingsRubric.allCases {
             all["settings-\(rubric.rawValue)"] = {
                 AdvancedRubrics.shared.set(rubric.rawValue, false)
