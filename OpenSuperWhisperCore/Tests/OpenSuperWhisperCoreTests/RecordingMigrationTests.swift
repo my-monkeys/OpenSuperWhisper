@@ -65,7 +65,7 @@ final class RecordingMigrationTests: CoreTestCase {
         XCTAssertEqual(RecordingStore.makeMigrator().migrations,
                        ["v1", "v2_add_status", "v3_add_source_context", "v4_add_model_used", "v5_add_was_fallback",
                         "v6_add_raw_transcription", "v7_add_transcription_reports", "v8_add_style_used",
-                        "v10_add_cleanup_outcome"])
+                        "v9_clear_own_recording_source", "v10_add_cleanup_outcome"])
     }
 
     // MARK: - Schema
@@ -248,6 +248,46 @@ final class RecordingMigrationTests: CoreTestCase {
             transcription: "Old text", duration: 3.5, status: .completed, progress: 1,
             sourceFileURL: nil, sourceAppName: nil, sourceWindowTitle: nil, sourceURL: nil,
             modelUsed: nil, wasFallback: false))
+    }
+
+    /// #274: a regeneration saved a dictation's own recordings/<fileName> as its source, so Home
+    /// showed it as an imported file. Rows whose source is their own file lose it, whatever the
+    /// storage root was; a real import, or a source that merely shares a file name with another
+    /// row's recording, keeps it.
+    func testOwnRecordingIsClearedAsSourceFileOnly() throws {
+        let queue = try DatabaseQueue()
+        try RecordingStore.makeMigrator().migrate(queue, upTo: "v8_add_style_used")
+        let rows: [(UUID, String, String?)] = [
+            (UUID(), "own.wav", "/Users/a/Library/Application Support/Dictation/recordings/own.wav"),
+            (UUID(), "own-other-root.wav", "/private/var/tmp/x/recordings/own-other-root.wav"),
+            (UUID(), "mine.wav", "/Users/a/Desktop/interview.m4a"),
+            (UUID(), "copy.wav", "/Users/a/Downloads/recordings/copy.wav.bak"),
+            (UUID(), "elsewhere.wav", "/Users/a/Library/Application Support/Dictation/recordings/own.wav"),
+            (UUID(), "dictation.wav", nil),
+        ]
+        try queue.write { db in
+            for (id, fileName, source) in rows {
+                try db.execute(sql: """
+                    INSERT INTO recordings (id, timestamp, fileName, transcription, duration, sourceFileURL)
+                    VALUES (?, '2025-10-09 09:00:00.000', ?, 'text', 1, ?)
+                    """, arguments: [id, fileName, source])
+            }
+        }
+
+        _ = try RecordingStore(databaseQueue: queue)
+
+        let sources = try queue.read { db in
+            try Row.fetchAll(db, sql: "SELECT fileName, sourceFileURL FROM recordings")
+                .reduce(into: [String: String?]()) { $0[$1["fileName"]] = $1["sourceFileURL"] }
+        }
+        XCTAssertEqual(sources, [
+            "own.wav": nil,
+            "own-other-root.wav": nil,
+            "mine.wav": "/Users/a/Desktop/interview.m4a",
+            "copy.wav": "/Users/a/Downloads/recordings/copy.wav.bak",
+            "elsewhere.wav": "/Users/a/Library/Application Support/Dictation/recordings/own.wav",
+            "dictation.wav": nil,
+        ])
     }
 
     /// 0.14.2 and older know nothing of the new column and table. Opened by one after an
