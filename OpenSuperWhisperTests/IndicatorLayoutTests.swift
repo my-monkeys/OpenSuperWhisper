@@ -102,12 +102,30 @@ final class IndicatorLayoutTests: XCTestCase {
 
     func testMigrationReproducesTheOldSettings() {
         let off = IndicatorLayout.migrated(meterMode: "off", showStop: false, showCancel: false)
-        XCTAssertEqual(off.elements, [.dot, .label])
+        XCTAssertEqual(off.elements, [.dot, .label, .liveText])
 
         let replaces = IndicatorLayout.migrated(meterMode: "replacesDot", showStop: false, showCancel: false)
-        XCTAssertEqual(replaces.elements, [.waveform, .label])
+        XCTAssertEqual(replaces.elements, [.waveform, .label, .liveText])
 
         let beside = IndicatorLayout.migrated(meterMode: "besideLabel", showStop: true, showCancel: true)
-        XCTAssertEqual(beside.elements, [.dot, .label, .waveform, .stopButton, .cancelButton])
+        XCTAssertEqual(beside.elements, [.dot, .label, .waveform, .stopButton, .cancelButton, .liveText])
+    }
+
+    /// A layout stored before the live text became an element lists none of it. It must come
+    /// back with the live text shown, as it always was, and not reorderable.
+    func testLayoutStoredBeforeLiveTextShowsIt() {
+        let old = #"{"order":["waveform","label","dot","stopButton","cancelButton"],"hidden":["dot"],"waveformHeight":30}"#
+        let loaded = IndicatorLayout.load(from: old)
+        XCTAssertTrue(loaded.isVisible(.liveText))
+        XCTAssertEqual(loaded.order.last, .liveText)
+        XCTAssertEqual(loaded.leading, [.waveform, .label])
+        XCTAssertFalse(loaded.trailing.contains(.liveText))
+    }
+
+    func testHidingLiveTextRemovesItWithoutTouchingTheRow() {
+        var layout = IndicatorLayout.default
+        layout.setVisible(false, for: .liveText)
+        XCTAssertFalse(layout.contains(.liveText))
+        XCTAssertEqual(layout.leading, IndicatorLayout.default.leading)
     }
 }

@@ -71,6 +71,7 @@ struct NotchGeometry: Equatable {
         // this is the width to keep clear.
         case .label: return 96 * textScale
         case .stopButton, .cancelButton: return 24
+        case .liveText: return 0 // never part of a row
         }
     }
 

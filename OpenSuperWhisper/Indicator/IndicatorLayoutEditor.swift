@@ -199,7 +199,7 @@ struct IndicatorElementList<Upcoming: View>: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            ForEach(model.layout.order.filter { !$0.isTrailingControl }) { element in
+            ForEach(model.layout.order.filter(\.isReorderable)) { element in
                 row(for: element)
                     .opacity(dragging == element ? 0.4 : 1)
                     .background(GeometryReader { proxy in
@@ -207,6 +207,8 @@ struct IndicatorElementList<Upcoming: View>: View {
                                                value: [element: proxy.frame(in: .named(indicatorListSpace))])
                     })
             }
+            // Placed by the bubble, not by `order`: no handle, like the buttons.
+            row(for: .liveText)
             upcoming()
             // Listed last because that is where they render, whatever their place in `order`.
             ForEach(model.layout.order.filter(\.isTrailingControl)) { element in
@@ -223,9 +225,9 @@ struct IndicatorElementList<Upcoming: View>: View {
                                 title: LocalizedStringKey(element.title),
                                 subtitle: LocalizedStringKey(element.subtitle),
                                 active: visible,
-                                handle: element.isTrailingControl ? .none : .drag(
+                                handle: element.isReorderable ? .drag(
                                     onMove: { pointerY in drag(element, toPointerY: pointerY) },
-                                    onEnd: endDrag)) {
+                                    onEnd: endDrag) : .none) {
             SSwitch(isOn: Binding(get: { visible },
                                   set: { model.setVisible($0, for: element) }))
                 .controlSize(.small)
