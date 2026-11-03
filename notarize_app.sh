@@ -24,8 +24,11 @@ KEYCHAIN_PROFILE="osw-notary"
 # than unreadable. That cost a full build on 0.12.4: ten minutes of compiling before the failure
 # surfaced.
 #
-# So the App Store Connect key is accepted directly as a fallback. Put the three values in
-# ~/.osw-notary.env, outside the repo:
+# The same item also becomes unreadable once the screen locks, and the choice below is made once,
+# before a ten minute build: on 0.15.0 the profile answered at the start, the Mac locked during the
+# x86_64 build, and the app's notarization failed with that same message. So the App Store Connect
+# key, a plain file that a locked screen doesn't hide, comes first when it is set up, and the
+# keychain profile is the fallback. Put the three values in ~/.osw-notary.env, outside the repo:
 #
 #   NOTARY_KEY=$HOME/.appstoreconnect/private_keys/AuthKey_XXXXXXXXXX.p8
 #   NOTARY_KEY_ID=XXXXXXXXXX
@@ -37,13 +40,13 @@ NOTARY_ENV="${NOTARY_ENV:-$HOME/.osw-notary.env}"
 [ -f "${NOTARY_ENV}" ] && . "${NOTARY_ENV}"
 
 notary_auth_args() {
-    if xcrun notarytool history --keychain-profile "${KEYCHAIN_PROFILE}" >/dev/null 2>&1; then
-        printf '%s' "--keychain-profile ${KEYCHAIN_PROFILE}"
-        return 0
-    fi
     if [ -n "${NOTARY_KEY:-}" ] && [ -f "${NOTARY_KEY}" ] \
        && [ -n "${NOTARY_KEY_ID:-}" ] && [ -n "${NOTARY_ISSUER:-}" ]; then
         printf '%s' "--key ${NOTARY_KEY} --key-id ${NOTARY_KEY_ID} --issuer ${NOTARY_ISSUER}"
+        return 0
+    fi
+    if xcrun notarytool history --keychain-profile "${KEYCHAIN_PROFILE}" >/dev/null 2>&1; then
+        printf '%s' "--keychain-profile ${KEYCHAIN_PROFILE}"
         return 0
     fi
     return 1
