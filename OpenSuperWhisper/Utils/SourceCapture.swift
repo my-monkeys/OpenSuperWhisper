@@ -108,6 +108,7 @@ enum SourceCapture {
         "com.microsoft.edgemac": "tell application \"Microsoft Edge\" to return URL of active tab of front window",
         "com.vivaldi.Vivaldi": "tell application \"Vivaldi\" to return URL of active tab of front window",
         "company.thebrowser.Browser": "tell application \"Arc\" to return URL of active tab of front window",
+        "company.thebrowser.dia": "tell application \"Dia\" to return URL of active tab of front window",
         "com.apple.Safari": "tell application \"Safari\" to return URL of front document",
     ]
 
