@@ -73,6 +73,25 @@ struct PerAppDetail: View {
                 note("Synthetic keystrokes. Leaves the clipboard alone. Raise the pace if this app falls behind.")
                 typingPace
             }
+            if isRemoteSessionApp {
+                keyboard(note: "This app is always typed key by key, because the text goes to another computer. Choose the layout that computer uses.")
+            } else if entry.insertion?.mode == .type {
+                keyboard(note: "The layout of the computer the text is typed into, for remote sessions and virtual machines. Leave on “Same as this Mac” otherwise.")
+            }
+        }
+    }
+
+    private var isRemoteSessionApp: Bool { RemoteSession.isRemoteSession(entry.bundleID) }
+
+    private func keyboard(note text: LocalizedStringKey) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Text("Keyboard")
+                    .scaledFont(size: 14, weight: .medium)
+                    .foregroundColor(STheme.textBright)
+                pickers.keyboardMenu
+            }
+            note(text)
         }
     }
 

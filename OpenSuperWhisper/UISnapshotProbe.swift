@@ -50,6 +50,12 @@ enum UISnapshotProbe {
         },
         "per-app": { seedPerApp(); return AnyView(AppShellView(page: .perApp)) },
         "per-app-expanded": { seedPerApp(expandFirst: true); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-keyboard": { seedPerApp(expandFirst: true, typedWithLayout: true); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-keyboard-large-text": {
+            seedPerApp(expandFirst: true, typedWithLayout: true)
+            AppPreferences.shared.textScale = TextScale.maximum
+            return AnyView(AppShellView(page: .perApp))
+        },
         "per-app-empty": { AnyView(AppShellView(page: .perApp)) },
         "per-app-large-text": {
             seedPerApp()

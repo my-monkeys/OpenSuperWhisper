@@ -5,13 +5,19 @@ import OpenSuperWhisperCore
 extension UISnapshotProbe {
     /// Made-up per-app rules for the Per app screens, written to the isolated preferences before
     /// the page's view model reads them.
-    static func seedPerApp(expandFirst: Bool = false) {
+    static func seedPerApp(expandFirst: Bool = false, typedWithLayout: Bool = false) {
         let prefs = AppPreferences.shared
         prefs.appInsertionRules = [
             AppInsertionRule(bundleIdentifier: "com.apple.mail", appName: "Mail", mode: .paste),
             AppInsertionRule(bundleIdentifier: "com.apple.Terminal", appName: "Terminal", mode: .type,
                              typingPaceMilliseconds: 2),
         ]
+        if typedWithLayout {
+            // Sorts first, so the expanded row is the one with a Keyboard menu.
+            prefs.appInsertionRules.append(AppInsertionRule(
+                bundleIdentifier: "com.google.Chrome.app.remote", appName: "Chrome Remote Desktop",
+                mode: .type, keyboardLayoutID: RemoteKeyboardLayouts.usLayoutID))
+        }
         prefs.appContextProfiles = AppContextProfile.defaultPresets
         prefs.appWritingStyles = ["com.apple.mail": WritingStyle.proID]
         prefs.perAppDisabledBundleIDs = AppContextProfile.defaultPresets.map(\.bundleIdentifier)

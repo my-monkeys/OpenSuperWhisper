@@ -1,8 +1,8 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// The three "Value ▾" menus of an app, in the editor under its row: the writing style, the
-/// insertion mode and the model. The row itself only shows what they are set to, as badges.
+/// The "Value ▾" menus of an app, in the editor under its row: the writing style, the
+/// insertion mode, the keyboard of a typed app and the model. The row itself only shows what they are set to, as badges.
 struct PerAppPickers {
     let entry: PerAppEntry
     let viewModel: SettingsViewModel
@@ -40,6 +40,26 @@ struct PerAppPickers {
                 Text("Default insertion").tag(AppInsertionMode?.none)
                 ForEach(AppInsertionMode.allCases) { mode in
                     Text(LocalizedStringKey(mode.title)).tag(AppInsertionMode?.some(mode))
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
+    }
+
+    /// The layout of the computer the app's text goes to. Labelled and listed the way the removed
+    /// global setting was: this Mac's own first, then the installed layouts.
+    var keyboardMenu: some View {
+        let selection = Binding<String?>(
+            get: { entry.insertion?.keyboardLayoutID },
+            set: { store.setKeyboardLayout($0, for: entry) })
+        let label = selection.wrappedValue.map { Text(verbatim: RemoteKeyboardLayouts.name(id: $0) ?? $0) }
+            ?? Text("Same as this Mac")
+        return RowMenu(label: label, width: Self.width) {
+            Picker("", selection: selection) {
+                Text("Same as this Mac").tag(String?.none)
+                ForEach(RemoteKeyboardLayouts.choices()) { layout in
+                    Text(verbatim: layout.name).tag(String?.some(layout.id))
                 }
             }
             .pickerStyle(.inline)

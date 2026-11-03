@@ -31,7 +31,7 @@ struct PerAppEntry: Identifiable, Equatable {
 /// customised shows `.standard` alone.
 enum PerAppBadge: Hashable {
     case style(String)
-    case insertion(AppInsertionMode, paceMilliseconds: Int?)
+    case insertion(AppInsertionMode, paceMilliseconds: Int?, layoutID: String? = nil)
     case model(String)
     case formatting
     case standard
@@ -43,7 +43,8 @@ enum PerAppBadge: Hashable {
         if !entry.isSite {
             if let styleName, entry.style != nil { badges.append(.style(styleName)) }
             if let rule = entry.insertion {
-                badges.append(.insertion(rule.mode, paceMilliseconds: rule.typingPaceMilliseconds))
+                badges.append(.insertion(rule.mode, paceMilliseconds: rule.typingPaceMilliseconds,
+                                         layoutID: rule.mode == .type ? rule.keyboardLayoutID : nil))
             }
         }
         if let model = entry.model { badges.append(.model(model.displayName)) }
@@ -147,6 +148,22 @@ struct PerAppStore {
         } else {
             viewModel.appInsertionRules.append(
                 AppInsertionRule(bundleIdentifier: entry.bundleID, appName: entry.appName, mode: mode))
+        }
+    }
+
+    /// nil goes back to this Mac's layout. A remote-session app is typed key by key whatever its
+    /// mode, so naming a layout for one that follows the global switch or pastes makes it a
+    /// typing rule, which is what the layout belongs to.
+    func setKeyboardLayout(_ layoutID: String?, for entry: PerAppEntry) {
+        if let index = viewModel.appInsertionRules.firstIndex(where: { matches($0.bundleIdentifier, entry) }) {
+            viewModel.appInsertionRules[index].keyboardLayoutID = layoutID
+            if layoutID != nil && RemoteSession.isRemoteSession(entry.bundleID) {
+                viewModel.appInsertionRules[index].mode = .type
+            }
+        } else if layoutID != nil {
+            viewModel.appInsertionRules.append(
+                AppInsertionRule(bundleIdentifier: entry.bundleID, appName: entry.appName,
+                                 mode: .type, keyboardLayoutID: layoutID))
         }
     }
 
