@@ -195,6 +195,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private var microphoneObserver: AnyCancellable?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // First, so nothing else appears or starts while the app is about to be replaced by its copy.
+        if MainActor.assumeIsolated({ MoveToApplications.offerIfNeeded() }) { return }
 
         setupStatusBarItem()
         AppearanceController.shared.apply()
