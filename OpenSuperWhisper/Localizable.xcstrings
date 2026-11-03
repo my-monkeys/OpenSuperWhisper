@@ -58963,48 +58963,48 @@
         }
       }
     },
-    "Turn off for a short or common word the model starts hearing everywhere, like “Maxim” written for “Mais”. The replacement still applies.": {
+    "Turn off for a short or common word the model starts hearing everywhere, like “Maxim” written for “Mais”. The replacement still applies, and AI cleanup still keeps the word as written.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Désactivez-le pour un mot court ou courant que le modèle se met à entendre partout, comme « Maxim » écrit à la place de « Mais ». Le remplacement s'applique toujours."
+            "value": "Désactivez-le pour un mot court ou courant que le modèle se met à entendre partout, comme « Maxim » écrit à la place de « Mais ». Le remplacement s'applique toujours, et le nettoyage IA garde toujours le mot tel qu'il est écrit."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ausschalten bei einem kurzen oder häufigen Wort, das das Modell plötzlich überall hört, etwa „Maxim“ statt „Mais“. Die Ersetzung gilt weiterhin."
+            "value": "Ausschalten bei einem kurzen oder häufigen Wort, das das Modell plötzlich überall hört, etwa „Maxim“ statt „Mais“. Die Ersetzung gilt weiterhin, und die KI-Bereinigung behält das Wort so, wie es geschrieben ist."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desactívalo para una palabra corta o común que el modelo empieza a oír por todas partes, como “Maxim” escrito en lugar de “Mais”. El reemplazo sigue aplicándose."
+            "value": "Desactívalo para una palabra corta o común que el modelo empieza a oír por todas partes, como “Maxim” escrito en lugar de “Mais”. El reemplazo sigue aplicándose y la limpieza con IA mantiene la palabra tal como está escrita."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Disattivalo per una parola breve o comune che il modello inizia a sentire ovunque, come “Maxim” scritto al posto di “Mais”. La sostituzione resta attiva."
+            "value": "Disattivalo per una parola breve o comune che il modello inizia a sentire ovunque, come “Maxim” scritto al posto di “Mais”. La sostituzione resta attiva e la pulizia con IA mantiene la parola così com'è scritta."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desligue para uma palavra curta ou comum que o modelo passa a ouvir em todo lugar, como “Maxim” escrito no lugar de “Mais”. A substituição continua valendo."
+            "value": "Desligue para uma palavra curta ou comum que o modelo passa a ouvir em todo lugar, como “Maxim” escrito no lugar de “Mais”. A substituição continua valendo, e a limpeza com IA mantém a palavra como está escrita."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tắt cho từ ngắn hoặc phổ biến mà mô hình bắt đầu nghe thấy ở khắp nơi, như “Maxim” được viết thay cho “Mais”. Phép thay thế vẫn áp dụng."
+            "value": "Tắt cho từ ngắn hoặc phổ biến mà mô hình bắt đầu nghe thấy ở khắp nơi, như “Maxim” được viết thay cho “Mais”. Phép thay thế vẫn áp dụng và bước dọn dẹp bằng AI vẫn giữ nguyên cách viết của từ."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "如果模型开始到处“听到”某个简短或常用的词（例如把“Mais”写成“Maxim”），就关闭它。替换规则仍然生效。"
+            "value": "如果模型开始到处“听到”某个简短或常用的词（例如把“Mais”写成“Maxim”），就关闭它。替换规则仍然生效，AI 清理也会保留该词的写法。"
           }
         }
       }

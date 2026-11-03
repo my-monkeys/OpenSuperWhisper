@@ -126,7 +126,7 @@ public enum LLMPostProcessor {
             ? profile(for: bundleID, in: prefs.appContextProfiles) : nil
         let spokenFormatting = general && prefs.aiSpokenFormattingEnabled
         let vocabulary = prefs.customDictionaryEnabled
-            ? cleanupVocabulary(CustomDictionary.boostTerms(entries: prefs.customDictionaryEntries), in: text) : []
+            ? cleanupVocabulary(CustomDictionary.cleanupTerms(entries: prefs.customDictionaryEntries), in: text) : []
         guard let system = assembleSystemPrompt(generalCleanup: general,
                                                 generalPrompt: prefs.aiPostProcessingPrompt,
                                                 profile: prof,
