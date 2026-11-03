@@ -112,6 +112,10 @@ enum SourceCapture {
         "com.apple.Safari": "tell application \"Safari\" to return URL of front document",
     ]
 
+    static func isSupportedBrowser(bundleID: String) -> Bool {
+        browserScripts.keys.contains { $0.caseInsensitiveCompare(bundleID) == .orderedSame }
+    }
+
     /// Active-tab URL for a known browser bundle id, or nil (not a browser, no
     /// window, or automation permission denied). Synchronous — call on the main
     /// thread (NSAppleScript requirement).
@@ -132,5 +136,12 @@ enum SourceCapture {
               let host = URLComponents(string: urlString)?.host,
               !host.isEmpty else { return nil }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    /// The host a person typed for a site rule: "https://www.Mail.Google.com/mail/u/0" and
+    /// "mail.google.com" both give "mail.google.com". nil when no host can be read from it.
+    static func normalizedHost(_ input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        return host(of: trimmed.contains("://") ? trimmed : "https://" + trimmed)?.lowercased()
     }
 }

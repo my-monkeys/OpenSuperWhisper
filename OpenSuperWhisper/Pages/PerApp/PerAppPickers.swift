@@ -1,8 +1,8 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// The three "Value ▾" menus of an app, in the editor under its row: the writing style, the
-/// insertion mode and the model. The row itself only shows what they are set to, as badges.
+/// The "Value ▾" menus of an app or site, in the editor under its row: the writing style, AI
+/// cleanup, the insertion mode and the model. The row itself only shows what they are set to, as badges.
 struct PerAppPickers {
     let entry: PerAppEntry
     let viewModel: SettingsViewModel
@@ -13,7 +13,6 @@ struct PerAppPickers {
 
     private var store: PerAppStore { PerAppStore(viewModel: viewModel) }
 
-    /// A site row has no style: like insertion, it follows the app.
     var styleMenu: some View {
         let selection = Binding<String?>(get: { entry.style }, set: { store.setStyle($0, for: entry) })
         let styles = WritingStyle.builtIns + viewModel.customWritingStyles
@@ -24,6 +23,27 @@ struct PerAppPickers {
                 ForEach(styles) { style in
                     Text(verbatim: WritingStyleText.name(style)).tag(String?.some(style.id))
                 }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
+    }
+
+    /// "Default" names the global switch's state, so the menu shows what following it means.
+    var cleanupMenu: some View {
+        let selection = Binding<Bool?>(get: { entry.cleanup }, set: { store.setCleanup($0, for: entry) })
+        let globalOn = viewModel.aiPostProcessingEnabled
+        let label: Text
+        switch entry.cleanup {
+        case true?: label = Text("On")
+        case false?: label = Text("Off")
+        case nil: label = globalOn ? Text("Default (On)") : Text("Default (Off)")
+        }
+        return RowMenu(label: label, width: Self.width) {
+            Picker("", selection: selection) {
+                (globalOn ? Text("Default (On)") : Text("Default (Off)")).tag(Bool?.none)
+                Text("On").tag(Bool?.some(true))
+                Text("Off").tag(Bool?.some(false))
             }
             .pickerStyle(.inline)
             .labelsHidden()

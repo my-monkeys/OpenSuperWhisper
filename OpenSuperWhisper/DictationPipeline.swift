@@ -273,17 +273,20 @@ final class DictationPipeline: ObservableObject {
             // app-aware formatting rules are keyed off the app that was frontmost when the clip was
             // RECORDED — the app the user was dictating into — not whatever is frontmost now that
             // the background queue got to it. (parallel-recording)
-            let style = AppPreferences.shared.writingStyle(for: item.context.bundleID)
+            // The site, for a browser, decides AI cleanup and the style as the app does: Gmail can
+            // be cleaned up while the rest of the browser is not.
+            let host = SourceCapture.host(of: item.context.fullURL)
+            let style = AppPreferences.shared.writingStyle(for: item.context.bundleID, host: host)
+            let generalCleanup = AppPreferences.shared.cleanupEnabled(bundleID: item.context.bundleID, host: host)
             let cleanup: CleanupOutcome
-            isCleaningUp = AppPreferences.shared.aiPostProcessingEnabled
-                || AppPreferences.shared.appContextFormattingEnabled
+            isCleaningUp = generalCleanup || AppPreferences.shared.appContextFormattingEnabled
             if let cleanupOverride {
                 cleanup = await cleanupOverride(text)
             } else {
                 cleanup = await LLMPostProcessor.processWithOutcome(
                     text, bundleID: item.context.bundleID, translating: settings.translateToEnglish,
                     writesLists: RichListPaste.cleanupWritesLists(into: item.context.bundleID),
-                    style: style.instructions)
+                    style: style.instructions, generalCleanup: generalCleanup)
             }
             isCleaningUp = false
             CleanupSessionStatus.shared.record(cleanup)

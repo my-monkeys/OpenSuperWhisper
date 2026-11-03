@@ -841,16 +841,29 @@ final class AppPreferences {
         set { customWritingStylesData = try? JSONEncoder().encode(newValue) }
     }
 
-    /// Bundle identifier, lowercased, to style id: an app that always gets the same voice.
+    /// Bundle identifier, lowercased, to style id: an app that always gets the same voice. A key
+    /// "bundleID|host" is the same for one site of a browser.
     @UserDefault(key: "appWritingStyles", defaultValue: [String: String]())
     var appWritingStyles: [String: String]
 
-    /// The style for a dictation into `bundleID`: the app's own if it has one and is switched on,
-    /// else the default.
-    func writingStyle(for bundleID: String?) -> WritingStyle {
-        let appStyle = PerAppSwitch.isOn(bundleID, disabled: perAppDisabledBundleIDs)
-            ? bundleID.flatMap { appWritingStyles[$0.lowercased()] } : nil
-        return WritingStyle.resolve(appStyle ?? writingStyleID, custom: customWritingStyles)
+    /// Same keys, to whether AI cleanup runs there: on or off whatever the global switch says.
+    /// Absent follows the global switch.
+    @UserDefault(key: "appCleanupOverrides", defaultValue: [String: Bool]())
+    var appCleanupOverrides: [String: Bool]
+
+    /// The style for a dictation into `bundleID` (and `host`, for a browser): the site's own, else
+    /// the app's, else the default. Own styles only count while the app is switched on.
+    func writingStyle(for bundleID: String?, host: String? = nil) -> WritingStyle {
+        let own = PerAppOverride.value(in: appWritingStyles, bundleID: bundleID, host: host,
+                                       disabled: perAppDisabledBundleIDs)
+        return WritingStyle.resolve(own ?? writingStyleID, custom: customWritingStyles)
+    }
+
+    /// Whether AI cleanup runs for a dictation into `bundleID` (and `host`): the site's own choice,
+    /// else the app's, else the global switch.
+    func cleanupEnabled(bundleID: String?, host: String? = nil) -> Bool {
+        PerAppOverride.value(in: appCleanupOverrides, bundleID: bundleID, host: host,
+                             disabled: perAppDisabledBundleIDs) ?? aiPostProcessingEnabled
     }
 
     /// Bundle identifiers (lowercased) of the apps whose per-app settings are switched off: none of

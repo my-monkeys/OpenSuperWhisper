@@ -35,6 +35,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "aiRemoteModel",
         "aiSpokenFormattingEnabled",
         "appAppearance",
+        "appCleanupOverrides",
         "appContextFormattingEnabled",
         "appContextProfilesData",
         "appInsertionRulesData",
@@ -209,6 +210,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
             prefs.customWritingStyles = [WritingStyle(name: "Charity", instructions: "Warm.")]
         }
         assertWrites("appWritingStyles") { prefs.appWritingStyles = ["com.apple.mail": WritingStyle.proID] }
+        assertWrites("appCleanupOverrides") { prefs.appCleanupOverrides = ["com.apple.notes": true] }
         assertWrites("translateToEnglish") { prefs.translateToEnglish = true }
         assertWrites("suppressBlankAudio") { prefs.suppressBlankAudio = false }
         assertWrites("showTimestamps") { prefs.showTimestamps = true }
