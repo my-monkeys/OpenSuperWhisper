@@ -47,6 +47,7 @@ public protocol CorePreferences: AnyObject, Sendable {
     var aiPostProcessingEnabled: Bool { get }
     var appContextFormattingEnabled: Bool { get }
     var appContextProfiles: [AppContextProfile] { get }
+    var perAppDisabledBundleIDs: [String] { get }
     var aiPostProcessingPrompt: String { get }
     var aiPostProcessingClosing: String { get }
     var aiPostProcessingTranslation: String { get }

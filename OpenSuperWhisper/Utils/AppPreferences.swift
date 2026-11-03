@@ -839,10 +839,35 @@ final class AppPreferences {
     @UserDefault(key: "appWritingStyles", defaultValue: [String: String]())
     var appWritingStyles: [String: String]
 
-    /// The style for a dictation into `bundleID`: the app's own if it has one, else the default.
+    /// The style for a dictation into `bundleID`: the app's own if it has one and is switched on,
+    /// else the default.
     func writingStyle(for bundleID: String?) -> WritingStyle {
-        let appStyle = bundleID.flatMap { appWritingStyles[$0.lowercased()] }
+        let appStyle = PerAppSwitch.isOn(bundleID, disabled: perAppDisabledBundleIDs)
+            ? bundleID.flatMap { appWritingStyles[$0.lowercased()] } : nil
         return WritingStyle.resolve(appStyle ?? writingStyleID, custom: customWritingStyles)
+    }
+
+    /// Bundle identifiers (lowercased) of the apps whose per-app settings are switched off: none of
+    /// their profile, insertion rule, model rule or style applies, though all stay stored. See
+    /// `PerAppSwitch`. The built-in formatting profiles are added here when they arrive, so they
+    /// are opt-in.
+    @UserDefault(key: "perAppDisabledBundleIDs", defaultValue: [String]())
+    var perAppDisabledBundleIDs: [String]
+
+    /// Whether the built-in profile for this app is added switched off. Not a terminal that has a
+    /// seeded paste rule: the switch is per app, and turning it off would drop that fix with the
+    /// profile. Formatting is globally off until the user turns "Reformat per app" on anyway.
+    private func arrivesSwitchedOff(_ preset: AppContextProfile) -> Bool {
+        !AppInsertionRule.bundledTerminalPresets.contains {
+            $0.bundleIdentifier.caseInsensitiveCompare(preset.bundleIdentifier) == .orderedSame
+        }
+    }
+
+    private func switchOff(_ presets: [AppContextProfile]) {
+        let ids = presets.filter(arrivesSwitchedOff).map(\.bundleIdentifier)
+        perAppDisabledBundleIDs = ids.reduce(perAppDisabledBundleIDs) {
+            PerAppSwitch.setting($1, on: false, in: $0)
+        }
     }
 
     /// Flips true once the bundled presets have been seeded, so a user who deletes them keeps
@@ -864,6 +889,7 @@ final class AppPreferences {
         if !didSeedAppContextPresets {
             if appContextProfiles.isEmpty {
                 appContextProfiles = AppContextProfile.defaultPresets
+                switchOff(AppContextProfile.defaultPresets)
             }
             offeredAppContextPresets = AppContextProfile.defaultPresets.map(\.bundleIdentifier)
             didSeedAppContextPresets = true
@@ -876,12 +902,15 @@ final class AppPreferences {
         let fresh = AppContextProfile.defaultPresets.filter { !offeredAppContextPresets.contains($0.bundleIdentifier) }
         guard !fresh.isEmpty else { return }
         var profiles = appContextProfiles
+        var added: [AppContextProfile] = []
         for preset in fresh where !profiles.contains(where: {
             $0.bundleIdentifier.caseInsensitiveCompare(preset.bundleIdentifier) == .orderedSame
         }) {
             profiles.append(preset)
+            added.append(preset)
         }
         appContextProfiles = profiles
+        switchOff(added)
         offeredAppContextPresets += fresh.map(\.bundleIdentifier)
     }
 

@@ -49,7 +49,7 @@ final class AppPreferencesMigrationTests: XCTestCase {
         XCTAssertEqual(scratch.writtenKeys,
                        ["appContextProfilesData", "appInsertionRulesData", "didSeedAppContextPresets",
                         "didSeedTerminalInsertionRules", "indicatorLayout", "offeredAppContextPresets",
-                        "recordingTriggers"])
+                        "perAppDisabledBundleIDs", "recordingTriggers"])
         XCTAssertEqual(prefs.selectedEngine, "whisper")
         XCTAssertNil(defaults.object(forKey: "aiBackend"))
     }

@@ -15,6 +15,23 @@ final class BuiltInAppIconTests: XCTestCase {
         }
     }
 
+    /// The four rows that showed no icon (#283 follow-up) were seeded terminals this Mac does not
+    /// have, none of which had a bundled one.
+    func testEverySeededTerminalHasABundledIcon() {
+        for rule in AppInsertionRule.bundledTerminalPresets {
+            XCTAssertNotNil(InstalledApps.bundledIcon(forBundleIdentifier: rule.bundleIdentifier),
+                            "no icon in Assets.xcassets/AppIcons for \(rule.bundleIdentifier)")
+        }
+    }
+
+    func testAnInstalledAppIsFoundWhateverTheCaseOfItsStoredIdentifier() {
+        let id = "com.apple.Terminal"
+        guard InstalledApps.isInstalled(bundleIdentifier: id) else { return }
+        XCTAssertEqual(InstalledApps.applicationURL(forBundleIdentifier: id.lowercased()),
+                       InstalledApps.applicationURL(forBundleIdentifier: id))
+        XCTAssertTrue(InstalledApps.isInstalled(bundleIdentifier: id.uppercased()))
+    }
+
     func testAnAppWithoutABuiltInProfileHasNoBundledIcon() {
         XCTAssertNil(InstalledApps.bundledIcon(forBundleIdentifier: "com.example.unknown"))
     }

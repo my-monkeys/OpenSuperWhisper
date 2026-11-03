@@ -1,32 +1,33 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// What opens under "›": the typing pace for a typed app, its formatting instructions, and the
-/// actions on the row.
+/// What opens under "›": the style, insertion and model menus, the typing pace for a typed app,
+/// its formatting instructions, and the actions on the row.
 struct PerAppDetail: View {
     let entry: PerAppEntry
     @ObservedObject var viewModel: SettingsViewModel
+    let models: [DictationModelOption]
     let showsModelMenu: Bool
+    let isOn: Bool
     let onRemove: () -> Void
     let onChangeApp: () -> Void
 
     private var store: PerAppStore { PerAppStore(viewModel: viewModel) }
+    private var pickers: PerAppPickers { PerAppPickers(entry: entry, viewModel: viewModel, models: models) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if !isOn {
+                note("Switched off: none of the settings below apply. They are kept for when you switch it back on.")
+            }
             if entry.isSite {
                 note("A site rule only picks the transcription model, in Safari, Arc and other supported browsers. Insertion and formatting follow the app.")
-                if !showsModelMenu, let model = entry.model {
-                    note("Model: \(model.displayName). Model rules need at least two models to switch between.")
-                }
+                modelSection
             } else {
+                styleSection
                 insertionSection
+                modelSection
                 formattingSection
-                if !showsModelMenu, let model = entry.model {
-                    section("Model") {
-                        note("\(model.displayName). Model rules need at least two models to switch between.")
-                    }
-                }
             }
             actions
         }
@@ -36,10 +37,33 @@ struct PerAppDetail: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(STheme.border, lineWidth: 1))
     }
 
+    // MARK: - Style and model
+
+    private var styleSection: some View {
+        section("Style") {
+            pickers.styleMenu
+            note("The voice AI cleanup writes in for this app. Default follows the style chosen on the Style page.")
+        }
+    }
+
+    @ViewBuilder private var modelSection: some View {
+        if showsModelMenu {
+            section("Model") {
+                pickers.modelMenu
+                note("Switches to this model when the app comes to the front. Default keeps the model in effect.")
+            }
+        } else if let model = entry.model {
+            section("Model") {
+                note("\(model.displayName). Model rules need at least two models to switch between.")
+            }
+        }
+    }
+
     // MARK: - Insertion
 
     @ViewBuilder private var insertionSection: some View {
         section("Insertion") {
+            pickers.insertionMenu
             switch entry.insertion?.mode {
             case nil:
                 note("Follows the global “Paste instead of typing” switch. Choose Paste or Type to override it for this app.")
