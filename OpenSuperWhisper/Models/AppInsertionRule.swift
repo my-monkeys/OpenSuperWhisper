@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// How a transcription should reach one particular app.
 ///
@@ -69,8 +70,9 @@ extension AppInsertionRule {
     /// Matched case-insensitively, because a bundle identifier typed by hand rarely comes out
     /// with the same capitalisation as the one the system reports. The first match wins, so a
     /// duplicated identifier behaves like the list reads rather than unpredictably.
-    static func rule(for bundleID: String?, in rules: [AppInsertionRule]) -> AppInsertionRule? {
-        guard let bundleID, !bundleID.isEmpty else { return nil }
+    static func rule(for bundleID: String?, in rules: [AppInsertionRule],
+                     disabled: [String]) -> AppInsertionRule? {
+        guard let bundleID, !bundleID.isEmpty, PerAppSwitch.isOn(bundleID, disabled: disabled) else { return nil }
         return rules.first {
             !$0.bundleIdentifier.isEmpty
                 && $0.bundleIdentifier.compare(bundleID, options: .caseInsensitive) == .orderedSame

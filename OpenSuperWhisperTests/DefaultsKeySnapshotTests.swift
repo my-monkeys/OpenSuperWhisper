@@ -88,6 +88,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "pasteIntoOriginalField",
         "pasteListsAsRichText",
         "pauseMediaOnRecord",
+        "perAppDisabledBundleIDs",
         "playSoundOnRecordStart",
         "playSoundOnRecordStop",
         "postRecordHookCommand",
@@ -290,6 +291,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         }
         assertWrites("didSeedAppContextPresets") { prefs.didSeedAppContextPresets = true }
         assertWrites("offeredAppContextPresets") { prefs.offeredAppContextPresets = ["com.example"] }
+        assertWrites("perAppDisabledBundleIDs") { prefs.perAppDisabledBundleIDs = ["com.example"] }
         assertWrites("didSeedTerminalInsertionRules") { prefs.didSeedTerminalInsertionRules = true }
         assertWrites("crashReportMode") { prefs.crashReportMode = .auto }
         assertWrites("autoCopyToClipboard") { prefs.autoCopyToClipboard = false }
@@ -469,6 +471,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.appContextProfiles, [])
         XCTAssertEqual(prefs.didSeedAppContextPresets, false)
         XCTAssertEqual(prefs.offeredAppContextPresets, [])
+        XCTAssertEqual(prefs.perAppDisabledBundleIDs, [])
         XCTAssertEqual(prefs.didSeedTerminalInsertionRules, false)
         XCTAssertEqual(prefs.crashReportMode, .ask)
         XCTAssertEqual(prefs.autoCopyToClipboard, true)

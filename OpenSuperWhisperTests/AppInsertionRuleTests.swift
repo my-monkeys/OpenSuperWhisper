@@ -21,29 +21,29 @@ final class AppInsertionRuleTests: XCTestCase {
     // MARK: - Matching
 
     func testTheRuleForAnAppIsFound() {
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: rules), terminal)
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: rules, disabled: []), terminal)
     }
 
     /// A bundle identifier typed by hand rarely comes out capitalised the way the system reports
     /// it, and a rule that silently does not apply is worse than no rule at all.
     func testMatchingIgnoresCase() {
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.microsoft.vscode", in: rules), vsCode)
-        XCTAssertEqual(AppInsertionRule.rule(for: "COM.APPLE.TERMINAL", in: rules), terminal)
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.microsoft.vscode", in: rules, disabled: []), vsCode)
+        XCTAssertEqual(AppInsertionRule.rule(for: "COM.APPLE.TERMINAL", in: rules, disabled: []), terminal)
     }
 
     /// No rule means the global setting decides, which is what every existing install gets.
     func testAnAppWithNoRuleMatchesNothing() {
-        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: rules))
-        XCTAssertNil(AppInsertionRule.rule(for: nil, in: rules))
-        XCTAssertNil(AppInsertionRule.rule(for: "", in: rules))
+        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: rules, disabled: []))
+        XCTAssertNil(AppInsertionRule.rule(for: nil, in: rules, disabled: []))
+        XCTAssertNil(AppInsertionRule.rule(for: "", in: rules, disabled: []))
     }
 
     /// A half-filled row in the editor must not swallow every app that comes past it.
     func testARuleWithNoIdentifierNeverMatches() {
         let blank = AppInsertionRule(bundleIdentifier: "", appName: "", mode: .paste)
 
-        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: [blank]))
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [blank, terminal]),
+        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: [blank], disabled: []))
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [blank, terminal], disabled: []),
                        terminal)
     }
 
@@ -52,7 +52,7 @@ final class AppInsertionRuleTests: XCTestCase {
         let second = AppInsertionRule(bundleIdentifier: "com.apple.Terminal",
                                       appName: "Terminal again", mode: .type)
 
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [terminal, second]),
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [terminal, second], disabled: []),
                        terminal)
     }
 

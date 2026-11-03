@@ -122,7 +122,8 @@ public enum LLMPostProcessor {
         guard general || formatting else { return notRun }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return notRun }
 
-        let prof = formatting ? profile(for: bundleID, in: prefs.appContextProfiles) : nil
+        let prof = formatting && PerAppSwitch.isOn(bundleID, disabled: prefs.perAppDisabledBundleIDs)
+            ? profile(for: bundleID, in: prefs.appContextProfiles) : nil
         let spokenFormatting = general && prefs.aiSpokenFormattingEnabled
         let vocabulary = prefs.customDictionaryEnabled
             ? cleanupVocabulary(CustomDictionary.boostTerms(entries: prefs.customDictionaryEntries), in: text) : []

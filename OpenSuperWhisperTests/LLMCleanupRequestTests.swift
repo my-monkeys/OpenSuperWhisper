@@ -345,6 +345,23 @@ final class LLMCleanupRequestTests: XCTestCase {
         XCTAssertTrue(LLMStubProtocol.requests.isEmpty)
     }
 
+    /// The per-app switch: a profile for an app that is switched off is not used, though stored.
+    func testAProfileOfAnAppSwitchedOffSendsNothing() async {
+        prefs.aiPostProcessingEnabled = false
+        prefs.appContextFormattingEnabled = true
+        prefs.appContextProfiles = [AppContextProfile(bundleIdentifier: "com.example.app", instructions: "x")]
+        prefs.perAppDisabledBundleIDs = ["com.example.app"]
+        LLMStubProtocol.reset(replying: ollamaReply("Changed."))
+
+        let off = await LLMPostProcessor.process(Self.input, bundleID: "com.example.APP")
+        XCTAssertEqual(off, Self.input)
+        XCTAssertTrue(LLMStubProtocol.requests.isEmpty)
+
+        prefs.perAppDisabledBundleIDs = []
+        let on = await LLMPostProcessor.process(Self.input, bundleID: "com.example.app")
+        XCTAssertEqual(on, "Changed.")
+    }
+
     func testBlankTranscriptionSendsNothing() async {
         LLMStubProtocol.reset(replying: ollamaReply("Changed."))
         let result = await LLMPostProcessor.process(" \n", bundleID: nil)

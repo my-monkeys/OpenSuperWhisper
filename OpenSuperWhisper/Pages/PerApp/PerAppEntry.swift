@@ -27,6 +27,35 @@ struct PerAppEntry: Identifiable, Equatable {
     static func groupKey(_ bundleID: String) -> String { bundleID.lowercased() }
 }
 
+/// What a row shows for what is not default. Defaults are left out; a row with nothing
+/// customised shows `.standard` alone.
+enum PerAppBadge: Hashable {
+    case style(String)
+    case insertion(AppInsertionMode, paceMilliseconds: Int?)
+    case model(String)
+    case formatting
+    case standard
+
+    /// `styleName` is the display name of the entry's style, resolved by the caller because
+    /// custom styles live in the view model.
+    static func badges(for entry: PerAppEntry, styleName: String?) -> [PerAppBadge] {
+        var badges: [PerAppBadge] = []
+        if !entry.isSite {
+            if let styleName, entry.style != nil { badges.append(.style(styleName)) }
+            if let rule = entry.insertion {
+                badges.append(.insertion(rule.mode, paceMilliseconds: rule.typingPaceMilliseconds))
+            }
+        }
+        if let model = entry.model { badges.append(.model(model.displayName)) }
+        if !entry.isSite, entry.profiles.contains(where: {
+            !$0.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) {
+            badges.append(.formatting)
+        }
+        return badges.isEmpty ? [.standard] : badges
+    }
+}
+
 enum PerAppEntries {
     /// Merges the stores into rows, apps by name, each app's site rules right after it.
     /// `pending` are apps just added from the picker that nothing is set for yet.
@@ -90,7 +119,7 @@ enum PerAppEntries {
     private static func displayName(_ bundleID: String, stored: String?) -> String {
         if let stored, !stored.isEmpty { return stored }
         guard !bundleID.isEmpty else { return String(localized: "No app chosen") }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+        guard let url = InstalledApps.applicationURL(forBundleIdentifier: bundleID) else {
             return bundleID
         }
         return FileManager.default.displayName(atPath: url.path)
@@ -141,6 +170,12 @@ struct PerAppStore {
         viewModel.appWritingStyles[PerAppEntry.groupKey(entry.bundleID)] = styleID
     }
 
+    /// Off keeps everything stored; see `PerAppSwitch`.
+    func setEnabled(_ enabled: Bool, for entry: PerAppEntry) {
+        viewModel.perAppDisabledBundleIDs = PerAppSwitch.setting(
+            entry.bundleID, on: enabled, in: viewModel.perAppDisabledBundleIDs)
+    }
+
     func addProfile(for entry: PerAppEntry) {
         viewModel.appContextProfiles.append(
             AppContextProfile(bundleIdentifier: entry.bundleID, appName: entry.appName, instructions: ""))
@@ -153,6 +188,7 @@ struct PerAppStore {
     /// An app row leaves every store; a site row only drops its model rule.
     func remove(_ entry: PerAppEntry) {
         if !entry.isSite {
+            setEnabled(true, for: entry)
             viewModel.appInsertionRules.removeAll { matches($0.bundleIdentifier, entry) }
             viewModel.appContextProfiles.removeAll { matches($0.bundleIdentifier, entry) }
             viewModel.appWritingStyles[PerAppEntry.groupKey(entry.bundleID)] = nil
@@ -175,6 +211,10 @@ struct PerAppStore {
         if let style = entry.style {
             viewModel.appWritingStyles[PerAppEntry.groupKey(entry.bundleID)] = nil
             viewModel.appWritingStyles[PerAppEntry.groupKey(app.bundleIdentifier)] = style
+        }
+        if !PerAppSwitch.isOn(entry.bundleID, disabled: viewModel.perAppDisabledBundleIDs) {
+            setEnabled(true, for: entry)
+            setEnabled(false, for: PerAppEntry(bundleID: app.bundleIdentifier, host: nil, appName: app.name))
         }
         if entry.hasBundle, let model = entry.model {
             AppContextModelRules.remove(bundleID: entry.bundleID)

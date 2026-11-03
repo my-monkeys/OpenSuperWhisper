@@ -73,7 +73,8 @@ enum TranscriptInserter {
                        submitting: Bool = false, wanted: () -> Bool = { true }) async -> Insertion {
         let text = prepared.fitted
         let prefs = AppPreferences.shared
-        let rule = AppInsertionRule.rule(for: targetBundleID, in: prefs.appInsertionRules)
+        let rule = AppInsertionRule.rule(for: targetBundleID, in: prefs.appInsertionRules,
+                                         disabled: prefs.perAppDisabledBundleIDs)
         noteNewerTranscription()
         // Whatever goes in now, a dictation, a paste-last or the pieces of a long prompt, is ours,
         // and a watch still reading the field would take it for the user's correction (#169).

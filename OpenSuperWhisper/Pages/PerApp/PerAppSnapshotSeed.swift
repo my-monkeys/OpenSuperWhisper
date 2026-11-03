@@ -13,6 +13,9 @@ extension UISnapshotProbe {
                              typingPaceMilliseconds: 2),
         ]
         prefs.appContextProfiles = AppContextProfile.defaultPresets
+        prefs.appWritingStyles = ["com.apple.mail": WritingStyle.proID]
+        prefs.perAppDisabledBundleIDs = AppContextProfile.defaultPresets.map(\.bundleIdentifier)
+            .filter { $0 != "com.apple.Terminal" && $0 != "com.apple.mail" }
         let parakeet = DictationModelOption(engine: "fluidaudio", identifier: "v3", displayName: "Parakeet v3")
         let turbo = DictationModelOption(engine: "whisper", identifier: "/tmp/ggml-large-v3-turbo.bin",
                                          displayName: "Whisper turbo")

@@ -940,6 +940,10 @@ class SettingsViewModel: ObservableObject {
         didSet { AppPreferences.shared.appWritingStyles = appWritingStyles }
     }
 
+    @Published var perAppDisabledBundleIDs: [String] {
+        didSet { AppPreferences.shared.perAppDisabledBundleIDs = perAppDisabledBundleIDs }
+    }
+
     @Published var appContextProfiles: [AppContextProfile] {
         didSet {
             AppPreferences.shared.appContextProfiles = appContextProfiles
@@ -1133,6 +1137,7 @@ class SettingsViewModel: ObservableObject {
         self.typingPaceMilliseconds = prefs.typingPaceMilliseconds
         self.appInsertionRules = prefs.appInsertionRules
         self.appContextProfiles = prefs.appContextProfiles
+        self.perAppDisabledBundleIDs = prefs.perAppDisabledBundleIDs
         self.writingStyleID = prefs.writingStyleID
         self.customWritingStyles = prefs.customWritingStyles
         self.appWritingStyles = prefs.appWritingStyles

@@ -46,6 +46,7 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var aiPostProcessingEnabled = false
         var appContextFormattingEnabled = false
         var appContextProfiles: [AppContextProfile] = []
+        var perAppDisabledBundleIDs: [String] = []
         var aiPostProcessingPrompt = LLMPostProcessor.defaultInstruction
         var aiPostProcessingClosing = LLMPostProcessor.defaultClosingInstruction
         var aiPostProcessingTranslation = LLMPostProcessor.defaultTranslationInstruction
@@ -195,6 +196,10 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
     var appContextProfiles: [AppContextProfile] {
         get { self[\.appContextProfiles] }
         set { self[\.appContextProfiles] = newValue }
+    }
+    var perAppDisabledBundleIDs: [String] {
+        get { self[\.perAppDisabledBundleIDs] }
+        set { self[\.perAppDisabledBundleIDs] = newValue }
     }
     var aiPostProcessingPrompt: String {
         get { self[\.aiPostProcessingPrompt] }

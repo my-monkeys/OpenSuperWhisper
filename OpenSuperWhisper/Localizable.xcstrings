@@ -1933,6 +1933,52 @@
         }
       }
     },
+    "Default": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por omisión"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Par défaut"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Predefinito"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Padrão"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mặc định"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认"
+          }
+        }
+      }
+    },
     "Delete All": {
       "localizations": {
         "fr": {
@@ -2987,6 +3033,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "转写后通过本地模型修正标点与明显错误。"
+          }
+        }
+      }
+    },
+    "Formatting rules": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formatierungsregeln"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reglas de formato"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Règles de mise en forme"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regole di formattazione"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regras de formatação"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quy tắc định dạng"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "格式规则"
           }
         }
       }
@@ -8603,6 +8695,190 @@
         }
       }
     },
+    "Switch off: none of this app's settings apply": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausschalten: keine Einstellung dieser App wird angewendet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desactivar: no se aplica ningún ajuste de esta app"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désactiver : aucun réglage de cette app ne s'applique"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattiva: nessuna impostazione di questa app viene applicata"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desativar: nenhuma configuração deste app é aplicada"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tắt: không áp dụng cài đặt nào của ứng dụng này"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭：此应用的所有设置都不生效"
+          }
+        }
+      }
+    },
+    "Switch on: this app's settings apply again": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einschalten: die Einstellungen dieser App gelten wieder"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar: los ajustes de esta app vuelven a aplicarse"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activer : les réglages de cette app s'appliquent de nouveau"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attiva: le impostazioni di questa app tornano a essere applicate"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativar: as configurações deste app voltam a ser aplicadas"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bật: cài đặt của ứng dụng này được áp dụng trở lại"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启：此应用的设置重新生效"
+          }
+        }
+      }
+    },
+    "Switched off: none of the settings below apply. They are kept for when you switch it back on.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgeschaltet: keine der Einstellungen unten wird angewendet. Sie bleiben erhalten, bis du sie wieder einschaltest."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desactivado: no se aplica ninguno de los ajustes de abajo. Se conservan para cuando lo vuelvas a activar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désactivé : aucun des réglages ci-dessous ne s'applique. Ils sont conservés pour quand tu le réactiveras."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattivato: nessuna delle impostazioni qui sotto viene applicata. Restano salvate per quando lo riattiverai."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desativado: nenhuma das configurações abaixo é aplicada. Elas ficam guardadas para quando você reativar."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã tắt: không áp dụng cài đặt nào bên dưới. Chúng được giữ lại để khi bạn bật lại."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已关闭：下方的设置都不生效。它们会保留，重新开启后恢复。"
+          }
+        }
+      }
+    },
+    "Switches to this model when the app comes to the front. Default keeps the model in effect.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wechselt zu diesem Modell, sobald die App im Vordergrund ist. Standard behält das aktuelle Modell bei."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambia a este modelo cuando la app pasa al primer plano. Por omisión mantiene el modelo en uso."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bascule sur ce modèle quand l'app passe au premier plan. Par défaut garde le modèle en cours."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passa a questo modello quando l'app va in primo piano. Predefinito mantiene il modello in uso."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muda para este modelo quando o app vai para o primeiro plano. Padrão mantém o modelo em uso."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang mô hình này khi ứng dụng ở phía trước. Mặc định giữ nguyên mô hình đang dùng."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用切换到前台时自动切换到此模型。默认保持当前使用的模型。"
+          }
+        }
+      }
+    },
     "System": {
       "localizations": {
         "fr": {
@@ -8967,6 +9243,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "文本会在短暂延迟后出现，仅为粗略实时预览 — 可能与最终结果不同。实际插入的文本始终来自完整、准确的转写，而非此预览。"
+          }
+        }
+      }
+    },
+    "The voice AI cleanup writes in for this app. Default follows the style chosen on the Style page.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Ton, in dem die KI-Bereinigung für diese App schreibt. Standard folgt dem Stil der Stil-Seite."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voz en la que escribe la limpieza con IA para esta app. Por omisión sigue el estilo elegido en la página Estilo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voix dans laquelle le nettoyage par IA écrit pour cette app. Par défaut suit le style choisi sur la page Style."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voce con cui la pulizia con IA scrive per questa app. Predefinito segue lo stile scelto nella pagina Stile."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A voz em que a limpeza por IA escreve para este app. Padrão segue o estilo escolhido na página Estilo."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giọng văn mà tính năng làm sạch bằng AI dùng cho ứng dụng này. Mặc định theo phong cách chọn ở trang phong cách."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 清理为此应用使用的文风。默认跟随“样式”页中选择的样式。"
           }
         }
       }
@@ -21759,52 +22081,6 @@
         }
       }
     },
-    "Follows the global “Paste instead of typing” switch": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Folgt dem globalen Schalter „Einfügen statt Tippen“"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sigue el ajuste global “Pegar en lugar de escribir”"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suit le réglage global « Coller au lieu de taper »"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Segue l'opzione globale “Incolla invece di digitare”"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Segue a opção global “Colar em vez de digitar”"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Theo công tắc chung “Dán thay vì gõ”"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "跟随全局“以粘贴代替键入”开关"
-          }
-        }
-      }
-    },
     "Follows the global “Paste instead of typing” switch. Choose Paste or Type to override it for this app.": {
       "localizations": {
         "de": {
@@ -24469,52 +24745,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "保留看起来正确的"
-          }
-        }
-      }
-    },
-    "Keeps the model in effect": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Behält das aktuelle Modell"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mantiene el modelo vigente"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conserve le modèle en vigueur"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mantiene il modello in uso"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mantém o modelo em uso"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Giữ mô hình đang dùng"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "保持当前模型生效"
           }
         }
       }
@@ -27505,52 +27735,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "刘海开口宽度"
-          }
-        }
-      }
-    },
-    "Nothing customised yet": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Noch nichts angepasst"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aún no hay nada personalizado"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rien de personnalisé pour l'instant"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora niente di personalizzato"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nada personalizado ainda"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chưa tùy chỉnh gì"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尚未自定义任何内容"
           }
         }
       }
@@ -35509,52 +35693,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "在没有刘海的屏幕上模拟刘海"
-          }
-        }
-      }
-    },
-    "Site · model only": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Website · nur Modell"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sitio · solo modelo"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Site · modèle uniquement"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sito · solo modello"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Site · só modelo"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trang web · chỉ mô hình"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "站点 · 仅模型"
           }
         }
       }
@@ -55003,52 +55141,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "AI 清理已关闭"
-          }
-        }
-      }
-    },
-    "The voice AI cleanup writes in for this app": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Tonfall, in dem die KI-Bereinigung für diese App schreibt"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La voz con la que escribe la limpieza con IA para esta app"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La voix dans laquelle le nettoyage IA écrit pour cette app"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La voce con cui la pulizia IA scrive per questa app"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A voz em que a limpeza por IA escreve para este app"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Giọng văn Dọn dẹp AI dùng cho ứng dụng này"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI 清理为此应用采用的写作语气"
           }
         }
       }
