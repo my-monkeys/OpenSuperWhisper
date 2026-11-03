@@ -67,7 +67,7 @@ struct OpenSuperWhisperApp: App {
             // that could stall a logout.
             CommandGroup(replacing: .appTermination) {
                 Button("Quit to Menu Bar") {
-                    (NSApplication.shared.delegate as? AppDelegate)?.closeInterfaceWindows()
+                    AppDelegate.shared?.closeInterfaceWindows()
                 }
                 .keyboardShortcut("q", modifiers: .command)
                 Button("Quit OpenSuperWhisper") {
@@ -161,12 +161,25 @@ class AppState: ObservableObject {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableObject {
+    /// The instance SwiftUI created for `@NSApplicationDelegateAdaptor`. `NSApp.delegate` is
+    /// SwiftUI's own object, which forwards to this one, so `NSApp.delegate as? AppDelegate` is
+    /// always nil: ⌘Q "Quit to Menu Bar" did nothing through it (#254).
+    private(set) static weak var shared: AppDelegate?
+
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
+
     private var statusItem: NSStatusItem?
     /// The app's own window, looked up rather than remembered: SwiftUI creates it after
     /// `applicationDidFinishLaunching` has run, and owns it from then on.
+    /// The one on screen first: SwiftUI keeps hidden titled copies around, and the first titled
+    /// window in the list can be one of those.
     private var mainWindow: NSWindow? {
         let settings = MainActor.assumeIsolated { SettingsWindowController.shared.window }
-        return NSApplication.shared.windows.first { $0.styleMask.contains(.titled) && $0 !== settings }
+        let dashboards = NSApplication.shared.windows.filter { $0.styleMask.contains(.titled) && $0 !== settings }
+        return dashboards.first(where: \.isVisible) ?? dashboards.first
     }
     private var languageSubmenu: NSMenu?
     private var modelSubmenu: NSMenu?
@@ -770,9 +783,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     
     /// ⌘Q: the dashboard and Settings go away, the app stays in the menu bar. Closing them is
     /// what `windowWillClose` already turns into the accessory policy.
+    ///
+    /// Every visible window with a title bar goes, not just the one `mainWindow` finds: it was a
+    /// hidden copy of the dashboard, so ⌘Q closed nothing on screen. The bubble and the agent
+    /// panel are panels and stay where they are.
     func closeInterfaceWindows() {
-        mainWindow?.close()
         MainActor.assumeIsolated { SettingsWindowController.shared.close() }
+        for window in NSApplication.shared.windows
+        where window.isVisible && window.styleMask.contains(.titled) && !(window is NSPanel) {
+            window.close()
+        }
     }
 
     func showMainWindow() {

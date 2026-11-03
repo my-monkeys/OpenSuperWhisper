@@ -107,7 +107,7 @@ final class AppNavigation: ObservableObject {
     }
     var presentDashboardWindow: @MainActor () -> Void = {
         guard !DefaultsStore.isRunningTests else { return }
-        (NSApplication.shared.delegate as? AppDelegate)?.showMainWindow()
+        AppDelegate.shared?.showMainWindow()
     }
 
     func openSettings(_ rubric: SettingsRubric = .dictation, focusing row: String? = nil) {
