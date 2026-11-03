@@ -60067,48 +60067,140 @@
         }
       }
     },
-    "Remote computer's keyboard": {
+    "Keyboard": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clavier de l'ordinateur distant"
+            "value": "Clavier"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tastatur des entfernten Computers"
+            "value": "Tastatur"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Teclado del ordenador remoto"
+            "value": "Teclado"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tastiera del computer remoto"
+            "value": "Tastiera"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Teclado do computador remoto"
+            "value": "Teclado"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bàn phím của máy tính từ xa"
+            "value": "Bàn phím"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "远程电脑的键盘"
+            "value": "键盘"
+          }
+        }
+      }
+    },
+    "The layout of the computer the text is typed into, for remote sessions and virtual machines. Leave on “Same as this Mac” otherwise.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La disposition de l'ordinateur dans lequel le texte est tapé, pour les sessions à distance et les machines virtuelles. Laissez « Comme ce Mac » sinon."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Layout des Computers, in den der Text getippt wird, für Remote-Sitzungen und virtuelle Maschinen. Sonst auf „Wie dieser Mac“ lassen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La distribución del ordenador en el que se escribe el texto, para sesiones remotas y máquinas virtuales. En los demás casos, deja «Igual que este Mac»."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il layout del computer in cui viene digitato il testo, per le sessioni remote e le macchine virtuali. Altrimenti lascia «Come questo Mac»."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O layout do computador em que o texto é digitado, para sessões remotas e máquinas virtuais. Nos outros casos, deixe em “Igual a este Mac”."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bố cục của máy tính nhận văn bản được gõ vào, dùng cho phiên từ xa và máy ảo. Các trường hợp khác để “Giống máy Mac này”."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本被输入到的那台电脑所用的键盘布局,适用于远程会话和虚拟机。其他情况请保持“与此 Mac 相同”。"
+          }
+        }
+      }
+    },
+    "This app is always typed key by key, because the text goes to another computer. Choose the layout that computer uses.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette app est toujours saisie touche par touche, car le texte part vers un autre ordinateur. Choisissez la disposition de cet ordinateur."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese App wird immer Taste für Taste getippt, weil der Text an einen anderen Computer geht. Wählen Sie das Layout dieses Computers."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta app siempre se escribe tecla a tecla, porque el texto va a otro ordenador. Elige la distribución de ese ordenador."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa app viene sempre digitata tasto per tasto, perché il testo va a un altro computer. Scegli il layout di quel computer."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este app é sempre digitado tecla por tecla, porque o texto vai para outro computador. Escolha o layout desse computador."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ứng dụng này luôn được gõ từng phím, vì văn bản được gửi đến một máy tính khác. Hãy chọn bố cục mà máy tính đó dùng."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 App 始终逐键输入,因为文本会发送到另一台电脑。请选择那台电脑使用的键盘布局。"
           }
         }
       }
@@ -60155,52 +60247,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "与此 Mac 相同"
-          }
-        }
-      }
-    },
-    "Screen Sharing and other remote desktop apps send keys, which the other computer reads with its own layout. Pick it when it differs from this Mac's: a Linux or Windows machine is often U.S. Accented letters it can't type lose their accent.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Partage d'écran et les autres apps de bureau à distance envoient des touches, que l'autre ordinateur lit avec sa propre disposition. Choisissez-la si elle diffère de celle de ce Mac : une machine Linux ou Windows est souvent en U.S. Les lettres accentuées qu'elle ne sait pas taper perdent leur accent."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bildschirmfreigabe und andere Remote-Desktop-Apps senden Tasten, die der andere Computer mit seinem eigenen Layout liest. Wählen Sie es, wenn es von dem dieses Mac abweicht: Ein Linux- oder Windows-Rechner nutzt oft U.S. Buchstaben mit Akzent, die es nicht tippen kann, verlieren ihren Akzent."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Compartir pantalla y otras apps de escritorio remoto envían teclas, que el otro ordenador lee con su propia distribución. Elígela si difiere de la de este Mac: una máquina Linux o Windows suele usar U.S. Las letras con tilde que no pueda escribir pierden la tilde."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Condivisione schermo e le altre app di desktop remoto inviano tasti, che l'altro computer legge con il proprio layout. Sceglilo se è diverso da quello di questo Mac: una macchina Linux o Windows è spesso U.S. Le lettere accentate che non può digitare perdono l'accento."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Compartilhamento de Tela e outros apps de área de trabalho remota enviam teclas, que o outro computador lê com o próprio layout. Escolha-o se for diferente do deste Mac: uma máquina Linux ou Windows costuma ser U.S. Letras acentuadas que ele não consegue digitar perdem o acento."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chia sẻ màn hình và các ứng dụng điều khiển từ xa gửi phím, và máy kia đọc chúng theo bố cục của nó. Hãy chọn bố cục đó nếu khác với máy Mac này: máy Linux hoặc Windows thường dùng U.S. Các chữ có dấu không gõ được sẽ mất dấu."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“屏幕共享”和其他远程桌面应用发送的是按键，另一台电脑会按自己的键盘布局来理解。如果它与这台 Mac 不同，请在此选择：Linux 或 Windows 电脑通常是 U.S. 布局。无法输入的带重音字母会去掉重音。"
           }
         }
       }

@@ -146,9 +146,11 @@ private struct PerAppBadgeView: View {
         case .style(let name): return Text(verbatim: name)
         case .model(let name): return Text(verbatim: name)
         case .formatting: return Text("Formatting rules")
-        case .insertion(.paste, _): return Text("Pastes")
-        case .insertion(.type, let pace?): return Text("Types, \(pace) ms")
-        case .insertion(.type, nil): return Text("Types")
+        case .insertion(.paste, _, _): return Text("Pastes")
+        case .insertion(.type, let pace, let layoutID):
+            let types = pace.map { Text("Types, \($0) ms") } ?? Text("Types")
+            guard let layoutID else { return types }
+            return types + Text(verbatim: " · \(RemoteKeyboardLayouts.name(id: layoutID) ?? layoutID)")
         case .standard: return Text("Default")
         }
     }

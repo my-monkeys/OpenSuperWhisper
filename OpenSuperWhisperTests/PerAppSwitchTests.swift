@@ -183,6 +183,66 @@ final class PerAppSwitchTests: XCTestCase {
                        [.insertion(.paste, paceMilliseconds: nil)])
     }
 
+    func testATypedAppShowsItsLayoutOnTheBadge() {
+        let us = RemoteKeyboardLayouts.usLayoutID
+        let typed = AppInsertionRule(bundleIdentifier: "com.example.app", mode: .type, keyboardLayoutID: us)
+        XCTAssertEqual(PerAppBadge.badges(for: entry(insertion: typed), styleName: nil),
+                       [.insertion(.type, paceMilliseconds: nil, layoutID: us)])
+    }
+
+    /// A paste rule does not act on a stored layout, so the badge does not advertise it.
+    func testAPastingAppHidesAStoredLayout() {
+        let paste = AppInsertionRule(bundleIdentifier: "com.example.app", mode: .paste,
+                                     keyboardLayoutID: RemoteKeyboardLayouts.usLayoutID)
+        XCTAssertEqual(PerAppBadge.badges(for: entry(insertion: paste), styleName: nil),
+                       [.insertion(.paste, paceMilliseconds: nil)])
+    }
+
+    // MARK: - Keyboard layout writes
+
+    @MainActor
+    func testNamingALayoutForARemoteSessionAppCreatesATypingRule() {
+        let viewModel = SettingsViewModel()
+        viewModel.appInsertionRules = []
+        let screenSharing = PerAppEntry(bundleID: "com.apple.ScreenSharing", host: nil, appName: "Screen Sharing")
+        let us = RemoteKeyboardLayouts.usLayoutID
+
+        PerAppStore(viewModel: viewModel).setKeyboardLayout(us, for: screenSharing)
+
+        XCTAssertEqual(viewModel.appInsertionRules.map(\.mode), [.type])
+        XCTAssertEqual(viewModel.appInsertionRules.first?.keyboardLayoutID, us)
+    }
+
+    @MainActor
+    func testNamingALayoutForARemoteSessionAppSwitchesItsPasteRuleToTyping() {
+        let viewModel = SettingsViewModel()
+        viewModel.appInsertionRules = [AppInsertionRule(bundleIdentifier: "com.apple.ScreenSharing",
+                                                        appName: "Screen Sharing", mode: .paste)]
+        let screenSharing = PerAppEntry(bundleID: "com.apple.ScreenSharing", host: nil, appName: "Screen Sharing")
+
+        PerAppStore(viewModel: viewModel).setKeyboardLayout(RemoteKeyboardLayouts.usLayoutID, for: screenSharing)
+
+        XCTAssertEqual(viewModel.appInsertionRules.first?.mode, .type)
+    }
+
+    @MainActor
+    func testClearingTheLayoutKeepsTheRuleAndCreatesNone() {
+        let viewModel = SettingsViewModel()
+        let us = RemoteKeyboardLayouts.usLayoutID
+        viewModel.appInsertionRules = [AppInsertionRule(bundleIdentifier: "com.example.app", appName: "App",
+                                                        mode: .type, keyboardLayoutID: us)]
+        let store = PerAppStore(viewModel: viewModel)
+        let app = PerAppEntry(bundleID: "com.example.app", host: nil, appName: "App")
+
+        store.setKeyboardLayout(nil, for: app)
+        XCTAssertEqual(viewModel.appInsertionRules.count, 1)
+        XCTAssertNil(viewModel.appInsertionRules.first?.keyboardLayoutID)
+
+        viewModel.appInsertionRules = []
+        store.setKeyboardLayout(nil, for: app)
+        XCTAssertEqual(viewModel.appInsertionRules, [])
+    }
+
     func testASiteRowOnlyShowsItsModel() {
         XCTAssertEqual(PerAppBadge.badges(for: entry(model: model("Turbo"), host: "github.com"), styleName: nil),
                        [.model("Turbo")])

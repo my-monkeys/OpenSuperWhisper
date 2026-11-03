@@ -28,6 +28,28 @@ enum RemoteSession {
         return bundleIDs.contains(bundleID)
     }
 
+    /// How a dictation reaches the app in front, before the "is anything inserted at all" gate.
+    enum Route: Equatable {
+        /// Key by key, read with this layout (nil: this Mac's own), with no editable-field check.
+        case keyByKey(layoutID: String?)
+        case typing
+        case paste
+    }
+
+    /// A remote-session app is always typed key by key, above any rule: neither of the two modes
+    /// a rule can pick gets through to the other machine (#255). Any other app whose rule types
+    /// and names a layout is typed the same way: a layout is only set for a window that shows
+    /// another machine (Chrome Remote Desktop, a virtual machine), where ⌘V and Unicode typing
+    /// fail alike. A paste rule ignores the stored layout; it is kept for when the rule goes
+    /// back to typing.
+    static func route(isRemoteSession: Bool, rule: AppInsertionRule?, globalPaste: Bool) -> Route {
+        if isRemoteSession { return .keyByKey(layoutID: rule?.keyboardLayoutID) }
+        if let rule, rule.mode == .type, let layoutID = rule.keyboardLayoutID {
+            return .keyByKey(layoutID: layoutID)
+        }
+        return (rule.map { $0.mode == .paste } ?? globalPaste) ? .paste : .typing
+    }
+
     /// Pause after each key, so the client forwards them in order rather than in a burst it may
     /// coalesce. A per-app typing pace replaces it.
     static let defaultStrokePauseMilliseconds = 4
