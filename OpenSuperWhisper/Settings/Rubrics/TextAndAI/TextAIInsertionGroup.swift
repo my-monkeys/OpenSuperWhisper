@@ -67,7 +67,7 @@ struct TextAIInsertionGroup: View {
                 SSwitch(isOn: $viewModel.matchTextAroundCaret)
             }
             SettingRow("Lists as bullets",
-                       hint: "A pasted list becomes real bullets or numbers in apps that take formatted text, like Notes, Mail, Slack, Notion, Word and browsers. Everywhere else, terminals and code editors included, it stays as “- ” lines. With AI cleanup on, a spoken enumeration is written as a list for those apps.",
+                       hint: "A pasted list becomes real bullets or numbers in apps that take formatted text, like Notes, Mail, Slack, Notion, Word and browsers. Everywhere else, terminals and code editors included, it stays as “- ” lines. With AI cleanup on, a spoken enumeration is written as a list for those apps, and in terminals and code editors too.",
                        advanced: true) {
                 SSwitch(isOn: $viewModel.pasteListsAsRichText)
             }
@@ -79,8 +79,7 @@ struct TextAIInsertionGroup: View {
             whisperRows
             SettingRow("Per-app exceptions", hint: perAppHint, advanced: true) {
                 Button("Open →") {
-                    AppNavigation.shared.closeSettings()
-                    AppNavigation.shared.go(.style)
+                    AppNavigation.shared.showDashboard(.perApp)
                 }
                 .buttonStyle(.sSecondary)
             }
@@ -105,8 +104,8 @@ struct TextAIInsertionGroup: View {
     private var perAppHint: LocalizedStringKey {
         let count = viewModel.appInsertionRules.count
         return count == 0
-            ? "None yet. Set on the Style page, under Per app."
-            : "\(count) apps. Set on the Style page, under Per app."
+            ? "None yet. Set on the Per app page."
+            : "\(count) apps. Set on the Per app page."
     }
 
     private var typingPace: Binding<Double> {

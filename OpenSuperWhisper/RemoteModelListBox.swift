@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenSuperWhisperCore
 
 /// One model from an OpenAI-compatible `GET /v1/models`.
 struct RemoteModelInfo: Identifiable, Equatable {
@@ -10,18 +11,9 @@ struct RemoteModelInfo: Identifiable, Equatable {
 /// URL normalization and JSON parsing are unit-testable and identical everywhere
 /// (the Remote transcription engine and the Remote LLM-cleanup both use it).
 enum RemoteModelsAPI {
-    /// `<base>/v1/models`, tolerating a base that lacks a scheme, has a trailing
-    /// slash, or already includes `/v1`.
+    /// `<base>/models` under the base's own version segment, or `/v1` for a bare host.
     static func modelsEndpoint(base: String) -> URL? {
-        var base = base.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !base.isEmpty else { return nil }
-        let lower = base.lowercased()
-        if !lower.hasPrefix("http://") && !lower.hasPrefix("https://") {
-            base = "http://" + base
-        }
-        while base.hasSuffix("/") { base.removeLast() }
-        if base.hasSuffix("/v1") { base.removeLast(3) }
-        return URL(string: base + "/v1/models")
+        OpenAICompatibleURL.endpoint(base: base, resource: "models")
     }
 
     /// OpenAI shape: `{"data":[{"id":"…","owned_by":"…"}]}`, sorted by id.

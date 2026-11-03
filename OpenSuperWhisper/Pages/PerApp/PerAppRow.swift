@@ -1,7 +1,7 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// One app (or site) in Style → Per app: what is customised on the left, the quick choices on
+/// One app (or site) in the Per app page: what is customised on the left, the quick choices on
 /// the right, and the full set of options under "›".
 struct PerAppRow: View {
     let entry: PerAppEntry
@@ -13,12 +13,18 @@ struct PerAppRow: View {
     let onRemove: () -> Void
     let onChangeApp: () -> Void
 
-    private static let insertionWidth: CGFloat = 150
+    private static let insertionWidth: CGFloat = 170
     private static let modelWidth: CGFloat = 170
     private static let styleWidth: CGFloat = 110
 
     private var store: PerAppStore { PerAppStore(viewModel: viewModel) }
     private var showsModelMenu: Bool { models.count > 1 && entry.hasBundle }
+    /// A built-in profile for an app this Mac does not have: shown, greyed, with its bundled icon.
+    private var isMissingBuiltIn: Bool {
+        !entry.isSite && entry.hasBundle
+            && !InstalledApps.isInstalled(bundleIdentifier: entry.bundleID)
+            && InstalledApps.bundledIcon(forBundleIdentifier: entry.bundleID) != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -57,7 +63,7 @@ struct PerAppRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: entry.title)
                     .scaledFont(size: 15, weight: .semibold)
-                    .foregroundColor(entry.hasBundle ? STheme.textBright : STheme.hint)
+                    .foregroundColor(entry.hasBundle && !isMissingBuiltIn ? STheme.textBright : STheme.hint)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(verbatim: summary)
@@ -74,6 +80,8 @@ struct PerAppRow: View {
         Image(nsImage: InstalledApps.icon(forBundleIdentifier: entry.bundleID))
             .resizable()
             .interpolation(.high)
+            .saturation(isMissingBuiltIn ? 0 : 1)
+            .opacity(isMissingBuiltIn ? 0.55 : 1)
             .frame(width: 30, height: 30)
             .frame(width: 34, height: 34)
             .overlay(alignment: .bottomTrailing) {
@@ -204,7 +212,10 @@ struct PerAppRow: View {
             parts.append(String(localized: "Model: \(model.displayName)"))
         }
         if parts.isEmpty {
-            return String(localized: "Nothing customised yet")
+            parts.append(String(localized: "Nothing customised yet"))
+        }
+        if isMissingBuiltIn {
+            parts.insert(String(localized: "Not installed"), at: 0)
         }
         return parts.joined(separator: " · ")
     }

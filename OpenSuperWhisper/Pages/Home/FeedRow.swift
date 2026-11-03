@@ -12,8 +12,8 @@ struct FeedRow: View {
     let onDelete: () -> Void
     /// nil → rerun with the current model; otherwise rerun once with that model. (F3)
     let onRegenerate: (DictationModelOption?) -> Void
-    /// Rewrites the text in another writing style, without transcribing again (#160).
-    let onRestyle: (WritingStyle) -> Void
+    /// Runs the AI cleanup again on the engine's text, without transcribing again (#160, #276).
+    let onCleanup: (HistoryRestyle.Request) -> Void
     let onReport: () -> Void
     @ObservedObject private var audioRecorder = AudioRecorder.shared
     @State private var isExpanded = false
@@ -81,7 +81,8 @@ struct FeedRow: View {
                     metaLine
                 }
                 if showsOriginal, let original {
-                    FeedRowOriginalText(original: original)
+                    FeedRowOriginalText(original: original, cleaned: recording.transcription,
+                                    cleanupModel: recording.cleanupModel)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -101,7 +102,7 @@ struct FeedRow: View {
     private var actions: some View {
         FeedRowActions(recording: recording, isHovered: isHovered, isPlaying: isPlaying,
                        isRegenerating: isRegenerating, onDelete: onDelete, onRegenerate: onRegenerate,
-                       onRestyle: onRestyle, onReport: onReport)
+                       onCleanup: onCleanup, onReport: onReport)
     }
 
     private var metaLine: some View {
@@ -166,7 +167,19 @@ private struct FeedRowMeta: View {
             .scaledFont(size: 12)
             .foregroundColor(STheme.hint)
             .lineLimit(2)
-            .help(recording.wasFallback ? String(localized: "Local fallback — the remote server was unreachable") : "")
+            .help(tooltip)
+    }
+
+    /// What the line cannot fit: why the model is tinted, and which model cleaned the text or why
+    /// it failed.
+    private var tooltip: String {
+        var lines: [String] = []
+        if recording.wasFallback { lines.append(String(localized: "Local fallback — the remote server was unreachable")) }
+        if let model = recording.cleanupModel {
+            lines.append(recording.cleanupError.map { String(localized: "Cleanup with \(model) failed: \($0). The text is what the engine heard.") }
+                         ?? String(localized: "Cleaned up with \(model)"))
+        }
+        return lines.joined(separator: "\n")
     }
 
     private var line: Text {
@@ -176,6 +189,11 @@ private struct FeedRowMeta: View {
             parts.append(recording.wasFallback ? Text(model).foregroundColor(STheme.warn) : Text(model))
         }
         if let style = recording.styleUsed { parts.append(Text(style)) }
+        if recording.cleanupModel != nil {
+            parts.append(recording.cleanupError == nil
+                         ? Text("Cleaned up")
+                         : Text("Cleanup failed").foregroundColor(STheme.warn))
+        }
         if recording.duration > 0 { parts.append(Text(TextUtil.formatDuration(recording.duration))) }
         guard var line = parts.first else { return Text(verbatim: "") }
         for part in parts.dropFirst() {
@@ -249,9 +267,11 @@ private struct FeedRowActions: View {
     let isRegenerating: Bool
     let onDelete: () -> Void
     let onRegenerate: (DictationModelOption?) -> Void
-    let onRestyle: (WritingStyle) -> Void
+    let onCleanup: (HistoryRestyle.Request) -> Void
     let onReport: () -> Void
+    @Environment(\.appTextScale) private var textScale
     @State private var copied = false
+    @State private var showsPanel = false
 
     private var canPlayAndCopy: Bool { !recording.isPending && recording.status != .failed }
     private var canReport: Bool {
@@ -282,36 +302,29 @@ private struct FeedRowActions: View {
                 .visible(isHovered || isPlaying)
             }
             if canRegenerate {
-                Menu {
-                    Button("Current model") { onRegenerate(nil) }
-                    let models = ModelCatalog.allAvailable()
-                    if !models.isEmpty {
-                        Divider()
-                        ForEach(models.indices, id: \.self) { i in
-                            Button(models[i].displayName) { onRegenerate(models[i]) }
-                        }
-                    }
-                    if HistoryRestyle.isAvailable(for: recording) {
-                        Divider()
-                        Section("Rewrite in a style") {
-                            ForEach(WritingStyle.builtIns + AppPreferences.shared.customWritingStyles) { style in
-                                Button(WritingStyleText.name(style)) { onRestyle(style) }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .modifier(ActionChrome())
-                }
                 // A click reruns with the model in use, which is what a failed row needs nine times
-                // out of ten; holding the button opens the other models and the styles.
-                primaryAction: { onRegenerate(nil) }
-                .menuStyle(.button)
-                .menuIndicator(.hidden)
-                .buttonStyle(.plain)
-                .fixedSize()
-                .help("Click to regenerate with the current model. Hold for another model or a style.")
-                .visible(isHovered)
+                // out of ten; the chevron opens the panel for another model or another cleanup.
+                HStack(spacing: 2) {
+                    Button { onRegenerate(nil) } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .modifier(ActionChrome())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Regenerate with the current model")
+                    Button { showsPanel.toggle() } label: {
+                        Image(systemName: "chevron.down")
+                            .modifier(ActionChrome(compact: true))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Regenerate with another model, or run the AI cleanup again")
+                    .accessibilityLabel(Text("More ways to regenerate"))
+                    .popover(isPresented: $showsPanel, arrowEdge: .bottom) {
+                        RegeneratePanel(recording: recording, onRegenerate: onRegenerate, onCleanup: onCleanup,
+                                        onClose: { showsPanel = false })
+                            .environment(\.appTextScale, textScale)
+                    }
+                }
+                .visible(isHovered || showsPanel)
             }
             if canReport {
                 Button(action: onReport) {
@@ -361,13 +374,15 @@ private struct FeedRowActions: View {
 /// The small bordered cream button of the row actions.
 private struct ActionChrome: ViewModifier {
     var tint: Color? = nil
+    /// The chevron beside a button: narrower, so the pair reads as one control.
+    var compact = false
 
     func body(content: Content) -> some View {
         content
             .scaledFont(size: 12, weight: .medium)
             .foregroundColor(tint ?? STheme.textSecondary)
             .frame(minWidth: 14, minHeight: 16)
-            .padding(.horizontal, 9).padding(.vertical, 5)
+            .padding(.horizontal, compact ? 5 : 9).padding(.vertical, 5)
             .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(STheme.controlBg))
             .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(STheme.border, lineWidth: 1))
             .contentShape(Rectangle())

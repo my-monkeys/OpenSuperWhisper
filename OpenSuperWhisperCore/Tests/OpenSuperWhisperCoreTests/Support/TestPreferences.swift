@@ -40,6 +40,7 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var aiRemoteEndpoint = ""
         var aiRemoteModel = ""
         var aiRemoteAPIKey: String?
+        var aiRemoteDisableReasoning: Bool?
         var aiOllamaEndpoint = ""
         var aiOllamaModel = ""
         var aiPostProcessingEnabled = false
@@ -48,6 +49,7 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var aiPostProcessingPrompt = LLMPostProcessor.defaultInstruction
         var aiPostProcessingClosing = LLMPostProcessor.defaultClosingInstruction
         var aiPostProcessingTranslation = LLMPostProcessor.defaultTranslationInstruction
+        var aiSpokenFormattingEnabled = true
         var builtInModelFileName = LLMModelManager.defaultModel.fileName
         var unloadBuiltInModelWhenIdle = true
     }
@@ -170,6 +172,10 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         get { self[\.aiRemoteAPIKey] }
         set { self[\.aiRemoteAPIKey] = newValue }
     }
+    var aiRemoteDisableReasoning: Bool? {
+        get { self[\.aiRemoteDisableReasoning] }
+        set { self[\.aiRemoteDisableReasoning] = newValue }
+    }
     var aiOllamaEndpoint: String {
         get { self[\.aiOllamaEndpoint] }
         set { self[\.aiOllamaEndpoint] = newValue }
@@ -201,6 +207,10 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
     var aiPostProcessingTranslation: String {
         get { self[\.aiPostProcessingTranslation] }
         set { self[\.aiPostProcessingTranslation] = newValue }
+    }
+    var aiSpokenFormattingEnabled: Bool {
+        get { self[\.aiSpokenFormattingEnabled] }
+        set { self[\.aiSpokenFormattingEnabled] = newValue }
     }
     var builtInModelFileName: String {
         get { self[\.builtInModelFileName] }

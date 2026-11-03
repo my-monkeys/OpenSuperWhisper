@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum OnboardingStep: Int, CaseIterable, Comparable {
-    case shortcut, model, permissions, firstTry
+    case shortcut, model, words, permissions, firstTry
 
     static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 
@@ -12,6 +12,7 @@ enum OnboardingStep: Int, CaseIterable, Comparable {
         switch self {
         case .shortcut: return "Shortcut"
         case .model: return "Model"
+        case .words: return "Your words"
         case .permissions: return "Permissions"
         case .firstTry: return "First try"
         }
@@ -21,8 +22,9 @@ enum OnboardingStep: Int, CaseIterable, Comparable {
         switch self {
         case .shortcut: return "01 / Your shortcut"
         case .model: return "02 / Speech recognition"
-        case .permissions: return "03 / Permissions"
-        case .firstTry: return "04 / First dictation"
+        case .words: return "03 / Your words"
+        case .permissions: return "04 / Permissions"
+        case .firstTry: return "05 / First dictation"
         }
     }
 
@@ -30,6 +32,7 @@ enum OnboardingStep: Int, CaseIterable, Comparable {
         switch self {
         case .shortcut: return "One key. Your words."
         case .model: return "The right model to start with."
+        case .words: return "The words you say every day."
         case .permissions: return "Only the access it needs."
         case .firstTry: return "Let's try a sentence."
         }
@@ -39,13 +42,14 @@ enum OnboardingStep: Int, CaseIterable, Comparable {
         switch self {
         case .shortcut: return "Pick the gesture that feels natural."
         case .model: return "One download, then dictation runs on your Mac."
+        case .words: return "Names, jargon, product names: OpenSuperWhisper writes them the way you spell them."
         case .permissions: return "Each permission has a reason. You stay in control."
         case .firstTry: return "Say whatever comes to mind."
         }
     }
 }
 
-/// The four steps in a row: the current one in the accent, the ones behind it checked. A step
+/// The steps in a row: the current one in the accent, the ones behind it checked. A step
 /// is a button when it can be reached, so going back never loses a choice.
 struct OnboardingStepper: View {
     let current: OnboardingStep

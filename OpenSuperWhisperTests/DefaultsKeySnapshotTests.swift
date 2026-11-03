@@ -30,8 +30,10 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "aiPostProcessingEnabled",
         "aiPostProcessingPrompt",
         "aiPostProcessingTranslation",
+        "aiRemoteDisableReasoning",
         "aiRemoteEndpoint",
         "aiRemoteModel",
+        "aiSpokenFormattingEnabled",
         "appAppearance",
         "appContextFormattingEnabled",
         "appContextProfilesData",
@@ -65,6 +67,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "hasCompletedOnboarding",
         "holdRecordingTriggers",
         "holdToRecord",
+        "iCloudSettingsBackupEnabled",
         "indicatorCustomAnchor",
         "indicatorLayout",
         "indicatorMeterMode",
@@ -79,6 +82,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "mouseButtonHotkey",
         "noSpeechThreshold",
         "notifyWhenNoPasteTarget",
+        "offeredAppContextPresets",
         "pasteAgentPromptsInPieces",
         "pasteInsteadOfTyping",
         "pasteIntoOriginalField",
@@ -233,6 +237,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("hasCompletedOnboarding") { prefs.hasCompletedOnboarding = true }
         assertWrites("feedbackPromptDone") { prefs.feedbackPromptDone = true }
         assertWrites("feedbackPromptLaunches") { prefs.feedbackPromptLaunches = 2 }
+        assertWrites("iCloudSettingsBackupEnabled") { prefs.iCloudSettingsBackupEnabled = true }
         assertWrites("useAsianAutocorrect") { prefs.useAsianAutocorrect = false }
         assertWrites("selectedMicrophoneData") { prefs.selectedMicrophoneData = Data([1]) }
         assertWrites("modifierOnlyHotkey") { prefs.modifierOnlyHotkey = "rightOption" }
@@ -266,6 +271,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("aiBackend") { prefs.aiBackend = "remote" }
         assertWrites("aiOllamaEndpoint") { prefs.aiOllamaEndpoint = "http://ollama" }
         assertWrites("aiOllamaModel") { prefs.aiOllamaModel = "ollama-model" }
+        assertWrites("aiRemoteDisableReasoning") { prefs.aiRemoteDisableReasoning = false }
         assertWrites("aiRemoteEndpoint") { prefs.aiRemoteEndpoint = "http://remote" }
         assertWrites("aiRemoteModel") { prefs.aiRemoteModel = "remote-llm" }
         assertWrites("builtInModelFileName") { prefs.builtInModelFileName = "model.gguf" }
@@ -273,6 +279,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("aiPostProcessingPrompt") { prefs.aiPostProcessingPrompt = "open" }
         assertWrites("aiPostProcessingClosing") { prefs.aiPostProcessingClosing = "close" }
         assertWrites("aiPostProcessingTranslation") { prefs.aiPostProcessingTranslation = "translate" }
+        assertWrites("aiSpokenFormattingEnabled") { prefs.aiSpokenFormattingEnabled = false }
         assertWrites("appContextFormattingEnabled") { prefs.appContextFormattingEnabled = true }
         assertWrites("typingPaceMilliseconds") { prefs.typingPaceMilliseconds = 9 }
         assertWrites("appInsertionRulesData") {
@@ -282,6 +289,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
             prefs.appContextProfiles = [AppContextProfile(bundleIdentifier: "com.example")]
         }
         assertWrites("didSeedAppContextPresets") { prefs.didSeedAppContextPresets = true }
+        assertWrites("offeredAppContextPresets") { prefs.offeredAppContextPresets = ["com.example"] }
         assertWrites("didSeedTerminalInsertionRules") { prefs.didSeedTerminalInsertionRules = true }
         assertWrites("crashReportMode") { prefs.crashReportMode = .auto }
         assertWrites("autoCopyToClipboard") { prefs.autoCopyToClipboard = false }
@@ -444,6 +452,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.aiOllamaModel, "llama3.2")
         XCTAssertEqual(prefs.aiRemoteEndpoint, "https://api.groq.com/openai/v1")
         XCTAssertEqual(prefs.aiRemoteModel, "llama-3.1-8b-instant")
+        XCTAssertNil(prefs.aiRemoteDisableReasoning)
         // A file name on disk: a different default would point existing installs at a model
         // they never downloaded.
         XCTAssertEqual(prefs.builtInModelFileName, "qwen2.5-1.5b-instruct-q4_k_m.gguf")
@@ -453,11 +462,13 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.aiPostProcessingPrompt, ShippedCleanupPrompts.opening)
         XCTAssertEqual(prefs.aiPostProcessingClosing, ShippedCleanupPrompts.closing)
         XCTAssertEqual(prefs.aiPostProcessingTranslation, ShippedCleanupPrompts.translation)
+        XCTAssertEqual(prefs.aiSpokenFormattingEnabled, true)
         XCTAssertEqual(prefs.appContextFormattingEnabled, false)
         XCTAssertEqual(prefs.typingPaceMilliseconds, 2)
         XCTAssertEqual(prefs.appInsertionRules, [])
         XCTAssertEqual(prefs.appContextProfiles, [])
         XCTAssertEqual(prefs.didSeedAppContextPresets, false)
+        XCTAssertEqual(prefs.offeredAppContextPresets, [])
         XCTAssertEqual(prefs.didSeedTerminalInsertionRules, false)
         XCTAssertEqual(prefs.crashReportMode, .ask)
         XCTAssertEqual(prefs.autoCopyToClipboard, true)

@@ -16,9 +16,9 @@ enum ContextAwareModelMode: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .ask: return "Ask on change"
-        case .auto: return "Auto · no prompt"
-        case .off: return "Off"
+        case .ask: return String(localized: "Ask on change")
+        case .auto: return String(localized: "Auto · no prompt")
+        case .off: return String(localized: "Off")
         }
     }
 

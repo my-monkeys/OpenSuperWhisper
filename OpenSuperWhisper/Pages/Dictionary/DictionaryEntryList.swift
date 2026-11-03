@@ -85,6 +85,12 @@ private struct DictionaryEntryRow: View {
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(RoundedRectangle(cornerRadius: 6).fill(STheme.fill))
             }
+            if !entry.boostsRecognition {
+                Text("Spelling only")
+                    .scaledFont(size: 12)
+                    .foregroundColor(STheme.hint)
+                    .help("Rewrites what it matches without steering recognition.")
+            }
             if entry.kind == .command {
                 Text(verbatim: "→ \(visibleReplacement)")
                     .scaledFont(size: 13, design: .monospaced)

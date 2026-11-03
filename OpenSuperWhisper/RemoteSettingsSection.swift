@@ -1,53 +1,19 @@
 import SwiftUI
 import AppKit
+import OpenSuperWhisperCore
 
-/// Built-in presets for the generic remote (OpenAI-compatible) engine. Groq is a
-/// preset that points the remote engine at Groq's API with a curated model list;
-/// "Custom" exposes the full URL/model/timeout controls for any other server.
-enum RemotePreset: String, CaseIterable, Identifiable {
-    case groq
-    case custom
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .groq: return "Groq"
-        case .custom: return "Custom"
-        }
-    }
-}
-
-/// Groq preset constants. Groq is the OpenAI-compatible remote engine pointed at
-/// Groq's API; only the base URL and the curated model list are fixed.
-enum GroqPreset {
-    static let baseURL = "https://api.groq.com/openai/v1"
-    static let defaultModel = "whisper-large-v3-turbo"
-    /// Only the full model translates to English; turbo is transcription-only.
-    static let translatingModel = "whisper-large-v3"
-
-    static func isGroqURL(_ url: String) -> Bool {
-        url.lowercased().contains("api.groq.com")
-    }
-
-    struct Model: Identifiable {
-        let id: String
-        let desc: String
-    }
-    static let models = [
-        Model(id: "whisper-large-v3-turbo", desc: "Fastest — transcription only"),
-        Model(id: "whisper-large-v3", desc: "Supports Translate to English"),
-    ]
-}
-
-/// Remote engine settings (Settings → Engine & Model when browsing "Remote"). A
-/// preset picker switches between Groq (curated, pre-filled) and a fully custom
-/// OpenAI-compatible server. Both write the same `remoteServer*` preferences and
-/// activate the single `"remote"` engine; the preset is just a convenience prefill.
-/// What the preset menu currently points at: a built-in, or a user-saved preset.
+/// What the preset menu currently points at: a built-in service, Custom, or a user-saved preset.
 enum RemotePresetSelection: Equatable {
     case custom
-    case groq
+    case service(RemoteService)
     case user(UUID)
 }
+
+/// Remote engine settings (Settings → Engine & Model when browsing "Remote"). A service picker
+/// switches between the built-in services that offer transcription (pre-filled address and
+/// models, see `RemoteService`) and a fully custom OpenAI-compatible server. All write the same
+/// `remoteServer*` preferences and activate the single `"remote"` engine; the choice is just a
+/// convenience prefill.
 
 struct RemoteSettingsSection: View {
     @ObservedObject var viewModel: SettingsViewModel
@@ -59,30 +25,32 @@ struct RemoteSettingsSection: View {
     init(viewModel: SettingsViewModel) {
         self.viewModel = viewModel
         // Infer the selection from the configured URL/model so re-opening Settings
-        // shows the right label (a saved preset wins over the Groq heuristic).
+        // shows the right label (a saved preset wins over the built-in service heuristic).
         if let match = RemoteUserPresets.matching(
             url: viewModel.remoteServerURL, model: viewModel.remoteServerModel) {
             _selection = State(initialValue: .user(match.id))
         } else {
             _selection = State(initialValue:
-                GroqPreset.isGroqURL(viewModel.remoteServerURL) ? .groq : .custom)
+                RemoteService.detect(url: viewModel.remoteServerURL).map { .service($0) } ?? .custom)
         }
     }
 
     private var selectionLabel: String {
         switch selection {
         case .custom: return "Custom"
-        case .groq: return "Groq"
+        case .service(let service): return service.displayName
         case .user(let id): return userPresets.first { $0.id == id }?.name ?? "Custom"
         }
     }
 
     var body: some View {
         RemoteServerSettingsView(viewModel: viewModel) {
-            SettingRow("Service", hint: "Groq fills in the address and models. Custom takes any OpenAI-compatible server.") {
+            SettingRow("Service", hint: "A built-in service fills in the address and models. Custom takes any OpenAI-compatible server.") {
                 SMenu(Text(verbatim: DictationRubric.middleTruncated(selectionLabel))) {
                     Button("Custom") { select(.custom) }
-                    Button("Groq") { select(.groq) }
+                    ForEach(RemoteService.transcriptionServices) { service in
+                        Button(service.displayName) { select(.service(service)) }
+                    }
                     if !userPresets.isEmpty {
                         Divider()
                         ForEach(userPresets) { p in
@@ -120,21 +88,21 @@ struct RemoteSettingsSection: View {
         }
     }
 
-    /// Prefill (Groq), restore (user preset) or clear (Custom) the server config.
+    /// Prefill (built-in service), restore (user preset) or clear (Custom) the server config.
     /// Selecting a model/activating the engine happens in the sub-views.
     private func select(_ newSelection: RemotePresetSelection) {
         selection = newSelection
         switch newSelection {
-        case .groq:
-            if !GroqPreset.isGroqURL(viewModel.remoteServerURL) {
-                viewModel.remoteServerURL = GroqPreset.baseURL
+        case .service(let service):
+            if RemoteService.detect(url: viewModel.remoteServerURL) != service {
+                viewModel.remoteServerURL = service.baseURL
             }
-            if !GroqPreset.models.contains(where: { $0.id == viewModel.remoteServerModel }) {
-                viewModel.remoteServerModel = GroqPreset.defaultModel
+            if !service.transcriptionModels.contains(where: { $0.id == viewModel.remoteServerModel }) {
+                viewModel.remoteServerModel = service.defaultTranscriptionModel ?? ""
             }
         case .custom:
-            // Leaving Groq: clear the Groq URL/model so the user can enter their own.
-            if GroqPreset.isGroqURL(viewModel.remoteServerURL) {
+            // Leaving a built-in service: clear its URL/model so the user can enter their own.
+            if RemoteService.detect(url: viewModel.remoteServerURL) != nil {
                 viewModel.remoteServerURL = ""
                 viewModel.remoteServerModel = ""
             }

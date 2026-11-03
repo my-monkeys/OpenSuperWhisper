@@ -862,6 +862,12 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    @Published var aiSpokenFormattingEnabled: Bool {
+        didSet {
+            AppPreferences.shared.aiSpokenFormattingEnabled = aiSpokenFormattingEnabled
+        }
+    }
+
     @Published var pasteListsAsRichText: Bool {
         didSet {
             AppPreferences.shared.pasteListsAsRichText = pasteListsAsRichText
@@ -1117,6 +1123,7 @@ class SettingsViewModel: ObservableObject {
         self.pasteIntoOriginalField = prefs.pasteIntoOriginalField
         self.matchTextAroundCaret = prefs.matchTextAroundCaret
         self.pasteListsAsRichText = prefs.pasteListsAsRichText
+        self.aiSpokenFormattingEnabled = prefs.aiSpokenFormattingEnabled
         self.pasteAgentPromptsInPieces = prefs.pasteAgentPromptsInPieces
         self.submitOnVoiceCommand = prefs.submitOnVoiceCommand
         self.stopPhrase = prefs.stopPhrase
@@ -1165,12 +1172,14 @@ class SettingsViewModel: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.translateToEnglish = AppPreferences.shared.translateToEnglish }
         }
-        // A word added from the suggestion notice, while the Dictionary page may be open.
+        // A word added from the suggestion notice or onboarding, while the Dictionary page may be
+        // open. Onboarding also turns the dictionary on, which nothing else posts about.
         dictionarySyncObserver = NotificationCenter.default.addObserver(
             forName: .customDictionaryDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.customDictionaryEntries = CustomDictionary.merged(AppPreferences.shared.customDictionaryEntries)
+                self?.customDictionaryEnabled = AppPreferences.shared.customDictionaryEnabled
             }
         }
     }

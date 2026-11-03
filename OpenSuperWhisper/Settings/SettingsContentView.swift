@@ -19,9 +19,25 @@ struct SettingsSearchEntry: Identifiable {
     }
 }
 
-/// The settings, as a card over the main window (⌘, opens it, ✕ or Esc closes it): the rubric
-/// list with its search on the left, the rubric on the right.
-struct SettingsOverlay: View {
+/// What the Settings window hosts: the settings, with what the dashboard gives its content
+/// (the permissions, the accent, the text size).
+struct SettingsWindowView: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @StateObject private var permissions = PermissionsManager()
+    @ObservedObject private var navigation = AppNavigation.shared
+
+    var body: some View {
+        SettingsContentView(viewModel: viewModel, rubric: navigation.settingsRubric)
+            .environmentObject(permissions)
+            .tint(STheme.accent)
+            // From the view model rather than preferences, like the dashboard: the slider
+            // has to redraw this window too.
+            .environment(\.appTextScale, viewModel.textScale)
+    }
+}
+
+/// The settings: the rubric list with its search on the left, the rubric on the right.
+struct SettingsContentView: View {
     @ObservedObject var viewModel: SettingsViewModel
     let rubric: SettingsRubric
     @ObservedObject private var navigation = AppNavigation.shared
@@ -30,15 +46,14 @@ struct SettingsOverlay: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        ModalCard(onClose: navigation.closeSettings) {
-            HStack(spacing: 0) {
-                sidebar
-                Rectangle().fill(STheme.border).frame(width: 1)
-                rubricView
-                    .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .clipped()
-            }
+        HStack(spacing: 0) {
+            sidebar
+            Rectangle().fill(STheme.border).frame(width: 1)
+            rubricView
+                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
         }
+        .background(STheme.cardBg)
     }
 
     // MARK: Sidebar
@@ -72,8 +87,7 @@ struct SettingsOverlay: View {
                     .scaledFont(size: 12)
                     .foregroundColor(STheme.hint)
                 Button("Release notes") {
-                    navigation.closeSettings()
-                    navigation.helpOpen = true
+                    navigation.openHelp()
                 }
                 .buttonStyle(.plain)
                 .scaledFont(size: 12)
@@ -199,7 +213,7 @@ enum SettingsSearchIndex {
     }
 }
 
-/// A rubric's page: title, one line of intro, the Advanced switch and the close button, then the
+/// A rubric's page: title, one line of intro and the Advanced switch, then the
 /// groups. Scrolls to `AppNavigation.settingsFocusRow` when the search picked a row here.
 struct RubricPage<Content: View>: View {
     let rubric: SettingsRubric
@@ -264,7 +278,6 @@ struct RubricPage<Content: View>: View {
                 .overlay(Capsule().stroke(STheme.border, lineWidth: 1))
                 .fixedSize()
             }
-            CloseButton(action: navigation.closeSettings)
         }
     }
 

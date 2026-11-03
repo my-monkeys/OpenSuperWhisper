@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Step 4: a field to dictate into with the real shortcut. The shortcut types into whichever
+/// The last step: a field to dictate into with the real shortcut. The shortcut types into whichever
 /// field has the caret, so a focused editor in this window is a test target like any other app.
 struct OnboardingFirstTryStep: View {
     /// One cap per key of the shortcut that starts a dictation.

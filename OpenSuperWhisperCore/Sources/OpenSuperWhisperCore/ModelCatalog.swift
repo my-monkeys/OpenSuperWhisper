@@ -66,6 +66,14 @@ public enum ModelCatalog {
         return [DictationModelOption(engine: "apple", identifier: "default", displayName: "Apple Speech")]
     }
 
+    /// The system speech model, only when its assets for `language` are installed.
+    public static func appleSpeechModels(forLanguage language: String) -> [DictationModelOption] {
+        guard AppleSpeechSupport.isSupported, AppleSpeechSupport.hasInstalledModel(forLanguage: language) else {
+            return []
+        }
+        return appleSpeechModels()
+    }
+
     /// Every usable model across engines. Used to decide whether switching is
     /// even meaningful (one model → nothing to choose).
     public static func allAvailable() -> [DictationModelOption] {

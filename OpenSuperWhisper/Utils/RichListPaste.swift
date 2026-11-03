@@ -43,10 +43,29 @@ enum RichListPaste {
     /// Fewer items than this and a leading dash is more likely punctuation than a list.
     static let minimumItems = 2
 
-    /// Whether AI cleanup should write a dictation's enumerations as "- " lines: only when the
-    /// paste will turn them into bullets, so nowhere else gets a new line break it did not ask for.
+    /// Whether AI cleanup should write a dictation's enumerations as "- " lines: when the paste
+    /// will turn them into bullets, and in the terminals and editors where "- " lines are how a
+    /// list is written anyway (#265), so a chat box never gets line breaks it did not ask for.
     static func cleanupWritesLists(into bundleID: String?) -> Bool {
-        AppPreferences.shared.pasteListsAsRichText && acceptsRichText(bundleID)
+        AppPreferences.shared.pasteListsAsRichText
+            && (acceptsRichText(bundleID) || writesPlainLists(bundleID))
+    }
+
+    /// Terminals and code editors: a prompt to Claude Code or a comment reads a "- " list as one.
+    /// Their paste is plain, so the lines go in as written.
+    static let plainListApps: Set<String> = [
+        "com.apple.terminal",
+        "com.googlecode.iterm2",
+        "dev.warp.warp-stable",
+        "com.mitchellh.ghostty",
+        "com.microsoft.vscode",
+        "com.todesktop.230313mt0mtn5",
+        "dev.zed.zed",
+    ]
+
+    static func writesPlainLists(_ bundleID: String?) -> Bool {
+        guard let bundleID else { return false }
+        return plainListApps.contains(bundleID.lowercased())
     }
 
     static func acceptsRichText(_ bundleID: String?) -> Bool {
@@ -57,7 +76,7 @@ enum RichListPaste {
     /// The rich forms of `text` for the app it is pasted into, nil when that app is not one that
     /// takes them or the text holds no list worth formatting.
     static func richText(for text: String, into bundleID: String?) -> RichPasteText? {
-        guard acceptsRichText(bundleID), let blocks = blocks(of: text) else { return nil }
+        guard acceptsRichText(bundleID), !hasTaskItems(text), let blocks = blocks(of: text) else { return nil }
         guard let rtf = rtf(blocks) else { return nil }
         return RichPasteText(html: Data(html(blocks).utf8), rtf: rtf)
     }
@@ -73,6 +92,16 @@ enum RichListPaste {
         let ordered: Bool
         let number: Int
         let text: String
+    }
+
+    /// "- [ ] " lines, which the Notion and Obsidian profiles write for a spoken to-do list (#271).
+    /// As plain text Notion makes them to-do blocks; the rich forms would make them bullets that
+    /// read "[ ] buy bread", so such a text is pasted plain.
+    static func hasTaskItems(_ text: String) -> Bool {
+        text.split(whereSeparator: \.isNewline).contains { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces).lowercased()
+            return trimmed.hasPrefix("- [ ]") || trimmed.hasPrefix("- [x]")
+        }
     }
 
     /// The text as lines and lists, or nil when it holds no list of at least `minimumItems`.

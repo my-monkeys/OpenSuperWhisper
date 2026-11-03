@@ -13,6 +13,8 @@ import OpenSuperWhisperCore
 enum UISnapshotProbe {
     static let screens: [String: () -> AnyView] = [
         "home": { AnyView(AppShellView(page: .home)) },
+        "home-unfinished": { seedUnfinished(); return AnyView(AppShellView(page: .home)) },
+        "home-unfinished-recovered": { seedUnfinished(recovered: true); return AnyView(AppShellView(page: .home)) },
         "home-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return AnyView(AppShellView(page: .home)) },
         "dictionary": { seedDictionary(); return AnyView(AppShellView(page: .dictionary)) },
         "dictionary-editor": { seedDictionary(openEditor: true); return AnyView(AppShellView(page: .dictionary)) },
@@ -41,8 +43,19 @@ enum UISnapshotProbe {
         },
         "dictionary-suggestion-notice": { suggestionNotice() },
         "dictionary-suggestion-notice-large-text": { suggestionNotice(textScale: TextScale.maximum) },
-        "style": { seedStyle(); return AnyView(AppShellView(page: .style)) },
-        "style-expanded": { seedStyle(expandFirst: true); return AnyView(AppShellView(page: .style)) },
+        "style": { AnyView(AppShellView(page: .style)) },
+        "style-large-text": {
+            AppPreferences.shared.textScale = TextScale.maximum
+            return AnyView(AppShellView(page: .style))
+        },
+        "per-app": { seedPerApp(); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-expanded": { seedPerApp(expandFirst: true); return AnyView(AppShellView(page: .perApp)) },
+        "per-app-empty": { AnyView(AppShellView(page: .perApp)) },
+        "per-app-large-text": {
+            seedPerApp()
+            AppPreferences.shared.textScale = TextScale.maximum
+            return AnyView(AppShellView(page: .perApp))
+        },
         "settings-models-remote": {
             let prefs = AppPreferences.shared
             prefs.selectedEngine = "remote"
@@ -50,7 +63,7 @@ enum UISnapshotProbe {
             prefs.remoteServerModel = "whisper-large-v3-turbo"
             prefs.cachedRemoteModels = ["whisper-large-v3", "whisper-large-v3-turbo", "distil-whisper-large-v3-en"]
             ModelSelectionStore.shared.refresh()
-            return AnyView(AppShellView(page: .home, settings: .models))
+            return settingsWindow(.models)
         },
         "help": { AppNavigation.shared.helpOpen = true; return AnyView(AppShellView(page: .home)) },
         "feedback-form": { feedbackCard() },
@@ -86,12 +99,14 @@ enum UISnapshotProbe {
         "settings-dictation-fixed-volume": { microphoneSettings(.tooQuiet, volume: .fixed) },
         "onboarding": { AnyView(OnboardingView().environmentObject(AppState())) },
         "onboarding-2": { AnyView(OnboardingView(initialStep: .model).environmentObject(AppState())) },
-        "onboarding-3": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
-        "onboarding-4": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
+        "onboarding-3": { AnyView(OnboardingView(initialStep: .words).environmentObject(AppState())) },
+        "onboarding-4": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
+        "onboarding-5": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
         "settings-textAndAI-ai": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             return scrolled(.textAndAI, to: "Format with AI")
         },
+        "settings-textAndAI-default-style": { scrolled(.textAndAI, to: "Default style") },
         "settings-textAndAI-prompts": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             AppPreferences.shared.aiBackend = "builtin"
@@ -102,12 +117,33 @@ enum UISnapshotProbe {
             AppPreferences.shared.aiBackend = "remote"
             return scrolled(.textAndAI, to: "Server")
         },
+        "settings-textAndAI-server-failed": {
+            AppPreferences.shared.aiPostProcessingEnabled = true
+            AppPreferences.shared.aiBackend = "remote"
+            AppPreferences.shared.aiRemoteEndpoint = "https://openrouter.ai/api/v1"
+            AppPreferences.shared.aiRemoteModel = "google/gemini-2.5-flash-lite"
+            AppPreferences.shared.aiRemoteAPIKey = "sk-or-v1-0000demo-a1b2"
+            CleanupSessionStatus.shared.record(CleanupOutcome(
+                text: "", status: .failed(model: "google/gemini-2.5-flash-lite", reason: "401 Invalid API key")),
+                at: Date().addingTimeInterval(-120))
+            return scrolled(.textAndAI, to: "Server")
+        },
+        "settings-textAndAI-server-openrouter": {
+            AppPreferences.shared.aiPostProcessingEnabled = true
+            AppPreferences.shared.aiBackend = "remote"
+            AppPreferences.shared.aiRemoteEndpoint = "https://openrouter.ai/api/v1"
+            AppPreferences.shared.aiRemoteModel = "google/gemini-2.5-flash-lite"
+            AppPreferences.shared.aiRemoteAPIKey = "gsk_demo0000000000a1b2"
+            return scrolled(.textAndAI, to: "Server")
+        },
         "settings-textAndAI-insertion": { scrolled(.textAndAI, to: "Warn when no field is focused") },
         "settings-privacy-context": {
             AppPreferences.shared.customDictionaryEnabled = true
             AppPreferences.shared.suggestDictionaryWords = true
             return scrolled(.privacy, to: "Suggest words from your corrections")
         },
+        "settings-privacy-history": { scrolled(.privacy, to: "Transcriptions folder") },
+        "settings-general-backup": { scrolled(.general, to: "Back up to iCloud Drive") },
         "settings-appearance-list": { scrolled(.appearance, to: "Order and display") },
         "settings-appearance-notch": { scrolled(.appearance, to: "Notch opening width") },
         "agent-panel": { AgentPanelSnapshot.make(focused: true) },
@@ -183,10 +219,16 @@ enum UISnapshotProbe {
         }
     }
 
+    /// The Settings window's content on `rubric`, rendered directly: no window is opened.
+    private static func settingsWindow(_ rubric: SettingsRubric) -> AnyView {
+        AppNavigation.shared.settingsRubric = rubric
+        return AnyView(SettingsWindowView(viewModel: SettingsViewModel()))
+    }
+
     /// A rubric with Advanced on, scrolled to one of its rows, for the parts below the fold.
     private static func scrolled(_ rubric: SettingsRubric, to row: String) -> AnyView {
         AdvancedRubrics.shared.set(rubric.rawValue, true)
-        let view = AnyView(AppShellView(page: .home, settings: rubric))
+        let view = settingsWindow(rubric)
         AppNavigation.shared.settingsFocusRow = row
         return view
     }
@@ -239,19 +281,26 @@ enum UISnapshotProbe {
 
         var all = screens.merging(onboardingScreens) { current, _ in current }
             .merging(reportScreens) { current, _ in current }
+            .merging(regenerateScreens) { current, _ in current }
         for rubric in SettingsRubric.allCases {
             all["settings-\(rubric.rawValue)"] = {
                 AdvancedRubrics.shared.set(rubric.rawValue, false)
-                return AnyView(AppShellView(page: .home, settings: rubric))
+                return settingsWindow(rubric)
             }
             all["settings-\(rubric.rawValue)-advanced"] = {
                 AdvancedRubrics.shared.set(rubric.rawValue, true)
-                return AnyView(AppShellView(page: .home, settings: rubric))
+                return settingsWindow(rubric)
             }
         }
         let wanted = names.isEmpty ? all.keys.sorted() : names
-        let size = CGSize(width: Double(ProcessInfo.processInfo.environment["OSW_SNAPSHOT_WIDTH"] ?? "") ?? 1080,
-                          height: Double(ProcessInfo.processInfo.environment["OSW_SNAPSHOT_HEIGHT"] ?? "") ?? 760)
+        let environment = ProcessInfo.processInfo.environment
+        func size(_ name: String) -> CGSize {
+            // The settings are their own window, with their own default size.
+            let fallback = name.hasPrefix("settings-") ? SettingsWindowController.defaultSize
+                                                       : CGSize(width: 1080, height: 760)
+            return CGSize(width: Double(environment["OSW_SNAPSHOT_WIDTH"] ?? "") ?? fallback.width,
+                          height: Double(environment["OSW_SNAPSHOT_HEIGHT"] ?? "") ?? fallback.height)
+        }
         for name in wanted {
             guard let make = all[name] else {
                 print("ui-snapshot: unknown screen \(name)")
@@ -265,7 +314,7 @@ enum UISnapshotProbe {
                 AppPreferences.shared.textScale = TextScale.default
                 let view = make()
                 let file = dir.appendingPathComponent("\(name)-\(dark ? "dark" : "light").png")
-                render(view, size: size, dark: dark, to: file)
+                render(view, size: size(name), dark: dark, to: file)
                 print("ui-snapshot: \(file.path)")
             }
         }
@@ -319,14 +368,27 @@ enum UISnapshotProbe {
         ]
         // What the engine wrote before the cleanup, for the first one: the history offers it back.
         let originals = [0: "i'll send you the mock ups tomorrow morning thanks for the feedback shall we meet on thursday"]
+        // The first was cleaned up; the second hit a refused key and kept the engine's text.
+        let cleanups: [Int: (String, String?)] = [0: ("google/gemini-2.5-flash-lite", nil),
+                                                   1: ("google/gemini-2.5-flash-lite", "401 Invalid API key")]
+        try? FileManager.default.createDirectory(at: Recording.recordingsDirectory, withIntermediateDirectories: true)
         for (index, (offset, text, app, model, status, source)) in samples.enumerated() {
             let recording = Recording(id: UUID(), timestamp: now.addingTimeInterval(offset),
                                       fileName: "\(Int(now.timeIntervalSince1970 + offset)).wav",
                                       transcription: text, duration: 6, status: status, progress: 1,
                                       sourceFileURL: source, sourceAppName: app, modelUsed: model,
-                                      rawTranscription: originals[index] ?? (source == nil ? text : nil))
+                                      rawTranscription: originals[index] ?? (source == nil ? text : nil),
+                                      cleanupModel: cleanups[index]?.0, cleanupError: cleanups[index]?.1)
+            if index < 3 {
+                // Real files, so the weight shown on Home and in Privacy is the folder's.
+                try? Data(count: 4_200_000).write(to: recording.url)
+            }
             RecordingStore.shared.addRecording(recording)
         }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        // The off-screen window never runs the views' .task, so count the folder here, once the
+        // inserts above have landed (each one adds its file to a count that already exists).
+        Task { await RecordingsDiskUsage.shared.refresh() }
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
     }
 }

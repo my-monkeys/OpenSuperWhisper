@@ -60,14 +60,24 @@ struct OpenSuperWhisperApp: App {
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            // ⌘Q must not end dictation: the menu bar item and the global shortcut are the app,
+            // the windows are only its interface (#254). Nothing here calls terminate, so the
+            // quits that matter (menu bar "Quit", Dock, Sparkle's relaunch, logout and shutdown,
+            // `osascript`) reach AppKit untouched and need no applicationShouldTerminate veto
+            // that could stall a logout.
+            CommandGroup(replacing: .appTermination) {
+                Button("Quit to Menu Bar") {
+                    (NSApplication.shared.delegate as? AppDelegate)?.closeInterfaceWindows()
+                }
+                .keyboardShortcut("q", modifiers: .command)
+                Button("Quit OpenSuperWhisper") {
+                    NSApplication.shared.terminate(nil)
+                }
+                .keyboardShortcut("q", modifiers: [.command, .option])
+            }
             CommandGroup(replacing: .appSettings) {
-                // The window is the settings UI too: bring it forward on a settings pane
-                // (showMainWindow also re-creates the window if macOS dropped it).
                 Button("Settings...") {
-                    if let delegate = NSApplication.shared.delegate as? AppDelegate {
-                        delegate.showMainWindow()
-                    }
-                    NotificationCenter.default.post(name: .showSettingsPane, object: nil)
+                    AppNavigation.shared.showSettings()
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
@@ -96,6 +106,23 @@ extension OpenSuperWhisperApp {
         guard !DefaultsStore.isRunningTests else { return }
         Task { @MainActor in
             RecordingStore.shared.startRetentionScheduler()
+        }
+    }
+
+    static func startICloudSettingsBackup() {
+        // A test host must not write into the user's iCloud Drive.
+        guard !DefaultsStore.isRunningTests else { return }
+        Task { @MainActor in
+            ICloudSettingsBackup.shared.start()
+        }
+    }
+
+    /// Looks in `unfinished/` for takes an earlier run left behind, before the first dictation.
+    static func startUnfinishedRecovery() {
+        // A test host has its own storage root and its own recordings to look after.
+        guard !DefaultsStore.isRunningTests else { return }
+        Task { @MainActor in
+            UnfinishedDictations.shared.start()
         }
     }
 
@@ -138,7 +165,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     /// The app's own window, looked up rather than remembered: SwiftUI creates it after
     /// `applicationDidFinishLaunching` has run, and owns it from then on.
     private var mainWindow: NSWindow? {
-        NSApplication.shared.windows.first { $0.styleMask.contains(.titled) }
+        let settings = MainActor.assumeIsolated { SettingsWindowController.shared.window }
+        return NSApplication.shared.windows.first { $0.styleMask.contains(.titled) && $0 !== settings }
     }
     private var languageSubmenu: NSMenu?
     private var modelSubmenu: NSMenu?
@@ -186,6 +214,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         OpenSuperWhisperApp.startTranscriptionQueue()
         OpenSuperWhisperApp.startRetentionScheduler()
+        OpenSuperWhisperApp.startICloudSettingsBackup()
+        OpenSuperWhisperApp.startUnfinishedRecovery()
         OpenSuperWhisperApp.preloadCleanupModel()
         AgentBridge.registerRunningApp()
         AgentInbox.shared.start()
@@ -193,8 +223,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
 
         // The Apple Speech locale lists are async-only; refresh the sync caches the
         // model catalog and language picker read (menu must never trigger a download).
+        // Not in a test host: the write lands seconds later, in the middle of whichever test is
+        // running, and a test that counts the keys it writes sees one it never wrote.
 #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, *), !DefaultsStore.isRunningTests {
             Task.detached(priority: .utility) { await AppleSpeechSupport.refreshCaches() }
         }
 #endif
@@ -290,7 +322,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private func updateStatusBarMenu() {
         let menu = NSMenu()
 
-        // One window, two ways in: this one opens on the list, "Settings…" below on the settings.
+        // The dashboard on its list; "Settings…" below opens the Settings window.
         let transcriptionsItem = NSMenuItem(title: NSLocalizedString("Transcriptions", comment: ""),
                                             action: #selector(openTranscriptions), keyEquivalent: "o")
         transcriptionsItem.target = self   // without a target macOS disables the item
@@ -693,8 +725,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     }
     
     @objc private func openSettings() {
-        showMainWindow()
-        NotificationCenter.default.post(name: .showSettingsPane, object: nil)
+        MainActor.assumeIsolated { AppNavigation.shared.showSettings() }
     }
 
     @objc private func openTranscriptions() {
@@ -737,6 +768,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         }
     }
     
+    /// ⌘Q: the dashboard and Settings go away, the app stays in the menu bar. Closing them is
+    /// what `windowWillClose` already turns into the accessory policy.
+    func closeInterfaceWindows() {
+        mainWindow?.close()
+        MainActor.assumeIsolated { SettingsWindowController.shared.close() }
+    }
+
     func showMainWindow() {
         NSApplication.shared.setActivationPolicy(.regular)
 

@@ -6,6 +6,7 @@ import OpenSuperWhisperCore
 /// for the two that have a server.
 struct TextAIBackendFields: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject private var session = CleanupSessionStatus.shared
 
     var body: some View {
         switch viewModel.aiBackend {
@@ -19,6 +20,28 @@ struct TextAIBackendFields: View {
         default:
             ollamaFields
             statusLine
+        }
+        lastFailureLine
+    }
+
+    // MARK: Last failure
+
+    /// The connection test passing says little about a cleanup that is failing, so the failure
+    /// the last dictation hit is shown on its own until a pass works again (#264).
+    @ViewBuilder private var lastFailureLine: some View {
+        if let failure = session.lastFailure {
+            TextAILine(indented: true) {
+                Text("✕ The last cleanup failed: \(failure.reason)")
+                    .scaledFont(size: 13)
+                    .foregroundColor(STheme.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Text(failure.date, format: .relative(presentation: .named))
+                    .scaledFont(size: 13)
+                    .foregroundColor(STheme.hint)
+                    .lineLimit(1)
+            }
+            .help(failure.model)
         }
     }
 
@@ -145,8 +168,14 @@ struct TextAIBackendFields: View {
                            ? "Reachable, but “\(model)” isn't in the server's model list"
                            : "Reachable, but “\(model)” isn't pulled. Run: ollama pull \(model)",
                            color: STheme.warn)
-        case .authFailed:
-            TextAIFootnote("✕ The server rejected the API key", color: STheme.danger)
+        case .authFailed(let message):
+            if let message {
+                TextAIFootnote("✕ The server rejected the API key: \(message)", color: STheme.danger)
+            } else {
+                TextAIFootnote("✕ The server rejected the API key", color: STheme.danger)
+            }
+        case .requestFailed(let message):
+            TextAIFootnote("✕ A test request failed: \(message)", color: STheme.danger)
         case .unreachable:
             TextAIFootnote(isRemote
                            ? "✕ Can't reach the server. Check the URL."

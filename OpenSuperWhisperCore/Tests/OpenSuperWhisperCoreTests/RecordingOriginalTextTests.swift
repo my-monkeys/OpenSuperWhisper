@@ -42,12 +42,50 @@ final class RecordingOriginalTextTests: CoreTestCase {
     /// Rewriting a row in another style (#160) replaces the text and names the style, and keeps
     /// the engine's original, which is what the next rewrite starts from.
     func testARestyleKeepsTheOriginal() async throws {
-        try await store.restyle(recording, transcription: "Please send the mock-ups.", styleUsed: "Pro")
+        try await store.restyle(recording, transcription: "Please send the mock-ups.", styleUsed: "Pro",
+                                cleanup: CleanupOutcome(text: "Please send the mock-ups.", status: .cleaned(model: "m")))
 
         let row = try await stored()
         XCTAssertEqual(row?.transcription, "Please send the mock-ups.")
         XCTAssertEqual(row?.styleUsed, "Pro")
         XCTAssertEqual(row?.rawTranscription, "um send the mock ups")
+    }
+
+    /// The pass that just ran replaces what the row kept from the previous one (#266).
+    func testARestyleReplacesTheCleanupOutcome() async throws {
+        var failed = recording!
+        failed.cleanupModel = "old-model"
+        failed.cleanupError = "401 Invalid API key"
+        let seed = failed
+        try await queue.write { db in try seed.update(db) }
+
+        try await store.restyle(seed, transcription: "Please send the mock-ups.", styleUsed: "Pro",
+                                cleanup: CleanupOutcome(text: "x", status: .cleaned(model: "new-model")))
+        var row = try await stored()
+        XCTAssertEqual(row?.cleanupModel, "new-model")
+        XCTAssertNil(row?.cleanupError)
+
+        try await store.restyle(try XCTUnwrap(row), transcription: "um send the mock ups", styleUsed: "Pro",
+                                cleanup: CleanupOutcome(text: "x", status: .failed(model: "new-model", reason: "429 Slow down")))
+        row = try await stored()
+        XCTAssertEqual(row?.cleanupModel, "new-model")
+        XCTAssertEqual(row?.cleanupError, "429 Slow down")
+    }
+
+    /// A rerun's text is the engine's own, so the cleanup outcome of the old text no longer applies.
+    func testARerunClearsTheCleanupOutcome() async throws {
+        var cleaned = recording!
+        cleaned.cleanupModel = "old-model"
+        cleaned.cleanupError = "boom"
+        let seed = cleaned
+        try await queue.write { db in try seed.update(db) }
+
+        await store.updateRecordingProgressOnlySync(recording.id, transcription: "Rerun text", progress: 1,
+                                                    status: .completed, rawTranscription: "Rerun text")
+
+        let row = try await stored()
+        XCTAssertNil(row?.cleanupModel)
+        XCTAssertNil(row?.cleanupError)
     }
 
     func testARerunStoresItsOwnTextAsTheOriginal() async throws {

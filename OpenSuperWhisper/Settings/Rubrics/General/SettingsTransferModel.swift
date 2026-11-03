@@ -16,6 +16,8 @@ final class SettingsTransferModel: ObservableObject {
     struct PendingImport {
         let values: [String: Any]
         let savedAt: Date?
+        /// The Mac that saved it, when the copy comes from iCloud Drive.
+        var host: String?
     }
 
     @Published private(set) var github: GitHubState = .signedOut
@@ -71,7 +73,7 @@ final class SettingsTransferModel: ObservableObject {
 
     func confirmImport() {
         guard let pending = pendingImport else { return }
-        SettingsArchive.apply(pending.values, to: DefaultsStore.current)
+        ICloudSettingsBackup.shared.restore(pending.values)
         pendingImport = nil
         status = nil
         needsRelaunch = true

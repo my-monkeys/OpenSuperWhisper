@@ -14,6 +14,9 @@ public protocol LLMCleanupBackend {
     /// the blank-output and prompt-echo checks, so a user who repurposed the instruction on a big
     /// model (condensing, expanding) isn't second-guessed.
     var enforcesLengthRatio: Bool { get }
+    /// Short name of the model that answers, for the notices and the history row: "Apple
+    /// Intelligence", or the model id as the user configured it.
+    var modelLabel: String { get }
     func generate(system: String, user: String) async throws -> String
 }
 
@@ -27,8 +30,9 @@ public enum LLMStatus: Equatable, Sendable {
     case checking
     case ok                     // reachable and the configured model is present
     case modelMissing(String)   // reachable, but the model isn't available there
-    case authFailed             // reachable, but the server rejected the API key
+    case authFailed(String?)    // reachable, but the server rejected the API key (its message, if any)
     case unreachable            // server not running / wrong endpoint
+    case requestFailed(String)  // reachable, but a real chat request failed (the server's message)
 }
 
 /// Cleans up a transcription with a local LLM, behind a single `process` entry point so the
@@ -37,6 +41,7 @@ public enum LLMStatus: Equatable, Sendable {
 ///
 /// `process` never throws and never loses the transcription: if post-processing is disabled
 /// or the LLM call fails (server down, bad model, timeout, bad key…), it returns the input text.
+/// `processWithOutcome` says which of those happened.
 public enum LLMPostProcessor {
     /// The backend someone gets when they never picked one: Apple Intelligence where it can run
     /// (nothing to download or set up), Ollama, the long-standing default, everywhere else.
@@ -50,17 +55,28 @@ public enum LLMPostProcessor {
 
     /// Selects the configured backend. Falls back to Ollama for any unknown value.
     public static func currentBackend() -> LLMCleanupBackend {
+        backend(CoreAccess.preferences.aiBackend)
+    }
+
+    /// The backend named `tag` ("builtin", "apple", "remote", anything else is Ollama), with the
+    /// endpoint and key the user configured. `model` replaces the configured model id for one
+    /// pass of Ollama or Remote, which is how the history tries another model without touching
+    /// the preference; the other two have no model id to replace.
+    public static func backend(_ tag: String, model: String? = nil) -> LLMCleanupBackend {
         let prefs = CoreAccess.preferences
-        switch prefs.aiBackend {
+        switch tag {
         case "builtin":
             return BuiltInLlamaBackend.shared
         case "apple":
             return AppleIntelligenceBackend(model: AppleIntelligence.model)
         case "remote":
-            return RemoteBackend(endpoint: prefs.aiRemoteEndpoint, model: prefs.aiRemoteModel,
-                                  apiKey: prefs.aiRemoteAPIKey ?? "")
+            let service = RemoteService.detect(url: prefs.aiRemoteEndpoint)
+            return RemoteBackend(endpoint: prefs.aiRemoteEndpoint, model: model ?? prefs.aiRemoteModel,
+                                 apiKey: prefs.aiRemoteAPIKey ?? "",
+                                 disableReasoning: RemoteService.disablesReasoning(
+                                     stored: prefs.aiRemoteDisableReasoning, service: service))
         default:
-            return OllamaBackend(endpoint: prefs.aiOllamaEndpoint, model: prefs.aiOllamaModel)
+            return OllamaBackend(endpoint: prefs.aiOllamaEndpoint, model: model ?? prefs.aiOllamaModel)
         }
     }
 
@@ -77,14 +93,37 @@ public enum LLMPostProcessor {
     /// cleanup runs: a style is a way of cleaning up, not a reason to send the text to a model.
     public static func process(_ text: String, bundleID: String?, translating: Bool = false,
                                writesLists: Bool = false, style: String = "") async -> String {
+        await processWithOutcome(text, bundleID: bundleID, translating: translating,
+                                 writesLists: writesLists, style: style).text
+    }
+
+    /// `process`, with what happened to the text: a pass that failed and a pass that changed
+    /// nothing both hand back the input, and only the status tells them apart.
+    ///
+    /// `backend` runs the pass on another backend than the configured one, and `extraInstruction`
+    /// adds a request for this pass alone, after the style: what the history's regenerate panel
+    /// offers to compare two models on a real dictation.
+    public static func processWithOutcome(_ text: String, bundleID: String?, translating: Bool = false,
+                                          writesLists: Bool = false, style: String = "",
+                                          extraInstruction: String = "",
+                                          backend: LLMCleanupBackend? = nil) async -> CleanupOutcome {
+        await run(text, bundleID: bundleID, translating: translating, writesLists: writesLists,
+                  style: style, extraInstruction: extraInstruction, backend: backend ?? currentBackend())
+    }
+
+    static func run(_ text: String, bundleID: String?, translating: Bool, writesLists: Bool,
+                    style: String, extraInstruction: String = "",
+                    backend: LLMCleanupBackend) async -> CleanupOutcome {
         let prefs = CoreAccess.preferences
         let general = prefs.aiPostProcessingEnabled
         let formatting = prefs.appContextFormattingEnabled
+        let notRun = CleanupOutcome(text: text, status: .notRun)
 
-        guard general || formatting else { return text }
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+        guard general || formatting else { return notRun }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return notRun }
 
         let prof = formatting ? profile(for: bundleID, in: prefs.appContextProfiles) : nil
+        let spokenFormatting = general && prefs.aiSpokenFormattingEnabled
         let vocabulary = prefs.customDictionaryEnabled
             ? cleanupVocabulary(CustomDictionary.boostTerms(entries: prefs.customDictionaryEntries), in: text) : []
         guard let system = assembleSystemPrompt(generalCleanup: general,
@@ -95,13 +134,18 @@ public enum LLMPostProcessor {
                                                 translationPrompt: prefs.aiPostProcessingTranslation,
                                                 vocabulary: vocabulary,
                                                 writesLists: writesLists,
-                                                style: style)
-        else { return text }
+                                                spokenFormatting: spokenFormatting,
+                                                style: style,
+                                                extraInstruction: extraInstruction)
+        else { return notRun }
 
-        let backend = currentBackend()
+        let model = backend.modelLabel
+        func failed(_ reason: String) -> CleanupOutcome {
+            CleanupOutcome(text: text, status: .failed(model: model, reason: reason))
+        }
         guard backend.isReady else {
             print("AI post-processing skipped, \(backend) is not ready: using the raw transcription")
-            return text
+            return failed("Backend not ready")
         }
 
         do {
@@ -113,7 +157,7 @@ public enum LLMPostProcessor {
             // on top of that runs only for backends that ask for it (the small built-in model), and
             // an active app profile relaxes its shrink floor because those rules condense on
             // purpose — see `passesLengthGuard`.
-            guard !result.isEmpty else { return text }
+            guard !result.isEmpty else { return failed("Empty reply") }
             // Every backend, whatever the input length: a model with next to nothing to correct
             // can answer with its own instructions, which would then be pasted (#147).
             let shipped = shippedInstructions(generalCleanup: general,
@@ -124,23 +168,25 @@ public enum LLMPostProcessor {
                                               translationPrompt: prefs.aiPostProcessingTranslation,
                                               vocabulary: vocabulary,
                                               writesLists: writesLists,
+                                              spokenFormatting: spokenFormatting,
                                               style: style)
             if echoesPrompt(output: result, system: shipped, input: text) {
                 print("AI post-processing returned its own instructions, using the raw transcription")
-                return text
+                return failed("The model repeated its instructions")
             }
             if backend.enforcesLengthRatio,
                !passesLengthGuard(input: text, output: result, condensingAllowed: prof != nil) {
-                return text
+                return failed("The reply was too long or too short")
             }
             if writesLists, listRepeatsText(input: text, output: result) {
                 print("AI post-processing kept the sentence next to its list, running it again without lists")
-                return await process(text, bundleID: bundleID, translating: translating, style: style)
+                return await run(text, bundleID: bundleID, translating: translating, writesLists: false,
+                                 style: style, extraInstruction: extraInstruction, backend: backend)
             }
-            return result
+            return CleanupOutcome(text: result, status: .cleaned(model: model))
         } catch {
             print("AI post-processing failed, using the raw transcription: \(error)")
-            return text
+            return failed(error.localizedDescription)
         }
     }
 
@@ -210,6 +256,22 @@ public enum LLMPostProcessor {
         came from: never write both. Questions, opinions and stories stay as sentences.
         """
 
+    /// Added while "Spoken punctuation" is on (#265). People who dictate say "comma" or "entre
+    /// parenthèses" out of habit, from the dictation tools that always took those as commands,
+    /// and the plain cleanup contract writes them out as words. The last sentence keeps a word
+    /// that only sounds like a command ("le point de départ") a word.
+    public static let spokenFormattingInstruction = """
+        The speaker may dictate punctuation and layout as words, in any language. When such a \
+        word is meant as a command, write what it asks for instead of the word: "comma" or \
+        "virgule" is ",", "period", "full stop" or "point" ending a sentence is ".", "question \
+        mark" or "point d'interrogation" is "?", "colon" or "deux-points" is ":", "open \
+        parenthesis ... close parenthesis", "ouvrez la parenthèse ... fermez la parenthèse", "in \
+        parentheses ..." or "entre parenthèses ..." put the words they enclose in "( )", "new \
+        line" or "à la ligne" starts a new line, and "new paragraph" or "nouveau paragraphe" \
+        leaves a blank line. When the word is part of the sentence, as in "le point de départ" \
+        or "a comma-separated list", keep it as a word.
+        """
+
     /// A list written in place of the sentence has about as many words as the dictation, often
     /// fewer ("and", "then" go). Every reply that kept the sentence too came out at 1.7x or more,
     /// every reshaped one at 1.15x or less.
@@ -255,6 +317,7 @@ public enum LLMPostProcessor {
                                     translationPrompt: String,
                                     vocabulary: [String] = [],
                                     writesLists: Bool = false,
+                                    spokenFormatting: Bool = false,
                                     style: String = "") -> String {
         func isShipped(_ text: String, _ shipped: [String]) -> Bool {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -272,6 +335,9 @@ public enum LLMPostProcessor {
         }
         if let spellings = vocabularySection(vocabulary) {
             sections.append(spellings)
+        }
+        if spokenFormatting {
+            sections.append(spokenFormattingInstruction)
         }
         if writesLists {
             sections.append(listInstruction)
@@ -293,7 +359,9 @@ public enum LLMPostProcessor {
                                      translationPrompt: String = "",
                                      vocabulary: [String] = [],
                                      writesLists: Bool = false,
-                                     style: String = "") -> String? {
+                                     spokenFormatting: Bool = false,
+                                     style: String = "",
+                                     extraInstruction: String = "") -> String? {
         guard generalCleanup || profile != nil else { return nil }
 
         var sections: [String] = []
@@ -304,6 +372,9 @@ public enum LLMPostProcessor {
             // to general cleanup and goes with it. App rules still come later and win on format.
             sections.append(style)
         }
+        // A one-off request of the person rerunning the pass: it refines the style, so it sits
+        // right after it, and the app rules and the closing guardrail still come after.
+        sections.append(extraInstruction)
         // Early, next to the contract it qualifies, and gone entirely when translation is off:
         // that disappearance is the whole request. Instructions about translating, left in the
         // general prompt where they apply to every dictation, are what sent a small model into
@@ -315,6 +386,11 @@ public enum LLMPostProcessor {
         // the translation note, and one the closing guardrail must still come after.
         if let spellings = vocabularySection(vocabulary) {
             sections.append(spellings)
+        }
+        // Commands said in the dictation, and so a part of general cleanup: next to the list
+        // request, which shapes the text the same way and may follow from a dictated line break.
+        if spokenFormatting {
+            sections.append(spokenFormattingInstruction)
         }
         // A request about the shape of the text, like the spellings: the app's own rules and the
         // closing guardrail still come after it.
@@ -522,29 +598,23 @@ public enum LLMPostProcessor {
         await OllamaBackend.checkConnection(endpoint: endpoint, model: model)
     }
 
+    /// Sends a minimal chat request to a Remote cleanup server for the settings "Test Connection".
+    /// Forwards to `RemoteBackend`.
+    public static func checkRemoteChat(endpoint: String, model: String, apiKey: String,
+                                       disableReasoning: Bool) async -> LLMStatus {
+        await RemoteBackend.probe(endpoint: endpoint, model: model, apiKey: apiKey,
+                                  disableReasoning: disableReasoning)
+    }
+
     // MARK: - Remote (OpenAI-compatible) endpoint helpers
     //
     // Pure and unit-tested; shared by `RemoteBackend` (actual cleanup calls) and
     // `RemoteCleanupSettingsView` (the settings "Test Connection" probe).
 
-    /// `<base>/v1/chat/completions`, tolerating a base that may lack a scheme or already
-    /// include `/v1` or a trailing slash.
+    /// `<base>/chat/completions` under the base's own version segment, or `/v1` for a bare host
+    /// (see `OpenAICompatibleURL`).
     static func chatEndpoint(base: String) -> URL? {
-        normalizedBase(base).flatMap { URL(string: $0 + "/v1/chat/completions") }
-    }
-
-    /// Normalize an OpenAI-compatible base URL: add http:// if no scheme, drop a trailing
-    /// slash and a trailing `/v1` (callers append their own `/v1/...`).
-    private static func normalizedBase(_ raw: String) -> String? {
-        var base = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !base.isEmpty else { return nil }
-        let lower = base.lowercased()
-        if !lower.hasPrefix("http://") && !lower.hasPrefix("https://") {
-            base = "http://" + base
-        }
-        while base.hasSuffix("/") { base.removeLast() }
-        if base.hasSuffix("/v1") { base.removeLast(3) }
-        return base
+        OpenAICompatibleURL.endpoint(base: base, resource: "chat/completions")
     }
 
     /// OpenAI chat completions: `{"choices":[{"message":{"content":"…"}}]}`.
