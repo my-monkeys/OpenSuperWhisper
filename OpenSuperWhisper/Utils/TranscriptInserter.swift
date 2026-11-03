@@ -164,7 +164,7 @@ enum TranscriptInserter {
     @MainActor
     private static func pressKeys(_ text: String, pace: Int?, wanted: () -> Bool,
                                   log: (_ strokes: Int, _ pause: useconds_t) -> Void) async -> Insertion {
-        guard let map = KeystrokeMap.current() else {
+        guard let map = KeystrokeMap.forRemoteSession(layoutID: AppPreferences.shared.remoteSessionKeyboardLayout) else {
             Diag.mark("remote session: keyboard layout unreadable, nothing typed")
             ClipboardUtil.copyToClipboard(text)
             return .onClipboard

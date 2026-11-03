@@ -33,6 +33,17 @@ struct TextAIInsertionGroup: View {
                         range: 0...Double(TextInserter.maxChunkPauseMilliseconds),
                         valueLabel: "\(viewModel.typingPaceMilliseconds) ms")
             }
+            SettingRow("Remote computer's keyboard",
+                       hint: "Screen Sharing and other remote desktop apps send keys, which the other computer reads with its own layout. Pick it when it differs from this Mac's: a Linux or Windows machine is often U.S. Accented letters it can't type lose their accent.",
+                       advanced: true) {
+                SMenu(Text(verbatim: remoteLayoutLabel)) {
+                    Button("Same as this Mac") { viewModel.remoteSessionKeyboardLayout = "" }
+                    Divider()
+                    ForEach(RemoteKeyboardLayouts.choices()) { layout in
+                        Button(layout.name) { viewModel.remoteSessionKeyboardLayout = layout.id }
+                    }
+                }
+            }
             SettingRow("Also keep it on the clipboard",
                        hint: "When off, what you had copied before is put back after the paste. Only a paste that doesn’t land, with the warning on and no shortcut to paste it again, leaves the dictation there for ⌘V.") {
                 SSwitch(isOn: $viewModel.autoCopyToClipboard)
@@ -111,5 +122,13 @@ struct TextAIInsertionGroup: View {
     private var typingPace: Binding<Double> {
         Binding(get: { Double(viewModel.typingPaceMilliseconds) },
                 set: { viewModel.typingPaceMilliseconds = Int($0.rounded()) })
+    }
+}
+
+extension TextAIInsertionGroup {
+    fileprivate var remoteLayoutLabel: String {
+        let id = viewModel.remoteSessionKeyboardLayout
+        guard !id.isEmpty else { return String(localized: "Same as this Mac") }
+        return RemoteKeyboardLayouts.name(id: id) ?? id
     }
 }

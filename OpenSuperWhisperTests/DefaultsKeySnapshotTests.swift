@@ -102,6 +102,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "remoteServerTimeoutEnabled",
         "remoteServerTimeoutSeconds",
         "remoteServerURL",
+        "remoteSessionKeyboardLayout",
         "remoteUserPresets",
         "removeFillerWords",
         "retentionMaxAgeEnabled",
@@ -283,6 +284,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("aiSpokenFormattingEnabled") { prefs.aiSpokenFormattingEnabled = false }
         assertWrites("appContextFormattingEnabled") { prefs.appContextFormattingEnabled = true }
         assertWrites("typingPaceMilliseconds") { prefs.typingPaceMilliseconds = 9 }
+        assertWrites("remoteSessionKeyboardLayout") { prefs.remoteSessionKeyboardLayout = "com.apple.keylayout.US" }
         assertWrites("appInsertionRulesData") {
             prefs.appInsertionRules = [AppInsertionRule(bundleIdentifier: "com.example", mode: .type)]
         }
@@ -467,6 +469,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.aiSpokenFormattingEnabled, true)
         XCTAssertEqual(prefs.appContextFormattingEnabled, false)
         XCTAssertEqual(prefs.typingPaceMilliseconds, 2)
+        XCTAssertNil(prefs.remoteSessionKeyboardLayout)
         XCTAssertEqual(prefs.appInsertionRules, [])
         XCTAssertEqual(prefs.appContextProfiles, [])
         XCTAssertEqual(prefs.didSeedAppContextPresets, false)
