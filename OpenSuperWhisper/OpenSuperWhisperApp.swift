@@ -67,7 +67,7 @@ struct OpenSuperWhisperApp: App {
             // that could stall a logout.
             CommandGroup(replacing: .appTermination) {
                 Button("Quit to Menu Bar") {
-                    (NSApplication.shared.delegate as? AppDelegate)?.closeInterfaceWindows()
+                    AppDelegate.shared?.closeInterfaceWindows()
                 }
                 .keyboardShortcut("q", modifiers: .command)
                 Button("Quit OpenSuperWhisper") {
@@ -161,6 +161,16 @@ class AppState: ObservableObject {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableObject {
+    /// The instance SwiftUI created for `@NSApplicationDelegateAdaptor`. `NSApp.delegate` is
+    /// SwiftUI's own object, which forwards to this one, so `NSApp.delegate as? AppDelegate` is
+    /// always nil: ⌘Q "Quit to Menu Bar" did nothing through it (#254).
+    private(set) static weak var shared: AppDelegate?
+
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
+
     private var statusItem: NSStatusItem?
     /// The app's own window, looked up rather than remembered: SwiftUI creates it after
     /// `applicationDidFinishLaunching` has run, and owns it from then on.
