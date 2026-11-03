@@ -226,16 +226,16 @@ final class AppPreferencesMigrationTests: XCTestCase {
     func testIndicatorSwitchesBecomeALayout() {
         let cases: [(String, Bool, Bool, IndicatorLayout)] = [
             ("replacesDot", false, false, IndicatorLayout(
-                order: [.waveform, .label, .dot, .stopButton, .cancelButton],
+                order: [.waveform, .label, .dot, .stopButton, .cancelButton, .liveText],
                 hidden: [.dot, .stopButton, .cancelButton], waveformHeight: 30)),
             ("off", true, false, IndicatorLayout(
-                order: [.dot, .label, .waveform, .stopButton, .cancelButton],
+                order: [.dot, .label, .waveform, .stopButton, .cancelButton, .liveText],
                 hidden: [.waveform, .cancelButton], waveformHeight: 30)),
             ("besideLabel", true, true, IndicatorLayout(
-                order: [.dot, .label, .waveform, .stopButton, .cancelButton],
+                order: [.dot, .label, .waveform, .stopButton, .cancelButton, .liveText],
                 hidden: [], waveformHeight: 30)),
             ("unknown-mode", false, true, IndicatorLayout(
-                order: [.waveform, .label, .dot, .stopButton, .cancelButton],
+                order: [.waveform, .label, .dot, .stopButton, .cancelButton, .liveText],
                 hidden: [.dot, .stopButton], waveformHeight: 30)),
         ]
         for (mode, stop, cancel, expected) in cases {
@@ -266,7 +266,11 @@ final class AppPreferencesMigrationTests: XCTestCase {
 
         prefs.runMigrations()
 
-        XCTAssertEqual(IndicatorLayout.load(from: prefs.indicatorLayout), custom)
+        // Kept as it was, with live text added at the end like any element the stored layout
+        // predates.
+        var expected = custom
+        expected.order.append(.liveText)
+        XCTAssertEqual(IndicatorLayout.load(from: prefs.indicatorLayout), expected)
     }
 
     // MARK: - Recording triggers
