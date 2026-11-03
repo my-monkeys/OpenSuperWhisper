@@ -63,20 +63,23 @@ struct PerAppDetail: View {
 
     @ViewBuilder private var insertionSection: some View {
         section("Insertion") {
-            pickers.insertionMenu
-            switch entry.insertion?.mode {
-            case nil:
-                note("Follows the global “Paste instead of typing” switch. Choose Paste or Type to override it for this app.")
-            case .paste?:
-                note("One ⌘V. Immune to apps that redraw on every keystroke, but uses the clipboard.")
-            case .type?:
-                note("Synthetic keystrokes. Leaves the clipboard alone. Raise the pace if this app falls behind.")
-                typingPace
-            }
+            // A remote session is typed key by key whatever a rule says, so the Paste/Type menu
+            // and its notes would describe a choice that has no effect there.
             if isRemoteSessionApp {
                 keyboard(note: "This app is always typed key by key, because the text goes to another computer. Choose the layout that computer uses.")
-            } else if entry.insertion?.mode == .type {
-                keyboard(note: "The layout of the computer the text is typed into, for remote sessions and virtual machines. Leave on “Same as this Mac” otherwise.")
+                if entry.insertion != nil { typingPace }
+            } else {
+                pickers.insertionMenu
+                switch entry.insertion?.mode {
+                case nil:
+                    note("Follows the global “Paste instead of typing” switch. Choose Paste or Type to override it for this app.")
+                case .paste?:
+                    note("One ⌘V. Immune to apps that redraw on every keystroke, but uses the clipboard.")
+                case .type?:
+                    note("Synthetic keystrokes. Leaves the clipboard alone. Raise the pace if this app falls behind.")
+                    typingPace
+                    keyboard(note: "The layout of the computer the text is typed into, for remote sessions and virtual machines. Leave on “Same as this Mac” otherwise.")
+                }
             }
         }
     }
