@@ -68,19 +68,23 @@ struct KeystrokeMap {
         "\u{2026}": "...", "\u{00A0}": " ", "\u{202F}": " ", "\u{2009}": " ",
     ]
 
-    init?(layoutData: CFData, keyboardType: UInt32) {
+    /// - Parameter plainKeysOnly: only keys alone or with Shift. For another machine's layout,
+    ///   which is most often a Linux or Windows one: Option arrives there as Alt, and a Mac dead
+    ///   key types nothing, so a character that needs either is better written without its accent.
+    init?(layoutData: CFData, keyboardType: UInt32, plainKeysOnly: Bool = false) {
         guard let bytes = CFDataGetBytePtr(layoutData) else { return nil }
         let layout = UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self)
         let keyCodes = (0..<128).map(CGKeyCode.init).filter { !Self.keypadKeyCodes.contains($0) }
+        let combinations = Self.modifierCombinations.filter { !plainKeysOnly || !$0.option }
 
         var deadKeys: [(stroke: KeyStroke, state: UInt32)] = []
-        for combination in Self.modifierCombinations {
+        for combination in combinations {
             for keyCode in keyCodes {
                 let stroke = KeyStroke(keyCode: keyCode, shift: combination.shift, option: combination.option)
                 var state: UInt32 = 0
                 let typed = Self.translate(stroke, in: layout, keyboardType: keyboardType, deadKeyState: &state)
                 if typed.isEmpty, state != 0 {
-                    deadKeys.append((stroke, state))
+                    if !plainKeysOnly { deadKeys.append((stroke, state)) }
                 } else {
                     record(typed, as: [stroke])
                 }
@@ -89,7 +93,7 @@ struct KeystrokeMap {
         // Accented letters a layout only reaches through a dead key: é is Option-E then E on a
         // US board. Searched after every single key, so a layout with an é key uses it.
         for deadKey in deadKeys {
-            for combination in Self.modifierCombinations {
+            for combination in combinations {
                 for keyCode in keyCodes {
                     let stroke = KeyStroke(keyCode: keyCode, shift: combination.shift, option: combination.option)
                     var state = deadKey.state
@@ -132,7 +136,7 @@ struct KeystrokeMap {
         for character in text {
             if let sequence = strokes[character] {
                 planned += sequence
-            } else if let substitute = Self.substitutes[character],
+            } else if let substitute = Self.substitutes[character] ?? Self.withoutAccent(character),
                       substitute.allSatisfy({ strokes[$0] != nil }) {
                 planned += substitute.flatMap { strokes[$0] ?? [] }
             } else {
@@ -142,9 +146,76 @@ struct KeystrokeMap {
         return (planned, skipped)
     }
 
+    /// "é" → "e", "Ç" → "C": a letter the other machine's layout cannot type reads better bare
+    /// than skipped (#255).
+    static func withoutAccent(_ character: Character) -> String? {
+        let bare = String(character).applyingTransform(.stripDiacritics, reverse: false)
+        return bare == String(character) ? nil : bare
+    }
+
     /// The map of the layout typing would use right now.
     static func current() -> KeystrokeMap? {
         guard let data = KeyboardLayoutProvider.currentLayoutData() else { return nil }
         return KeystrokeMap(layoutData: data, keyboardType: UInt32(LMGetKbdType()))
+    }
+
+    /// The map for a remote session: the layout the other machine reads keys with, when the user
+    /// named one, else this Mac's. A Linux machine on a U.S. layout reading this Mac's AZERTY keys
+    /// wrote "Je fqis 0 ;qnger" for "Je fais à manger" (#255).
+    static func forRemoteSession(layoutID: String?) -> KeystrokeMap? {
+        guard let layoutID, let data = RemoteKeyboardLayouts.layoutData(id: layoutID) else { return current() }
+        return KeystrokeMap(layoutData: data, keyboardType: UInt32(LMGetKbdType()), plainKeysOnly: true)
+    }
+}
+
+/// The keyboard layouts installed on this Mac, offered as the other machine's layout.
+enum RemoteKeyboardLayouts {
+    struct Layout: Identifiable, Hashable {
+        let id: String
+        let name: String
+    }
+
+    /// Enabled layouts first, the way the user knows them, then U.S., which a remote Linux or
+    /// Windows machine most often uses.
+    static func choices() -> [Layout] {
+        var seen = Set<String>()
+        let enabled = layouts(includeAllInstalled: false)
+        let us = layouts(includeAllInstalled: true).filter { $0.id == usLayoutID }
+        return (enabled + us).filter { seen.insert($0.id).inserted }
+    }
+
+    static let usLayoutID = "com.apple.keylayout.US"
+
+    static func layoutData(id: String) -> CFData? {
+        source(id: id).flatMap { property($0, kTISPropertyUnicodeKeyLayoutData) }
+            .map { Unmanaged<CFData>.fromOpaque($0).takeUnretainedValue() }
+    }
+
+    static func name(id: String) -> String? {
+        source(id: id).flatMap { property($0, kTISPropertyLocalizedName) }
+            .map { Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }
+    }
+
+    private static func layouts(includeAllInstalled: Bool) -> [Layout] {
+        let filter = [kTISPropertyInputSourceType as String: kTISTypeKeyboardLayout as String] as CFDictionary
+        let sources = TISCreateInputSourceList(filter, includeAllInstalled)?.takeRetainedValue()
+            as? [TISInputSource] ?? []
+        return sources.compactMap { source in
+            guard let id = property(source, kTISPropertyInputSourceID)
+                    .map({ Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }),
+                  let name = property(source, kTISPropertyLocalizedName)
+                    .map({ Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String })
+            else { return nil }
+            return Layout(id: id, name: name)
+        }
+    }
+
+    private static func source(id: String) -> TISInputSource? {
+        let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
+        return (TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource])?.first
+    }
+
+    private static func property(_ source: TISInputSource, _ key: CFString) -> UnsafeMutableRawPointer? {
+        TISGetInputSourceProperty(source, key)
     }
 }

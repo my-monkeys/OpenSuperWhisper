@@ -920,6 +920,14 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// Empty for "Same as this Mac".
+    @Published var remoteSessionKeyboardLayout: String {
+        didSet {
+            AppPreferences.shared.remoteSessionKeyboardLayout =
+                remoteSessionKeyboardLayout.isEmpty ? nil : remoteSessionKeyboardLayout
+        }
+    }
+
     @Published var typingPaceMilliseconds: Int {
         didSet { AppPreferences.shared.typingPaceMilliseconds = typingPaceMilliseconds }
     }
@@ -1131,6 +1139,7 @@ class SettingsViewModel: ObservableObject {
         self.stopPhraseSilenceMs = Double(prefs.stopPhraseSilenceMs)
         self.appContextFormattingEnabled = prefs.appContextFormattingEnabled
         self.typingPaceMilliseconds = prefs.typingPaceMilliseconds
+        self.remoteSessionKeyboardLayout = prefs.remoteSessionKeyboardLayout ?? ""
         self.appInsertionRules = prefs.appInsertionRules
         self.appContextProfiles = prefs.appContextProfiles
         self.writingStyleID = prefs.writingStyleID

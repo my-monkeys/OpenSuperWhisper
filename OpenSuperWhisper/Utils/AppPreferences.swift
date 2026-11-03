@@ -779,6 +779,12 @@ final class AppPreferences {
     /// in several, including the Electron terminal that produced #85. Handing the number to the
     /// person who hits the bug beats another constant chosen by reasoning, which is how the
     /// first attempt came to scale on the wrong thing.
+    /// The layout the other machine of a remote session reads keys with, as an input source id
+    /// ("com.apple.keylayout.US"); nil for this Mac's own (#255). Local: it names a layout
+    /// installed on this Mac, and the remote machines differ from one Mac to the next.
+    @OptionalUserDefault(key: "remoteSessionKeyboardLayout")
+    var remoteSessionKeyboardLayout: String?
+
     @UserDefault(key: "typingPaceMilliseconds", defaultValue: 2)
     var typingPaceMilliseconds: Int
 

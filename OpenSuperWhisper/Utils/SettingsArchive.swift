@@ -50,6 +50,7 @@ enum SettingsArchive {
         "lastModifierOnlyHotkey",
         "lastMouseButtonHotkey",
         "offeredAppContextPresets",
+        "remoteSessionKeyboardLayout",
         "selectedMicrophoneData",
         "selectedWhisperModelPath",
     ]
