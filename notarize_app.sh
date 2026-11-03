@@ -81,6 +81,14 @@ if [[ "${XCODE_DIR}" == *[Bb]eta* && "${ALLOW_BETA_XCODE:-0}" != "1" ]]; then
   exit 1
 fi
 
+# The disk image's window is laid out by dmgbuild, run through uvx at a pinned version. Checked
+# here rather than at the end, where a missing tool would waste the whole build and notarization.
+DMGBUILD=(uvx --from "dmgbuild==1.6.5" dmgbuild)
+if ! command -v uvx >/dev/null; then
+  echo "❌ uvx not found: install uv (https://docs.astral.sh/uv/), it runs dmgbuild for the DMG."
+  exit 1
+fi
+
 echo "=== Building ${APP_NAME} for ${ARCH} (toolchain: ${XCODE_DIR}) ==="
 
 ./Scripts/fetch-sherpa.sh
@@ -184,13 +192,11 @@ cd "${current_dir}"
 xcrun notarytool submit "${ZIP_PATH}" --wait ${NOTARY_AUTH}
 xcrun stapler staple "${APP_PATH}"
 
-# Build the DMG with hdiutil (no extra tooling): the .app + an Applications symlink.
-DMG_STAGE="$(mktemp -d)"
-cp -R "${APP_PATH}" "${DMG_STAGE}/"
-ln -s /Applications "${DMG_STAGE}/Applications"
+# The DMG: the .app and an Applications link, in a window whose background shows to drag one
+# onto the other (Scripts/dmg).
 rm -f "${DMG_NAME}.dmg"
-hdiutil create -volname "${APP_NAME}" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_NAME}.dmg"
-rm -rf "${DMG_STAGE}"
+"${DMGBUILD[@]}" -s Scripts/dmg/settings.py -D app="${APP_PATH}" \
+  -D background=Scripts/dmg/background.png "${APP_NAME}" "${DMG_NAME}.dmg"
 
 codesign --sign "${CODE_SIGN_IDENTITY}" "${DMG_NAME}.dmg"
 xcrun notarytool submit "${DMG_NAME}.dmg" --wait ${NOTARY_AUTH}
