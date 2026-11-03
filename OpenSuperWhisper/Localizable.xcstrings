@@ -60710,6 +60710,282 @@
           }
         }
       }
+    },
+    "Move OpenSuperWhisper to Applications?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacer OpenSuperWhisper dans Applications ?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper in den Programme-Ordner bewegen?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Mover OpenSuperWhisper a Aplicaciones?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spostare OpenSuperWhisper in Applicazioni?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover o OpenSuperWhisper para Aplicativos?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển OpenSuperWhisper vào Applications?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要将 OpenSuperWhisper 移到“应用程序”吗？"
+          }
+        }
+      }
+    },
+    "From where it runs now, OpenSuperWhisper can't update itself, and it goes away when the disk image is ejected.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depuis son emplacement actuel, OpenSuperWhisper ne peut pas se mettre à jour, et il disparaît quand l’image disque est éjectée."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Von seinem aktuellen Speicherort aus kann sich OpenSuperWhisper nicht selbst aktualisieren und verschwindet, sobald das Disk-Image ausgeworfen wird."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desde donde se ejecuta ahora, OpenSuperWhisper no puede actualizarse y desaparece al expulsar la imagen de disco."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da dove è in esecuzione ora, OpenSuperWhisper non può aggiornarsi da solo e scompare quando l’immagine disco viene espulsa."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Do local onde está rodando agora, o OpenSuperWhisper não consegue se atualizar e desaparece quando a imagem de disco é ejetada."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Từ vị trí hiện tại, OpenSuperWhisper không thể tự cập nhật và sẽ biến mất khi bạn đẩy ảnh đĩa ra."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从当前位置运行时，OpenSuperWhisper 无法自行更新，并且在推出磁盘映像后会消失。"
+          }
+        }
+      }
+    },
+    "Move to Applications": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacer dans Applications"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In „Programme“ bewegen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover a Aplicaciones"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta in Applicazioni"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover para Aplicativos"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển vào Applications"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移到“应用程序”"
+          }
+        }
+      }
+    },
+    "Not Now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas maintenant"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht jetzt"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non ora"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không phải bây giờ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂不"
+          }
+        }
+      }
+    },
+    "Couldn't move OpenSuperWhisper": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de déplacer OpenSuperWhisper"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper konnte nicht bewegt werden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo mover OpenSuperWhisper"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile spostare OpenSuperWhisper"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível mover o OpenSuperWhisper"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể chuyển OpenSuperWhisper"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法移动 OpenSuperWhisper"
+          }
+        }
+      }
+    },
+    "Drag OpenSuperWhisper to your Applications folder from the disk image yourself.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faites glisser OpenSuperWhisper vous-même vers votre dossier Applications depuis l’image disque."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziehe OpenSuperWhisper selbst aus dem Disk-Image in deinen Programme-Ordner."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrastra OpenSuperWhisper tú mismo a tu carpeta Aplicaciones desde la imagen de disco."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascina tu stesso OpenSuperWhisper nella cartella Applicazioni dall’immagine disco."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arraste o OpenSuperWhisper você mesmo para a pasta Aplicativos a partir da imagem de disco."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy tự kéo OpenSuperWhisper vào thư mục Applications từ ảnh đĩa."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请自行将 OpenSuperWhisper 从磁盘映像拖到“应用程序”文件夹。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
