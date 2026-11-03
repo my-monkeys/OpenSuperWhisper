@@ -49,7 +49,9 @@ struct PerAppDetail: View {
     private var styleSection: some View {
         section("Style") {
             pickers.styleMenu
-            note("The voice AI cleanup writes in for this app. Default follows the style chosen on the Style page.")
+            note(entry.isSite
+                 ? "The voice AI cleanup writes in on this site. Default follows the app's style, then the one chosen on the Style page."
+                 : "The voice AI cleanup writes in for this app. Default follows the style chosen on the Style page.")
         }
     }
 

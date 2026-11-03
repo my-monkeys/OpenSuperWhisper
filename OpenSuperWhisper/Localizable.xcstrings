@@ -38963,6 +38963,52 @@
         }
       }
     },
+    "The voice AI cleanup writes in on this site. Default follows the app's style, then the one chosen on the Style page.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Ton, in dem die KI-Bereinigung auf dieser Website schreibt. Standard folgt dem Stil der App, sonst dem der Stil-Seite."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voz en la que escribe la limpieza con IA en este sitio. Por omisión sigue el estilo de la app y, si no tiene, el elegido en la página Estilo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voix dans laquelle le nettoyage par IA écrit sur ce site. Par défaut suit le style de l'app, sinon celui choisi sur la page Style."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voce con cui la pulizia con IA scrive su questo sito. Predefinito segue lo stile dell'app, altrimenti quello scelto nella pagina Stile."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A voz em que a limpeza por IA escreve neste site. Padrão segue o estilo do app e, sem ele, o escolhido na página Estilo."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giọng văn mà tính năng làm sạch bằng AI dùng trên trang web này. Mặc định theo phong cách của ứng dụng, nếu không thì theo phong cách chọn ở trang phong cách."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 清理在此网站上使用的文风。默认跟随应用的样式，否则跟随“样式”页中选择的样式。"
+          }
+        }
+      }
+    },
     "The words land wherever the cursor is: here, or in any other app.": {
       "localizations": {
         "de": {
