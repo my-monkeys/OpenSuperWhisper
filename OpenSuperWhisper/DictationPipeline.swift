@@ -341,7 +341,7 @@ final class DictationPipeline: ObservableObject {
                     finalURL: finalURL, transcription: text, rawTranscription: original.isEmpty ? nil : original,
                     status: .completed, progress: 1.0, context: item.context,
                     modelUsed: modelUsed, wasFallback: wasFallback,
-                    styleUsed: HistoryRestyle.label(for: style), cleanup: cleanup)
+                    styleUsed: HistoryRestyle.label(for: style, cleanedUp: generalCleanup), cleanup: cleanup)
             } else if item.onRecovered == nil {
                 discardAudio(item.tempURL)
             }

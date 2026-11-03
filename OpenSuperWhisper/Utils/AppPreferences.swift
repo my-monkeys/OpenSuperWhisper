@@ -860,6 +860,14 @@ final class AppPreferences {
                              disabled: perAppDisabledBundleIDs) ?? aiPostProcessingEnabled
     }
 
+    /// Whether AI cleanup runs for at least some dictations: the global switch, or one app or site
+    /// set to clean up while its app is switched on.
+    var cleanupOnSomewhere: Bool {
+        aiPostProcessingEnabled || appCleanupOverrides.contains { key, on in
+            on && PerAppSwitch.isOn(String(key.prefix { $0 != "|" }), disabled: perAppDisabledBundleIDs)
+        }
+    }
+
     /// Bundle identifiers (lowercased) of the apps whose per-app settings are switched off: none of
     /// their profile, insertion rule, model rule or style applies, though all stay stored. See
     /// `PerAppSwitch`. The built-in formatting profiles are added here when they arrive, so they

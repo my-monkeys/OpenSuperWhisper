@@ -40,14 +40,42 @@ final class WritingStylePreferencesTests: XCTestCase {
     }
 
     /// What a history row keeps: the style's name only when cleanup ran and the style added
-    /// something to it.
+    /// something to it. Whether it ran is the dictation's own answer, so an app set to clean up
+    /// gets its style named while the global switch is off.
     @MainActor
     func testTheHistoryNamesAStyleOnlyWhenItShapedTheText() {
         prefs.aiPostProcessingEnabled = false
-        XCTAssertNil(HistoryRestyle.label(for: .pro))
+        XCTAssertNil(HistoryRestyle.label(for: .pro, cleanedUp: false))
+        XCTAssertEqual(HistoryRestyle.label(for: .pro, cleanedUp: true), "Pro")
+        XCTAssertNil(HistoryRestyle.label(for: .raw, cleanedUp: true))
+    }
+
+    /// The rewrite button follows cleanup being on anywhere: with the global switch off, one app
+    /// set to clean up is enough, and a row from any app can then be rewritten.
+    @MainActor
+    func testAHistoryRowCanBeRewrittenWhenOneAppCleansUp() {
+        let row = Recording(id: UUID(), timestamp: Date(), fileName: "a.wav", transcription: "Salut",
+                            duration: 1, status: .completed, progress: 1, rawTranscription: "salut")
+        prefs.aiPostProcessingEnabled = false
+        XCTAssertFalse(HistoryRestyle.isAvailable(for: row))
+        prefs.appCleanupOverrides = ["com.automattic.beeper.desktop": true]
+        XCTAssertTrue(HistoryRestyle.isAvailable(for: row))
+    }
+
+    /// An override that turns cleanup off, or one on an app switched off on the Per app page,
+    /// leaves cleanup off everywhere. A site key counts through its app.
+    func testCleanupIsOnSomewhereOnlyThroughALiveOverride() {
+        prefs.aiPostProcessingEnabled = false
+        prefs.appCleanupOverrides = ["com.apple.notes": false]
+        XCTAssertFalse(prefs.cleanupOnSomewhere)
+
+        prefs.appCleanupOverrides = ["company.thebrowser.dia|mail.google.com": true]
+        XCTAssertTrue(prefs.cleanupOnSomewhere)
+        prefs.perAppDisabledBundleIDs = ["company.thebrowser.dia"]
+        XCTAssertFalse(prefs.cleanupOnSomewhere)
+
         prefs.aiPostProcessingEnabled = true
-        XCTAssertEqual(HistoryRestyle.label(for: .pro), "Pro")
-        XCTAssertNil(HistoryRestyle.label(for: .raw))
+        XCTAssertTrue(prefs.cleanupOnSomewhere)
     }
 
     func testADeletedStyleFallsBackToRaw() {
