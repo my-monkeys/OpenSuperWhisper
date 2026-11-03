@@ -131,10 +131,13 @@ private struct PerAppBadgeView: View {
                 .scaledFont(size: 12, weight: .medium)
                 .foregroundColor(STheme.textBright)
                 .lineLimit(1)
+                .truncationMode(.middle)
+                // A model's name can be as long as a file path; the badge shortens it rather than
+                // widening the row.
+                .frame(maxWidth: 200)
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .background(Capsule().fill(STheme.controlBg))
                 .overlay(Capsule().stroke(STheme.border, lineWidth: 1))
-                .fixedSize()
         }
     }
 
