@@ -596,7 +596,7 @@ struct IndicatorWindow: View {
     /// itself: a fixed 200pt left a waveform-only layout stranded at the left of an
     /// empty pill.
     private var bubbleWidth: CGFloat? {
-        let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
+        let hasCaption = showsLiveText
         if isNotchMode {
             return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth + meterWidthAllowance
         }
@@ -614,6 +614,12 @@ struct IndicatorWindow: View {
         return 200 + buttonExtraWidth + meterWidthAllowance
     }
     
+    /// Words are streaming in and the user wants them on the bubble. Hiding the live text only
+    /// hides this display: the stream still feeds the stop phrase and the rescue of an empty take.
+    private var showsLiveText: Bool {
+        layout.contains(.liveText) && (!streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty)
+    }
+
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
 
     // The bubble's surface is now the themed `BubbleSurface` seam (Theme/BubbleSurface.swift): the
@@ -783,7 +789,7 @@ struct IndicatorWindow: View {
 
     @available(macOS 26.0, *)
     private var glassBubbleContent: some View {
-        let hasText = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
+        let hasText = showsLiveText
         // The capsule beside the waveform carries the live text, or, when the microphone hears
         // nothing at all, a warning in its place: words would mean there is sound.
         let warnsOfSilence = viewModel.state == .recording && viewModel.hearsNothing && !hasText
@@ -884,7 +890,7 @@ struct IndicatorWindow: View {
                         .lineLimit(1)
                         .fixedSize()
                         .transition(.opacity)
-                } else if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
+                } else if !showsLiveText {
                     // Before any text arrives, just the dot + label, vertically centered.
                     HStack(alignment: .center, spacing: 10) {
                         ForEach(layout.leading) { element in
@@ -1244,9 +1250,7 @@ struct IndicatorWindow: View {
     private var hasNotchApron: Bool {
         switch viewModel.state {
         case .recording:
-            return viewModel.isConfirmingCancel
-                || !streaming.confirmedText.isEmpty
-                || !streaming.volatileText.isEmpty
+            return viewModel.isConfirmingCancel || showsLiveText
         case .connecting, .busy, .error, .info:
             return true
         case .idle, .decoding:

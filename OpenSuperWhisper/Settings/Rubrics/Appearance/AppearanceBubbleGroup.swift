@@ -60,7 +60,6 @@ struct AppearanceBubbleGroup: View {
     /// Elements the design adds to the bubble, listed where they will go but not built yet.
     @ViewBuilder private var upcomingRows: some View {
         upcomingRow(symbol: "pencil.tip", title: "Active style", subtitle: "Pro, Personal… before you speak")
-        upcomingRow(symbol: "text.alignleft", title: "Live text", subtitle: "The last words recognised")
         upcomingRow(symbol: "quote.opening", title: "Recognised snippet", subtitle: "The snippet's name before it is inserted")
     }
 

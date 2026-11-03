@@ -12,6 +12,7 @@ enum IndicatorElement: String, Codable, CaseIterable, Identifiable {
     case label
     case stopButton
     case cancelButton
+    case liveText
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum IndicatorElement: String, Codable, CaseIterable, Identifiable {
         case .label: return "\"Recording…\" label"
         case .stopButton: return "Stop button"
         case .cancelButton: return "Cancel button"
+        case .liveText: return "Live text"
         }
     }
 
@@ -32,6 +34,7 @@ enum IndicatorElement: String, Codable, CaseIterable, Identifiable {
         case .label: return "Also shows how many clips are queued"
         case .stopButton: return "Stops and transcribes"
         case .cancelButton: return "Discards the recording"
+        case .liveText: return "The last words recognised"
         }
     }
 
@@ -42,6 +45,7 @@ enum IndicatorElement: String, Codable, CaseIterable, Identifiable {
         case .label: return "textformat"
         case .stopButton: return "stop.circle"
         case .cancelButton: return "trash"
+        case .liveText: return "text.alignleft"
         }
     }
 
@@ -50,6 +54,14 @@ enum IndicatorElement: String, Codable, CaseIterable, Identifiable {
     var isTrailingControl: Bool {
         self == .stopButton || self == .cancelButton
     }
+
+    /// The live text is not a stop in the row: it takes the label's place, or its own capsule
+    /// beside the pill in the glass bubble, and only while words are streaming in. Its switch
+    /// decides whether those words are shown; where they go does not depend on `order`.
+    var isLiveText: Bool { self == .liveText }
+
+    /// Elements whose position in the row is the user's to choose.
+    var isReorderable: Bool { !isTrailingControl && !isLiveText }
 }
 
 /// The bubble's contents and geometry.
@@ -67,7 +79,7 @@ struct IndicatorLayout: Codable, Equatable {
     static let defaultWaveformHeight: Double = 30
 
     static let `default` = IndicatorLayout(
-        order: [.dot, .waveform, .label, .stopButton, .cancelButton],
+        order: [.dot, .waveform, .label, .stopButton, .cancelButton, .liveText],
         hidden: [.dot, .stopButton, .cancelButton],
         waveformHeight: defaultWaveformHeight)
 
@@ -80,7 +92,7 @@ struct IndicatorLayout: Codable, Equatable {
 
     /// Leading elements in their configured order, then the trailing controls, so a button
     /// moved to the front still renders at the edge where a click target belongs.
-    var leading: [IndicatorElement] { elements.filter { !$0.isTrailingControl } }
+    var leading: [IndicatorElement] { elements.filter(\.isReorderable) }
     var trailing: [IndicatorElement] { elements.filter(\.isTrailingControl) }
 
     /// What the bubble shows while the clip is being transcribed.
@@ -107,7 +119,7 @@ struct IndicatorLayout: Codable, Equatable {
             case .dot: return .dot
             case .waveform: return .waveform
             case .label: return .label
-            case .stopButton, .cancelButton: return nil
+            case .stopButton, .cancelButton, .liveText: return nil
             }
         }
     }
@@ -160,13 +172,13 @@ struct IndicatorLayout: Codable, Equatable {
         var layout = IndicatorLayout.default
         switch meterMode {
         case "off":
-            layout.order = [.dot, .label, .waveform, .stopButton, .cancelButton]
+            layout.order = [.dot, .label, .waveform, .stopButton, .cancelButton, .liveText]
             layout.hidden = [.waveform]
         case "besideLabel":
-            layout.order = [.dot, .label, .waveform, .stopButton, .cancelButton]
+            layout.order = [.dot, .label, .waveform, .stopButton, .cancelButton, .liveText]
             layout.hidden = []
         default:
-            layout.order = [.waveform, .label, .dot, .stopButton, .cancelButton]
+            layout.order = [.waveform, .label, .dot, .stopButton, .cancelButton, .liveText]
             layout.hidden = [.dot]
         }
         if !showStop { layout.hidden.insert(.stopButton) }
