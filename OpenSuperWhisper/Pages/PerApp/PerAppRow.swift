@@ -12,6 +12,7 @@ struct PerAppRow: View {
     let onToggle: () -> Void
     let onRemove: () -> Void
     let onChangeApp: () -> Void
+    let onAddSite: (String) -> Void
 
     private var store: PerAppStore { PerAppStore(viewModel: viewModel) }
     private var showsModelMenu: Bool { models.count > 1 && entry.hasBundle }
@@ -48,7 +49,8 @@ struct PerAppRow: View {
             if expanded {
                 PerAppDetail(entry: entry, viewModel: viewModel, models: models,
                              showsModelMenu: showsModelMenu, isOn: isOn,
-                             onRemove: onRemove, onChangeApp: onChangeApp)
+                             onRemove: onRemove, onChangeApp: onChangeApp,
+                             onAddSite: onAddSite)
                     .padding(.leading, 46)
                     .padding(.bottom, 14)
             }
@@ -144,6 +146,8 @@ private struct PerAppBadgeView: View {
     private var text: Text {
         switch badge {
         case .style(let name): return Text(verbatim: name)
+        case .cleanup(true): return Text("AI cleanup")
+        case .cleanup(false): return Text("No AI cleanup")
         case .model(let name): return Text(verbatim: name)
         case .formatting: return Text("Formatting rules")
         case .insertion(.paste, _, _): return Text("Pastes")

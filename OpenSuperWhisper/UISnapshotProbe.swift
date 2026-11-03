@@ -56,6 +56,7 @@ enum UISnapshotProbe {
             AppPreferences.shared.textScale = TextScale.maximum
             return AnyView(AppShellView(page: .perApp))
         },
+        "per-app-site-expanded": { seedPerApp(expandFirstSite: true); return AnyView(AppShellView(page: .perApp)) },
         "per-app-empty": { AnyView(AppShellView(page: .perApp)) },
         "per-app-large-text": {
             seedPerApp()

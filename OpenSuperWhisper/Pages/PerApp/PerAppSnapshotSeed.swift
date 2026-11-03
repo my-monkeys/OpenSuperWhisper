@@ -5,7 +5,8 @@ import OpenSuperWhisperCore
 extension UISnapshotProbe {
     /// Made-up per-app rules for the Per app screens, written to the isolated preferences before
     /// the page's view model reads them.
-    static func seedPerApp(expandFirst: Bool = false, typedWithLayout: Bool = false) {
+    static func seedPerApp(expandFirst: Bool = false, expandFirstSite: Bool = false,
+                           typedWithLayout: Bool = false) {
         let prefs = AppPreferences.shared
         prefs.appInsertionRules = [
             AppInsertionRule(bundleIdentifier: "com.apple.mail", appName: "Mail", mode: .paste),
@@ -19,7 +20,15 @@ extension UISnapshotProbe {
                 mode: .type, keyboardLayoutID: RemoteKeyboardLayouts.usLayoutID))
         }
         prefs.appContextProfiles = AppContextProfile.defaultPresets
-        prefs.appWritingStyles = ["com.apple.mail": WritingStyle.proID]
+        prefs.appWritingStyles = [
+            "com.apple.mail": WritingStyle.proID,
+            "company.thebrowser.dia|mail.google.com": WritingStyle.proID,
+        ]
+        prefs.appCleanupOverrides = [
+            "com.apple.notes": true,
+            "company.thebrowser.dia|mail.google.com": true,
+            "company.thebrowser.dia": false,
+        ]
         prefs.perAppDisabledBundleIDs = AppContextProfile.defaultPresets.map(\.bundleIdentifier)
             .filter { $0 != "com.apple.Terminal" && $0 != "com.apple.mail" }
         let parakeet = DictationModelOption(engine: "fluidaudio", identifier: "v3", displayName: "Parakeet v3")
@@ -31,6 +40,7 @@ extension UISnapshotProbe {
             "com.apple.Safari|github.com": parakeet,
         ])) ?? Data()
         PerAppPage.snapshotExpandsFirstRow = expandFirst
+        PerAppPage.snapshotExpandsFirstSite = expandFirstSite
     }
 }
 #endif

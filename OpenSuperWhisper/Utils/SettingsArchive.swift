@@ -85,7 +85,7 @@ enum SettingsArchive {
         "translateToEnglish", "typingPaceMilliseconds", "uiTheme", "unloadBuiltInModelWhenIdle",
         "unloadWhisperModelWhenIdle", "useAsianAutocorrect", "useBeamSearch",
         "useSurroundingTextAsContext", "whisperLanguage", "writingStyleID", "customWritingStylesData",
-        "appWritingStyles", "perAppDisabledBundleIDs",
+        "appWritingStyles", "perAppDisabledBundleIDs", "appCleanupOverrides",
     ]
 
     /// The portable preferences set in `defaults`, as the file's bytes. Keys left at their

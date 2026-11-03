@@ -103,19 +103,25 @@ public enum LLMPostProcessor {
     /// `backend` runs the pass on another backend than the configured one, and `extraInstruction`
     /// adds a request for this pass alone, after the style: what the history's regenerate panel
     /// offers to compare two models on a real dictation.
+    ///
+    /// `generalCleanup` is whether general prose cleanup runs for this dictation: the caller
+    /// resolves it per app and per site, where the global switch is only the fallback. nil reads
+    /// the global switch.
     public static func processWithOutcome(_ text: String, bundleID: String?, translating: Bool = false,
                                           writesLists: Bool = false, style: String = "",
                                           extraInstruction: String = "",
+                                          generalCleanup: Bool? = nil,
                                           backend: LLMCleanupBackend? = nil) async -> CleanupOutcome {
         await run(text, bundleID: bundleID, translating: translating, writesLists: writesLists,
-                  style: style, extraInstruction: extraInstruction, backend: backend ?? currentBackend())
+                  style: style, extraInstruction: extraInstruction, generalCleanup: generalCleanup,
+                  backend: backend ?? currentBackend())
     }
 
     static func run(_ text: String, bundleID: String?, translating: Bool, writesLists: Bool,
-                    style: String, extraInstruction: String = "",
+                    style: String, extraInstruction: String = "", generalCleanup: Bool? = nil,
                     backend: LLMCleanupBackend) async -> CleanupOutcome {
         let prefs = CoreAccess.preferences
-        let general = prefs.aiPostProcessingEnabled
+        let general = generalCleanup ?? prefs.aiPostProcessingEnabled
         let formatting = prefs.appContextFormattingEnabled
         let notRun = CleanupOutcome(text: text, status: .notRun)
 
@@ -182,7 +188,8 @@ public enum LLMPostProcessor {
             if writesLists, listRepeatsText(input: text, output: result) {
                 print("AI post-processing kept the sentence next to its list, running it again without lists")
                 return await run(text, bundleID: bundleID, translating: translating, writesLists: false,
-                                 style: style, extraInstruction: extraInstruction, backend: backend)
+                                 style: style, extraInstruction: extraInstruction,
+                                 generalCleanup: generalCleanup, backend: backend)
             }
             return CleanupOutcome(text: result, status: .cleaned(model: model))
         } catch {

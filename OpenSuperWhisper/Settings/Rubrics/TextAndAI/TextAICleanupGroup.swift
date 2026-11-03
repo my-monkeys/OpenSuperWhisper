@@ -23,7 +23,7 @@ struct TextAICleanupGroup: View {
                 SSwitch(isOn: .constant(false))
             }
             SettingRow("Format with AI",
-                       hint: "Cleans up the text with a language model before inserting it.") {
+                       hint: "Cleans up the text with a language model before inserting it. Apps and sites can override this on the Per app page.") {
                 SSwitch(isOn: $viewModel.aiPostProcessingEnabled)
             }
             if showsEngine {
