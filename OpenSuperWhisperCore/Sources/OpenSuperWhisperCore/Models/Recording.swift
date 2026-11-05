@@ -208,6 +208,21 @@ public class RecordingStore: ObservableObject {
         }
     }
 
+    /// The row as the database has it now, by id.
+    ///
+    /// For a caller that would otherwise act on a value it read earlier: a row keeps changing
+    /// after it is first shown — the timing write lands after the insert (#262), a rerun clears
+    /// it, a restyle rewrites the text — so anything built from a held copy can be one write
+    /// stale. One row, one primary-key lookup.
+    public nonisolated func fetchRecording(id: UUID) async throws -> Recording? {
+        // The column filter, not the primary-key helper: it is the idiom the rest of this file
+        // uses for an id, so the lookup is known to encode the UUID the way the rows were
+        // written (a 16-byte blob, not the TEXT the column is declared as).
+        try await dbQueue.read { db in
+            try Recording.filter(Recording.Columns.id == id).fetchOne(db)
+        }
+    }
+
     func getPendingRecordings() -> [Recording] {
         do {
             return try dbQueue.read { db in
@@ -257,18 +272,20 @@ public class RecordingStore: ObservableObject {
         }
     }
     
-    /// Inserts the row and returns once it is in the store, without the retention pass.
+    /// Inserts the row and returns once it is in the store.
     ///
     /// `addRecording` is a fire-and-forget `Task`, so a caller that writes to the same row again
     /// immediately afterwards — the pipeline's post-delivery timing update (#262) — has no
-    /// guarantee the insert has run. Awaited callers use this instead; retention stays with them,
-    /// off the critical path.
+    /// guarantee the insert has run. Awaited callers use this instead. The retention pass is
+    /// announced here, in its own task, so every insert keeps the policy without any caller
+    /// having to remember it and without holding the caller up.
     public func addRecordingSync(_ recording: Recording) async throws {
         try await insertRecording(recording)
         await MainActor.run {
             RecordingsDiskUsage.shared.recordingSaved(at: recording.url)
             NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
         }
+        Task { _ = await enforceRetentionPolicy() }
     }
     
     private nonisolated func insertRecording(_ recording: Recording) async throws {
@@ -293,21 +310,25 @@ public class RecordingStore: ObservableObject {
     /// Replaces a row's text with the same dictation rewritten in another writing style, from
     /// the history (#160). The engine's original stays as it was. The pass that just ran replaces
     /// the outcome the row kept from the previous one.
+    ///
+    /// The row is re-read here and only these four fields are written. Copying the caller's
+    /// `Recording` back wholesale would revert anything that changed since they read it — the
+    /// timing blob above all, which lands after the row is first inserted (#262) — and could
+    /// resurrect a blob a rerun had cleared.
     public func restyle(_ recording: Recording, transcription: String, styleUsed: String?,
                         cleanup: CleanupOutcome) async throws {
-        var updated = recording
-        updated.transcription = transcription
-        updated.styleUsed = styleUsed
-        updated.cleanupModel = cleanup.model
-        updated.cleanupError = cleanup.failureReason
-        try await updateRecordingSync(updated)
-    }
-
-    func updateRecordingSync(_ recording: Recording) async throws {
-        try await updateRecordingInDB(recording)
-        await MainActor.run {
-            NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
+        let id = recording.id
+        let cleanupModel = cleanup.model
+        let cleanupError = cleanup.failureReason
+        try await dbQueue.write { db in
+            guard var row = try Recording.fetchOne(db, key: id) else { return }
+            row.transcription = transcription
+            row.styleUsed = styleUsed
+            row.cleanupModel = cleanupModel
+            row.cleanupError = cleanupError
+            try row.update(db)
         }
+        NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
     }
 
     /// Writes the measurement again once the dictation has finished, because the row is created
@@ -329,6 +350,10 @@ public class RecordingStore: ObservableObject {
             if let index = recordings.firstIndex(where: { $0.id == id }) {
                 recordings[index].timingJSON = timingJSON
             }
+            // Every other writer announces its change, and this one lands after the row already
+            // exists: without the post, a list loaded at insert time keeps the pre-delivery blob
+            // and a report filed from it prints `total —` and `insert —` (#262).
+            NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
         } catch {
             // The first blob stays intact with `insertMs`/`totalMs` nil: "could not record the
             // end", never "instant".

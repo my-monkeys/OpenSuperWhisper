@@ -47,12 +47,14 @@ public class TranscriptionService: ObservableObject {
     public struct RunTimings: Equatable, Sendable {
         public let engineWaitMs: Int?
         public let engineLoadMs: Int?
-        public let transcribeMs: Int?
+        /// This run's own span inside the service. Named `runMs` because the pipeline also has a
+        /// `transcribeMs`, which is the wall time a retried call waited — two different spans.
+        public let runMs: Int?
 
-        public init(engineWaitMs: Int?, engineLoadMs: Int?, transcribeMs: Int?) {
+        public init(engineWaitMs: Int?, engineLoadMs: Int?, runMs: Int?) {
             self.engineWaitMs = engineWaitMs
             self.engineLoadMs = engineLoadMs
-            self.transcribeMs = transcribeMs
+            self.runMs = runMs
         }
     }
 
@@ -322,7 +324,7 @@ public class TranscriptionService: ObservableObject {
             lastRunTimings = RunTimings(
                 engineWaitMs: engineWaitMs,
                 engineLoadMs: lastEngineLoadMs,
-                transcribeMs: UptimeClock.milliseconds(from: runStart, to: uptime()))
+                runMs: UptimeClock.milliseconds(from: runStart, to: uptime()))
         }
         return try await transcribe(url: url, settings: settings, fallbackModel: nil)
     }
@@ -334,7 +336,11 @@ public class TranscriptionService: ObservableObject {
     private func transcribe(url: URL, settings: TranscriptionSettings, fallbackModel: DictationModelOption?) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
+            // The fallback engine is built AND initialized here, so a user on remote-with-
+            // fallback pays this cold load; leaving it nil hid it from the report.
+            let fallbackLoadStart = uptime()
             engine = try await makeEngine(for: fallbackModel)
+            lastEngineLoadMs = UptimeClock.milliseconds(from: fallbackLoadStart, to: uptime())
             lastUsedModel = fallbackModel
             lastUsedFallback = true
         } else {

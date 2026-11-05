@@ -40,7 +40,7 @@ final class TranscriptionServiceRunTimingsTests: CoreTestCase {
         let timings = try XCTUnwrap(service.lastRunTimings)
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(timings.engineWaitMs), 0)
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(timings.engineLoadMs), 0)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(timings.transcribeMs), 0)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(timings.runMs), 0)
     }
 
     /// A second run still measures its load stage even though the engine is already up: 0 is a
@@ -74,7 +74,7 @@ final class TranscriptionServiceRunTimingsTests: CoreTestCase {
         let timings = try XCTUnwrap(service.lastRunTimings)
         XCTAssertEqual(timings.engineWaitMs, 1, "gate start 0 → gate end 1")
         XCTAssertEqual(timings.engineLoadMs, 1, "load start 3 → load end 4")
-        XCTAssertEqual(timings.transcribeMs, 3, "run start 2 → run end 5")
+        XCTAssertEqual(timings.runMs, 3, "run start 2 → run end 5")
         XCTAssertEqual(stamps, 6, "one stamp per boundary, no double reads")
     }
 }

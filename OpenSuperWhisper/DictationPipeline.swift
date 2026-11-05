@@ -264,7 +264,8 @@ final class DictationPipeline: ObservableObject {
                 // here, before any await can let another transcription overwrite the service's
                 // per-run state — and never when the engine was replaced by a test seam, where
                 // the value would belong to an unrelated run.
-                if transcribeOverride == nil, let run = transcriptionService.lastRunTimings {
+                if let run = Self.engineSplit(replacedEngine: transcribeOverride != nil,
+                                              lastRun: transcriptionService.lastRunTimings) {
                     item.timing.engineWaitMs = run.engineWaitMs
                     item.timing.engineLoadMs = run.engineLoadMs
                 }
@@ -458,11 +459,15 @@ final class DictationPipeline: ObservableObject {
             } else {
                 delivery = .inserted
             }
-            // Only text that was actually inserted: a submit-only take presses Return, and an
-            // empty one does nothing, so neither has a stage to measure.
-            if hasText {
+            // Only a real insertion: `.held` (no editable target, a cut-short paste, a discard),
+            // `.onClipboardAnnounced` (text on the clipboard, never in a field) and auto-paste
+            // off all leave `insertMs` nil, because nothing was inserted.
+            if hasText, delivery == .inserted, AppPreferences.shared.autoPasteTranscription {
                 item.timing.insertMs = UptimeClock.milliseconds(from: insertionStart, to: uptime())
             }
+            // The dictation ends when the insertion returns. The post-record hook and the submit
+            // settle below happen after the text is in, so they must not inflate the total.
+            item.timing.totalMs = totalMs(for: item)
             if hasText {
                 PostRecordHook.runIfEnabled(text: text, rawText: engineText,
                                             bundleID: item.context.bundleID,
@@ -496,7 +501,6 @@ final class DictationPipeline: ObservableObject {
             // The whole blob is re-encoded: patching keys into the stored JSON could half-merge.
             // No row means nothing to update: history off must not cost a write that matches
             // zero rows.
-            item.timing.totalMs = totalMs(for: item)
             if writesRow {
                 await recordingStore.updateTimingSync(item.id, timingJSON: item.timing.encoded)
             }
@@ -513,7 +517,8 @@ final class DictationPipeline: ObservableObject {
             if item.timing.transcribeMs == nil, let transcribeStart {
                 item.timing.transcribeMs = UptimeClock.milliseconds(from: transcribeStart, to: uptime())
                 item.timing.transcribeAttempts = engineAttempts
-                if transcribeOverride == nil, let run = transcriptionService.lastRunTimings {
+                if let run = Self.engineSplit(replacedEngine: transcribeOverride != nil,
+                                              lastRun: transcriptionService.lastRunTimings) {
                     item.timing.engineWaitMs = run.engineWaitMs
                     item.timing.engineLoadMs = run.engineLoadMs
                 }
@@ -572,6 +577,17 @@ final class DictationPipeline: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "."))
         return text.count > 120 ? String(text.prefix(119)) + "…" : text
+    }
+
+    /// The engine split this dictation may claim, or nil when a test seam replaced the engine:
+    /// the service's per-run snapshot then describes some other run, and attaching it would
+    /// label this dictation with a foreign wait and load.
+    ///
+    /// Pure, so the decision is testable on its own rather than only through its nil outcome in
+    /// a process where the snapshot happens to be nil anyway.
+    nonisolated static func engineSplit(replacedEngine: Bool,
+                                        lastRun: TranscriptionService.RunTimings?) -> TranscriptionService.RunTimings? {
+        replacedEngine ? nil : lastRun
     }
 
     /// Runs a transcription, and once more if it throws. Engine failures are mostly passing ones
@@ -636,7 +652,6 @@ final class DictationPipeline: ObservableObject {
         } catch {
             print("Failed to add recording: \(error)")
         }
-        Task { _ = await recordingStore.enforceRetentionPolicy() }
     }
 
     /// Move a temp recording to its permanent location after a FAILED transcription so the audio
