@@ -45,12 +45,12 @@ final class CrashReportTests: XCTestCase {
         XCTAssertEqual(message, "crash: EXC_BAD_ACCESS (SIGSEGV)\n#0 A 0x01\n#1 B 0x02\n#2 C 0x03")
     }
 
-    /// The deepest frames go first: the fault is at the top of the stack.
+    /// Frames run from the crash site (#0) outward, so a limit cuts the outermost ones.
     func testTheFrameLimitKeepsTheTopOfTheStack() {
-        let message = CrashReport.message(for: draft(frames: ["top 0x01", "mid 0x02", "deep 0x03"]),
+        let message = CrashReport.message(for: draft(frames: ["crash 0x01", "mid 0x02", "entry 0x03"]),
                                           frameLimit: 1)
 
-        XCTAssertEqual(message, "crash: EXC_BAD_ACCESS (SIGSEGV)\n#0 top 0x01")
+        XCTAssertEqual(message, "crash: EXC_BAD_ACCESS (SIGSEGV)\n#0 crash 0x01")
     }
 
     // MARK: - Submission
@@ -67,8 +67,8 @@ final class CrashReportTests: XCTestCase {
         XCTAssertTrue(FeedbackSender.fitsLimits(submission))
     }
 
-    /// A stack far past the endpoint's byte limit still sends: frames are dropped from the bottom
-    /// until it fits, and the top frame, where the fault is, always survives.
+    /// A stack far past the endpoint's byte limit still sends: the outermost frames (the end of the
+    /// list) are dropped until it fits, and #0, the crash site, always survives.
     func testAnOversizedStackIsTrimmedToFitAndKeepsItsTop() {
         let frames = (0..<400).map { "VeryLongBinaryNameThatPadsEachFrameNicely_\($0) 0x000000010abcdef0" }
         let submission = CrashReport.submission(for: draft(frames: frames))
@@ -118,9 +118,9 @@ final class CallStackTreeTests: XCTestCase {
         let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp))
 
         XCTAssertEqual(parsed.frames, [
-            "OpenSuperWhisper 0x10439a54c +0x39a54c",
-            "libdyld.dylib 0x1ab69db24 +0x1b24",
             "OpenSuperWhisper 0x10439a58c +0x39a58c",
+            "libdyld.dylib 0x1ab69db24 +0x1b24",
+            "OpenSuperWhisper 0x10439a54c +0x39a54c",
         ])
     }
 
@@ -149,9 +149,42 @@ final class CallStackTreeTests: XCTestCase {
     func testTheAttributedThreadIsChosenAndTheFrameLimitApplies() {
         let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp), limit: 2)
 
-        XCTAssertEqual(parsed.frames.count, 2)
-        XCTAssertFalse(parsed.frames.contains { $0.hasPrefix("Other") })
-        XCTAssertEqual(parsed.images.count, 2)
+        XCTAssertEqual(parsed.frames, [
+            "OpenSuperWhisper 0x10439a58c +0x39a58c",
+            "libdyld.dylib 0x1ab69db24 +0x1b24",
+        ])
+        XCTAssertEqual(parsed.images, [
+            "image OpenSuperWhisper \(appUUID)",
+            "image libdyld.dylib \(dyldUUID)",
+        ])
+    }
+
+    /// A linear chain `depth` frames deep: `f0` is the thread's entry, `f<depth-1>` the crash site.
+    private func chain(depth: Int) -> Data {
+        var json = #"{"binaryName": "f\#(depth - 1)", "address": \#(depth - 1)}"#
+        for index in stride(from: depth - 2, through: 0, by: -1) {
+            json = #"{"binaryName": "f\#(index)", "address": \#(index), "subFrames": [\#(json)]}"#
+        }
+        return tree(attributedFrames: json)
+    }
+
+    func testTheCrashSiteComesFirstAndSurvivesTheFrameLimit() {
+        let limit = CallStackTree.defaultFrameLimit
+        let depth = limit + 40
+        let parsed = CallStackTree.parse(chain(depth: depth))
+
+        XCTAssertEqual(parsed.frames.count, limit)
+        XCTAssertEqual(parsed.frames.first, "f\(depth - 1) 0x\(String(depth - 1, radix: 16))")
+        XCTAssertEqual(parsed.frames.last, "f\(depth - limit) 0x\(String(depth - limit, radix: 16))")
+        XCTAssertFalse(parsed.frames.contains { $0.hasPrefix("f0 ") })
+    }
+
+    func testTheImageLinesCoverOnlyTheFramesKept() {
+        let json = #"{"binaryName": "Entry", "binaryUUID": "E", "address": 1, "subFrames": [{"binaryName": "Crash", "binaryUUID": "C", "address": 2}]}"#
+        let parsed = CallStackTree.parse(tree(attributedFrames: json), limit: 1)
+
+        XCTAssertEqual(parsed.frames, ["Crash 0x2"])
+        XCTAssertEqual(parsed.images, ["image Crash C"])
     }
 
     func testUnexpectedJSONYieldsNothingInsteadOfCrashing() {
@@ -170,7 +203,7 @@ final class CallStackTreeTests: XCTestCase {
                        "crash: c\n#0 A 0x1 +0x1\nimage A \(appUUID)")
     }
 
-    /// Frames are dropped from the bottom to fit; the image lines are never among them.
+    /// The outermost frames are dropped to fit; the image lines are never among them.
     func testAnOversizedStackKeepsEveryImageLine() {
         let frames = (0..<400).map { "VeryLongBinaryNameThatPadsEachFrameNicely_\($0) 0x000000010abcdef0 +0x39a54c" }
         let images = (0..<5).map { "image Binary\($0) \(appUUID)" }
@@ -182,5 +215,18 @@ final class CallStackTreeTests: XCTestCase {
         XCTAssertFalse(submission.message.contains("#399 "))
         XCTAssertTrue(submission.message.contains("#0 "))
         for image in images { XCTAssertTrue(submission.message.contains(image)) }
+    }
+
+    /// The trim walks in from the end of the list, the outermost frames, and stops before #0.
+    func testTheSizeTrimDropsTheOutermostFramesAndNeverTheCrashSite() {
+        let frames = (0..<400).map { "VeryLongBinaryNameThatPadsEachFrameNicely_\($0) 0x000000010abcdef0" }
+        let submission = CrashReport.submission(for: CrashReportDraft(kind: .crash, cause: "c", frames: frames,
+                                                                      appVersion: "1", osVersion: "26"))
+        let kept = submission.message.split(separator: "\n").filter { $0.hasPrefix("#") }
+
+        XCTAssertLessThan(kept.count, frames.count)
+        for (index, line) in kept.enumerated() {
+            XCTAssertTrue(line.hasPrefix("#\(index) VeryLongBinaryNameThatPadsEachFrameNicely_\(index) "), String(line))
+        }
     }
 }

@@ -15,8 +15,8 @@ struct CrashReportDraft: Equatable {
     /// The Mach exception, the BSD signal, or the OS's termination reason, whichever the payload
     /// carried. One short line, never the audio or the dictation, which a crash payload never holds.
     var cause: String
-    /// The crashing (or stuck) thread's frames, in the tree's order, each a binary, an address and
-    /// an offset into the binary. MetricKit gives no source paths, and a report would not send one
+    /// The crashing (or stuck) thread's frames, crash site first and thread entry last, each a
+    /// binary, an address and an offset into the binary. MetricKit gives no source paths, and a report would not send one
     /// if it did.
     var frames: [String]
     /// One `image <binary> <UUID>` line per binary the frames come from: what the offsets need to
@@ -33,9 +33,9 @@ enum CrashReport {
     /// A cause above zero or more positioned frames can keep the report under the endpoint's limit.
     private static let maxCauseLength = 200
 
-    /// The report's text: the cause, then as many frames as fit, numbered from the top, then every
-    /// image line. The deepest frames are the first to go, because the fault sits at the top of the
-    /// stack; the image lines never go, since no frame can be symbolicated without them.
+    /// The report's text: the cause, then as many frames as fit, numbered from #0, then every
+    /// image line. The outermost frames (the end of the list) are the first to go, because the fault
+    /// sits at #0; the image lines never go, since no frame can be symbolicated without them.
     static func message(for draft: CrashReportDraft, frameLimit: Int) -> String {
         let cause = String(draft.cause.prefix(maxCauseLength))
         let header = "\(draft.kind.rawValue): \(cause)"
@@ -44,8 +44,9 @@ enum CrashReport {
     }
 
     /// An anonymous submission (no email) whose context names the build that crashed. The message
-    /// is trimmed one frame at a time, the image lines counting toward the limit but never trimmed, until the endpoint would take it, so even a very deep stack
-    /// sends its top rather than nothing.
+    /// is trimmed one frame at a time, the image lines counting toward the limit but never trimmed,
+    /// until the endpoint would take it, so even a very deep stack sends its crash site rather than
+    /// nothing.
     static func submission(for draft: CrashReportDraft) -> FeedbackSubmission {
         let details = "OpenSuperWhisper \(draft.appVersion) · macOS \(draft.osVersion)"
         var frameLimit = draft.frames.count
