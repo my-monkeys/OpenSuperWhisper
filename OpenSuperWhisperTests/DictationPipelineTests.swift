@@ -1099,7 +1099,7 @@ final class DictationPipelineTests: XCTestCase {
         let before = await recordingIDs()
         pipeline.enqueue(tempURL: try makeClip("osw-timing-bounds"), startedAt: Date(),
                          streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
-                         modelOption: nil, stoppedAtUptime: UptimeClock.now)
+                         modelOption: nil, stoppedAtUptime: UptimeClock.now())
         await drain(pipeline)
 
         let saved = await newRecording(after: before)
