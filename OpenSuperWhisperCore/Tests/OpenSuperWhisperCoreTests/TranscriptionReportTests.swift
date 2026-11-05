@@ -63,6 +63,30 @@ final class TranscriptionReportTests: CoreTestCase {
         XCTAssertNil(report.audioFileName)
     }
 
+    /// The measurement is part of the snapshot: a report outlives the recording it came from, so
+    /// the numbers have to travel with it rather than be looked up later (#262).
+    func testReportCarriesTheMeasurement() {
+        var recording = Self.recording()
+        var timing = DictationTiming()
+        timing.finalizeMs = 120
+        timing.transcribeMs = 1_200
+        timing.transcribeAttempts = 2
+        timing.totalMs = 1_500
+        recording.timingJSON = timing.encoded
+
+        let report = Self.report(for: recording)
+
+        XCTAssertEqual(report.timing, timing)
+    }
+
+    /// A corrupt blob is "not measured", never a decode that takes the report list down with it.
+    func testACorruptMeasurementReadsAsNotMeasured() {
+        var recording = Self.recording()
+        recording.timingJSON = "{not json"
+
+        XCTAssertNil(Self.report(for: recording).timing)
+    }
+
     /// Where it was dictated (app, window title, URL) is private and says nothing about the
     /// transcription, so a report has nowhere to keep it.
     func testReportLeavesOutWhereItWasDictated() throws {

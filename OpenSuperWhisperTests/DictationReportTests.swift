@@ -96,6 +96,26 @@ final class DictationReportTests: XCTestCase {
         message.split(separator: "\n").first { $0.hasPrefix("output: ") }.map(String.init)
     }
 
+    /// The largest output a report can carry, with the timing line: the line costs its own
+    /// length and never a character of the dictated text, and the result still fits the endpoint.
+    func testAMaximalOutputFitsWithTheTimingLine() {
+        var timing = DictationTiming()
+        timing.totalMs = 4_300
+        timing.transcribeMs = 1_200
+        timing.cleanupMs = 600
+        timing.transcribeAttempts = 2
+        let output = String(repeating: "x", count: DictationReport.maxTextLength)
+
+        let submission = DictationReport.submission(for: draft(output: output, timing: timing))
+
+        XCTAssertTrue(FeedbackSender.fitsLimits(submission))
+        XCTAssertTrue(submission.message.contains("timing: total 4.3 s"),
+                      "there is room for the line, so it goes")
+        XCTAssertEqual(outputLine(in: submission.message)?.count,
+                       "output: ".count + output.count,
+                       "the whole output is sent; the timing line does not cost text")
+    }
+
     // MARK: - Submission
 
     func testAnOrdinaryReportSendsAsABugWithNoEmail() {
