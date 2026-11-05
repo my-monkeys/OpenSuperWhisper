@@ -159,8 +159,11 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     /// The cap applies to the field's contribution only. The other two lists had no cap before
     /// this feature and dictionaries have no entry limit, so capping the merged list would
     /// truncate an existing user's boost — a regression for someone who changed nothing.
-    private func activeBoostTerms(_ settings: TranscriptionSettings,
-                                  fieldTerms: [String]) -> [String] {
+    /// Internal rather than private so a core test can pin the cross-clip rule directly: clip B
+    /// must never be boosted with clip A's field terms, and the merged list is where that is
+    /// visible without running a model.
+    func activeBoostTerms(_ settings: TranscriptionSettings,
+                          fieldTerms: [String]) -> [String] {
         let dictionary = CoreAccess.preferences.dictionaryBoostTerms
         let base = RecognitionBoost.terms(dictionary: dictionary, snippets: settings.snippetTriggers)
         let allowance = max(0, Self.mergedTermLimit - base.count)

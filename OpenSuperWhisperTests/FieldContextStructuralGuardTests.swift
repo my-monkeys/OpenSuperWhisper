@@ -146,4 +146,28 @@ final class FieldContextStructuralGuardTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(callSites, 1,
                                     "generate no longer calls request(for:system:): the cleanup privacy test inspects dead code")
     }
+
+    /// The secure-field predicate is tested on its own; nothing checked that the readers ask it.
+    /// `SecureTextFields` states that "the three readers that feed a model all ask here", so a
+    /// reader that stopped calling it — or called it without negating the answer — would leave
+    /// every predicate test green while reading a password box.
+    ///
+    /// Blind spot, stated: this covers the three files that are the readers today. A NEW reader
+    /// that never calls the guard is not caught, because finding it would mean enumerating
+    /// "model-facing Accessibility readers", a curated list with the same weakness as the network
+    /// one above.
+    func testTheThreeModelFacingReadersAskTheSecureFieldGuard() throws {
+        let sources = try sources()
+        let readers = [
+            "OpenSuperWhisper/Utils/SourceCapture.swift",
+            "OpenSuperWhisper/Utils/TextAroundCaret.swift",
+            "OpenSuperWhisper/Utils/WatchedField.swift",
+        ]
+
+        for path in readers {
+            let text = try XCTUnwrap(sources[path], "reader not found: \(path)")
+            XCTAssertTrue(text.contains("!SecureTextFields.isSecure("),
+                          "\(path) no longer refuses a secure field, or calls the guard without negating it")
+        }
+    }
 }

@@ -10,7 +10,7 @@ final class FieldContextTermsTests: CoreTestCase {
     private static let known: Set<String> = [
         "the", "and", "is", "here", "met", "at", "about", "it", "run", "now", "call", "then",
         "again", "went", "sang", "repos", "code", "maxim", "parakeet", "charity", "bunny",
-        "monday", "paris",
+        "monday", "paris", "github",
         "der", "mann", "ging", "zu", "hello", "there",
     ]
 
@@ -18,8 +18,9 @@ final class FieldContextTermsTests: CoreTestCase {
         knows: { FieldContextTermsTests.known.contains($0.lowercased()) },
         correctsTypo: { _ in false })
 
-    private func terms(_ text: String, limit: Int = 10) -> [String] {
-        FieldContextTerms.terms(from: text, spelling: spelling, limit: limit)
+    private func terms(_ text: String, capitalMarksNames: Bool = true, limit: Int = 10) -> [String] {
+        FieldContextTerms.terms(from: text, spelling: spelling,
+                                capitalMarksNames: capitalMarksNames, limit: limit)
     }
 
     // MARK: - Nothing to reduce
@@ -138,10 +139,20 @@ final class FieldContextTermsTests: CoreTestCase {
 
     /// German's mid-sentence capitals are grammar. The common nouns must not become terms; the
     /// surname still does.
-    ///
-    /// The guard is what rejects the nouns, not a language flag: a German noun is a known word in
-    /// lowercase, so its capital buys it nothing.
     func testGermanNounsAreNotTerms() {
-        XCTAssertEqual(terms("Der Mann ging zu Cherith"), ["Cherith"])
+        XCTAssertEqual(terms("Der Mann ging zu Cherith", capitalMarksNames: false), ["Cherith"])
+    }
+
+    /// The flag is load-bearing through run candidacy, not through the word it emits.
+    ///
+    /// "Mann" is a known word, so the guard drops it whichever way the flag is set. But with the
+    /// flag on it also satisfies `isVocabulary` for the run "Der Mann GitHub", and the run's
+    /// survivor is "GitHub" — known as written, so `isVocabulary` never counts it alone, but a
+    /// strong shape, so the guard keeps it. With the flag off nothing witnesses the run and
+    /// "GitHub" is never reached: a single word is only ever emitted if it is vocabulary by
+    /// itself.
+    func testCapitalMarksNamesDecidesWhetherARunIsWitnessed() {
+        XCTAssertEqual(terms("Der Mann GitHub ging", capitalMarksNames: true), ["GitHub"])
+        XCTAssertEqual(terms("Der Mann GitHub ging", capitalMarksNames: false), [])
     }
 }

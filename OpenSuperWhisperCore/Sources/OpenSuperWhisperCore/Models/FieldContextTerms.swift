@@ -19,6 +19,7 @@ public enum FieldContextTerms {
     /// can assert rather than whatever a set happens to iterate first.
     public static func terms(from text: String,
                              spelling: DictionaryCandidates.Spelling,
+                             capitalMarksNames: Bool,
                              limit: Int = 10) -> [String] {
         guard !text.isEmpty, limit > 0 else { return [] }
 
@@ -32,14 +33,16 @@ public enum FieldContextTerms {
             // Longest run first: "Claude Code" is one name, not two words.
             for length in stride(from: min(3, words.count - index), through: 1, by: -1) {
                 let run = Array(words[index..<(index + length)])
-                // `capitalMarksNames: true` is the permissive reading, and `survivesFieldGuard`
-                // below is what narrows it. Passing the language's real value here would change
-                // no output — every word whose verdict it changes is one whose lowercase the
-                // dictionary knows, and the guard drops those in either case — so a parameter
-                // that reads like a control but cannot move the answer is not carried.
+                // The flag decides two different things, and only one of them is the word we
+                // emit. `term(from:)` also asks `isVocabulary` whether *any* word in the run is
+                // evidence, and the flag changes that answer for a capitalised word whose
+                // as-written form the dictionary knows. The guard below drops most such words
+                // from the output — but a run they admitted still emits the words that survive,
+                // so the flag reaches the answer through candidacy even when the word that
+                // admitted it is dropped.
                 guard run.allSatisfy({ startsName($0.text) }),
                       let candidate = DictionaryCandidates.term(
-                          from: run, spelling: spelling, capitalMarksNames: true)
+                          from: run, spelling: spelling, capitalMarksNames: capitalMarksNames)
                 else { continue }
 
                 // The guard is per word, so "Code" falls out of "Claude Code" and "Claude"
