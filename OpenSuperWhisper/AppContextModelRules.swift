@@ -131,11 +131,24 @@ final class RecordingContext {
     /// Always assigns, including nil. A field left over from an earlier dictation is never where
     /// this one started, and a setting turned off between two recordings must not keep the old
     /// text alive.
+    /// Test seam: where `captureFocusedText` gets the text. nil in production, which uses the
+    /// Accessibility reader below.
+    ///
+    /// It exists because the behavioural assertion cannot otherwise be made. A headless test gets
+    /// nil from the real reader whether or not it was called, so "the field was not read" would
+    /// pass for the wrong reason — proving the read is skipped for an engine that cannot use it
+    /// needs a reader that can report being called.
+    var focusedTextReader: (() -> String?)?
+
     func captureFocusedText() {
         let prefs = AppPreferences.shared
         guard Self.wantsFieldText(enabled: prefs.useSurroundingTextAsContext,
                                   engine: prefs.selectedEngine) else {
             focusedText = nil
+            return
+        }
+        if let focusedTextReader {
+            focusedText = focusedTextReader()
             return
         }
         // An element captured just now is the one the text is read from: no second lookup.

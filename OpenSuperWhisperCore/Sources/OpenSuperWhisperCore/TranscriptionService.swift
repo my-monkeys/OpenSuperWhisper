@@ -438,6 +438,14 @@ public class TranscriptionService: ObservableObject {
         guard let text = TranscriptionPrompt.surroundingText(
             enabled: settings.useSurroundingTextAsContext, captured: text) else { return nil }
 
+        // The mode, not only the conformance. The capture gate already refused to read the field
+        // for an engine that cannot use it, but that is one layer, and the layer that is easy to
+        // bypass — a test stub, a future engine, a fallback path. Checking the selected id here
+        // means a conforming engine selected as `remote` still receives nothing, so the refusal
+        // holds even when the gate did not run.
+        guard EngineCapabilities.supportsFieldContext(engine: CoreAccess.preferences.selectedEngine)
+        else { return nil }
+
         if engine is ProseContextEngine { return .prose(text) }
         // The spelling pass runs only here: a prose engine returned above, and an engine with
         // nowhere to put a term list returns below without one.
