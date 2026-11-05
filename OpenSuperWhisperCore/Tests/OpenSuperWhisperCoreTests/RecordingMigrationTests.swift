@@ -65,7 +65,8 @@ final class RecordingMigrationTests: CoreTestCase {
         XCTAssertEqual(RecordingStore.makeMigrator().migrations,
                        ["v1", "v2_add_status", "v3_add_source_context", "v4_add_model_used", "v5_add_was_fallback",
                         "v6_add_raw_transcription", "v7_add_transcription_reports", "v8_add_style_used",
-                        "v9_clear_own_recording_source", "v10_add_cleanup_outcome"])
+                        "v9_clear_own_recording_source", "v10_add_cleanup_outcome",
+                        "v11_add_dictation_timing"])
     }
 
     // MARK: - Schema
@@ -145,6 +146,9 @@ final class RecordingMigrationTests: CoreTestCase {
         XCTAssertEqual(try queue.read { db in
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM recordings WHERE rawTranscription IS NOT NULL")
         }, 0)
+        XCTAssertEqual(try queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM recordings WHERE timingJSON IS NOT NULL")
+        }, 0, "an unmeasured row stays unmeasured")
         // The rows themselves, column for column, as they were before the upgrade.
         let oldColumns = Self.expectedColumns.prefix(13).map { $0.split(separator: "|")[1] }.joined(separator: ", ")
         XCTAssertEqual(try Self.rows(queue, columns: oldColumns), before.filter { $0.hasPrefix("recordings: ") })
@@ -205,6 +209,7 @@ final class RecordingMigrationTests: CoreTestCase {
         recording.styleUsed = "Pro"
         recording.cleanupModel = "google/gemini-2.5-flash-lite"
         recording.cleanupError = "401 Invalid API key"
+        recording.timingJSON = #"{"finalizeMs":120,"insertMs":40,"queueWaitMs":15,"totalMs":900,"transcribeAttempts":1,"transcribeMs":600,"version":1}"#
         recording.isRegeneration = true
         try await queue.write { db in try recording.insert(db) }
 
@@ -344,6 +349,7 @@ final class RecordingMigrationTests: CoreTestCase {
         "14|styleUsed|TEXT|0||0",
         "15|cleanupModel|TEXT|0||0",
         "16|cleanupError|TEXT|0||0",
+        "17|timingJSON|TEXT|0||0",
     ]
 
     /// Index name, uniqueness, and indexed columns with their collation.
@@ -362,7 +368,7 @@ final class RecordingMigrationTests: CoreTestCase {
         "progress" DOUBLE NOT NULL DEFAULT 1.0, "sourceFileURL" TEXT, "sourceAppName" TEXT, \
         "sourceWindowTitle" TEXT, "sourceURL" TEXT, "modelUsed" TEXT, \
         "wasFallback" BOOLEAN NOT NULL DEFAULT 0, "rawTranscription" TEXT, "styleUsed" TEXT, \
-        "cleanupModel" TEXT, "cleanupError" TEXT)
+        "cleanupModel" TEXT, "cleanupError" TEXT, "timingJSON" TEXT)
         """
 
     // MARK: - Helpers
@@ -446,6 +452,7 @@ final class RecordingMigrationTests: CoreTestCase {
         XCTAssertEqual(actual.styleUsed, expected.styleUsed, label, file: file, line: line)
         XCTAssertEqual(actual.cleanupModel, expected.cleanupModel, label, file: file, line: line)
         XCTAssertEqual(actual.cleanupError, expected.cleanupError, label, file: file, line: line)
+        XCTAssertEqual(actual.timingJSON, expected.timingJSON, label, file: file, line: line)
         XCTAssertEqual(actual.isRegeneration, expected.isRegeneration, label, file: file, line: line)
     }
 }

@@ -40,6 +40,13 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
     public let appDetails: String
     /// The copy of the audio under `reportsDirectory`, nil when the dictation had none.
     public var audioFileName: String?
+    /// Where the dictation's time went (#262), copied from the recording at save time. A report
+    /// outlives its recording, so a pointer would lose the measurement exactly when a slow
+    /// dictation is being reported. Nil on a row that was never measured.
+    public let timingJSON: String?
+
+    /// The decoded measurement, read from the column every time so the two can never disagree.
+    public var timing: DictationTiming? { DictationTiming.decode(timingJSON) }
 
     public init(id: UUID = UUID(), createdAt: Date = Date(), recording: Recording,
                 problem: Problem, comment: String = "", writtenAs: String? = nil, shouldBe: String? = nil,
@@ -59,6 +66,7 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
         self.duration = recording.duration
         self.languageSetting = languageSetting
         self.appDetails = appDetails
+        self.timingJSON = recording.timingJSON
         self.audioFileName = nil
     }
 

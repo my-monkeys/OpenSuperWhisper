@@ -123,6 +123,7 @@ final class TranscriptionReportTests: CoreTestCase {
             "languageSetting|TEXT|0||0",
             "appDetails|TEXT|1||0",
             "audioFileName|TEXT|0||0",
+            "timingJSON|TEXT|0||0",
         ])
         let foreignKeys = try queue.read { try Row.fetchAll($0, sql: "PRAGMA foreign_key_list(transcription_reports)") }
         XCTAssertTrue(foreignKeys.isEmpty, "a report must not follow its recording out")
