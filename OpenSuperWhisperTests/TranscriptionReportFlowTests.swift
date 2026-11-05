@@ -306,6 +306,28 @@ final class TranscriptionReportsModelTests: XCTestCase {
         await model.delete(saved)
         XCTAssertTrue(model.reports.isEmpty)
     }
+
+    /// Both report surfaces read the row again: the card's copy predates the post-delivery
+    /// timing update, so the saved report must carry the stored total, not the caller's nil one.
+    func testASavedReportCarriesTheStoredTimingNotTheCallersCopy() async throws {
+        var stored = recording()
+        var timing = DictationTiming()
+        timing.transcribeMs = 1_200
+        timing.insertMs = 100
+        timing.totalMs = 4_300
+        stored.timingJSON = timing.encoded
+        try await store.addRecordingSync(stored)
+
+        // The row the feed had before the update landed: same id, no timing.
+        var staleCopy = stored
+        staleCopy.timingJSON = nil
+        try await model.save(ReportDraft(problem: .wrongWord), for: staleCopy)
+
+        let saved = try XCTUnwrap(model.reports.first)
+        XCTAssertEqual(saved.timing?.totalMs, 4_300)
+        XCTAssertEqual(saved.timing?.insertMs, 100)
+        XCTAssertEqual(saved.ending, TranscriptionReport.Ending.insertion)
+    }
 }
 
 /// What the history keeps of a dictation (#168): the engine's text beside the final one.

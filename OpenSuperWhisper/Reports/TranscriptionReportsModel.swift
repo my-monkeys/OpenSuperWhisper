@@ -49,7 +49,7 @@ final class TranscriptionReportsModel: ObservableObject {
     /// is not the same thing: it propagates, and the card reports the save as failed rather than
     /// filing numbers known to be stale.
     func save(_ draft: ReportDraft, for recording: Recording) async throws {
-        let current = (try await store.fetchRecording(id: recording.id)) ?? recording
+        let current = try await store.recordingForReport(recording)
         guard let report = draft.report(for: current, languageSetting: languageSetting(),
                                         appDetails: appDetails()) else { return }
         try await store.saveReport(report, audioFrom: current.url)
@@ -82,5 +82,15 @@ final class TranscriptionReportsModel: ObservableObject {
         try await Task.detached(priority: .userInitiated) {
             try TranscriptionReportArchive.write(reports, to: destination, exportedWith: exportedWith)
         }.value
+    }
+}
+
+extension RecordingStore {
+    /// The row as it stands now, or the caller's copy when retention has removed it. A read
+    /// error propagates: both report surfaces prefer a visible failure to filing numbers known
+    /// to be stale (#262). Shared by the saved report and the one-tap feedback message, so the
+    /// two can never disagree about which value they are reporting.
+    nonisolated func recordingForReport(_ recording: Recording) async throws -> Recording {
+        (try await fetchRecording(id: recording.id)) ?? recording
     }
 }
