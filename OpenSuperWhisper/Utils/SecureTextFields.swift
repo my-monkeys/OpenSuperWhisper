@@ -3,11 +3,14 @@ import ApplicationServices
 /// Whether an Accessibility element is a secure text field — one whose contents are not the
 /// app's to read, whatever it would do with them.
 ///
-/// The comparison lives here and nowhere else. The three readers that feed a model —
-/// `SourceCapture.focusedText`, `TextAroundCaret.focused` and `WatchedField.focused` — each ask
-/// this predicate, so a fourth reader either calls it or is conspicuous in review for not doing
-/// so. It guards the read itself, not what is done with the text afterwards: a password box is
-/// not read and then discarded.
+/// The comparison lives here and nowhere else. Every reader that touches a field asks it —
+/// `SourceCapture.focusedText` (what the transcriber is told), `TextAroundCaret.focused` (how the
+/// dictation is fitted) and `WatchedField.focused` (what the user corrected) — so a fourth reader
+/// either calls it or is conspicuous in review for not doing so.
+///
+/// They share it because a password box is not ours to read for *any* purpose, not because all
+/// three feed a model: only the first does. It guards the read itself, not what is done with the
+/// text afterwards — a password box is not read and then discarded.
 enum SecureTextFields {
 
     /// A missing answer counts as secure: the read is refused unless the element positively
