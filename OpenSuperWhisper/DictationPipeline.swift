@@ -63,6 +63,16 @@ final class DictationPipeline: ObservableObject {
         /// so the text goes here instead of being inserted anywhere. Everything before the
         /// insertion runs as for any dictation.
         let onRecovered: ((String) -> Void)?
+        /// Where this dictation's time went (#262). Stamped by `process(_:)`, which is why this
+        /// is the one mutable field: the test seams replace the dependencies, so a stamp taken
+        /// inside one of them would never execute under test.
+        var timing: DictationTiming
+        /// The enqueue instant, for `queueWaitMs`. Never `startedAt`: a recovered clip carries
+        /// its original recording date, which can be days old.
+        let enqueuedAtUptime: UInt64
+        /// The stop press, for `totalMs`. Nil for a recovered clip, which had no stop press;
+        /// its total is measured from `enqueuedAtUptime` instead.
+        let stoppedAtUptime: UInt64?
     }
 
     /// Dictations waiting in the queue plus the one currently being processed. Drives optional
@@ -88,6 +98,17 @@ final class DictationPipeline: ObservableObject {
     /// Test seam: when set, used instead of the real engine so unit tests can exercise queue
     /// ordering / pendingCount / no-speech / failure paths without a model. nil in production.
     var transcribeOverride: ((URL, Settings) async throws -> String)?
+    /// Test seam: the clock the stage stamps are measured with, so a test can assert exact
+    /// milliseconds. Production uses the house monotonic clock (#262).
+    var uptime: () -> UInt64 = UptimeClock.now
+    /// Test seam: the move that publishes a finished clip, so a test can throw at the one point
+    /// that fails *after* transcription. The failure path keeps the real recorder, which is what
+    /// leaves a row to inspect. nil in production.
+    var moveOverride: ((URL, URL) throws -> Void)?
+    /// Test seam: where every in-process notice goes (see `notify(_:)`). Without it, driving a
+    /// notice path in a test builds an indicator panel in the test process, which is an
+    /// unmeasured hang in the only gate. nil in production.
+    var noticeOverride: ((RecordingState) -> Void)?
     /// Test seams around what happens to the text after transcription, so a test can see the
     /// order of the steps without a language model, an agent or a focused field: the cleanup
     /// model's pass, the hand-off to a waiting agent (text, request id, send), and the insertion
@@ -128,9 +149,17 @@ final class DictationPipeline: ObservableObject {
     /// Enqueue a finished recording for background transcription + paste. Returns immediately; the
     /// work drains on the serial loop. Called on the main actor from the indicator's stop handler.
     /// `seq` is monotonic and assigned here, so append order == recording-start order.
+    ///
+    /// - Parameters:
+    ///   - timing: what the stop handler already measured. A recovered clip passes nothing: it
+    ///     had no stop press, so `finalizeMs` and `machine` stay nil while the rest is stamped
+    ///     here. Its queue wait is still measured from this call, never from `startedAt`, which
+    ///     is the clip's original recording date (#262).
+    ///   - stoppedAtUptime: the stop press, the origin of `totalMs`.
     func enqueue(tempURL: URL?, startedAt: Date, streamedFallback: String,
                  context: ContextSnapshot, modelOption: DictationModelOption?,
                  submitAfterInsert: Bool = false, endedByStopPhrase: Bool = false,
+                 timing: DictationTiming = DictationTiming(), stoppedAtUptime: UInt64? = nil,
                  onRecovered: ((String) -> Void)? = nil) {
         seqCounter += 1
         queue.append(PendingDictation(
@@ -143,7 +172,10 @@ final class DictationPipeline: ObservableObject {
             modelOption: modelOption,
             submitAfterInsert: submitAfterInsert,
             endedByStopPhrase: endedByStopPhrase,
-            onRecovered: onRecovered))
+            onRecovered: onRecovered,
+            timing: timing,
+            enqueuedAtUptime: uptime(),
+            stoppedAtUptime: stoppedAtUptime))
         refreshPendingCount()
         startLoopIfNeeded()
     }
@@ -197,7 +229,11 @@ final class DictationPipeline: ObservableObject {
         pendingCount = queue.count + (inFlight ? 1 : 0)
     }
 
-    private func process(_ item: PendingDictation) async {
+    private func process(_ pending: PendingDictation) async {
+        var item = pending
+        item.timing.queueWaitMs = UptimeClock.milliseconds(from: item.enqueuedAtUptime, to: uptime())
+        var engineAttempts = 0
+        var transcribeStart: UInt64?
         var settings = Settings()
         settings.focusedText = item.context.focusedText
         // Only a dictation expands snippets, so only a dictation is biased toward their triggers.
@@ -209,14 +245,29 @@ final class DictationPipeline: ObservableObject {
             if let clip = item.tempURL {
                 filePassRunning = true
                 defer { filePassRunning = false }
+                engineAttempts = 1
+                let started = uptime()
+                transcribeStart = started
                 rawText = try await Self.retryingOnce(stop: { self.discarding }, onRetry: {
-                    IndicatorWindowManager.shared.flash(.info(String(localized: "Transcription failed, trying once more…")))
+                    engineAttempts = 2
+                    self.notify(.info(String(localized: "Transcription failed, trying once more…")))
                 }) {
                     if let transcribeOverride {
                         return try await transcribeOverride(clip, settings)
                     }
                     return try await self.transcriptionService.transcribeAudio(
                         url: clip, settings: settings, modelOverride: item.modelOption)
+                }
+                item.timing.transcribeMs = UptimeClock.milliseconds(from: started, to: uptime())
+                item.timing.transcribeAttempts = engineAttempts
+                // The engine split is the one stage the pipeline cannot measure itself. Read it
+                // here, before any await can let another transcription overwrite the service's
+                // per-run state — and never when the engine was replaced by a test seam, where
+                // the value would belong to an unrelated run.
+                if let run = Self.engineSplit(replacedEngine: transcribeOverride != nil,
+                                              lastRun: transcriptionService.lastRunTimings) {
+                    item.timing.engineWaitMs = run.engineWaitMs
+                    item.timing.engineLoadMs = run.engineLoadMs
                 }
             } else {
                 // Nothing to transcribe, which is exactly what the branch below already handles:
@@ -262,7 +313,7 @@ final class DictationPipeline: ObservableObject {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !fallback.isEmpty else {
                     discardAudio(item.tempURL)
-                    IndicatorWindowManager.shared.flash(.info("No speech detected"))
+                    notify(.info("No speech detected"))
                     return
                 }
                 text = fallback
@@ -280,6 +331,7 @@ final class DictationPipeline: ObservableObject {
             let generalCleanup = AppPreferences.shared.cleanupEnabled(bundleID: item.context.bundleID, host: host)
             let cleanup: CleanupOutcome
             isCleaningUp = generalCleanup || AppPreferences.shared.appContextFormattingEnabled
+            let cleanupStart = uptime()
             if let cleanupOverride {
                 cleanup = await cleanupOverride(text)
             } else {
@@ -287,6 +339,13 @@ final class DictationPipeline: ObservableObject {
                     text, bundleID: item.context.bundleID, translating: settings.translateToEnglish,
                     writesLists: RichListPaste.cleanupWritesLists(into: item.context.bundleID),
                     style: style.instructions, generalCleanup: generalCleanup)
+            }
+            // Keyed on what the processor reports it did, not on the preference expression that
+            // predicted it: with per-app formatting on and no profile for this app, the pass is
+            // `.notRun` and no time was spent, so `cleanupMs` must stay nil rather than read 0.
+            // A `.failed` pass did run and did cost time, so it is stamped.
+            if cleanup.status != .notRun {
+                item.timing.cleanupMs = UptimeClock.milliseconds(from: cleanupStart, to: uptime())
             }
             isCleaningUp = false
             CleanupSessionStatus.shared.record(cleanup)
@@ -303,9 +362,12 @@ final class DictationPipeline: ObservableObject {
             // Either route asks for the same thing: send Return once the text is in.
             let shouldSubmit = spokenSubmit || item.submitAfterInsert
             let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            // Read once, so the row write and the post-delivery timing update below can never
+            // disagree about whether a row exists (#262).
+            let writesRow = hasText && AppPreferences.shared.saveTranscriptionHistory
 
             var hookAudioPath: String? = nil
-            if hasText && AppPreferences.shared.saveTranscriptionHistory {
+            if writesRow {
                 // Use the record-start time as the row timestamp (when the user actually dictated),
                 // not the later processing time. The id suffix keeps two clips that finish within
                 // the same second from colliding on one on-disk file.
@@ -328,7 +390,11 @@ final class DictationPipeline: ObservableObject {
                 // the words. The hook is told there is no audio, exactly as it already is when
                 // history is off.
                 if let clip = item.tempURL {
-                    try recorder.moveTemporaryRecording(from: clip, to: finalURL)
+                    if let moveOverride {
+                        try moveOverride(clip, finalURL)
+                    } else {
+                        try recorder.moveTemporaryRecording(from: clip, to: finalURL)
+                    }
                     hookAudioPath = finalURL.path
                 }
 
@@ -341,7 +407,8 @@ final class DictationPipeline: ObservableObject {
                     finalURL: finalURL, transcription: text, rawTranscription: original.isEmpty ? nil : original,
                     status: .completed, progress: 1.0, context: item.context,
                     modelUsed: modelUsed, wasFallback: wasFallback,
-                    styleUsed: HistoryRestyle.label(for: style, cleanedUp: generalCleanup), cleanup: cleanup)
+                    styleUsed: HistoryRestyle.label(for: style, cleanedUp: generalCleanup), cleanup: cleanup,
+                    timing: item.timing)
             } else if item.onRecovered == nil {
                 discardAudio(item.tempURL)
             }
@@ -351,6 +418,10 @@ final class DictationPipeline: ObservableObject {
             if let onRecovered = item.onRecovered {
                 if hasText { onRecovered(text) }
                 discardAudio(item.tempURL)
+                item.timing.totalMs = totalMs(for: item)
+                if writesRow {
+                    await recordingStore.updateTimingSync(item.id, timingJSON: item.timing.encoded)
+                }
                 return
             }
 
@@ -366,11 +437,18 @@ final class DictationPipeline: ObservableObject {
                     // fall back to an older paste that missed.
                     TranscriptInserter.noteNewerTranscription()
                 }
+                // Nothing was inserted into a field, so `insertMs` stays nil; the hand-off is
+                // still this dictation's terminal point.
+                item.timing.totalMs = totalMs(for: item)
+                if writesRow {
+                    await recordingStore.updateTimingSync(item.id, timingJSON: item.timing.encoded)
+                }
                 return
             }
 
             let delivery: Delivery
             let submitting = shouldSubmit && AppPreferences.shared.autoPasteTranscription
+            let insertionStart = uptime()
             if hasText, let deliverOverride {
                 delivery = await deliverOverride(text, submitting)
             } else if hasText {
@@ -382,6 +460,15 @@ final class DictationPipeline: ObservableObject {
             } else {
                 delivery = .inserted
             }
+            // Only a real insertion: `.held` (no editable target, a cut-short paste, a discard),
+            // `.onClipboardAnnounced` (text on the clipboard, never in a field) and auto-paste
+            // off all leave `insertMs` nil, because nothing was inserted.
+            if hasText, delivery == .inserted, AppPreferences.shared.autoPasteTranscription {
+                item.timing.insertMs = UptimeClock.milliseconds(from: insertionStart, to: uptime())
+            }
+            // The dictation ends when the insertion returns. The post-record hook and the submit
+            // settle below happen after the text is in, so they must not inflate the total.
+            item.timing.totalMs = totalMs(for: item)
             if hasText {
                 PostRecordHook.runIfEnabled(text: text, rawText: engineText,
                                             bundleID: item.context.bundleID,
@@ -402,14 +489,21 @@ final class DictationPipeline: ObservableObject {
             // Said after the insertion, so the notice never delays the words, and before the
             // clipboard one below, which takes the bubble over because it asks for an action.
             if let reason = cleanup.failureReason {
-                IndicatorWindowManager.shared.flash(
-                    .error(String(localized: "Cleanup failed: \(reason). Pasted as dictated.")))
+                notify(.error(String(localized: "Cleanup failed: \(reason). Pasted as dictated.")))
             }
 
             // No editable target was found, or the app it was dictated into has gone — the text is
             // on the clipboard; tell the user to paste it.
             if delivery == .onClipboardAnnounced {
-                IndicatorWindowManager.shared.flash(.info("Copied — press ⌘V to paste"))
+                notify(.info("Copied — press ⌘V to paste"))
+            }
+
+            // The row was written before the insertion existed, so the last two stages land here.
+            // The whole blob is re-encoded: patching keys into the stored JSON could half-merge.
+            // No row means nothing to update: history off must not cost a write that matches
+            // zero rows.
+            if writesRow {
+                await recordingStore.updateTimingSync(item.id, timingJSON: item.timing.encoded)
             }
         } catch {
             print("Dictation transcription failed: \(error)")
@@ -417,6 +511,20 @@ final class DictationPipeline: ObservableObject {
             // its own left a user with nine failures in ten and nothing to report but that.
             let reason = Self.failureReason(error)
             Diag.mark("dictation failed: \(reason)")
+            // Fill only what the run never recorded. A throw AFTER the transcribe block must not
+            // re-stamp an already-measured span with a window that now includes the cleanup and
+            // the failed step, nor re-read the engine split after an await, when it may belong to
+            // a different run. A failure before that block still gets its span measured (#262).
+            if item.timing.transcribeMs == nil, let transcribeStart {
+                item.timing.transcribeMs = UptimeClock.milliseconds(from: transcribeStart, to: uptime())
+                item.timing.transcribeAttempts = engineAttempts
+                if let run = Self.engineSplit(replacedEngine: transcribeOverride != nil,
+                                              lastRun: transcriptionService.lastRunTimings) {
+                    item.timing.engineWaitMs = run.engineWaitMs
+                    item.timing.engineLoadMs = run.engineLoadMs
+                }
+            }
+            item.timing.totalMs = totalMs(for: item)
             // Don't lose the audio on failure. When history is on, keep the recording with a .failed
             // status + retry message so it shows in the log and can be re-run with the regenerate (↻)
             // button. Otherwise the clip stays in `unfinished/`, offered by Home until it is
@@ -431,15 +539,35 @@ final class DictationPipeline: ObservableObject {
                     finalURL: saved.url,
                     transcription: String(localized: "Transcription failed: \(reason). Click ↻ to try again."),
                     rawTranscription: nil, status: .failed, progress: 0, context: item.context,
-                    modelUsed: nil, wasFallback: false)
+                    modelUsed: nil, wasFallback: false, timing: item.timing)
             } else if discarding {
                 discardAudio(item.tempURL)
             } else {
                 keptForRecovery = item.tempURL != nil
             }
-            IndicatorWindowManager.shared.flash(.error(keptForRecovery
+            let notice = keptForRecovery
                 ? String(localized: "Transcription failed: \(reason). Kept in Home to try again.")
-                : String(localized: "Transcription failed: \(reason)")))
+                : String(localized: "Transcription failed: \(reason)")
+            notify(.error(notice))
+        }
+    }
+
+    /// The dictation's terminal stamp: the stop press → now, or the enqueue → now for a clip
+    /// recovered from `unfinished/`, which was never stopped by the user in this run.
+    private func totalMs(for item: PendingDictation) -> Int {
+        UptimeClock.milliseconds(from: item.stoppedAtUptime ?? item.enqueuedAtUptime, to: uptime())
+    }
+
+    /// Sends a bubble notice, through the test seam when one is installed.
+    ///
+    /// Every in-process notice goes through here. `flash` with no view model builds a new view
+    /// model and a panel, and the retry and no-speech paths are exactly what a pipeline test
+    /// drives — a panel in the test process is an unmeasured hang in the only gate.
+    private func notify(_ state: RecordingState) {
+        if let noticeOverride {
+            noticeOverride(state)
+        } else {
+            IndicatorWindowManager.shared.flash(state)
         }
     }
 
@@ -450,6 +578,17 @@ final class DictationPipeline: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "."))
         return text.count > 120 ? String(text.prefix(119)) + "…" : text
+    }
+
+    /// The engine split this dictation may claim, or nil when a test seam replaced the engine:
+    /// the service's per-run snapshot then describes some other run, and attaching it would
+    /// label this dictation with a foreign wait and load.
+    ///
+    /// Pure, so the decision is testable on its own rather than only through its nil outcome in
+    /// a process where the snapshot happens to be nil anyway.
+    nonisolated static func engineSplit(replacedEngine: Bool,
+                                        lastRun: TranscriptionService.RunTimings?) -> TranscriptionService.RunTimings? {
+        replacedEngine ? nil : lastRun
     }
 
     /// Runs a transcription, and once more if it throws. Engine failures are mostly passing ones
@@ -481,12 +620,12 @@ final class DictationPipeline: ObservableObject {
                                 status: RecordingStatus, progress: Float,
                                 context: ContextSnapshot,
                                 modelUsed: String?, wasFallback: Bool, styleUsed: String? = nil,
-                                cleanup: CleanupOutcome? = nil) async {
+                                cleanup: CleanupOutcome? = nil, timing: DictationTiming) async {
         // `modelUsed`/`wasFallback` are captured by the caller right after `transcribeAudio`
         // returns — NOT read here, because the `await` below can suspend long enough for another
         // transcription to overwrite them on the shared service. (parallel-recording review)
         let realDuration = await IndicatorViewModel.audioDuration(of: finalURL)
-        recordingStore.addRecording(Recording(
+        let row = Recording(
             id: id,
             timestamp: timestamp,
             fileName: fileName,
@@ -503,7 +642,17 @@ final class DictationPipeline: ObservableObject {
             rawTranscription: rawTranscription,
             styleUsed: styleUsed,
             cleanupModel: cleanup?.model,
-            cleanupError: cleanup?.failureReason))
+            cleanupError: cleanup?.failureReason,
+            timingJSON: timing.encoded)
+        // Awaited, not fire-and-forget: the agent-reply and recovered-clip branches reach the
+        // post-delivery timing update with only synchronous work in between, so an unawaited
+        // insert could be overtaken by that UPDATE and lose the whole blob (#262). Retention
+        // stays off the critical path — it must not hold up the text.
+        do {
+            try await recordingStore.addRecordingSync(row)
+        } catch {
+            print("Failed to add recording: \(error)")
+        }
     }
 
     /// Move a temp recording to its permanent location after a FAILED transcription so the audio

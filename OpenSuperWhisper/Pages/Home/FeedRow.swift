@@ -274,8 +274,11 @@ private struct FeedRowActions: View {
     @State private var showsPanel = false
 
     private var canPlayAndCopy: Bool { !recording.isPending && recording.status != .failed }
+    /// A failed dictation is reportable too: a slow one that then failed is exactly what #262 is
+    /// about, and its row already carries the engine's reason as the transcription text.
     private var canReport: Bool {
-        recording.status == .completed && !recording.transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        (recording.status == .completed || recording.status == .failed)
+            && !recording.transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     private var canRegenerate: Bool { recording.status == .completed || recording.status == .failed }
     private var deleteAlwaysVisible: Bool {

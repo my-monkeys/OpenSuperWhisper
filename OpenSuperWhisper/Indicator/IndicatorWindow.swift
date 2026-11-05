@@ -48,6 +48,12 @@ class IndicatorViewModel: ObservableObject {
     /// background now, so the next recording may already have started by then.
     var submitAfterInsert = false
 
+    /// Test seams for the stop instant (#262): the clock the stage stamps use, and the recorder's
+    /// stop, so a test can pin `finalizeMs` and `machine` without a microphone. Production uses
+    /// the house monotonic clock and the real recorder.
+    var uptime: () -> UInt64 = UptimeClock.now
+    var stopRecordingOverride: (() -> AudioRecorder.StopOutcome)?
+
     var delegate: IndicatorViewDelegate?
     private var blinkTimer: Timer?
     private var soundCheck: Timer?
@@ -282,6 +288,11 @@ class IndicatorViewModel: ObservableObject {
     }
 
     func startDecoding() {
+        // The stop press is the origin of the whole measurement (#262), so it is taken on the
+        // first line: everything below it — cancel-confirmation reset, the live-preview hand-off,
+        // the agent-reply disarm — is time the user waits after letting go.
+        let stopMark = uptime()
+        var timing = DictationTiming()
         resetCancelConfirmation()
         stopBlinking()
         stopListeningForSound()
@@ -302,7 +313,10 @@ class IndicatorViewModel: ObservableObject {
             Task { await StreamingTranscriptionController.shared.cancel() }
         }
 
-        let outcome = recorder.stopRecording()
+        let outcome = stopRecordingOverride?() ?? recorder.stopRecording()
+        // Captured after the microphone is closed, so the snapshot never sits in front of the
+        // stop; it is still the state at the stop instant, which is what #262 asks about.
+        timing.machine = MachineState.captureNow()
         let tempURL = outcome.url
         if tempURL == nil {
             // The live-transcription tap and the recorder are separate consumers of the
@@ -342,6 +356,8 @@ class IndicatorViewModel: ObservableObject {
             focusTarget: ctx.focusTarget,
             agentReplyID: agentReplyID)
         let modelOption = ModelCatalog.activeOption()
+        // Stop press → the clip is on its way. Everything between is recorder finalisation.
+        timing.finalizeMs = UptimeClock.milliseconds(from: stopMark, to: uptime())
 
         // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
         // queue in recording-start order, so the user can immediately start the next recording
@@ -353,7 +369,9 @@ class IndicatorViewModel: ObservableObject {
             context: snapshot,
             modelOption: modelOption,
             submitAfterInsert: submitAfterInsert,
-            endedByStopPhrase: endedByStopPhrase)
+            endedByStopPhrase: endedByStopPhrase,
+            timing: timing,
+            stoppedAtUptime: stopMark)
         endedByStopPhrase = false
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.

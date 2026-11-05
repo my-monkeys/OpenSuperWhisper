@@ -42,6 +42,7 @@ enum ReportIssueLink {
         lines += ["", "- Model: \(modelLine(for: report))"]
         if let language = report.languageSetting { lines.append("- Language setting: \(language)") }
         lines.append("- Length: \(String(format: "%.1f", report.duration)) s")
+        lines.append("- Timing: \(timingLine(for: report))")
         lines.append("- App: \(report.appDetails)")
         lines.append("")
         if let raw = report.distinctRawText {
@@ -58,6 +59,55 @@ enum ReportIssueLink {
     private static func modelLine(for report: TranscriptionReport) -> String {
         let model = report.modelUsed ?? "unknown"
         return report.wasFallback ? "\(model) (local fallback, the server was unreachable)" : model
+    }
+
+    /// Where the wall-clock time went, in the same English the rest of the body uses. Inside the
+    /// parentheses the unit is implied by the leading total; a stage that did not run is an em
+    /// dash, which is a different fact from zero. The engine split is nested inside `transcribe`
+    /// on purpose: both spans are measured within it, so listing them as siblings would read as
+    /// a partition and double-count against the total.
+    private static func timingLine(for report: TranscriptionReport) -> String {
+        guard let timing = report.timing else { return "not measured" }
+        let transcribe = timing.transcribeMs.map {
+            "transcribe \(value($0)) [engine wait \(value(timing.engineWaitMs)), "
+                + "model load \(value(timing.engineLoadMs))]"
+        } ?? "transcribe —"
+        let stages = [
+            stage("finalize", timing.finalizeMs),
+            stage("queue", timing.queueWaitMs),
+            transcribe,
+            stage("cleanup", timing.cleanupMs),
+            stage("insert", timing.insertMs),
+        ].joined(separator: ", ")
+        let total = timing.totalMs.map { String(format: "%.1f", Double($0) / 1000) + " s" } ?? "—"
+        var line = "total \(total) (\(stages))"
+        if let attempts = timing.transcribeAttempts { line += " · attempts \(attempts)" }
+        if let machine = timing.machine {
+            line += " · thermal \(machine.thermalState) · low power \(machine.lowPowerMode ? "on" : "off")"
+        }
+        if let ending = report.ending { line += " · ended \(endingLabel(ending))" }
+        line += " · measured at dictation time"
+        return line
+    }
+
+    private static func stage(_ name: String, _ milliseconds: Int?) -> String {
+        "\(name) \(value(milliseconds))"
+    }
+
+    private static func value(_ milliseconds: Int?) -> String {
+        guard let milliseconds else { return "—" }
+        return String(format: "%.1f", Double(milliseconds) / 1000)
+    }
+
+    /// The terminal point the data can support: a failure is known from the row's status, an
+    /// insertion from a measured insertion. A completed row with no insertion is named as such,
+    /// never guessed into a hand-off the report cannot distinguish.
+    private static func endingLabel(_ ending: TranscriptionReport.Ending) -> String {
+        switch ending {
+        case .insertion: return "insertion"
+        case .noInsertion: return "no insertion"
+        case .failure: return "failure"
+        }
     }
 
     /// A fence longer than any run of tildes in the text, so nothing in a dictation can close it.

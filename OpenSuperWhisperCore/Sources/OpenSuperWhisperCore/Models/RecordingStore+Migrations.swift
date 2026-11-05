@@ -113,6 +113,36 @@ extension RecordingStore {
             }
         }
 
+        // Nullable and versioned inside the value: a row written before this build has no
+        // measurement, and an older build that opens the file afterwards still writes without
+        // knowing the column. The report gets its own copy because a report outlives its
+        // recording by design (#262).
+        migrator.registerMigration("v11_add_dictation_timing") { db in
+            let recordingColumns = try db.columns(in: Recording.databaseTableName).map { $0.name }
+            if !recordingColumns.contains("timingJSON") {
+                try db.alter(table: Recording.databaseTableName) { t in
+                    t.add(column: "timingJSON", .text)
+                }
+            }
+            let reportColumns = try db.columns(in: TranscriptionReport.databaseTableName).map { $0.name }
+            if !reportColumns.contains("timingJSON") {
+                try db.alter(table: TranscriptionReport.databaseTableName) { t in
+                    t.add(column: "timingJSON", .text)
+                }
+            }
+        }
+
+        // Appended after v11 rather than folded into it: v11 is already in this branch, and a
+        // database that recorded it would never receive a column added to the same migration.
+        migrator.registerMigration("v12_add_report_ending") { db in
+            let reportColumns = try db.columns(in: TranscriptionReport.databaseTableName).map { $0.name }
+            if !reportColumns.contains("ending") {
+                try db.alter(table: TranscriptionReport.databaseTableName) { t in
+                    t.add(column: "ending", .text)
+                }
+            }
+        }
+
         return migrator
     }
 }

@@ -6,8 +6,15 @@ import OpenSuperWhisperCore
 /// stay on this Mac, and only what the person already chose to report goes out.
 enum DictationReportSender {
 
+    /// Main-actor bound because it reads `RecordingStore.shared` by id before building the
+    /// message; the network await below does not hold the actor.
+    @MainActor
     static func send(recording: Recording, problem: TranscriptionReport.Problem?, comment: String) async throws {
-        let submission = DictationReport.submission(for: draft(recording: recording, problem: problem, comment: comment))
+        // Same re-read as the saved report: the card's copy predates the post-delivery timing
+        // update, so sending it would omit `total` from the timing line. A read error reaches
+        // the card's "Couldn't send — retry" state instead of sending stale numbers.
+        let current = try await RecordingStore.shared.recordingForReport(recording)
+        let submission = DictationReport.submission(for: draft(recording: current, problem: problem, comment: comment))
         try await FeedbackSender().send(submission)
     }
 
@@ -34,6 +41,7 @@ enum DictationReportSender {
             output: recording.transcription,
             rawOutput: recording.distinctOriginal,
             appVersion: version,
-            osVersion: osString)
+            osVersion: osString,
+            timing: recording.timing)
     }
 }
