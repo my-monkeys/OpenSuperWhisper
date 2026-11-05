@@ -72,32 +72,30 @@ public enum EngineCapabilities {
         translationCapableEngines.contains(engine)
     }
 
-    /// The one enumerable list of engine ids, for the mode table and the totality test. The
-    /// stored ids are a persisted contract, so they stay strings; the test pins this list against
-    /// `TranscriptionService.EngineKind` so it cannot drift into a second hand-maintained array.
-    public static let allEngineIds: [String] = ["whisper", "fluidaudio", "sensevoice", "remote", "apple"]
+    /// The mode table: the single enumeration of every engine id and what it can do with the
+    /// field's text (#89). `allEngineIds` is derived from it, so an id cannot exist in one place
+    /// and be missing from the other — the drift the old pair of hand-maintained lists allowed.
+    ///
+    /// The stored ids are a persisted contract, so they stay strings.
+    static let fieldContextModes: [String: FieldContextMode] = [
+        "whisper": .prose,
+        // A vocabulary list, reduced from the field's prose.
+        "fluidaudio": .terms,
+        // Not for want of a prompt: its prompt is posted to someone else's server, and this text
+        // is the user's own writing.
+        "remote": .remoteExcluded,
+        "sensevoice": .none,
+        "apple": .none,
+    ]
 
-    /// What one engine can do with the focused field's text (#89). An id this build does not
-    /// know gets `.none`: it is not this table's job to guess, and a wrong `.prose` would read
-    /// someone's document for nothing.
+    /// Every engine id this build knows, sorted so the order does not depend on hashing.
+    public static let allEngineIds: [String] = fieldContextModes.keys.sorted()
+
+    /// What one engine can do with the focused field's text (#89). An id this table does not
+    /// describe has nowhere to put it: `.none` rather than a guess, because a wrong `.prose`
+    /// would read someone's document for nothing.
     public static func fieldContextMode(for engine: String) -> FieldContextMode {
-        switch engine {
-        case "whisper":
-            return .prose
-        case "fluidaudio":
-            // A vocabulary list, reduced from the field's prose. It is flipped in the same
-            // commit as the engine that consumes it: a capable switch with nothing behind it is
-            // the #126 failure.
-            return .terms
-        case "remote":
-            // Not for want of a prompt: its prompt is posted to someone else's server, and this
-            // text is the user's own writing.
-            return .remoteExcluded
-        case "sensevoice", "apple":
-            return .none
-        default:
-            return .none
-        }
+        fieldContextModes[engine] ?? .none
     }
 
     /// The single gate for the Settings switch and the capture path.
