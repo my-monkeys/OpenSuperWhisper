@@ -104,14 +104,16 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
     }
 
     private static func draft(from crash: MXCrashDiagnostic) -> CrashReportDraft {
-        CrashReportDraft(kind: .crash, cause: cause(of: crash), frames: frames(of: crash.callStackTree),
-                         appVersion: crash.applicationVersion, osVersion: crash.metaData.osVersion)
+        let stack = parsedStack(of: crash.callStackTree)
+        return CrashReportDraft(kind: .crash, cause: cause(of: crash), frames: stack.frames, images: stack.images,
+                                appVersion: crash.applicationVersion, osVersion: crash.metaData.osVersion)
     }
 
     private static func draft(from hang: MXHangDiagnostic) -> CrashReportDraft {
-        CrashReportDraft(kind: .hang, cause: "hang for \(hang.hangDuration.value) \(hang.hangDuration.unit.symbol)",
-                         frames: frames(of: hang.callStackTree),
-                         appVersion: hang.applicationVersion, osVersion: hang.metaData.osVersion)
+        let stack = parsedStack(of: hang.callStackTree)
+        return CrashReportDraft(kind: .hang, cause: "hang for \(hang.hangDuration.value) \(hang.hangDuration.unit.symbol)",
+                                frames: stack.frames, images: stack.images,
+                                appVersion: hang.applicationVersion, osVersion: hang.metaData.osVersion)
     }
 
     private static func cause(of crash: MXCrashDiagnostic) -> String {
@@ -123,24 +125,7 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
         return parts.isEmpty ? "crash" : parts.joined(separator: " · ")
     }
 
-    /// The attributed thread's frames, outermost first, each a binary and an address. Parsed from
-    /// the tree's own JSON because `MXCallStackTree` exposes nothing else; anything unexpected in
-    /// the shape yields fewer frames rather than a throw, since a report with a short stack still
-    /// helps and one that crashes the reporter helps no one.
-    private static func frames(of tree: MXCallStackTree, limit: Int = 60) -> [String] {
-        guard let root = try? JSONSerialization.jsonObject(with: tree.jsonRepresentation()) as? [String: Any],
-              let stacks = root["callStacks"] as? [[String: Any]] else { return [] }
-        let attributed = stacks.first { ($0["threadAttributed"] as? Bool) == true } ?? stacks.first
-        guard let rootFrames = attributed?["callStackRootFrames"] as? [[String: Any]] else { return [] }
-        var out: [String] = []
-        func walk(_ frame: [String: Any]) {
-            guard out.count < limit else { return }
-            let binary = frame["binaryName"] as? String ?? "?"
-            let address = frame["address"] as? UInt64 ?? (frame["address"] as? NSNumber)?.uint64Value ?? 0
-            out.append("\(binary) 0x\(String(address, radix: 16))")
-            for sub in frame["subFrames"] as? [[String: Any]] ?? [] { walk(sub) }
-        }
-        rootFrames.forEach(walk)
-        return out
+    private static func parsedStack(of tree: MXCallStackTree) -> ParsedCallStack {
+        CallStackTree.parse(tree.jsonRepresentation())
     }
 }
