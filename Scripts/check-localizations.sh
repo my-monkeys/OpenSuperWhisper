@@ -19,15 +19,17 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CATALOG="${1:-$ROOT/OpenSuperWhisper/Localizable.xcstrings}"
+PROJECT="${2:-$ROOT/OpenSuperWhisper.xcodeproj/project.pbxproj}"
 
 [[ -f "$CATALOG" ]] || { echo "check-localizations: no catalog at $CATALOG" >&2; exit 2; }
+[[ -f "$PROJECT" ]] || { echo "check-localizations: no project at $PROJECT" >&2; exit 2; }
 
-python3 - "$CATALOG" <<'PY'
+python3 - "$CATALOG" "$PROJECT" <<'PY'
 import json
 import sys
 
 path = sys.argv[1]
-locales = ["de", "es", "fr", "it", "pt-BR", "vi", "zh-Hans"]
+project = sys.argv[2]
 KNOWN_KEY = "Recognition"
 
 try:
@@ -35,6 +37,34 @@ try:
         catalog = json.load(handle)
 except (OSError, ValueError) as error:
     sys.exit(f"check-localizations: cannot read {path}: {error}")
+
+# Which locales to require comes from the project's knownRegions, not from a list here. A region
+# added to the project but not to this script would leave that language silently unchecked while
+# the run still reported success — a check that passes on an input it never looked at.
+source_language = catalog.get("sourceLanguage") or "en"
+regions = []
+inside = False
+try:
+    with open(project, encoding="utf-8") as handle:
+        for line in handle:
+            if "knownRegions = (" in line:
+                inside = True
+                continue
+            if inside:
+                if line.strip().startswith(")"):
+                    break
+                value = line.strip().rstrip(",").strip().strip('"')
+                if value:
+                    regions.append(value)
+except OSError as error:
+    sys.exit(f"check-localizations: cannot read {project}: {error}")
+
+# "Base" is the development-region placeholder, not a translation; the source language needs no
+# translation either.
+locales = [r for r in regions if r not in ("Base", source_language)]
+if not locales:
+    sys.exit("check-localizations: no target locales found in knownRegions — the parse or the "
+             "project moved, and an empty locale list would check nothing")
 
 strings = catalog.get("strings")
 # Positive controls. A completeness check that passes on an empty or mis-read catalog is worse
