@@ -282,6 +282,12 @@ class IndicatorViewModel: ObservableObject {
     }
 
     func startDecoding() {
+        // The stop press is the origin of the whole measurement (#262), so it is taken on the
+        // first line: everything below it — cancel-confirmation reset, the live-preview hand-off,
+        // the agent-reply disarm — is time the user waits after letting go.
+        let stopMark = UptimeClock.now()
+        var timing = DictationTiming()
+        timing.machine = MachineState.captureNow()
         resetCancelConfirmation()
         stopBlinking()
         stopListeningForSound()
@@ -342,6 +348,8 @@ class IndicatorViewModel: ObservableObject {
             focusTarget: ctx.focusTarget,
             agentReplyID: agentReplyID)
         let modelOption = ModelCatalog.activeOption()
+        // Stop press → the clip is on its way. Everything between is recorder finalisation.
+        timing.finalizeMs = UptimeClock.milliseconds(from: stopMark)
 
         // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
         // queue in recording-start order, so the user can immediately start the next recording
@@ -353,7 +361,9 @@ class IndicatorViewModel: ObservableObject {
             context: snapshot,
             modelOption: modelOption,
             submitAfterInsert: submitAfterInsert,
-            endedByStopPhrase: endedByStopPhrase)
+            endedByStopPhrase: endedByStopPhrase,
+            timing: timing,
+            stoppedAtUptime: stopMark)
         endedByStopPhrase = false
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.
