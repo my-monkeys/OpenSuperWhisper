@@ -159,11 +159,13 @@ public class TranscriptionQueue: ObservableObject {
             return
         }
 
+        // A rerun starts a new engine run: the previous measurement must not survive it (#262).
         await recordingStore.updateRecordingStatusOnly(
             recording.id,
             progress: 0.0,
             status: .pending,
-            isRegeneration: true
+            isRegeneration: true,
+            clearTiming: true
         )
 
         startProcessingQueue()
