@@ -12,10 +12,17 @@ import Foundation
 /// otherwise be pushed toward phrases nothing then replaces.
 public enum RecognitionBoost {
 
-    /// Both lists, the dictionary first, without repeating a term that differs only in case.
-    public static func terms(dictionary: [String], snippets: [String]) -> [String] {
+    /// The lists in priority order — dictionary, snippets, then the field — without repeating a
+    /// term that differs only in case.
+    ///
+    /// The field's terms come last because they are the weakest evidence: a name the user has
+    /// actually put in their dictionary should win the spelling when the two disagree. They are
+    /// also the only list that changes per dictation, which is why the caller caps them against
+    /// what the first two already cost rather than capping the merged list (#89).
+    public static func terms(dictionary: [String], snippets: [String],
+                             field: [String] = []) -> [String] {
         var seen = Set<String>()
-        return (dictionary + snippets).filter { seen.insert($0.lowercased()).inserted }
+        return (dictionary + snippets + field).filter { seen.insert($0.lowercased()).inserted }
     }
 }
 
