@@ -98,9 +98,10 @@ final class DictationTimingTests: CoreTestCase {
         XCTAssertEqual(UptimeClock.milliseconds(from: 5, to: 5), 0)
     }
 
-    /// A reversed pair must not trap and must not produce a negative duration.
+    /// A reversed pair is 0. Not merely "not negative": an unsigned subtraction would wrap to a
+    /// number of centuries, and a reader would take that for a measurement.
     func testMillisecondsIsWrapperSafe() {
-        XCTAssertGreaterThanOrEqual(UptimeClock.milliseconds(from: 10, to: 0), 0)
+        XCTAssertEqual(UptimeClock.milliseconds(from: 10, to: 0), 0)
     }
 
     // MARK: - Machine state

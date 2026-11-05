@@ -331,9 +331,6 @@ final class DictationPipeline: ObservableObject {
             let generalCleanup = AppPreferences.shared.cleanupEnabled(bundleID: item.context.bundleID, host: host)
             let cleanup: CleanupOutcome
             isCleaningUp = generalCleanup || AppPreferences.shared.appContextFormattingEnabled
-            // `isCleaningUp` is true only when a pass was actually due, so it is also the
-            // "was it run" signal: no pass due leaves cleanupMs nil, not 0 (#262).
-            let cleanupRan = isCleaningUp
             let cleanupStart = uptime()
             if let cleanupOverride {
                 cleanup = await cleanupOverride(text)
@@ -343,7 +340,11 @@ final class DictationPipeline: ObservableObject {
                     writesLists: RichListPaste.cleanupWritesLists(into: item.context.bundleID),
                     style: style.instructions, generalCleanup: generalCleanup)
             }
-            if cleanupRan {
+            // Keyed on what the processor reports it did, not on the preference expression that
+            // predicted it: with per-app formatting on and no profile for this app, the pass is
+            // `.notRun` and no time was spent, so `cleanupMs` must stay nil rather than read 0.
+            // A `.failed` pass did run and did cost time, so it is stamped.
+            if cleanup.status != .notRun {
                 item.timing.cleanupMs = UptimeClock.milliseconds(from: cleanupStart, to: uptime())
             }
             isCleaningUp = false
