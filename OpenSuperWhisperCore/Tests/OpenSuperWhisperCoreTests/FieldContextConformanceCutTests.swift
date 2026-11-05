@@ -11,11 +11,12 @@ import XCTest
 /// These tests drive `TranscriptionService` through its `engineBuilder` seam with fake engines and
 /// record which method each one was called through.
 ///
-/// Where the layers sit, so nothing here is read as more than it is: the SERVICE's cut is
-/// conformance — an engine that does not declare a context protocol is never handed one. The
-/// engine-era *mode* gate is upstream, in the capture path (`wantsFieldText`), and is tested in
-/// the hosted `FieldContextGateTests`. This file does not re-test that gate; it tests what happens
-/// once a context has been resolved.
+/// Where the layers sit: the service refuses context twice over — once by the selected engine's
+/// mode (`EngineCapabilities.supportsFieldContext`), once by the engine's declared conformance.
+/// The mode check is the layer that holds when the capture gate did not run (a stub, a fallback
+/// path, a future engine); the conformance check is the layer that holds when a capability is
+/// mis-declared. The capture gate itself is tested in the hosted `FieldContextGateTests`; this
+/// file tests the dispatch.
 @MainActor
 final class FieldContextConformanceCutTests: CoreTestCase {
 
@@ -132,6 +133,25 @@ final class FieldContextConformanceCutTests: CoreTestCase {
             url: Fixtures.jfkWav, settings: settings(fieldContext: true),
             capturedFieldText: "a private sentence")
 
+        XCTAssertEqual(engine.recorder.plainCalls, 1)
+        XCTAssertEqual(engine.recorder.contextCalls, 0)
+    }
+
+    /// The mode, not only the conformance — the case where both layers disagree.
+    ///
+    /// A conforming engine selected as `remote`, handed the captured text directly: the capture
+    /// gate would have refused to read the field for this engine, but the text is here anyway, so
+    /// the dispatch has to refuse it too. Mutation: drop the mode guard from
+    /// `resolveFieldContext` and the prose is delivered — this reddens and nothing else does.
+    func testAConformingEngineSelectedAsRemoteReceivesNothing() async throws {
+        CoreTestEnvironment.preferences.selectedEngine = "remote"
+        let engine = ProseStub()
+
+        _ = try await service(engine).transcribeAudio(
+            url: Fixtures.jfkWav, settings: settings(fieldContext: true),
+            capturedFieldText: "a private sentence")
+
+        XCTAssertNil(engine.recorder.proseContext, "the remote selection did not stop the context")
         XCTAssertEqual(engine.recorder.plainCalls, 1)
         XCTAssertEqual(engine.recorder.contextCalls, 0)
     }
