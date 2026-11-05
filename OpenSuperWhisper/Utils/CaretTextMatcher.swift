@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// Fits a dictation to the text around the caret of the field it goes into (#163).
 ///
@@ -52,12 +53,10 @@ enum CaretTextMatcher {
     /// apart from the engine's sentence start. Their case is left as the engine wrote it. An
     /// unknown language is fitted: the guess is the caller's to make.
     static func adjustsCase(language: String?) -> Bool {
-        guard let language else { return true }
-        let primary = language.lowercased().split(whereSeparator: { $0 == "-" || $0 == "_" }).first
-        return !nounCapitalisingLanguages.contains(primary.map(String.init) ?? "")
+        // One implementation, in core, because the field-term reducer needs the same answer and
+        // cannot reach an AppKit-side helper.
+        LanguageUtil.marksNamesWithCapitals(language)
     }
-
-    static let nounCapitalisingLanguages: Set<String> = ["de", "lb", "gsw"]
 
     /// The first letter as the place calls for: the case of the first letter of a selection
     /// being replaced, else lowercase when the caret is inside a sentence.
