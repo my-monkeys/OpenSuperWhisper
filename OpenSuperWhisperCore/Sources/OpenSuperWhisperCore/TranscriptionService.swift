@@ -33,6 +33,33 @@ public class TranscriptionService: ObservableObject {
     /// shows the real model (and flags fallbacks). Set on the main actor per run.
     public private(set) var lastUsedModel: DictationModelOption?
     public private(set) var lastUsedFallback = false
+    /// How the most recent run spent its time inside the engine gate (#262). Read right after
+    /// `transcribeAudio` returns, for the same reason as `lastUsedModel`: it is per-run state,
+    /// and the caller's snapshot has to be taken before any `await` can let another
+    /// transcription overwrite it.
+    ///
+    /// It is overwritten per run, so on a retried dictation it describes the successful attempt
+    /// while the caller's elapsed time covers both. Per-attempt splits are a non-goal.
+    public private(set) var lastRunTimings: RunTimings?
+
+    /// What one run inside `transcribeAudio` cost, in integer milliseconds. `engineLoadMs` is
+    /// nil when the engine never loaded (a thrown load), which is different from 0.
+    public struct RunTimings: Equatable, Sendable {
+        public let engineWaitMs: Int?
+        public let engineLoadMs: Int?
+        public let transcribeMs: Int?
+
+        public init(engineWaitMs: Int?, engineLoadMs: Int?, transcribeMs: Int?) {
+            self.engineWaitMs = engineWaitMs
+            self.engineLoadMs = engineLoadMs
+            self.transcribeMs = transcribeMs
+        }
+    }
+
+    /// Test seam: the clock the run timings are measured with. Production uses the house
+    /// monotonic clock.
+    var uptime: () -> UInt64 = UptimeClock.now
+    private var lastEngineLoadMs: Int?
     private var transcriptionTask: Task<String, Error>? = nil
     private var isCancelled = false
     
@@ -243,7 +270,9 @@ public class TranscriptionService: ObservableObject {
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
         // would crash or corrupt output. (parallel-recording #2)
+        let gateStart = uptime()
         await Self.engineGate.wait()
+        let engineWaitMs = UptimeClock.milliseconds(from: gateStart, to: uptime())
         // Apply a per-call model INSIDE the gate — the clip was recorded under this model, but a
         // later recording may since have switched the global one — so it can't leak to a concurrent
         // caller, and restore it before releasing. No-op when nil or already active. (#model-snapshot)
@@ -285,6 +314,16 @@ public class TranscriptionService: ObservableObject {
             self.totalDuration = durationInSeconds
         }
 
+        // Published on both the returning and the throwing path: a run that failed after
+        // spending 15 s waiting for a model is exactly what the measurement is for.
+        lastEngineLoadMs = nil
+        let runStart = uptime()
+        defer {
+            lastRunTimings = RunTimings(
+                engineWaitMs: engineWaitMs,
+                engineLoadMs: lastEngineLoadMs,
+                transcribeMs: UptimeClock.milliseconds(from: runStart, to: uptime()))
+        }
         return try await transcribe(url: url, settings: settings, fallbackModel: nil)
     }
 
@@ -302,9 +341,12 @@ public class TranscriptionService: ObservableObject {
             // Lazily initialize the selected engine on first use (downloads a local
             // model only now, never on mere engine selection in Settings).
             let activeOption = ModelCatalog.activeOption()
+            let loadStart = uptime()
             guard let loaded = await ensureEngineLoaded() else {
                 throw TranscriptionError.contextInitializationFailed
             }
+            // 0 when the engine was already up; left nil when the load never completed.
+            lastEngineLoadMs = UptimeClock.milliseconds(from: loadStart, to: uptime())
             engine = loaded
             lastUsedModel = activeOption
             lastUsedFallback = false
