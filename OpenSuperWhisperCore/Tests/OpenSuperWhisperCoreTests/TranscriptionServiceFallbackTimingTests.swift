@@ -9,7 +9,14 @@ import XCTest
 /// scripted clock — so the asserted value can only come from the fallback branch.
 final class TranscriptionServiceFallbackTimingTests: CoreTestCase {
 
-    private final class ClockBox { var now: UInt64 = 0 }
+    /// Nanoseconds, like `UptimeClock`, whose `milliseconds(from:to:)` divides by 1_000_000.
+    /// `advance(ms:)` is the only way to move it.
+    private final class ClockBox {
+        /// Read-only, so `clock.now += n` cannot compile: milliseconds go through `advance(ms:)`.
+        var now: UInt64 { nanoseconds }
+        private var nanoseconds: UInt64 = 0
+        func advance(ms: Int) { nanoseconds += UInt64(ms) * 1_000_000 }
+    }
 
     private final class RemoteEngineThatFails: TranscriptionEngine {
         let clock: ClockBox
@@ -18,7 +25,7 @@ final class TranscriptionServiceFallbackTimingTests: CoreTestCase {
 
         init(clock: ClockBox) { self.clock = clock }
 
-        func initialize() async throws { clock.now += 2 }
+        func initialize() async throws { clock.advance(ms: 2) }
         func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
             throw RemoteError.network(nil)
         }
@@ -33,7 +40,7 @@ final class TranscriptionServiceFallbackTimingTests: CoreTestCase {
 
         init(clock: ClockBox) { self.clock = clock }
 
-        func initialize() async throws { clock.now += 7 }
+        func initialize() async throws { clock.advance(ms: 7) }
         func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
             "from the fallback"
         }

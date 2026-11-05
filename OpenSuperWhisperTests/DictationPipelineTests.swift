@@ -345,7 +345,15 @@ final class DictationPipelineTests: XCTestCase {
 
     // MARK: - Timing (#262)
 
-    private final class ClockBox { var now: UInt64 = 0 }
+    /// Nanoseconds, like `UptimeClock`, whose `milliseconds(from:to:)` divides by 1_000_000.
+    /// `advance(ms:)` is the only way to move it, so a test cannot add milliseconds to a
+    /// nanosecond value and read back zero.
+    private final class ClockBox {
+        /// Read-only, so `clock.now += n` cannot compile: milliseconds go through `advance(ms:)`.
+        var now: UInt64 { nanoseconds }
+        private var nanoseconds: UInt64 = 0
+        func advance(ms: Int) { nanoseconds += UInt64(ms) * 1_000_000 }
+    }
     private struct MoveFailure: Error {}
 
     /// A temp clip that can actually be moved. The success and recovered paths publish it with
@@ -431,11 +439,11 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         pipeline.uptime = { clock.now }
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 50
+            clock.advance(ms: 50)
             return "hello there"
         }
         pipeline.moveOverride = { _, _ in
-            clock.now += 500
+            clock.advance(ms: 500)
             throw MoveFailure()
         }
         // The catch would otherwise build an indicator panel in the test process.
@@ -490,7 +498,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         pipeline.uptime = { clock.now }
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 10
+            clock.advance(ms: 10)
             return "recovered words"
         }
         let recovered = OrderBox()
@@ -547,12 +555,12 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 50
+            clock.advance(ms: 50)
             return "measured words"
         }
         pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
         pipeline.deliverOverride = { _, _ in
-            clock.now += 10
+            clock.advance(ms: 10)
             return .inserted
         }
         defer { resetSeams(pipeline) }
@@ -601,7 +609,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { url, _ in
-            if url.lastPathComponent.contains("queue-first") { clock.now += 50 }
+            if url.lastPathComponent.contains("queue-first") { clock.advance(ms: 50) }
             return "text for \(url.lastPathComponent)"
         }
         pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
@@ -647,7 +655,7 @@ final class DictationPipelineTests: XCTestCase {
         var notices: [RecordingState] = []
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 5
+            clock.advance(ms: 5)
             return "some words"
         }
         pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
@@ -699,7 +707,7 @@ final class DictationPipelineTests: XCTestCase {
         var notices: [RecordingState] = []
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 5
+            clock.advance(ms: 5)
             return "cleanup words"
         }
         pipeline.noticeOverride = { notices.append($0) }
@@ -708,7 +716,7 @@ final class DictationPipelineTests: XCTestCase {
 
         // Predicted, but the processor says no pass ran: nil, not 0.
         pipeline.cleanupOverride = { text in
-            clock.now += 25
+            clock.advance(ms: 25)
             return CleanupOutcome(text: text, status: .notRun)
         }
         let beforeNoPass = await recordingIDs()
@@ -724,7 +732,7 @@ final class DictationPipelineTests: XCTestCase {
 
         // A failed pass did run: its time is stamped, and the failure notice goes to the seam.
         pipeline.cleanupOverride = { text in
-            clock.now += 30
+            clock.advance(ms: 30)
             return CleanupOutcome(text: text, status: .failed(model: "m", reason: "boom"))
         }
         let beforeFailure = await recordingIDs()
@@ -761,12 +769,12 @@ final class DictationPipelineTests: XCTestCase {
         let viewModel = IndicatorViewModel()
         viewModel.uptime = { clock.now }
         viewModel.stopRecordingOverride = {
-            clock.now += 40
+            clock.advance(ms: 40)
             return .clip(clip)
         }
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 10
+            clock.advance(ms: 10)
             return "measured from the stop"
         }
         pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
@@ -805,7 +813,7 @@ final class DictationPipelineTests: XCTestCase {
         var notices: [RecordingState] = []
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 40
+            clock.advance(ms: 40)
             throw MoveFailure()
         }
         pipeline.noticeOverride = { notices.append($0) }
@@ -855,10 +863,10 @@ final class DictationPipelineTests: XCTestCase {
         pipeline.transcribeOverride = { _, _ in
             attempts += 1
             if attempts == 1 {
-                clock.now += 20
+                clock.advance(ms: 20)
                 throw MoveFailure()
             }
-            clock.now += 30
+            clock.advance(ms: 30)
             return "heard on the second try"
         }
         pipeline.noticeOverride = { _ in }
@@ -899,11 +907,11 @@ final class DictationPipelineTests: XCTestCase {
         var replies: [(text: String, id: String, send: Bool)] = []
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 30
+            clock.advance(ms: 30)
             return "reply words"
         }
         pipeline.cleanupOverride = { text in
-            clock.now += 15
+            clock.advance(ms: 15)
             return CleanupOutcome(text: text, status: .cleaned(model: "m"))
         }
         pipeline.agentReplyOverride = { replies.append(($0, $1, $2)) }
@@ -971,7 +979,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         runClock(pipeline, clock)
         pipeline.transcribeOverride = { _, _ in
-            clock.now += 10
+            clock.advance(ms: 10)
             return "words with no history"
         }
         pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
