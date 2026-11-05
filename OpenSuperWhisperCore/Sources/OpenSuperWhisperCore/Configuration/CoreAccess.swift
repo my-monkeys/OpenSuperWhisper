@@ -11,6 +11,8 @@ enum CoreAccess {
     @MainActor static func makeSettings() -> TranscriptionSettings { CoreConfiguration.current.makeSettings() }
     /// Internal, like `CoreAccess` itself: it is read only inside the module, by
     /// `TranscriptionService.resolveFieldContext`.
-    @MainActor static var fieldTermSpelling: DictionaryCandidates.Spelling { CoreConfiguration.current.fieldTermSpelling() }
+    @MainActor static func fieldTermSpelling(_ language: String?) -> DictionaryCandidates.Spelling {
+        CoreConfiguration.current.fieldTermSpelling(language)
+    }
     @MainActor static func confirmEnableHistory() async -> Bool { await CoreConfiguration.current.confirmEnableHistory() }
 }
