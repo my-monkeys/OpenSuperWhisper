@@ -118,9 +118,9 @@ final class CallStackTreeTests: XCTestCase {
         let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp))
 
         XCTAssertEqual(parsed.frames, [
-            "OpenSuperWhisper 0x10439a54c +0x39a54c",
-            "libdyld.dylib 0x1ab69db24 +0x1b24",
             "OpenSuperWhisper 0x10439a58c +0x39a58c",
+            "libdyld.dylib 0x1ab69db24 +0x1b24",
+            "OpenSuperWhisper 0x10439a54c +0x39a54c",
         ])
     }
 
