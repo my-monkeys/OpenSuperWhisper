@@ -130,7 +130,9 @@ public class TranscriptionService: ObservableObject {
 
     /// The engines `ensureEngineLoaded` can build. Named apart from the classes so the choice can
     /// be made, and tested, without instantiating anything (an engine's init may load a model).
-    enum EngineKind: Equatable {
+    /// `CaseIterable` so `EngineCapabilities.allEngineIds` can be pinned against every kind:
+    /// a new kind whose id never reaches the list is otherwise invisible to the capability test.
+    enum EngineKind: Equatable, CaseIterable {
         case whisper, fluidAudio, senseVoice, remote, appleSpeech
     }
 
