@@ -401,10 +401,7 @@ public class TranscriptionService: ObservableObject {
         // The spelling pass runs only here: a prose engine returned above, and an engine with
         // nowhere to put a term list returns below without one.
         guard engine is TermContextEngine else { return nil }
-        let terms = FieldContextTerms.terms(
-            from: text,
-            spelling: CoreAccess.fieldTermSpelling,
-            capitalMarksNames: LanguageUtil.marksNamesWithCapitals(settings.selectedLanguage))
+        let terms = FieldContextTerms.terms(from: text, spelling: CoreAccess.fieldTermSpelling)
         return terms.isEmpty ? nil : .terms(terms)
     }
 

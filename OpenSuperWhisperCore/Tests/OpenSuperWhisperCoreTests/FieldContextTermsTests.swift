@@ -18,9 +18,8 @@ final class FieldContextTermsTests: CoreTestCase {
         knows: { FieldContextTermsTests.known.contains($0.lowercased()) },
         correctsTypo: { _ in false })
 
-    private func terms(_ text: String, capitalMarksNames: Bool = true, limit: Int = 10) -> [String] {
-        FieldContextTerms.terms(from: text, spelling: spelling,
-                                capitalMarksNames: capitalMarksNames, limit: limit)
+    private func terms(_ text: String, limit: Int = 10) -> [String] {
+        FieldContextTerms.terms(from: text, spelling: spelling, limit: limit)
     }
 
     // MARK: - Nothing to reduce
@@ -139,7 +138,10 @@ final class FieldContextTermsTests: CoreTestCase {
 
     /// German's mid-sentence capitals are grammar. The common nouns must not become terms; the
     /// surname still does.
+    ///
+    /// The guard is what rejects the nouns, not a language flag: a German noun is a known word in
+    /// lowercase, so its capital buys it nothing.
     func testGermanNounsAreNotTerms() {
-        XCTAssertEqual(terms("Der Mann ging zu Cherith", capitalMarksNames: false), ["Cherith"])
+        XCTAssertEqual(terms("Der Mann ging zu Cherith"), ["Cherith"])
     }
 }
