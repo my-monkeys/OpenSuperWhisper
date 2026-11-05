@@ -32,6 +32,25 @@ final class CoreConfigurationInstallTests: CoreTestCase {
 #endif
     }
 
+    /// A provider nobody reads is the same as no provider. Installing a stub and reading it back
+    /// through `CoreAccess` proves the path the field-term reducer will use is live; a test that
+    /// only asserted the value round-trips through the configuration would pass on a dead seam.
+    @MainActor
+    func testTheSpellingProviderIsReadThroughTheConfiguration() {
+        var configuration = CoreTestEnvironment.configuration
+        configuration.fieldTermSpelling = {
+            DictionaryCandidates.Spelling(knows: { $0 == "known" }, correctsTypo: { $0 == "typo" })
+        }
+        CoreConfiguration.replaceForTesting(configuration)
+        defer { CoreConfiguration.replaceForTesting(CoreTestEnvironment.configuration) }
+
+        let spelling = CoreAccess.fieldTermSpelling
+        XCTAssertTrue(spelling.knows("known"))
+        XCTAssertFalse(spelling.knows("unknown"))
+        XCTAssertTrue(spelling.correctsTypo("typo"))
+        XCTAssertFalse(spelling.correctsTypo("known"))
+    }
+
     func testReplaceForTestingSwapsAndReturnsThePrevious() {
         let probeRoot = makeScratchRoot()
 

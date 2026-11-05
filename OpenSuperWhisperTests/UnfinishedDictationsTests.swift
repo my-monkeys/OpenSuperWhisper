@@ -154,7 +154,7 @@ final class UnfinishedDictationsTests: XCTestCase {
         defer { scratch.restore() }
         let pipeline = DictationPipeline.shared
         struct Boom: Error {}
-        pipeline.transcribeOverride = { _, _ in throw Boom() }
+        pipeline.transcribeOverride = { _, _, _ in throw Boom() }
         defer { pipeline.transcribeOverride = nil }
         let clip = write(takeName(secondsAgo: 5), WAVHeaderRepair.syntheticWAV(seconds: 1, staleSizes: false))
 
@@ -169,7 +169,7 @@ final class UnfinishedDictationsTests: XCTestCase {
         let scratch = pipelineSetUp(history: false)
         defer { scratch.restore() }
         let pipeline = DictationPipeline.shared
-        pipeline.transcribeOverride = { _, _ in "hello" }
+        pipeline.transcribeOverride = { _, _, _ in "hello" }
         pipeline.deliverOverride = { _, _ in .inserted }
         defer { pipeline.transcribeOverride = nil; pipeline.deliverOverride = nil }
         let clip = write(takeName(secondsAgo: 5), WAVHeaderRepair.syntheticWAV(seconds: 1, staleSizes: false))
@@ -184,7 +184,7 @@ final class UnfinishedDictationsTests: XCTestCase {
         let scratch = pipelineSetUp(history: false)
         defer { scratch.restore() }
         let pipeline = DictationPipeline.shared
-        pipeline.transcribeOverride = { _, _ in "the lost words" }
+        pipeline.transcribeOverride = { _, _, _ in "the lost words" }
         var inserted = false
         pipeline.deliverOverride = { _, _ in inserted = true; return .inserted }
         defer { pipeline.transcribeOverride = nil; pipeline.deliverOverride = nil }
@@ -211,7 +211,7 @@ final class UnfinishedDictationsTests: XCTestCase {
         defer { scratch.restore() }
         let pipeline = DictationPipeline.shared
         struct Boom: Error {}
-        pipeline.transcribeOverride = { _, _ in throw Boom() }
+        pipeline.transcribeOverride = { _, _, _ in throw Boom() }
         defer { pipeline.transcribeOverride = nil }
         let clip = write(takeName(secondsAgo: 5), WAVHeaderRepair.syntheticWAV(seconds: 1, staleSizes: false))
         var recovered: [String] = []
@@ -227,7 +227,7 @@ final class UnfinishedDictationsTests: XCTestCase {
         let scratch = pipelineSetUp(history: false)
         defer { scratch.restore() }
         let pipeline = DictationPipeline.shared
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             try await Task.sleep(nanoseconds: 200_000_000)
             return "late"
         }

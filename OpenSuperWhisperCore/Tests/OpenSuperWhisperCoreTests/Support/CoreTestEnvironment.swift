@@ -27,6 +27,7 @@ enum CoreTestEnvironment {
                           textFormatter: { $0 },
                           computePolicy: computePolicy,
                           makeSettings: { Fixtures.pinnedSettings() },
+                          fieldTermSpelling: { Fixtures.spelling },
                           confirmEnableHistory: { false })
     }
 

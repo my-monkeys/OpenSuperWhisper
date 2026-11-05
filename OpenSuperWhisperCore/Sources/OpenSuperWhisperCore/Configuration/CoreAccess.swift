@@ -9,5 +9,8 @@ enum CoreAccess {
     static func formatText(_ text: String) -> String { CoreConfiguration.current.textFormatter(text) }
     static var computePolicy: ComputePolicy { CoreConfiguration.current.computePolicy }
     @MainActor static func makeSettings() -> TranscriptionSettings { CoreConfiguration.current.makeSettings() }
+    /// Internal, like `CoreAccess` itself: it is read only inside the module, by
+    /// `TranscriptionService.resolveFieldContext`.
+    @MainActor static var fieldTermSpelling: DictionaryCandidates.Spelling { CoreConfiguration.current.fieldTermSpelling() }
     @MainActor static func confirmEnableHistory() async -> Bool { await CoreConfiguration.current.confirmEnableHistory() }
 }
