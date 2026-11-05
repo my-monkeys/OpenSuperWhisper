@@ -76,16 +76,34 @@ struct RemoteModelListBox: View {
     // label stays truthful while a search is active.
     private var hiddenModelCount: Int { models.count - preferredModels.count }
 
-    /// The model in use, whatever the filter and the scroll position say: a list of several
-    /// hundred (OpenRouter) otherwise hides it.
-    private var pinnedModel: String? {
-        if !isCustom, let selectedID { return selectedID }
-        let typed = customText.trimmingCharacters(in: .whitespaces)
-        return customSelected && !typed.isEmpty ? typed : nil
+    /// The live selection stays visible even when it is scrolled away or filtered out (#263).
+    /// Custom models have no listed id, so use their field only when Custom is active.
+    private var activeModelID: String? {
+        let id = customSelected ? customText : selectedID
+        guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return id
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let activeModelID {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Active model")
+                        .scaledFont(size: 11, weight: .semibold)
+                        .foregroundColor(STheme.accent)
+                    Text(verbatim: activeModelID)
+                        .scaledFont(size: 13, design: .monospaced)
+                        .foregroundColor(STheme.textBright)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                        .help(activeModelID)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 9).fill(STheme.accentSoft))
+            }
+
             // Aggregators (LiteLLM, gateways) can list hundreds of models — a filter
             // box beats scrolling. Hidden for short lists.
             if models.count > 5 {
@@ -109,14 +127,6 @@ struct RemoteModelListBox: View {
                 .padding(.horizontal, 9).padding(.vertical, 5)
                 .background(RoundedRectangle(cornerRadius: 7).fill(STheme.inputBg))
                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(STheme.controlBorder, lineWidth: 1))
-            }
-
-            if let pinnedModel {
-                modelRow(name: pinnedModel, selected: true) { }
-                    .allowsHitTesting(false)
-                    .background(RoundedRectangle(cornerRadius: 9).fill(STheme.cardBg))
-                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(STheme.accent.opacity(0.5), lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
             }
 
             // Bounded scroll box: shows a handful and scrolls for more, so a server
