@@ -152,15 +152,19 @@ final class FieldContextStructuralGuardTests: XCTestCase {
     }
 
     /// The secure-field predicate is tested on its own; nothing checked that the readers ask it.
-    /// `SecureTextFields` states that "the three readers that feed a model all ask here", so a
-    /// reader that stopped calling it — or called it without negating the answer — would leave
-    /// every predicate test green while reading a password box.
+    /// `SecureTextFields` states that every reader that touches a field asks — `SourceCapture`
+    /// (what the transcriber is told), `TextAroundCaret` (how the dictation is fitted) and
+    /// `WatchedField` (what the user corrected) — so a reader that stopped calling it, or called
+    /// it without negating the answer, would leave every predicate test green while reading a
+    /// password box.
+    ///
+    /// Only the first of the three feeds a model; they share the guard because a password box is
+    /// not ours to read for any purpose.
     ///
     /// Blind spot, stated: this covers the three files that are the readers today. A NEW reader
     /// that never calls the guard is not caught, because finding it would mean enumerating
-    /// "model-facing Accessibility readers", a curated list with the same weakness as the network
-    /// one above.
-    func testTheThreeModelFacingReadersAskTheSecureFieldGuard() throws {
+    /// "Accessibility readers", a curated list with the same weakness as the network one above.
+    func testTheThreeReadersAskTheSecureFieldGuard() throws {
         let sources = try sources()
         let readers = [
             "OpenSuperWhisper/Utils/SourceCapture.swift",
