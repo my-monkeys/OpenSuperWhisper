@@ -85,6 +85,13 @@ final class FieldContextTermsTests: CoreTestCase {
         XCTAssertEqual(terms("I opened iOS and macOS in eBay"), ["iOS", "macOS", "eBay"])
     }
 
+    /// Two sentences, two names. A run that crossed the full stop would invent "Cherith
+    /// Nyiragongo" — a term the user never wrote — and swallow the second name into it.
+    func testARunDoesNotCrossASentenceBoundary() {
+        XCTAssertEqual(terms("I emailed Cherith. Nyiragongo was next."),
+                       ["Cherith", "Nyiragongo"])
+    }
+
     func testCyrillicKeepsItsShape() {
         XCTAssertEqual(terms("Привет мир"), ["Привет"])
     }

@@ -40,7 +40,11 @@ public enum FieldContextTerms {
                 // from the output — but a run they admitted still emits the words that survive,
                 // so the flag reaches the answer through candidacy even when the word that
                 // admitted it is dropped.
-                guard run.allSatisfy({ admitsToRun($0.text) }),
+                // A run cannot cross a sentence end. "Cherith. Nyiragongo" is two names in two
+                // sentences, not one name of two words — joining them would put a term in the
+                // vocabulary that the user never wrote, and consume the second name doing it.
+                guard !run.dropFirst().contains(where: { $0.startsSentence }),
+                      run.allSatisfy({ admitsToRun($0.text) }),
                       let candidate = DictionaryCandidates.term(
                           from: run, spelling: spelling, capitalMarksNames: capitalMarksNames)
                 else { continue }
