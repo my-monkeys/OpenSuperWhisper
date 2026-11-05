@@ -77,6 +77,14 @@ final class FieldContextTermsTests: CoreTestCase {
         XCTAssertEqual(terms("run kubectl now"), [])
     }
 
+    /// A name can start lowercase and still be a name: the inner capital is the evidence, and it
+    /// is exactly the shape of the product names this feature exists for. The door that stays
+    /// shut is the one above — lowercase *without* shape is still dropped, which the assertion
+    /// on "kubectl" pins from the other side.
+    func testLowercaseInitialStrongShapesSurvive() {
+        XCTAssertEqual(terms("I opened iOS and macOS in eBay"), ["iOS", "macOS", "eBay"])
+    }
+
     func testCyrillicKeepsItsShape() {
         XCTAssertEqual(terms("Привет мир"), ["Привет"])
     }
