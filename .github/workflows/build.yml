@@ -133,6 +133,14 @@ jobs:
               | "- passed only on retry: \(.nodeIdentifier): \([.. | objects | select(.nodeType? == "Failure Message") | .name][0])"' <<< "$tests"
             jq -r '.. | objects | select(.nodeType? == "Test Case" and .result? == "Skipped") | "- skipped: \(.nodeIdentifier)"' <<< "$tests"
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      # Every entry in the hand-maintained catalog carries all seven non-source locales. Catalog
+      # completeness only: the source-key half is uncovered, because `SettingRow` takes a String
+      # title (its settings-search identity) and localizes at runtime, so the toolchain cannot
+      # see those literals. Nothing else checks the catalog, and a missing translation ships as
+      # English with no signal.
+      - name: Check the localization catalog
+        if: ${{ !cancelled() }}
+        run: Scripts/check-localizations.sh
       # No test the map moved to the core (docs/test-moves-slice5.txt) came back to the hosted
       # suite. The comparison with the frozen slice-4 reference (--slice5) is local only, since a
       # PR that adds, renames or removes a hosted test differs from it by design.
