@@ -86,3 +86,101 @@ final class CrashReportTests: XCTestCase {
         XCTAssertLessThanOrEqual(message.count, "crash: ".count + 200)
     }
 }
+
+final class CallStackTreeTests: XCTestCase {
+
+    private let appUUID = "70B89F27-1634-3580-A695-57CDB41D7743"
+    private let dyldUUID = "77A62F2E-8212-30F3-84C1-E8497440ACF8"
+
+    /// The shape MetricKit documents: a `callStackTree` wrapper, one stack per thread, nested sub-frames.
+    private func tree(attributedFrames: String) -> Data {
+        Data("""
+        {"callStackTree": {"callStackPerThread": true, "callStacks": [
+          {"threadAttributed": false, "callStackRootFrames": [
+            {"binaryName": "Other", "address": 1, "offsetIntoBinaryTextSegment": 1}]},
+          {"threadAttributed": true, "callStackRootFrames": [\(attributedFrames)]}
+        ]}}
+        """.utf8)
+    }
+
+    private var appDyldApp: String {
+        """
+        {"binaryName": "OpenSuperWhisper", "binaryUUID": "\(appUUID)", "address": 4365854028,
+         "offsetIntoBinaryTextSegment": 3777868, "subFrames": [
+          {"binaryName": "libdyld.dylib", "binaryUUID": "\(dyldUUID)", "address": 7170808612,
+           "offsetIntoBinaryTextSegment": 6948, "subFrames": [
+            {"binaryName": "OpenSuperWhisper", "binaryUUID": "\(appUUID)", "address": 4365854092,
+             "offsetIntoBinaryTextSegment": 3777932}]}]}
+        """
+    }
+
+    func testEachFrameCarriesItsOffsetIntoTheBinary() {
+        let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp))
+
+        XCTAssertEqual(parsed.frames, [
+            "OpenSuperWhisper 0x10439a54c +0x39a54c",
+            "libdyld.dylib 0x1ab69db24 +0x1b24",
+            "OpenSuperWhisper 0x10439a58c +0x39a58c",
+        ])
+    }
+
+    func testEachBinaryIsListedOnceWithItsUUID() {
+        let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp))
+
+        XCTAssertEqual(parsed.images, [
+            "image OpenSuperWhisper \(appUUID)",
+            "image libdyld.dylib \(dyldUUID)",
+        ])
+    }
+
+    func testAFrameWithoutOffsetOrUUIDStillYieldsALine() {
+        let parsed = CallStackTree.parse(tree(attributedFrames: #"{"binaryName": "Bare", "address": 255}"#))
+
+        XCTAssertEqual(parsed.frames, ["Bare 0xff"])
+        XCTAssertEqual(parsed.images, [])
+    }
+
+    func testTheTreeWithoutItsWrapperIsReadToo() {
+        let json = Data(#"{"callStacks": [{"callStackRootFrames": [{"binaryName": "A", "address": 16, "offsetIntoBinaryTextSegment": 4}]}]}"#.utf8)
+
+        XCTAssertEqual(CallStackTree.parse(json).frames, ["A 0x10 +0x4"])
+    }
+
+    func testTheAttributedThreadIsChosenAndTheFrameLimitApplies() {
+        let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp), limit: 2)
+
+        XCTAssertEqual(parsed.frames.count, 2)
+        XCTAssertFalse(parsed.frames.contains { $0.hasPrefix("Other") })
+        XCTAssertEqual(parsed.images.count, 2)
+    }
+
+    func testUnexpectedJSONYieldsNothingInsteadOfCrashing() {
+        for json in ["not json", "[]", #"{"callStacks": 3}"#, #"{"callStacks": [{}]}"#] {
+            XCTAssertEqual(CallStackTree.parse(Data(json.utf8)), ParsedCallStack(frames: [], images: []), json)
+        }
+    }
+
+    // MARK: - Message
+
+    func testTheImageLinesFollowTheFrames() {
+        let draft = CrashReportDraft(kind: .crash, cause: "c", frames: ["A 0x1 +0x1"],
+                                     images: ["image A \(appUUID)"], appVersion: "1", osVersion: "26")
+
+        XCTAssertEqual(CrashReport.message(for: draft, frameLimit: 1),
+                       "crash: c\n#0 A 0x1 +0x1\nimage A \(appUUID)")
+    }
+
+    /// Frames are dropped from the bottom to fit; the image lines are never among them.
+    func testAnOversizedStackKeepsEveryImageLine() {
+        let frames = (0..<400).map { "VeryLongBinaryNameThatPadsEachFrameNicely_\($0) 0x000000010abcdef0 +0x39a54c" }
+        let images = (0..<5).map { "image Binary\($0) \(appUUID)" }
+        let draft = CrashReportDraft(kind: .crash, cause: "c", frames: frames, images: images,
+                                     appVersion: "1", osVersion: "26")
+        let submission = CrashReport.submission(for: draft)
+
+        XCTAssertTrue(FeedbackSender.fitsLimits(submission))
+        XCTAssertFalse(submission.message.contains("#399 "))
+        XCTAssertTrue(submission.message.contains("#0 "))
+        for image in images { XCTAssertTrue(submission.message.contains(image)) }
+    }
+}
