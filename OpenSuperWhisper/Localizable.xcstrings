@@ -61217,52 +61217,6 @@
         }
       }
     },
-    "On: the text before your cursor is read to help the model recognise names. It stays on your Mac and is never saved.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "An: Der Text vor deinem Cursor wird gelesen, damit das Modell Namen besser erkennt. Er bleibt auf deinem Mac und wird nie gesichert."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activado: el texto anterior a tu cursor se lee para que el modelo reconozca mejor los nombres. Se queda en tu Mac y nunca se guarda."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activé : le texte avant votre curseur est lu pour aider le modèle à mieux reconnaître les noms. Il reste sur votre Mac et n'est jamais enregistré."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attivo: il testo prima del cursore viene letto per aiutare il modello a riconoscere meglio i nomi. Resta sul tuo Mac e non viene mai salvato."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ativado: o texto antes do cursor é lido para ajudar o modelo a reconhecer melhor os nomes. Ele fica no seu Mac e nunca é salvo."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bật: văn bản trước con trỏ được đọc để mô hình nhận dạng tên tốt hơn. Nội dung ở lại trên Mac và không bao giờ được lưu."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开启后，会读取光标前的文字，帮助模型更好地识别名字。内容只留在你的 Mac 上，绝不保存。"
-          }
-        }
-      }
-    },
     "On, but this engine does not use it: the field is not read.": {
       "localizations": {
         "de": {
@@ -61305,6 +61259,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "已开启，但此引擎不会使用：不会读取输入框。"
+          }
+        }
+      }
+    },
+    "On: the text before your cursor is read to help the model recognise names. It stays on your Mac and is used only for this transcription.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An: Der Text vor deinem Cursor wird gelesen, damit das Modell Namen besser erkennt. Er bleibt auf deinem Mac und wird nur für diese Transkription verwendet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activado: el texto anterior a tu cursor se lee para que el modelo reconozca mejor los nombres. Se queda en tu Mac y solo se usa para esta transcripción."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activé : le texte avant votre curseur est lu pour aider le modèle à mieux reconnaître les noms. Il reste sur votre Mac et ne sert qu'à cette transcription."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attivo: il testo prima del cursore viene letto per aiutare il modello a riconoscere meglio i nomi. Resta sul tuo Mac e viene usato solo per questa trascrizione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativado: o texto antes do cursor é lido para ajudar o modelo a reconhecer melhor os nomes. Ele fica no seu Mac e é usado apenas para esta transcrição."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bật: văn bản trước con trỏ được đọc để mô hình nhận dạng tên tốt hơn. Nội dung ở lại trên Mac và chỉ được dùng cho bản phiên âm này."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启后，会读取光标前的文字，帮助模型更好地识别名字。内容只留在你的 Mac 上，仅用于本次转写。"
           }
         }
       }
