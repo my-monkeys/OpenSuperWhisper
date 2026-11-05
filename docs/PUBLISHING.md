@@ -146,8 +146,8 @@ One invocation, per arch (~12 min each), runs end to end:
 5. Re-sign Sparkle's nested helpers (`Downloader.xpc`, `Installer.xpc`, `Autoupdate`, `Updater.app`,
    then the framework), then re-seal the whole app with hardened runtime + entitlements.
 6. Zip → `notarytool submit --wait` → `stapler staple` the app.
-7. Build the DMG with `hdiutil` (app + `/Applications` symlink), codesign the DMG, notarize + staple
-   **the DMG too**.
+7. Build the DMG with a pinned `dmgbuild` run through `uvx` (app + `/Applications` link, window
+   laid out from `Scripts/dmg/`), codesign the DMG, notarize + staple **the DMG too**.
 
 Output: `./OpenSuperWhisper-arm64.dmg` (and `./OpenSuperWhisper-x86_64.dmg`).
 

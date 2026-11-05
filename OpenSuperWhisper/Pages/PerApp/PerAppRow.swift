@@ -1,55 +1,56 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// One app (or site) in the Per app page: what is customised on the left, the quick choices on
-/// the right, and the full set of options under "›".
+/// One app (or site) in the Per app page: its icon and name, a badge for each thing that is not
+/// default, the on/off switch, and the editor under "›" where the choices are made.
 struct PerAppRow: View {
     let entry: PerAppEntry
     @ObservedObject var viewModel: SettingsViewModel
-    /// Every model usable right now. The model menu only appears with two or more, as before.
+    /// Every model usable right now. The model menu only appears with two or more.
     let models: [DictationModelOption]
     let expanded: Bool
     let onToggle: () -> Void
     let onRemove: () -> Void
     let onChangeApp: () -> Void
-
-    private static let insertionWidth: CGFloat = 170
-    private static let modelWidth: CGFloat = 170
-    private static let styleWidth: CGFloat = 110
+    let onAddSite: (String) -> Void
 
     private var store: PerAppStore { PerAppStore(viewModel: viewModel) }
     private var showsModelMenu: Bool { models.count > 1 && entry.hasBundle }
+    private var isOn: Bool { PerAppSwitch.isOn(entry.bundleID, disabled: viewModel.perAppDisabledBundleIDs) }
     /// A built-in profile for an app this Mac does not have: shown, greyed, with its bundled icon.
     private var isMissingBuiltIn: Bool {
         !entry.isSite && entry.hasBundle
             && !InstalledApps.isInstalled(bundleIdentifier: entry.bundleID)
             && InstalledApps.bundledIcon(forBundleIdentifier: entry.bundleID) != nil
     }
+    private var styleName: String? {
+        entry.style.map { WritingStyleText.name(WritingStyle.resolve($0, custom: viewModel.customWritingStyles)) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    identity.frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
-                    controls
+                    identity.frame(minWidth: 120, maxWidth: .infinity, alignment: .leading)
+                    badges
                     chevron
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 12) {
-                        identity.frame(maxWidth: .infinity, alignment: .leading)
-                        chevron
-                    }
-                    HStack(spacing: 10) { controls }
-                        .padding(.leading, 46)
+                .opacity(isOn ? 1 : 0.5)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onToggle)
+                if entry.hasBundle {
+                    SSwitch(isOn: Binding(get: { isOn }, set: { store.setEnabled($0, for: entry) }))
+                        .help(isOn ? "Switch off: none of this app's settings apply"
+                                   : "Switch on: this app's settings apply again")
                 }
             }
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onToggle)
+            .padding(.vertical, 10)
 
             if expanded {
-                PerAppDetail(entry: entry, viewModel: viewModel, showsModelMenu: showsModelMenu,
-                             onRemove: onRemove, onChangeApp: onChangeApp)
+                PerAppDetail(entry: entry, viewModel: viewModel, models: models,
+                             showsModelMenu: showsModelMenu, isOn: isOn,
+                             onRemove: onRemove, onChangeApp: onChangeApp,
+                             onAddSite: onAddSite)
                     .padding(.leading, 46)
                     .padding(.bottom, 14)
             }
@@ -60,20 +61,28 @@ struct PerAppRow: View {
     private var identity: some View {
         HStack(spacing: 12) {
             icon
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: entry.title)
                     .scaledFont(size: 15, weight: .semibold)
                     .foregroundColor(entry.hasBundle && !isMissingBuiltIn ? STheme.textBright : STheme.hint)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(verbatim: summary)
-                    .scaledFont(size: 12)
-                    .foregroundColor(STheme.hint)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                if isMissingBuiltIn {
+                    Text("Not installed")
+                        .scaledFont(size: 11)
+                        .foregroundColor(STheme.hint)
+                }
             }
         }
         .help(entry.bundleID)
+    }
+
+    private var badges: some View {
+        TrailingFlowLayout(spacing: 6, minimumWidth: 120) {
+            ForEach(PerAppBadge.badges(for: entry, styleName: styleName), id: \.self) { badge in
+                PerAppBadgeView(badge: badge)
+            }
+        }
     }
 
     private var icon: some View {
@@ -82,7 +91,7 @@ struct PerAppRow: View {
             .interpolation(.high)
             .saturation(isMissingBuiltIn ? 0 : 1)
             .opacity(isMissingBuiltIn ? 0.55 : 1)
-            .frame(width: 30, height: 30)
+            .frame(width: 28, height: 28)
             .frame(width: 34, height: 34)
             .overlay(alignment: .bottomTrailing) {
                 if entry.isSite {
@@ -93,18 +102,6 @@ struct PerAppRow: View {
                         .background(Circle().fill(STheme.cardBg))
                 }
             }
-    }
-
-    @ViewBuilder private var controls: some View {
-        if !entry.isSite && entry.hasBundle {
-            styleMenu
-            insertionMenu
-        } else {
-            Color.clear.frame(width: Self.styleWidth + 10 + Self.insertionWidth, height: 1)
-        }
-        if showsModelMenu {
-            modelMenu
-        }
     }
 
     private var chevron: some View {
@@ -119,139 +116,46 @@ struct PerAppRow: View {
         .buttonStyle(.plain)
         .help(expanded ? "Hide details" : "Show details")
     }
-
-    /// A site row has no style: like insertion, it follows the app.
-    private var styleMenu: some View {
-        let selection = Binding<String?>(get: { entry.style }, set: { store.setStyle($0, for: entry) })
-        let styles = WritingStyle.builtIns + viewModel.customWritingStyles
-        let label = entry.style.map { WritingStyleText.name(WritingStyle.resolve($0, custom: viewModel.customWritingStyles)) }
-        // "Style" alone while the app follows the default, like the other menus' "Default …" but
-        // short enough for three menus on a row at the window's minimum width.
-        return RowMenu(label: label.map { Text(verbatim: $0) } ?? Text("Style"), width: Self.styleWidth) {
-            Picker("", selection: selection) {
-                Text("Default style").tag(String?.none)
-                ForEach(styles) { style in
-                    Text(verbatim: WritingStyleText.name(style)).tag(String?.some(style.id))
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        }
-        .help(String(localized: "The voice AI cleanup writes in for this app"))
-    }
-
-    private var insertionMenu: some View {
-        let selection = Binding<AppInsertionMode?>(
-            get: { entry.insertion?.mode },
-            set: { store.setInsertion($0, for: entry) })
-        return RowMenu(label: Text(insertionLabel), width: Self.insertionWidth) {
-            Picker("", selection: selection) {
-                Text("Default insertion").tag(AppInsertionMode?.none)
-                ForEach(AppInsertionMode.allCases) { mode in
-                    Text(LocalizedStringKey(mode.title)).tag(AppInsertionMode?.some(mode))
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        }
-        .help(entry.insertion?.mode.subtitle ?? String(localized: "Follows the global “Paste instead of typing” switch"))
-    }
-
-    private var insertionLabel: LocalizedStringKey {
-        guard let mode = entry.insertion?.mode else { return "Default insertion" }
-        return LocalizedStringKey(mode.title)
-    }
-
-    private var modelMenu: some View {
-        let selection = Binding<DictationModelOption?>(
-            get: { entry.model },
-            set: { store.setModel($0, for: entry) })
-        var options = models
-        // A rule's model stays listed even when it is not installed any more, so the choice is
-        // never silently lost.
-        if let current = entry.model, !options.contains(current) { options.insert(current, at: 0) }
-        return RowMenu(label: entry.model.map { Text(verbatim: $0.displayName) } ?? Text("Default model"),
-                       width: Self.modelWidth) {
-            Picker("", selection: selection) {
-                Text("Default model").tag(DictationModelOption?.none)
-                ForEach(options, id: \.self) { model in
-                    Text(verbatim: model.displayName).tag(DictationModelOption?.some(model))
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        }
-        .help(entry.model?.displayName ?? String(localized: "Keeps the model in effect"))
-    }
-
-    /// What is customised for this row, in a line.
-    private var summary: String {
-        if entry.isSite {
-            return String(localized: "Site · model only")
-        }
-        var parts: [String] = []
-        if let rule = entry.insertion {
-            switch rule.mode {
-            case .paste: parts.append(String(localized: "Pastes"))
-            case .type:
-                if let pace = rule.typingPaceMilliseconds {
-                    parts.append(String(localized: "Types, \(pace) ms"))
-                } else {
-                    parts.append(String(localized: "Types"))
-                }
-            }
-        }
-        if let style = entry.style {
-            let name = WritingStyleText.name(WritingStyle.resolve(style, custom: viewModel.customWritingStyles))
-            parts.append(String(localized: "Style: \(name)"))
-        }
-        if entry.profiles.contains(where: { !$0.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-            parts.append(String(localized: "Formatting instructions"))
-        }
-        if let model = entry.model, !showsModelMenu {
-            parts.append(String(localized: "Model: \(model.displayName)"))
-        }
-        if parts.isEmpty {
-            parts.append(String(localized: "Nothing customised yet"))
-        }
-        if isMissingBuiltIn {
-            parts.insert(String(localized: "Not installed"), at: 0)
-        }
-        return parts.joined(separator: " · ")
-    }
 }
 
-/// A bordered "Value ▾" menu of a fixed width, so the columns line up from row to row and a long
-/// model name truncates in the middle instead of widening its row.
-private struct RowMenu<Content: View>: View {
-    let label: Text
-    let width: CGFloat
-    @ViewBuilder var content: () -> Content
+/// One small badge: a customised value, or the faint "Default" of a row with none.
+private struct PerAppBadgeView: View {
+    let badge: PerAppBadge
 
     var body: some View {
-        Menu {
-            content()
-        } label: {
-            HStack(spacing: 6) {
-                label
-                    .scaledFont(size: 13, weight: .semibold)
-                    .foregroundColor(STheme.textBright)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.down")
-                    .scaledFont(size: 9, weight: .bold)
-                    .foregroundColor(STheme.hint)
-            }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .frame(width: width)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.controlBg))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(STheme.border, lineWidth: 1))
-            .contentShape(Rectangle())
+        switch badge {
+        case .standard:
+            Text("Default")
+                .scaledFont(size: 12)
+                .foregroundColor(STheme.hint.opacity(0.7))
+        default:
+            text
+                .scaledFont(size: 12, weight: .medium)
+                .foregroundColor(STheme.textBright)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                // A model's name can be as long as a file path; the badge shortens it rather than
+                // widening the row.
+                .frame(maxWidth: 200)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(STheme.controlBg))
+                .overlay(Capsule().stroke(STheme.border, lineWidth: 1))
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
+    }
+
+    private var text: Text {
+        switch badge {
+        case .style(let name): return Text(verbatim: name)
+        case .cleanup(true): return Text("AI cleanup")
+        case .cleanup(false): return Text("No AI cleanup")
+        case .model(let name): return Text(verbatim: name)
+        case .formatting: return Text("Formatting rules")
+        case .insertion(.paste, _, _): return Text("Pastes")
+        case .insertion(.type, let pace, let layoutID):
+            let types = pace.map { Text("Types, \($0) ms") } ?? Text("Types")
+            guard let layoutID else { return types }
+            return types + Text(verbatim: " · \(RemoteKeyboardLayouts.name(id: layoutID) ?? layoutID)")
+        case .standard: return Text("Default")
+        }
     }
 }

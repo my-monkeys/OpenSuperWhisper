@@ -21,29 +21,29 @@ final class AppInsertionRuleTests: XCTestCase {
     // MARK: - Matching
 
     func testTheRuleForAnAppIsFound() {
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: rules), terminal)
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: rules, disabled: []), terminal)
     }
 
     /// A bundle identifier typed by hand rarely comes out capitalised the way the system reports
     /// it, and a rule that silently does not apply is worse than no rule at all.
     func testMatchingIgnoresCase() {
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.microsoft.vscode", in: rules), vsCode)
-        XCTAssertEqual(AppInsertionRule.rule(for: "COM.APPLE.TERMINAL", in: rules), terminal)
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.microsoft.vscode", in: rules, disabled: []), vsCode)
+        XCTAssertEqual(AppInsertionRule.rule(for: "COM.APPLE.TERMINAL", in: rules, disabled: []), terminal)
     }
 
     /// No rule means the global setting decides, which is what every existing install gets.
     func testAnAppWithNoRuleMatchesNothing() {
-        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: rules))
-        XCTAssertNil(AppInsertionRule.rule(for: nil, in: rules))
-        XCTAssertNil(AppInsertionRule.rule(for: "", in: rules))
+        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: rules, disabled: []))
+        XCTAssertNil(AppInsertionRule.rule(for: nil, in: rules, disabled: []))
+        XCTAssertNil(AppInsertionRule.rule(for: "", in: rules, disabled: []))
     }
 
     /// A half-filled row in the editor must not swallow every app that comes past it.
     func testARuleWithNoIdentifierNeverMatches() {
         let blank = AppInsertionRule(bundleIdentifier: "", appName: "", mode: .paste)
 
-        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: [blank]))
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [blank, terminal]),
+        XCTAssertNil(AppInsertionRule.rule(for: "com.apple.Notes", in: [blank], disabled: []))
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [blank, terminal], disabled: []),
                        terminal)
     }
 
@@ -52,7 +52,7 @@ final class AppInsertionRuleTests: XCTestCase {
         let second = AppInsertionRule(bundleIdentifier: "com.apple.Terminal",
                                       appName: "Terminal again", mode: .type)
 
-        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [terminal, second]),
+        XCTAssertEqual(AppInsertionRule.rule(for: "com.apple.Terminal", in: [terminal, second], disabled: []),
                        terminal)
     }
 
@@ -140,5 +140,65 @@ final class AppInsertionRuleTests: XCTestCase {
     func testNoPaceMeansNoWait() {
         XCTAssertEqual(TextInserter.chunkPause(forChunkCount: 10, requested: 0), 0)
         XCTAssertEqual(TextInserter.chunkPause(forChunkCount: 1, requested: 12_000), 0)
+    }
+
+    // MARK: - Keyboard layout
+
+    /// Rules saved before the layout existed carry no such key. Losing the whole list over it
+    /// would drop every app's rule on update.
+    func testARuleSavedBeforeTheLayoutExistedStillDecodes() throws {
+        let json = """
+        [{"id":"5C2D9E0A-7B0E-4C1E-9D55-0E4B1D3A9F11","bundleIdentifier":"com.apple.Terminal",\
+        "appName":"Terminal","mode":"type","typingPaceMilliseconds":6}]
+        """
+        let rules = try JSONDecoder().decode([AppInsertionRule].self, from: Data(json.utf8))
+
+        XCTAssertEqual(rules.first?.mode, .type)
+        XCTAssertEqual(rules.first?.typingPaceMilliseconds, 6)
+        XCTAssertNil(rules.first?.keyboardLayoutID)
+    }
+
+    func testTheLayoutSurvivesARoundTrip() throws {
+        let rule = AppInsertionRule(bundleIdentifier: "com.google.Chrome", appName: "Chrome", mode: .type,
+                                    keyboardLayoutID: RemoteKeyboardLayouts.usLayoutID)
+        let decoded = try JSONDecoder().decode(AppInsertionRule.self, from: JSONEncoder().encode(rule))
+        XCTAssertEqual(decoded, rule)
+    }
+
+    private func route(remote: Bool = false, _ rule: AppInsertionRule?,
+                       globalPaste: Bool = false) -> RemoteSession.Route {
+        RemoteSession.route(isRemoteSession: remote, rule: rule, globalPaste: globalPaste)
+    }
+
+    private func rule(_ mode: AppInsertionMode, layout: String?) -> AppInsertionRule {
+        AppInsertionRule(bundleIdentifier: "com.example.app", mode: mode, keyboardLayoutID: layout)
+    }
+
+    func testARemoteSessionAppIsTypedKeyByKeyWithItsRulesLayout() {
+        let us = RemoteKeyboardLayouts.usLayoutID
+        XCTAssertEqual(route(remote: true, nil), .keyByKey(layoutID: nil))
+        XCTAssertEqual(route(remote: true, rule(.type, layout: us)), .keyByKey(layoutID: us))
+        // Above the mode: a paste rule does not get ⌘V through to the other machine.
+        XCTAssertEqual(route(remote: true, rule(.paste, layout: us), globalPaste: true), .keyByKey(layoutID: us))
+        XCTAssertEqual(route(remote: true, rule(.paste, layout: nil)), .keyByKey(layoutID: nil))
+    }
+
+    func testATypeRuleWithALayoutIsTypedKeyByKey() {
+        let us = RemoteKeyboardLayouts.usLayoutID
+        XCTAssertEqual(route(rule(.type, layout: us)), .keyByKey(layoutID: us))
+        XCTAssertEqual(route(rule(.type, layout: us), globalPaste: true), .keyByKey(layoutID: us))
+    }
+
+    /// A stored layout comes back when the person switches the rule to Type again, so Paste keeps
+    /// it without acting on it.
+    func testAPasteRuleIgnoresAStoredLayout() {
+        XCTAssertEqual(route(rule(.paste, layout: RemoteKeyboardLayouts.usLayoutID)), .paste)
+    }
+
+    func testWithoutALayoutTheRuleOrTheGlobalSwitchDecides() {
+        XCTAssertEqual(route(rule(.type, layout: nil), globalPaste: true), .typing)
+        XCTAssertEqual(route(rule(.paste, layout: nil)), .paste)
+        XCTAssertEqual(route(nil, globalPaste: true), .paste)
+        XCTAssertEqual(route(nil, globalPaste: false), .typing)
     }
 }

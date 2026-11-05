@@ -48,6 +48,12 @@ class IndicatorViewModel: ObservableObject {
     /// background now, so the next recording may already have started by then.
     var submitAfterInsert = false
 
+    /// Test seams for the stop instant (#262): the clock the stage stamps use, and the recorder's
+    /// stop, so a test can pin `finalizeMs` and `machine` without a microphone. Production uses
+    /// the house monotonic clock and the real recorder.
+    var uptime: () -> UInt64 = UptimeClock.now
+    var stopRecordingOverride: (() -> AudioRecorder.StopOutcome)?
+
     var delegate: IndicatorViewDelegate?
     private var blinkTimer: Timer?
     private var soundCheck: Timer?
@@ -282,6 +288,11 @@ class IndicatorViewModel: ObservableObject {
     }
 
     func startDecoding() {
+        // The stop press is the origin of the whole measurement (#262), so it is taken on the
+        // first line: everything below it — cancel-confirmation reset, the live-preview hand-off,
+        // the agent-reply disarm — is time the user waits after letting go.
+        let stopMark = uptime()
+        var timing = DictationTiming()
         resetCancelConfirmation()
         stopBlinking()
         stopListeningForSound()
@@ -302,7 +313,10 @@ class IndicatorViewModel: ObservableObject {
             Task { await StreamingTranscriptionController.shared.cancel() }
         }
 
-        let outcome = recorder.stopRecording()
+        let outcome = stopRecordingOverride?() ?? recorder.stopRecording()
+        // Captured after the microphone is closed, so the snapshot never sits in front of the
+        // stop; it is still the state at the stop instant, which is what #262 asks about.
+        timing.machine = MachineState.captureNow()
         let tempURL = outcome.url
         if tempURL == nil {
             // The live-transcription tap and the recorder are separate consumers of the
@@ -342,6 +356,8 @@ class IndicatorViewModel: ObservableObject {
             focusTarget: ctx.focusTarget,
             agentReplyID: agentReplyID)
         let modelOption = ModelCatalog.activeOption()
+        // Stop press → the clip is on its way. Everything between is recorder finalisation.
+        timing.finalizeMs = UptimeClock.milliseconds(from: stopMark, to: uptime())
 
         // Hand the clip to the background pipeline: it transcribes, saves and pastes on a serial
         // queue in recording-start order, so the user can immediately start the next recording
@@ -353,7 +369,9 @@ class IndicatorViewModel: ObservableObject {
             context: snapshot,
             modelOption: modelOption,
             submitAfterInsert: submitAfterInsert,
-            endedByStopPhrase: endedByStopPhrase)
+            endedByStopPhrase: endedByStopPhrase,
+            timing: timing,
+            stoppedAtUptime: stopMark)
         endedByStopPhrase = false
 
         // Free the indicator right away so the next hotkey press starts a fresh recording.
@@ -596,7 +614,7 @@ struct IndicatorWindow: View {
     /// itself: a fixed 200pt left a waveform-only layout stranded at the left of an
     /// empty pill.
     private var bubbleWidth: CGFloat? {
-        let hasCaption = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
+        let hasCaption = showsLiveText
         if isNotchMode {
             return (hasCaption ? max(notch.width, 440) : notch.width) + buttonExtraWidth + meterWidthAllowance
         }
@@ -614,6 +632,12 @@ struct IndicatorWindow: View {
         return 200 + buttonExtraWidth + meterWidthAllowance
     }
     
+    /// Words are streaming in and the user wants them on the bubble. Hiding the live text only
+    /// hides this display: the stream still feeds the stop phrase and the rescue of an empty take.
+    private var showsLiveText: Bool {
+        layout.contains(.liveText) && (!streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty)
+    }
+
     private var isNotchMode: Bool { AppPreferences.shared.indicatorPosition == "notch" }
 
     // The bubble's surface is now the themed `BubbleSurface` seam (Theme/BubbleSurface.swift): the
@@ -783,7 +807,7 @@ struct IndicatorWindow: View {
 
     @available(macOS 26.0, *)
     private var glassBubbleContent: some View {
-        let hasText = !streaming.confirmedText.isEmpty || !streaming.volatileText.isEmpty
+        let hasText = showsLiveText
         // The capsule beside the waveform carries the live text, or, when the microphone hears
         // nothing at all, a warning in its place: words would mean there is sound.
         let warnsOfSilence = viewModel.state == .recording && viewModel.hearsNothing && !hasText
@@ -884,7 +908,7 @@ struct IndicatorWindow: View {
                         .lineLimit(1)
                         .fixedSize()
                         .transition(.opacity)
-                } else if streaming.confirmedText.isEmpty && streaming.volatileText.isEmpty {
+                } else if !showsLiveText {
                     // Before any text arrives, just the dot + label, vertically centered.
                     HStack(alignment: .center, spacing: 10) {
                         ForEach(layout.leading) { element in
@@ -1244,9 +1268,7 @@ struct IndicatorWindow: View {
     private var hasNotchApron: Bool {
         switch viewModel.state {
         case .recording:
-            return viewModel.isConfirmingCancel
-                || !streaming.confirmedText.isEmpty
-                || !streaming.volatileText.isEmpty
+            return viewModel.isConfirmingCancel || showsLiveText
         case .connecting, .busy, .error, .info:
             return true
         case .idle, .decoding:

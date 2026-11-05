@@ -50,7 +50,17 @@ done
 gh release create "v$VERSION" --repo my-monkeys/OpenSuperWhisper \
   "OpenSuperWhisper-arm64-$VERSION.dmg" "OpenSuperWhisper-x86_64-$VERSION.dmg" \
   --title "v$VERSION — …" --notes-file notes.md
+
+# 5. the same two files under names without a version: the website's download buttons point at
+#    releases/latest/download/OpenSuperWhisper-<arch>.dmg, which 404s until these are attached
+for a in arm64 x86_64; do cp -c "OpenSuperWhisper-$a-$VERSION.dmg" "/tmp/OpenSuperWhisper-$a.dmg"; done
+gh release upload "v$VERSION" --repo my-monkeys/OpenSuperWhisper \
+  /tmp/OpenSuperWhisper-arm64.dmg /tmp/OpenSuperWhisper-x86_64.dmg
 ```
+
+`notarize_app.sh` needs `uvx` ([uv](https://docs.astral.sh/uv/)): it runs a pinned `dmgbuild`,
+which lays out the DMG window from `Scripts/dmg/` (background, icon positions). After editing
+`Scripts/dmg/background.html`, rerun `Scripts/dmg/render-background.sh` and commit both PNGs.
 
 Verify each DMG before announcing: `xcrun stapler validate OpenSuperWhisper-<arch>-$VERSION.dmg`
 and, after mounting, `spctl -a -vvv -t exec /Volumes/OpenSuperWhisper/OpenSuperWhisper.app` should

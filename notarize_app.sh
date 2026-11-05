@@ -24,8 +24,11 @@ KEYCHAIN_PROFILE="osw-notary"
 # than unreadable. That cost a full build on 0.12.4: ten minutes of compiling before the failure
 # surfaced.
 #
-# So the App Store Connect key is accepted directly as a fallback. Put the three values in
-# ~/.osw-notary.env, outside the repo:
+# The same item also becomes unreadable once the screen locks, and the choice below is made once,
+# before a ten minute build: on 0.15.0 the profile answered at the start, the Mac locked during the
+# x86_64 build, and the app's notarization failed with that same message. So the App Store Connect
+# key, a plain file that a locked screen doesn't hide, comes first when it is set up, and the
+# keychain profile is the fallback. Put the three values in ~/.osw-notary.env, outside the repo:
 #
 #   NOTARY_KEY=$HOME/.appstoreconnect/private_keys/AuthKey_XXXXXXXXXX.p8
 #   NOTARY_KEY_ID=XXXXXXXXXX
@@ -37,13 +40,13 @@ NOTARY_ENV="${NOTARY_ENV:-$HOME/.osw-notary.env}"
 [ -f "${NOTARY_ENV}" ] && . "${NOTARY_ENV}"
 
 notary_auth_args() {
-    if xcrun notarytool history --keychain-profile "${KEYCHAIN_PROFILE}" >/dev/null 2>&1; then
-        printf '%s' "--keychain-profile ${KEYCHAIN_PROFILE}"
-        return 0
-    fi
     if [ -n "${NOTARY_KEY:-}" ] && [ -f "${NOTARY_KEY}" ] \
        && [ -n "${NOTARY_KEY_ID:-}" ] && [ -n "${NOTARY_ISSUER:-}" ]; then
         printf '%s' "--key ${NOTARY_KEY} --key-id ${NOTARY_KEY_ID} --issuer ${NOTARY_ISSUER}"
+        return 0
+    fi
+    if xcrun notarytool history --keychain-profile "${KEYCHAIN_PROFILE}" >/dev/null 2>&1; then
+        printf '%s' "--keychain-profile ${KEYCHAIN_PROFILE}"
         return 0
     fi
     return 1
@@ -78,6 +81,14 @@ if [[ "${XCODE_DIR}" == *[Bb]eta* && "${ALLOW_BETA_XCODE:-0}" != "1" ]]; then
   echo "   Build with the stable Xcode instead:"
   echo "     DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer $0 \"\$IDENTITY\" ${ARCH}"
   echo "   (Only override if you've confirmed the toolchain is fixed:  ALLOW_BETA_XCODE=1 …)"
+  exit 1
+fi
+
+# The disk image's window is laid out by dmgbuild, run through uvx at a pinned version. Checked
+# here rather than at the end, where a missing tool would waste the whole build and notarization.
+DMGBUILD=(uvx --from "dmgbuild==1.6.5" dmgbuild)
+if ! command -v uvx >/dev/null; then
+  echo "❌ uvx not found: install uv (https://docs.astral.sh/uv/), it runs dmgbuild for the DMG."
   exit 1
 fi
 
@@ -184,13 +195,11 @@ cd "${current_dir}"
 xcrun notarytool submit "${ZIP_PATH}" --wait ${NOTARY_AUTH}
 xcrun stapler staple "${APP_PATH}"
 
-# Build the DMG with hdiutil (no extra tooling): the .app + an Applications symlink.
-DMG_STAGE="$(mktemp -d)"
-cp -R "${APP_PATH}" "${DMG_STAGE}/"
-ln -s /Applications "${DMG_STAGE}/Applications"
+# The DMG: the .app and an Applications link, in a window whose background shows to drag one
+# onto the other (Scripts/dmg).
 rm -f "${DMG_NAME}.dmg"
-hdiutil create -volname "${APP_NAME}" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_NAME}.dmg"
-rm -rf "${DMG_STAGE}"
+"${DMGBUILD[@]}" -s Scripts/dmg/settings.py -D app="${APP_PATH}" \
+  -D background=Scripts/dmg/background.png "${APP_NAME}" "${DMG_NAME}.dmg"
 
 codesign --sign "${CODE_SIGN_IDENTITY}" "${DMG_NAME}.dmg"
 xcrun notarytool submit "${DMG_NAME}.dmg" --wait ${NOTARY_AUTH}

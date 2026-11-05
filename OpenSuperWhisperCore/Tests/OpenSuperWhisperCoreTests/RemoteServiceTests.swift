@@ -1,7 +1,7 @@
 import XCTest
 @testable import OpenSuperWhisperCore
 
-final class RemoteServiceTests: XCTestCase {
+final class RemoteServiceTests: CoreTestCase {
 
     func testBaseURLsAreTheDocumentedOnes() {
         XCTAssertEqual(RemoteService.openRouter.baseURL, "https://openrouter.ai/api/v1")

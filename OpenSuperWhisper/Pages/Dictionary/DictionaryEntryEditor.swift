@@ -251,7 +251,7 @@ struct DictionaryEntryEditor: View {
         if !AppPreferences.shared.customDictionaryBoostEnabled {
             return "Turn on “Help recognition of these words” on the Dictionary page first."
         }
-        return "Turn off for a short or common word the model starts hearing everywhere, like “Maxim” written for “Mais”. The replacement still applies."
+        return "Turn off for a short or common word the model starts hearing everywhere, like “Maxim” written for “Mais”. The replacement still applies, and AI cleanup still keeps the word as written."
     }
 
     private func fieldLabel(_ text: LocalizedStringKey) -> some View {

@@ -33,6 +33,31 @@ public class TranscriptionService: ObservableObject {
     /// shows the real model (and flags fallbacks). Set on the main actor per run.
     public private(set) var lastUsedModel: DictationModelOption?
     public private(set) var lastUsedFallback = false
+    /// How the most recent run spent its time inside the engine gate (#262). Read right after
+    /// `transcribeAudio` returns, for the same reason as `lastUsedModel`: it is per-run state,
+    /// and the caller's snapshot has to be taken before any `await` can let another
+    /// transcription overwrite it.
+    ///
+    /// It is overwritten per run, so on a retried dictation it describes the successful attempt
+    /// while the caller's elapsed time covers both. Per-attempt splits are a non-goal.
+    public private(set) var lastRunTimings: RunTimings?
+
+    /// What one run inside `transcribeAudio` cost, in integer milliseconds. `engineLoadMs` is
+    /// nil when the engine never loaded (a thrown load), which is different from 0.
+    public struct RunTimings: Equatable, Sendable {
+        public let engineWaitMs: Int?
+        public let engineLoadMs: Int?
+
+        public init(engineWaitMs: Int?, engineLoadMs: Int?) {
+            self.engineWaitMs = engineWaitMs
+            self.engineLoadMs = engineLoadMs
+        }
+    }
+
+    /// Test seam: the clock the run timings are measured with. Production uses the house
+    /// monotonic clock.
+    var uptime: () -> UInt64 = UptimeClock.now
+    private var lastEngineLoadMs: Int?
     private var transcriptionTask: Task<String, Error>? = nil
     private var isCancelled = false
     
@@ -243,7 +268,9 @@ public class TranscriptionService: ObservableObject {
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
         // would crash or corrupt output. (parallel-recording #2)
+        let gateStart = uptime()
         await Self.engineGate.wait()
+        let engineWaitMs = UptimeClock.milliseconds(from: gateStart, to: uptime())
         // Apply a per-call model INSIDE the gate — the clip was recorded under this model, but a
         // later recording may since have switched the global one — so it can't leak to a concurrent
         // caller, and restore it before releasing. No-op when nil or already active. (#model-snapshot)
@@ -285,6 +312,13 @@ public class TranscriptionService: ObservableObject {
             self.totalDuration = durationInSeconds
         }
 
+        // Published on both the returning and the throwing path: a run that failed after
+        // spending 15 s waiting for a model is exactly what the measurement is for.
+        lastEngineLoadMs = nil
+        defer {
+            lastRunTimings = RunTimings(engineWaitMs: engineWaitMs,
+                                        engineLoadMs: lastEngineLoadMs)
+        }
         return try await transcribe(url: url, settings: settings, fallbackModel: nil)
     }
 
@@ -295,16 +329,23 @@ public class TranscriptionService: ObservableObject {
     private func transcribe(url: URL, settings: TranscriptionSettings, fallbackModel: DictationModelOption?) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
+            // The fallback engine is built AND initialized here, so a user on remote-with-
+            // fallback pays this cold load; leaving it nil hid it from the report.
+            let fallbackLoadStart = uptime()
             engine = try await makeEngine(for: fallbackModel)
+            lastEngineLoadMs = UptimeClock.milliseconds(from: fallbackLoadStart, to: uptime())
             lastUsedModel = fallbackModel
             lastUsedFallback = true
         } else {
             // Lazily initialize the selected engine on first use (downloads a local
             // model only now, never on mere engine selection in Settings).
             let activeOption = ModelCatalog.activeOption()
+            let loadStart = uptime()
             guard let loaded = await ensureEngineLoaded() else {
                 throw TranscriptionError.contextInitializationFailed
             }
+            // 0 when the engine was already up; left nil when the load never completed.
+            lastEngineLoadMs = UptimeClock.milliseconds(from: loadStart, to: uptime())
             engine = loaded
             lastUsedModel = activeOption
             lastUsedFallback = false
@@ -398,12 +439,19 @@ public class TranscriptionService: ObservableObject {
     /// off the main actor, like `ensureEngineLoaded`.
     private func makeEngine(for option: DictationModelOption) async throws -> TranscriptionEngine {
         let choice = Self.fallbackEngineChoice(for: option)
+        // Test seam: the real fallback engine needs a model file, so a test injects a stub to
+        // exercise the fallback path at all. Production keeps the real builder.
+        let build = fallbackEngineBuilder
         return try await Task.detached(priority: .userInitiated) { () -> TranscriptionEngine in
-            let engine = await Self.buildFallbackEngine(choice)
+            let engine = await build(choice)
             try await engine.initialize()
             return engine
         }.value
     }
+
+    /// Test seam: builds the engine the remote local-fallback runs on. Production builds the real
+    /// engine for the choice with `buildFallbackEngine`.
+    var fallbackEngineBuilder: (FallbackEngineChoice) async -> TranscriptionEngine = TranscriptionService.buildFallbackEngine
 
     /// The engines the remote local-fallback can build, with what each is given. Separate from
     /// `EngineKind` because this factory has its own quirks, kept as they are (see below).

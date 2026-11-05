@@ -42,6 +42,30 @@ final class CleanupExplicitBackendTests: CoreTestCase {
         XCTAssertEqual(outcome, CleanupOutcome(text: "Hello there.", status: .cleaned(model: "other-model")))
     }
 
+    func testAResolvedOnRunsAPassEvenWhileTheGlobalSwitchIsOff() async {
+        prefs.aiPostProcessingEnabled = false
+        let backend = RecordingBackend(label: "m", reply: "Hello there.")
+        let outcome = await LLMPostProcessor.processWithOutcome("hello there", bundleID: nil,
+                                                                generalCleanup: true, backend: backend)
+        XCTAssertEqual(outcome.text, "Hello there.")
+        XCTAssertEqual(backend.lastSystem, "OPEN\n\nCLOSE")
+    }
+
+    func testAResolvedOffSkipsThePassWhileTheGlobalSwitchIsOn() async {
+        let backend = RecordingBackend(label: "m", reply: "Hello there.")
+        let outcome = await LLMPostProcessor.processWithOutcome("hello there", bundleID: nil,
+                                                                generalCleanup: false, backend: backend)
+        XCTAssertEqual(outcome, CleanupOutcome(text: "hello there", status: .notRun))
+        XCTAssertNil(backend.lastSystem)
+    }
+
+    func testNoResolvedValueFollowsTheGlobalSwitch() async {
+        prefs.aiPostProcessingEnabled = false
+        let backend = RecordingBackend(label: "m", reply: "Hello there.")
+        let outcome = await LLMPostProcessor.processWithOutcome("hello there", bundleID: nil, backend: backend)
+        XCTAssertEqual(outcome.status, .notRun)
+    }
+
     func testTheExtraInstructionComesAfterTheStyleAndBeforeTheClosingGuardrail() async throws {
         let backend = RecordingBackend(label: "m", reply: "Hello there.")
         _ = await LLMPostProcessor.processWithOutcome("hello there", bundleID: nil, style: "STYLE",

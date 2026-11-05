@@ -4,7 +4,7 @@ import XCTest
 /// One builder serves chat, model listing and transcription. Gemini's base
 /// (`…/v1beta/openai/`) holds its version segment in the middle of the path, where the old
 /// "strip a trailing /v1, append /v1/…" logic produced `…/openai/v1/chat/completions`.
-final class OpenAICompatibleURLTests: XCTestCase {
+final class OpenAICompatibleURLTests: CoreTestCase {
 
     private func url(_ base: String, _ resource: String = "chat/completions") -> String? {
         OpenAICompatibleURL.endpoint(base: base, resource: resource)?.absoluteString

@@ -62,6 +62,9 @@ struct IndicatorElementView: View {
                    enabled: !isDecoding) {
                 IndicatorWindowManager.shared.stopRecording()
             }
+        case .liveText:
+            // Drawn by the bubble itself, beside or in place of the label, not as a row element.
+            EmptyView()
         case .cancelButton:
             // Stays live through the transcription: changing your mind is exactly what happens
             // while you watch a slow model work, and until the text lands there is still

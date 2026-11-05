@@ -73,20 +73,20 @@ enum TranscriptInserter {
                        submitting: Bool = false, wanted: () -> Bool = { true }) async -> Insertion {
         let text = prepared.fitted
         let prefs = AppPreferences.shared
-        let rule = AppInsertionRule.rule(for: targetBundleID, in: prefs.appInsertionRules)
+        let rule = AppInsertionRule.rule(for: targetBundleID, in: prefs.appInsertionRules,
+                                         disabled: prefs.perAppDisabledBundleIDs)
         noteNewerTranscription()
         // Whatever goes in now, a dictation, a paste-last or the pieces of a long prompt, is ours,
         // and a watch still reading the field would take it for the user's correction (#169).
         CorrectionWatch.endCurrent()
 
         let inserting = prefs.autoPasteTranscription || !honorAutoPastePreference
-        // Above any rule: neither of the two modes a rule can pick gets through to the other
-        // machine (#255).
-        let remoteSession = RemoteSession.isRemoteSession(
-            targetBundleID ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
         // A rule for this app wins over the global switch, which is the whole point of having one.
-        let pasting = inserting && !remoteSession
-            && (rule.map { $0.mode == .paste } ?? prefs.pasteInsteadOfTyping)
+        let route = RemoteSession.route(
+            isRemoteSession: RemoteSession.isRemoteSession(
+                targetBundleID ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier),
+            rule: rule, globalPaste: prefs.pasteInsteadOfTyping)
+        let pasting = inserting && route == .paste
 
         // Optional, independent clipboard stash. A paste leaves the text there itself once the
         // app has taken it; stashing first as well would hand clipboard histories a second copy.
@@ -107,8 +107,8 @@ enum TranscriptInserter {
                                       chunks: chunks, pause: pause, pasteKeyCode: pasteKeyCode)
         }
 
-        if remoteSession {
-            return await pressKeys(text, pace: rule?.typingPaceMilliseconds, wanted: wanted,
+        if case .keyByKey(let layoutID) = route {
+            return await pressKeys(text, layoutID: layoutID, pace: rule?.typingPaceMilliseconds, wanted: wanted,
                                    log: { log(mechanism: "keystrokes", chunks: $0, pause: $1) })
         }
 
@@ -158,12 +158,13 @@ enum TranscriptInserter {
         return .done
     }
 
-    /// Types into a remote session key by key (#255). No editable-field check: the field is on
-    /// the other machine, and accessibility only ever sees the window that shows it.
+    /// Types into a window that shows another computer key by key (#255). No editable-field
+    /// check: the field is on the other machine, and accessibility only ever sees the window
+    /// that shows it.
     @MainActor
-    private static func pressKeys(_ text: String, pace: Int?, wanted: () -> Bool,
+    private static func pressKeys(_ text: String, layoutID: String?, pace: Int?, wanted: () -> Bool,
                                   log: (_ strokes: Int, _ pause: useconds_t) -> Void) async -> Insertion {
-        guard let map = KeystrokeMap.current() else {
+        guard let map = KeystrokeMap.forRemoteSession(layoutID: layoutID) else {
             Diag.mark("remote session: keyboard layout unreadable, nothing typed")
             ClipboardUtil.copyToClipboard(text)
             return .onClipboard

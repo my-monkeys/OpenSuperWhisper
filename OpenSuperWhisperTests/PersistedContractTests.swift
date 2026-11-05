@@ -379,7 +379,7 @@ final class PersistedContractTests: XCTestCase {
             """#)
 
         XCTAssertNotEqual(layout, .default)
-        XCTAssertEqual(layout.order, [.cancelButton, .label, .waveform, .dot, .stopButton])
+        XCTAssertEqual(layout.order, [.cancelButton, .label, .waveform, .dot, .stopButton, .liveText])
         XCTAssertEqual(layout.hidden, [.label])
         XCTAssertEqual(layout.waveformHeight, 24)
     }

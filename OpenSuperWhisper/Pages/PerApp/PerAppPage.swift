@@ -12,6 +12,8 @@ struct PerAppPage: View {
     /// Apps just picked that nothing is set for yet. Kept only while the page is open: a row
     /// with no setting behind it has nothing to persist.
     @State private var pendingApps: [InstalledApp] = []
+    /// Sites just added to a browser that nothing is set for yet, kept like `pendingApps`.
+    @State private var pendingSites: [PerAppEntries.PendingSite] = []
     @State private var expandedID: String?
     @State private var picker: PickerPurpose?
     @State private var pendingRemoval: PerAppEntry?
@@ -19,6 +21,8 @@ struct PerAppPage: View {
     #if DEBUG
     /// Lets the snapshot renderer show the first row open.
     static var snapshotExpandsFirstRow = false
+    /// Same, for the first site row.
+    static var snapshotExpandsFirstSite = false
     #endif
 
     private enum PickerPurpose: Identifiable {
@@ -37,7 +41,9 @@ struct PerAppPage: View {
                             profiles: viewModel.appContextProfiles,
                             modelRules: modelRules,
                             styles: viewModel.appWritingStyles,
-                            pending: pendingApps)
+                            cleanups: viewModel.appCleanupOverrides,
+                            pending: pendingApps,
+                            pendingSites: pendingSites)
     }
 
     var body: some View {
@@ -54,7 +60,7 @@ struct PerAppPage: View {
                 }
                 PerAppRulesGroup(viewModel: viewModel, hasModelChoice: availableModels.count > 1)
                 perAppList
-                Text("Site rules pick a model for one website in Safari, Arc and other supported browsers. Create them from the menu-bar “Model” submenu while the site is open.")
+                Text("Site rules pick a model, a style and AI cleanup for one website in Safari, Arc and other supported browsers. Add one from a browser's details here, or create a model rule from the menu-bar “Model” submenu while the site is open.")
                     .scaledFont(size: 13)
                     .foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
@@ -77,7 +83,7 @@ struct PerAppPage: View {
             Button("Cancel", role: .cancel) {}
         } message: { entry in
             Text(entry.isSite
-                 ? "The model chosen for this site is forgotten."
+                 ? "The model, style and AI cleanup chosen for this site are forgotten."
                  : "Its insertion mode, model and formatting instructions are removed.")
         }
     }
@@ -97,7 +103,8 @@ struct PerAppPage: View {
                           expanded: expandedID == entry.id,
                           onToggle: { toggle(entry) },
                           onRemove: { pendingRemoval = entry },
-                          onChangeApp: { picker = .reassign(entry) })
+                          onChangeApp: { picker = .reassign(entry) },
+                          onAddSite: { addSite($0, to: entry) })
             }
         }
         .overlay(alignment: .top) { Rectangle().fill(STheme.border).frame(height: 1) }
@@ -117,6 +124,9 @@ struct PerAppPage: View {
         #if DEBUG
         if Self.snapshotExpandsFirstRow, expandedID == nil {
             expandedID = entries.first { !$0.isSite }?.id
+        }
+        if Self.snapshotExpandsFirstSite, expandedID == nil {
+            expandedID = entries.first { $0.isSite }?.id
         }
         #endif
     }
@@ -140,9 +150,20 @@ struct PerAppPage: View {
         expandedID = key
     }
 
+    private func addSite(_ host: String, to app: PerAppEntry) {
+        let site = PerAppEntries.PendingSite(bundleID: app.bundleID, host: host)
+        let id = PerAppOverride.key(bundleID: site.bundleID, host: host)
+        if !entries.contains(where: { $0.id == id }) { pendingSites.append(site) }
+        expandedID = id
+    }
+
     private func remove(_ entry: PerAppEntry) {
         PerAppStore(viewModel: viewModel).remove(entry)
-        pendingApps.removeAll { PerAppEntry.groupKey($0.bundleIdentifier) == PerAppEntry.groupKey(entry.bundleID) }
+        if entry.isSite {
+            pendingSites.removeAll { PerAppOverride.key(bundleID: $0.bundleID, host: $0.host) == entry.id }
+        } else {
+            pendingApps.removeAll { PerAppEntry.groupKey($0.bundleIdentifier) == PerAppEntry.groupKey(entry.bundleID) }
+        }
         if expandedID == entry.id { expandedID = nil }
         pendingRemoval = nil
         reload()

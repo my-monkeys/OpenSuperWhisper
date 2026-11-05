@@ -19,6 +19,30 @@ final class RemoteSessionTypingTests: XCTestCase {
         return try XCTUnwrap(KeystrokeMap(layoutData: data, keyboardType: UInt32(LMGetKbdType())))
     }
 
+    private func remoteMap(_ id: String) throws -> KeystrokeMap {
+        let data = try XCTUnwrap(RemoteKeyboardLayouts.layoutData(id: id), "\(id) is not installed")
+        return try XCTUnwrap(KeystrokeMap(layoutData: data, keyboardType: UInt32(LMGetKbdType()),
+                                          plainKeysOnly: true))
+    }
+
+    /// The reported screen: AZERTY keys read by a U.S. machine wrote "Je fqis 0 ;qnger". Typed
+    /// with the other machine's layout, the letters are right and "à" loses its accent.
+    func testAUSRemoteGetsUSKeysAndBareLetters() throws {
+        let us = try remoteMap("com.apple.keylayout.US")
+        let plan = us.plan("à é")
+        XCTAssertEqual(plan.skipped, [])
+        XCTAssertEqual(plan.strokes, us.plan("a e").strokes)
+        XCTAssertEqual(us.plan("m").strokes, [KeyStroke(keyCode: 0x2E)])
+    }
+
+    /// Option is Alt on the other side: nothing that needs it is sent.
+    func testAnotherMachinesLayoutNeverUsesOption() throws {
+        let us = try remoteMap("com.apple.keylayout.US")
+        let plan = us.plan("Élysées ’quoted’")
+        XCTAssertFalse(plan.strokes.contains(where: \.option))
+        XCTAssertEqual(plan.skipped, [])
+    }
+
     func testScreenSharingIsARemoteSession() {
         XCTAssertTrue(RemoteSession.isRemoteSession("com.apple.ScreenSharing"))
         XCTAssertFalse(RemoteSession.isRemoteSession("com.apple.Terminal"))
