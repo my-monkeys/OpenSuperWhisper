@@ -264,7 +264,11 @@ final class RemoteEngineRequestTests: XCTestCase {
                        + field("prompt", "Mein Prompt")
                        + fileField + closing)
         XCTAssertFalse(body.contains("OpenSuperWhisper"), "the dictionary boost was sent")
-        XCTAssertFalse(body.contains("Text already in the field"), "the focused text was sent")
+        // The field's text is not asserted absent here, and deliberately: `focusedText` left
+        // `TranscriptionSettings`, so a substring check for it could never fail. The whole-body
+        // equality above is the guard that still means something — any added field, prompt or
+        // parameter changes the body and breaks it. What keeps the text off the wire is the
+        // conformance cut, pinned by `testTheRemoteEngineConformsToNeitherContextProtocol`.
     }
 
     /// 401 and 403 are not retried and name the problem from whether a key is set.
