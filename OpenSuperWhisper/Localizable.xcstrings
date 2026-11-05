@@ -29303,52 +29303,6 @@
         }
       }
     },
-    "On: the model reads the sentence before your cursor. It stays on your Mac and is never saved.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "An: Das Modell liest den Satz vor deinem Cursor. Er bleibt auf deinem Mac und wird nie gesichert."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activado: el modelo lee la frase anterior a tu cursor. Se queda en tu Mac y nunca se guarda."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activé : le modèle lit la phrase avant votre curseur. Elle reste sur votre Mac et n'est jamais enregistrée."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attivo: il modello legge la frase prima del cursore. Resta sul tuo Mac e non viene mai salvata."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ativado: o modelo lê a frase antes do cursor. Ela fica no seu Mac e nunca é salva."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bật: mô hình đọc câu trước con trỏ. Nội dung ở lại trên Mac và không bao giờ được lưu."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开启后，模型会读取光标前的句子。内容只留在你的 Mac 上，绝不保存。"
-          }
-        }
-      }
-    },
     "One download, then dictation runs on your Mac.": {
       "localizations": {
         "de": {
@@ -29621,52 +29575,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "只有 Whisper 和服务器支持翻译，当前引擎会忽略此项。"
-          }
-        }
-      }
-    },
-    "Only Whisper can be told what to expect. The current engine has nowhere to put it.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nur Whisper kann man sagen, was zu erwarten ist. Die aktuelle Engine hat keinen Platz dafür."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Solo a Whisper se le puede decir qué esperar. El motor actual no tiene dónde ponerlo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Seul Whisper peut être prévenu de ce qui l'attend. Le moteur actuel n'a nulle part où le mettre."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Solo a Whisper si può dire cosa aspettarsi. Il motore attuale non ha dove metterlo."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Só o Whisper pode ser avisado do que esperar. O motor atual não tem onde colocar isso."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chỉ Whisper có thể được báo trước nội dung. Công cụ hiện tại không có chỗ để dùng nó."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "只有 Whisper 可以指定预期内容，当前引擎无处设置此项。"
           }
         }
       }
@@ -61167,6 +61075,236 @@
           "stringUnit": {
             "state": "translated",
             "value": "请自行将 OpenSuperWhisper 从磁盘映像拖到“应用程序”文件夹。"
+          }
+        }
+      }
+    },
+    "Reads the focused field and gives Parakeet a term list from it, not a sentence. Never sent to a server.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liest das aktive Feld und gibt Parakeet daraus eine Begriffsliste, keinen Satz. Wird nie an einen Server gesendet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lee el campo activo y entrega a Parakeet una lista de términos extraída de él, no una frase. Nunca se envía a un servidor."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lit le champ actif et en tire une liste de termes pour Parakeet, pas une phrase. Jamais envoyé à un serveur."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legge il campo attivo e ne ricava per Parakeet un elenco di termini, non una frase. Mai inviato a un server."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lê o campo ativo e entrega ao Parakeet uma lista de termos a partir dele, não uma frase. Nunca é enviado a um servidor."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đọc trường đang chọn và cung cấp cho Parakeet một danh sách thuật ngữ từ đó, không phải một câu. Không bao giờ gửi lên máy chủ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取当前聚焦的输入框，从中提取术语列表交给 Parakeet，而不是整句话。绝不会发送到任何服务器。"
+          }
+        }
+      }
+    },
+    "This engine takes no hint about what is coming, so the field is not read.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Engine nimmt keine Hinweise darauf entgegen, was gesprochen wird; das Feld wird nicht gelesen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este motor no admite indicaciones sobre lo que se va a decir, así que el campo no se lee."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce moteur n'accepte aucune indication sur ce qui va être dit ; le champ n'est pas lu."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo motore non accetta indicazioni su ciò che sta per essere detto, quindi il campo non viene letto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este motor não aceita indicações sobre o que será dito, então o campo não é lido."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Công cụ này không nhận gợi ý về nội dung sắp được nói, nên trường không được đọc."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此引擎不接受关于即将口述内容的提示，因此不会读取输入框。"
+          }
+        }
+      }
+    },
+    "Never: this text would be sent to your server, so the field is not read.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niemals: Dieser Text würde an deinen Server gesendet, deshalb wird das Feld nicht gelesen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nunca: este texto se enviaría a tu servidor, así que el campo no se lee."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jamais : ce texte serait envoyé à votre serveur, donc le champ n'est pas lu."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mai: questo testo verrebbe inviato al tuo server, quindi il campo non viene letto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nunca: este texto seria enviado ao seu servidor, então o campo não é lido."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không bao giờ: văn bản này sẽ được gửi lên máy chủ của bạn, nên trường không được đọc."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "绝不：这段文字会发送到你的服务器，因此不会读取输入框。"
+          }
+        }
+      }
+    },
+    "On: the text before your cursor is read to help the model recognise names. It stays on your Mac and is never saved.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An: Der Text vor deinem Cursor wird gelesen, damit das Modell Namen besser erkennt. Er bleibt auf deinem Mac und wird nie gesichert."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activado: el texto anterior a tu cursor se lee para que el modelo reconozca mejor los nombres. Se queda en tu Mac y nunca se guarda."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activé : le texte avant votre curseur est lu pour aider le modèle à mieux reconnaître les noms. Il reste sur votre Mac et n'est jamais enregistré."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attivo: il testo prima del cursore viene letto per aiutare il modello a riconoscere meglio i nomi. Resta sul tuo Mac e non viene mai salvato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativado: o texto antes do cursor é lido para ajudar o modelo a reconhecer melhor os nomes. Ele fica no seu Mac e nunca é salvo."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bật: văn bản trước con trỏ được đọc để mô hình nhận dạng tên tốt hơn. Nội dung ở lại trên Mac và không bao giờ được lưu."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启后，会读取光标前的文字，帮助模型更好地识别名字。内容只留在你的 Mac 上，绝不保存。"
+          }
+        }
+      }
+    },
+    "On, but this engine does not use it: the field is not read.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An, aber diese Engine nutzt es nicht: Das Feld wird nicht gelesen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activado, pero este motor no lo usa: el campo no se lee."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activé, mais ce moteur ne l'utilise pas : le champ n'est pas lu."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attivo, ma questo motore non lo usa: il campo non viene letto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativado, mas este motor não usa isso: o campo não é lido."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bật, nhưng công cụ này không dùng nội dung đó: trường không được đọc."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已开启，但此引擎不会使用：不会读取输入框。"
           }
         }
       }

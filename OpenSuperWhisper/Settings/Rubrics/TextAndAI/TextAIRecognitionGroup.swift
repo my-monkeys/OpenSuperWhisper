@@ -30,10 +30,20 @@ struct TextAIRecognitionGroup: View {
     }
 
     /// Saying why the switch is off matters more than describing it: a switch that flips and
-    /// changes nothing is the mistake of #99.
+    /// changes nothing is the mistake of #99. The mode carries both halves — what the engine does
+    /// with the text, and the two different reasons it may do nothing with it. The two disabled
+    /// sentences say why, not which engine: `.none` is no input, `.remoteExcluded` is an input the
+    /// text must never reach.
     private var fieldContextHint: LocalizedStringKey {
-        viewModel.canUseFieldContext
-            ? "Reads the focused field to recognise names better. Never sent to a server."
-            : "Only Whisper can be told what to expect. The current engine has nowhere to put it."
+        switch EngineCapabilities.fieldContextMode(for: viewModel.selectedEngine) {
+        case .prose:
+            return "Reads the focused field to recognise names better. Never sent to a server."
+        case .terms:
+            return "Reads the focused field and gives Parakeet a term list from it, not a sentence. Never sent to a server."
+        case .none:
+            return "This engine takes no hint about what is coming, so the field is not read."
+        case .remoteExcluded:
+            return "Never: this text would be sent to your server, so the field is not read."
+        }
     }
 }
