@@ -58,15 +58,18 @@ final class RecordingContext {
     private(set) var focusTarget: FocusTarget?
     private init() {}
 
+    /// Note what this does not take: the field's text. It has its own writer, `captureFocusedText`,
+    /// because the answer depends on an engine that can still change after this runs. Assigning it
+    /// here would mean every caller of this method either reads someone's document or erases the
+    /// one a recording already captured (#F4).
     func update(appName: String?, bundleID: String?, host: String? = nil,
                 fullURL: String? = nil, windowTitle: String? = nil,
-                focusedText: String? = nil, keyboardLanguage: String? = nil) {
+                keyboardLanguage: String? = nil) {
         self.appName = appName
         self.bundleID = bundleID
         self.host = host
         self.fullURL = fullURL
         self.windowTitle = windowTitle
-        self.focusedText = focusedText
         self.keyboardLanguage = keyboardLanguage
     }
 
@@ -81,8 +84,11 @@ final class RecordingContext {
     ///
     /// - Parameter forRecording: a recording is starting, so the field it starts in is worth
     ///   remembering. The status-bar menu passes `false`: it only needs the app for the model
-    ///   rules, the field lookup would be Accessibility traffic on the main thread for nothing,
-    ///   and a recording under way keeps the field it started in.
+    ///   rules, and it must leave the field text a recording already captured alone (#F4).
+    ///
+    /// The field's text is deliberately not read here. Which engine will transcribe is not known
+    /// until the model rules have run, and reading a document for an engine that cannot use it is
+    /// worse than not offering the feature — see `captureFocusedText()`.
     func captureFrontmost(forRecording: Bool = true) {
         let prefs = AppPreferences.shared
         let front = NSWorkspace.shared.frontmostApplication
@@ -99,24 +105,43 @@ final class RecordingContext {
         let url = SourceCapture.browserURL(bundleID: bundle)
         let host = SourceCapture.host(of: url)
         let title = SourceCapture.focusedWindowTitle()
-        // Only read the field when the setting asks for it AND the engine can use it. Reading
-        // what someone is writing is not something to do speculatively and then discard, and an
-        // engine that takes no prompt would have it discarded.
-        let wantsField = prefs.useSurroundingTextAsContext
-            && EngineCapabilities.supportsFieldContext(engine: prefs.selectedEngine)
-        // An element captured just now is the one the text would be read from: no second
-        // lookup. Only just now: from the menu, focusTarget belongs to the recording under way.
-        let capturedElement = forRecording ? focusTarget?.element : nil
-        let written = wantsField
-            ? (capturedElement.map(SourceCapture.focusedText(in:)) ?? SourceCapture.focusedText())
-            : nil
         let layoutLanguage = prefs.whisperLanguage == KeyboardLanguage.selectionCode
             ? KeyboardLanguage.current(engine: prefs.selectedEngine,
                                        fluidAudioModelVersion: prefs.fluidAudioModelVersion)
             : nil
         update(appName: front.localizedName, bundleID: bundle, host: host,
-               fullURL: url, windowTitle: title, focusedText: written,
+               fullURL: url, windowTitle: title,
                keyboardLanguage: layoutLanguage)
+    }
+
+    /// Whether the field's text is read at all, given the user's switch and the engine that will
+    /// run (#F2). Pure, so the two conjuncts can be asserted separately: neither the switch alone
+    /// nor a capable engine alone is a reason to read someone's document.
+    static func wantsFieldText(enabled: Bool, engine: String) -> Bool {
+        enabled && EngineCapabilities.supportsFieldContext(engine: engine)
+    }
+
+    /// Read the field this dictation is going into, once the engine that will transcribe is known.
+    ///
+    /// Called after `ContextModelSwitcher.applyForCurrentContext`, because a per-app rule can
+    /// replace the selected engine and the gate has to see the engine that will actually run
+    /// (#F2). Separate from `captureFrontmost` so the menu path cannot reach it: that path must
+    /// never overwrite the text a recording already captured (#F4).
+    ///
+    /// Always assigns, including nil. A field left over from an earlier dictation is never where
+    /// this one started, and a setting turned off between two recordings must not keep the old
+    /// text alive.
+    func captureFocusedText() {
+        let prefs = AppPreferences.shared
+        guard Self.wantsFieldText(enabled: prefs.useSurroundingTextAsContext,
+                                  engine: prefs.selectedEngine) else {
+            focusedText = nil
+            return
+        }
+        // An element captured just now is the one the text is read from: no second lookup.
+        // Without one (the user turned paste-back off), ask the frontmost app itself.
+        focusedText = focusTarget.map { SourceCapture.focusedText(in: $0.element) }
+            ?? SourceCapture.focusedText()
     }
 
     /// Whether to remember the field a recording starts in (#164). Only when the text will be
