@@ -409,6 +409,23 @@ public class TranscriptionService: ObservableObject {
         }
     }
 
+    /// The language the spelling dictionary should judge the field's words in, or nil for "the
+    /// user's own languages".
+    ///
+    /// The clip's language, not the app's preference: a dictation transcribed in French must not
+    /// have its field checked against whichever language happened to be selected earlier.
+    ///
+    /// "auto" maps to nil, because it is not a language a dictionary can look a word up in — the
+    /// engine detects it from audio that had not been spoken when this text was written. Nil asks
+    /// the dictionary for the user's preferred languages, which is what the old preference-read
+    /// path did whenever the preference was "auto", and is the only honest answer available.
+    ///
+    /// The keyboard-layout selection code never reaches here: `DictationPipeline.process`
+    /// resolves it into a concrete language before these settings are built.
+    nonisolated static func spellingLanguage(for selectedLanguage: String) -> String? {
+        selectedLanguage == "auto" ? nil : selectedLanguage
+    }
+
     /// What this engine is allowed to see of the field, or nil when it is allowed nothing.
     ///
     /// The two gates are deliberate: the preference (the user asked) and the conformance (this
@@ -427,7 +444,8 @@ public class TranscriptionService: ObservableObject {
         guard engine is TermContextEngine else { return nil }
         let terms = FieldContextTerms.terms(
             from: text,
-            spelling: CoreAccess.fieldTermSpelling,
+            spelling: CoreAccess.fieldTermSpelling(
+                Self.spellingLanguage(for: settings.selectedLanguage)),
             capitalMarksNames: LanguageUtil.marksNamesWithCapitals(settings.selectedLanguage))
         return terms.isEmpty ? nil : .terms(terms)
     }
