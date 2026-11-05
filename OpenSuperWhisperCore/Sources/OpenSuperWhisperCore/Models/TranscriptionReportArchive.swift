@@ -95,6 +95,7 @@ public enum TranscriptionReportArchive {
         enum CodingKeys: String, CodingKey {
             case id, createdAt, recordedAt, problem, comment, writtenAs, shouldBe, rawText, finalText
             case model, usedLocalFallback, durationSeconds, languageSetting, appDetails, audioFile, timing
+            case ending
         }
 
         func encode(to encoder: Encoder) throws {
@@ -112,6 +113,7 @@ public enum TranscriptionReportArchive {
             try container.encode(report.wasFallback, forKey: .usedLocalFallback)
             try container.encode(report.duration, forKey: .durationSeconds)
             try container.encode(report.timing, forKey: .timing)
+            try container.encode(report.ending, forKey: .ending)
             try container.encode(report.languageSetting, forKey: .languageSetting)
             try container.encode(report.appDetails, forKey: .appDetails)
             try container.encode(audioFile, forKey: .audioFile)
