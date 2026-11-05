@@ -198,6 +198,59 @@ enum TextInserter {
         cmdUp.post(tap: .cghidEventTap)
     }
 
+    /// Presses `strokes` one at a time, Shift and Option as real keys around the ones that need
+    /// them, for an app that forwards key codes rather than text (#255).
+    ///
+    /// Async, unlike `type`: every key of a remote session is paced, which for a long dictation
+    /// adds up to seconds the main thread must not be held for. Stops as soon as `wanted` turns
+    /// false, and returns whether every key went out.
+    @MainActor
+    static func press(_ strokes: [KeyStroke], pauseMilliseconds: Int,
+                      wanted: () -> Bool = { true }) async -> Bool {
+        guard let source = CGEventSource(stateID: .combinedSessionState) else { return false }
+        let pause = min(max(pauseMilliseconds, 0), maxChunkPauseMilliseconds)
+        for stroke in strokes {
+            guard wanted() else { return false }
+            post(stroke, source: source)
+            if pause > 0 {
+                try? await Task.sleep(for: .milliseconds(pause))
+            }
+        }
+        return true
+    }
+
+    /// The flags are set on every event, the modifier keys' own included, so a dictation hotkey
+    /// still held down cannot turn a letter into a shortcut.
+    private static func post(_ stroke: KeyStroke, source: CGEventSource) {
+        let shiftKey: CGKeyCode = 0x38  // kVK_Shift
+        let optionKey: CGKeyCode = 0x3A // kVK_Option
+        var flags: CGEventFlags = []
+        func send(_ keyCode: CGKeyCode, down: Bool) {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: down)
+            else { return }
+            event.flags = flags
+            event.post(tap: .cghidEventTap)
+        }
+        if stroke.shift {
+            flags.insert(.maskShift)
+            send(shiftKey, down: true)
+        }
+        if stroke.option {
+            flags.insert(.maskAlternate)
+            send(optionKey, down: true)
+        }
+        send(stroke.keyCode, down: true)
+        send(stroke.keyCode, down: false)
+        if stroke.option {
+            flags.remove(.maskAlternate)
+            send(optionKey, down: false)
+        }
+        if stroke.shift {
+            flags.remove(.maskShift)
+            send(shiftKey, down: false)
+        }
+    }
+
     /// Presses Return in the focused app — used by the "press enter" voice command to submit a
     /// message or prompt after the dictated text has been inserted. Modifier flags are cleared so a
     /// still-held hotkey can't turn it into a shortcut (⌘↩, ⇧↩, …).

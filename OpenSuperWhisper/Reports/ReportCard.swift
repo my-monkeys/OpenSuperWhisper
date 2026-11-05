@@ -338,7 +338,8 @@ private struct ReportTranscriptPreview: View {
         VStack(alignment: .leading, spacing: 12) {
             text("You got", recording.transcription)
             if let original = recording.distinctOriginal {
-                text("Before cleanup", original)
+                OriginalComparison(original: original, cleaned: recording.transcription,
+                                   cleanupModel: recording.cleanupModel, lineLimit: 6)
             }
             details
         }

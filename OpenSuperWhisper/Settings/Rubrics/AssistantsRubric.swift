@@ -75,12 +75,14 @@ struct AssistantsRubric: View {
                     StatusPill(text: "✓ Plugin found")
                 }
             }
-            SettingRow("Answer Codex",
-                       hint: "Codex asks once to trust the plugin's hooks: run /hooks in Codex.",
-                       indented: true) {
-                SSwitch(isOn: $model.codexOn)
+            if model.codexHasPlugin {
+                SettingRow("Answer Codex",
+                           hint: "Codex asks once to trust the plugin's hooks: run /hooks in Codex.",
+                           indented: true) {
+                    SSwitch(isOn: $model.codexOn)
+                }
+                SettingNotice("Codex's questions still show in the terminal, not in the panel.")
             }
-            SettingNotice("Codex's questions still show in the terminal, not in the panel.")
             SettingRow("pi and oh-my-pi",
                        hint: "Install the pi-opensuperwhisper extension in pi or oh-my-pi, then turn on Answer pi and oh-my-pi below.") {
                 EmptyView()

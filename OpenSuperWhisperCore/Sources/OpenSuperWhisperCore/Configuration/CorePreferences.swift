@@ -40,14 +40,18 @@ public protocol CorePreferences: AnyObject, Sendable {
     var aiRemoteEndpoint: String { get }
     var aiRemoteModel: String { get }
     var aiRemoteAPIKey: String? { get }
+    /// nil until the user chooses: then on for a known service, off for Custom.
+    var aiRemoteDisableReasoning: Bool? { get }
     var aiOllamaEndpoint: String { get }
     var aiOllamaModel: String { get }
     var aiPostProcessingEnabled: Bool { get }
     var appContextFormattingEnabled: Bool { get }
     var appContextProfiles: [AppContextProfile] { get }
+    var perAppDisabledBundleIDs: [String] { get }
     var aiPostProcessingPrompt: String { get }
     var aiPostProcessingClosing: String { get }
     var aiPostProcessingTranslation: String { get }
+    var aiSpokenFormattingEnabled: Bool { get }
     var builtInModelFileName: String { get }
     var unloadBuiltInModelWhenIdle: Bool { get }
 }

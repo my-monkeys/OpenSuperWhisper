@@ -191,7 +191,7 @@ struct DictionaryOptionsGroup: View {
                 SSwitch(isOn: $viewModel.customDictionaryEnabled)
             }
             SettingRow("Help recognition of these words",
-                       hint: "Also bias the model toward these terms while listening, not just fix them afterwards. Helps rare, distinctive words, but can over-correct short, common ones. Applies to every entry.",
+                       hint: "On: the model is biased toward your words while listening, so it can recognise one it would otherwise mishear. Off: a New word only fixes the capitalisation of a word already spelt right. Helps rare, distinctive words, but can over-correct short, common ones: each entry can opt out in its editor.",
                        indented: true) {
                 SSwitch(isOn: $viewModel.customDictionaryBoostEnabled)
                     .disabled(!viewModel.customDictionaryEnabled)
@@ -211,7 +211,7 @@ struct DictionaryOptionsGroup: View {
             if !viewModel.customDictionaryEnabled {
                 SettingNotice("The dictionary is off. Your entries are kept but nothing is replaced or recognised better.")
             } else if hasWords && !viewModel.customDictionaryBoostEnabled {
-                SettingNotice("New words only help recognition when “Help recognition of these words” is on.")
+                SettingNotice("“Help recognition of these words” is off, so a New word only fixes capitalisation, not a word the model mishears. Turn it on to have the model recognise it.")
             }
         }
     }

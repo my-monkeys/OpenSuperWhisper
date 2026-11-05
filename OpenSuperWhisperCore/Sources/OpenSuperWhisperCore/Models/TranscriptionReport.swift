@@ -40,6 +40,25 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
     public let appDetails: String
     /// The copy of the audio under `reportsDirectory`, nil when the dictation had none.
     public var audioFileName: String?
+    /// Where the dictation's time went (#262), copied from the recording at save time. A report
+    /// outlives its recording, so a pointer would lose the measurement exactly when a slow
+    /// dictation is being reported. Nil on a row that was never measured.
+    public let timingJSON: String?
+
+    /// The decoded measurement, read from the column every time so the two can never disagree.
+    public var timing: DictationTiming? { DictationTiming.decode(timingJSON) }
+
+    /// How the dictation ended, as far as the report can know it (#262). `.noInsertion` is the
+    /// conservative catch-all: a completed row handed to an agent, recovered from `unfinished/`,
+    /// or left on the clipboard for a manual paste is not distinguishable here, and the report
+    /// does not guess. Nil when even that much is unknown: a row with no measurement at all (an
+    /// import, a rerun, or a row older than v11), or a blob that never reached its terminal stamp
+    /// (the post-delivery UPDATE failed, or the report was saved before it landed).
+    public enum Ending: String, Codable, Sendable {
+        case insertion, noInsertion, failure
+    }
+
+    public let ending: Ending?
 
     public init(id: UUID = UUID(), createdAt: Date = Date(), recording: Recording,
                 problem: Problem, comment: String = "", writtenAs: String? = nil, shouldBe: String? = nil,
@@ -59,7 +78,17 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
         self.duration = recording.duration
         self.languageSetting = languageSetting
         self.appDetails = appDetails
+        self.timingJSON = recording.timingJSON
+        self.ending = Self.ending(for: recording)
         self.audioFileName = nil
+    }
+
+    private static func ending(for recording: Recording) -> Ending? {
+        if recording.status == .failed { return .failure }
+        // A blob without its terminal stamp cannot support even "no insertion": an insertion may
+        // have happened and only the record of it been lost.
+        guard let timing = recording.timing, timing.totalMs != nil else { return nil }
+        return timing.insertMs != nil ? .insertion : .noInsertion
     }
 
     private static func nonBlank(_ text: String?) -> String? {

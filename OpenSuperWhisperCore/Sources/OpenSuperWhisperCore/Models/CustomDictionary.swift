@@ -43,14 +43,26 @@ public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable,
     /// apply, since the pattern already says what it wants to consume.
     public var isRegex: Bool
 
+    /// Whether the replacement also steers what the engine hears while "Help recognition of
+    /// these words" is on: the Whisper prompt, Parakeet's vocabulary boost, the cleanup model's
+    /// spellings. Off, the entry only rewrites what it matches.
+    ///
+    /// Boosting is fuzzy, and a short word pulls in whatever sounds a little like it: an entry
+    /// meant to turn "Maxime" into "Maxim" had Parakeet write "Maxim" for every "Mais". One switch
+    /// for the whole dictionary left the choice between that and losing the boost for the rare
+    /// words that need it.
+    public var boostsRecognition: Bool
+
     public init(id: UUID = UUID(), original: String = "", replacement: String = "",
-         alternates: [String] = [], spacing: Spacing = .standalone, isRegex: Bool = false) {
+         alternates: [String] = [], spacing: Spacing = .standalone, isRegex: Bool = false,
+         boostsRecognition: Bool = true) {
         self.id = id
         self.original = original
         self.replacement = replacement
         self.alternates = alternates
         self.spacing = spacing
         self.isRegex = isRegex
+        self.boostsRecognition = boostsRecognition
     }
 
     /// Hand-written so dictionaries saved before `alternates` and `spacing` existed still load;
@@ -63,6 +75,7 @@ public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable,
         alternates = try container.decodeIfPresent([String].self, forKey: .alternates) ?? []
         spacing = try container.decodeIfPresent(Spacing.self, forKey: .spacing) ?? .standalone
         isRegex = try container.decodeIfPresent(Bool.self, forKey: .isRegex) ?? false
+        boostsRecognition = try container.decodeIfPresent(Bool.self, forKey: .boostsRecognition) ?? true
     }
 
     /// Every phrasing this rule matches, the primary one first.
@@ -255,12 +268,39 @@ public enum CustomDictionary {
     /// the single source of the words we boost on both engines: Whisper via the
     /// initial prompt (`promptBoost`) and Parakeet via custom-vocabulary boosting
     /// (`FluidAudioEngine`). Order is preserved; de-duplication is case-insensitive.
+    /// The words the entries that steer recognition write, for the speech engines. An entry with
+    /// `boostsRecognition` off still rewrites, and is left out here only.
     public static func boostTerms(entries: [CustomDictionaryEntry]) -> [String] {
+        spellings(entries: entries.filter(\.boostsRecognition))
+    }
+
+    /// Every word the dictionary writes, whether or not it steers recognition: the spellings the
+    /// insertion keeps as they are ("Maxim" keeps its capital mid-sentence).
+    public static func spellings(entries: [CustomDictionaryEntry]) -> [String] {
+        // A regex replacement is a template, not a word. Boosting "$1," would teach the model
+        // nothing and put punctuation in the prompt.
+        words(entries.filter { !$0.isRegex })
+    }
+
+    /// The words the cleanup prompt asks the model to keep as written: every word the dictionary
+    /// writes, whatever the entry's recognition switch says, plus the plain word a pattern writes
+    /// ("YouGardener"). The switch is about the speech engine, which starts hearing a boosted
+    /// short word everywhere ("Maxim" for "Mais"). The cleanup model only gets the words already
+    /// in the text, so it has nothing to over-hear, and without the word it is the one that turns
+    /// "Maxim" back into "Maxime".
+    public static func cleanupTerms(entries: [CustomDictionaryEntry]) -> [String] {
+        words(entries.filter { !$0.isRegex || !writesTemplate($0.replacement) })
+    }
+
+    /// Whether a pattern's replacement refers to what it matched ("$1", "\\1") rather than
+    /// being a word of its own.
+    private static func writesTemplate(_ replacement: String) -> Bool {
+        replacement.contains("$") || replacement.contains("\\")
+    }
+
+    private static func words(_ entries: [CustomDictionaryEntry]) -> [String] {
         var seen = Set<String>()
         return entries
-            // A regex replacement is a template, not a word. Boosting "$1," would teach the
-            // model nothing and put punctuation in the prompt.
-            .filter { !$0.isRegex }
             .map { $0.replacement.trimmingCharacters(in: .whitespacesAndNewlines) }
             // Punctuation rules ("open quote" → `"`) have nothing to teach a model about
             // spelling, and boosting a bare quote mark would just litter the prompt.

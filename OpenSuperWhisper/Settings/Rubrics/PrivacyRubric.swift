@@ -67,8 +67,13 @@ struct PrivacyRubric: View {
                 SSwitch(isOn: $viewModel.saveTranscriptionHistory)
             }
             SettingRow("Transcriptions folder", hint: LocalizedStringKey(Recording.recordingsDirectory.path)) {
-                Button("Show in Finder") { NSWorkspace.shared.open(Recording.recordingsDirectory) }
-                    .buttonStyle(.sSecondary)
+                HStack(spacing: 10) {
+                    RecordingsSizeText(style: .sizeAndCount)
+                        .scaledFont(size: 12)
+                        .foregroundColor(STheme.hint)
+                    Button("Show in Finder") { NSWorkspace.shared.open(Recording.recordingsDirectory) }
+                        .buttonStyle(.sSecondary)
+                }
             }
         }
     }
@@ -131,8 +136,7 @@ struct PrivacyRubric: View {
             }
             SettingRow("Suggest words from your corrections", hint: suggestionsHint) {
                 Button("Open the Dictionary") {
-                    AppNavigation.shared.closeSettings()
-                    AppNavigation.shared.go(.dictionary)
+                    AppNavigation.shared.showDashboard(.dictionary)
                 }
                 .buttonStyle(.sSecondary)
             }

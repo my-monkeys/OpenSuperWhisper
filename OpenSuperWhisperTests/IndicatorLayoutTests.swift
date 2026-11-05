@@ -42,7 +42,7 @@ final class IndicatorLayoutTests: XCTestCase {
     func testMoveReordersIncludingHiddenElements() {
         var layout = IndicatorLayout(order: [.waveform, .label, .dot, .stopButton, .cancelButton],
                                      hidden: [.dot], waveformHeight: 30)
-        layout.move(.dot, before: .waveform)
+        layout.move(.dot, toPointerY: 0, rows: Self.rows)
         XCTAssertEqual(layout.order.first, .dot, "a hidden element can still be repositioned")
         layout.setVisible(true, for: .dot)
         XCTAssertEqual(layout.elements.first, .dot)
@@ -62,18 +62,70 @@ final class IndicatorLayoutTests: XCTestCase {
     func testButtonsKeepTheirRelativeOrder() {
         var layout = IndicatorLayout(order: [.waveform, .stopButton, .cancelButton],
                                      hidden: [], waveformHeight: 30)
-        layout.move(.cancelButton, before: .stopButton)
+        layout.move(.cancelButton, toPointerY: 0, rows: Self.rows)
         XCTAssertEqual(layout.trailing, [.cancelButton, .stopButton])
+    }
+
+    /// Rows 40 high, 6 apart, in the order the list draws them.
+    private static let rows: [IndicatorElement: CGRect] = [
+        .waveform: CGRect(x: 0, y: 0, width: 300, height: 40),
+        .label: CGRect(x: 0, y: 46, width: 300, height: 40),
+        .dot: CGRect(x: 0, y: 92, width: 300, height: 40),
+        .stopButton: CGRect(x: 0, y: 138, width: 300, height: 40),
+        .cancelButton: CGRect(x: 0, y: 184, width: 300, height: 40),
+    ]
+
+    func testDraggingDownPastARowsMiddleMovesAfterIt() {
+        var layout = IndicatorLayout(order: [.waveform, .label, .dot, .stopButton, .cancelButton],
+                                     hidden: [], waveformHeight: 30)
+        layout.move(.waveform, toPointerY: 70, rows: Self.rows)
+        XCTAssertEqual(layout.order, [.label, .waveform, .dot, .stopButton, .cancelButton])
+        layout.move(.waveform, toPointerY: 500, rows: Self.rows)
+        XCTAssertEqual(layout.order.last, .waveform, "dragged past the end of the list")
+    }
+
+    func testPointerBeforeTheNextRowsMiddleLeavesTheOrderAlone() {
+        var layout = IndicatorLayout(order: [.waveform, .label, .dot, .stopButton, .cancelButton],
+                                     hidden: [], waveformHeight: 30)
+        layout.move(.label, toPointerY: 80, rows: Self.rows)
+        XCTAssertEqual(layout.order, [.waveform, .label, .dot, .stopButton, .cancelButton])
+        layout.move(.label, toPointerY: -30, rows: Self.rows)
+        XCTAssertEqual(layout.order.first, .label, "dragged above the list")
+    }
+
+    func testRowsOutsideTheMapAreNotCounted() {
+        var layout = IndicatorLayout(order: [.waveform, .label, .dot, .stopButton, .cancelButton],
+                                     hidden: [], waveformHeight: 30)
+        layout.move(.waveform, toPointerY: 500, rows: [.waveform: Self.rows[.waveform]!, .label: Self.rows[.label]!])
+        XCTAssertEqual(layout.order, [.label, .waveform, .dot, .stopButton, .cancelButton])
     }
 
     func testMigrationReproducesTheOldSettings() {
         let off = IndicatorLayout.migrated(meterMode: "off", showStop: false, showCancel: false)
-        XCTAssertEqual(off.elements, [.dot, .label])
+        XCTAssertEqual(off.elements, [.dot, .label, .liveText])
 
         let replaces = IndicatorLayout.migrated(meterMode: "replacesDot", showStop: false, showCancel: false)
-        XCTAssertEqual(replaces.elements, [.waveform, .label])
+        XCTAssertEqual(replaces.elements, [.waveform, .label, .liveText])
 
         let beside = IndicatorLayout.migrated(meterMode: "besideLabel", showStop: true, showCancel: true)
-        XCTAssertEqual(beside.elements, [.dot, .label, .waveform, .stopButton, .cancelButton])
+        XCTAssertEqual(beside.elements, [.dot, .label, .waveform, .stopButton, .cancelButton, .liveText])
+    }
+
+    /// A layout stored before the live text became an element lists none of it. It must come
+    /// back with the live text shown, as it always was, and not reorderable.
+    func testLayoutStoredBeforeLiveTextShowsIt() {
+        let old = #"{"order":["waveform","label","dot","stopButton","cancelButton"],"hidden":["dot"],"waveformHeight":30}"#
+        let loaded = IndicatorLayout.load(from: old)
+        XCTAssertTrue(loaded.isVisible(.liveText))
+        XCTAssertEqual(loaded.order.last, .liveText)
+        XCTAssertEqual(loaded.leading, [.waveform, .label])
+        XCTAssertFalse(loaded.trailing.contains(.liveText))
+    }
+
+    func testHidingLiveTextRemovesItWithoutTouchingTheRow() {
+        var layout = IndicatorLayout.default
+        layout.setVisible(false, for: .liveText)
+        XCTAssertFalse(layout.contains(.liveText))
+        XCTAssertEqual(layout.leading, IndicatorLayout.default.leading)
     }
 }

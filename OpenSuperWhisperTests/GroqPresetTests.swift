@@ -1,29 +1,31 @@
 import XCTest
+import OpenSuperWhisperCore
 @testable import OpenSuperWhisper
 
-/// `GroqPreset.isGroqURL` decides whether the Remote settings open on the Groq
-/// preset (vs Custom) from the configured server URL, and the preset's model
-/// constants drive its curated list. This guards that inference (case-insensitive,
-/// rejects non-Groq) and the coherence of the model constants.
+/// `RemoteService.detect` decides whether the Remote settings open on a built-in service (vs
+/// Custom) from the configured server URL, and the service's model constants drive its curated
+/// list. This guards that inference for Groq (case-insensitive, rejects others) and the
+/// coherence of Groq's model constants.
 final class GroqPresetTests: XCTestCase {
 
     func testDetectsGroqURLCaseInsensitively() {
-        XCTAssertTrue(GroqPreset.isGroqURL("https://api.groq.com/openai/v1"))
-        XCTAssertTrue(GroqPreset.isGroqURL("HTTPS://API.GROQ.COM/openai/v1"))
+        XCTAssertEqual(RemoteService.detect(url: "https://api.groq.com/openai/v1"), .groq)
+        XCTAssertEqual(RemoteService.detect(url: "HTTPS://API.GROQ.COM/openai/v1"), .groq)
     }
 
     func testRejectsNonGroqURLs() {
-        XCTAssertFalse(GroqPreset.isGroqURL("http://litellm.docker.lan:4000/v1"))
-        XCTAssertFalse(GroqPreset.isGroqURL("https://api.openai.com/v1"))
-        XCTAssertFalse(GroqPreset.isGroqURL(""))
+        XCTAssertNotEqual(RemoteService.detect(url: "https://api.openai.com/v1"), .groq)
+        XCTAssertNil(RemoteService.detect(url: "http://litellm.docker.lan:4000/v1"))
+        XCTAssertNil(RemoteService.detect(url: ""))
     }
 
     func testModelConstantsAreCoherent() {
         // The translating model differs from the default (turbo is transcription-only),
         // and both are offered in the curated list.
-        XCTAssertNotEqual(GroqPreset.defaultModel, GroqPreset.translatingModel)
-        let ids = GroqPreset.models.map(\.id)
-        XCTAssertTrue(ids.contains(GroqPreset.defaultModel))
-        XCTAssertTrue(ids.contains(GroqPreset.translatingModel))
+        let groq = RemoteService.groq
+        XCTAssertNotEqual(groq.defaultTranscriptionModel, groq.translatingModel)
+        let ids = groq.transcriptionModels.map(\.id)
+        XCTAssertTrue(ids.contains(groq.defaultTranscriptionModel!))
+        XCTAssertTrue(ids.contains(groq.translatingModel!))
     }
 }

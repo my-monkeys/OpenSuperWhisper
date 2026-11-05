@@ -43,6 +43,18 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
     /// The writing style AI cleanup wrote this text in, by name, as it was called then (#160).
     /// Nil when no style shaped it: Raw, cleanup off, or a row older than the column.
     public var styleUsed: String? = nil
+    /// The model of the AI cleanup pass that ran, or was attempted, on this text (#266). Nil when
+    /// no pass was due, and on a row older than the column.
+    public var cleanupModel: String? = nil
+    /// Why that pass failed and the engine's text was used instead (#264). Set only alongside
+    /// `cleanupModel`; nil when the pass worked.
+    public var cleanupError: String? = nil
+    /// Where this dictation's time went, as versioned JSON (#262). Nil on a row that was never
+    /// measured: an import, a rerun, or a row older than the column.
+    public var timingJSON: String? = nil
+
+    /// The decoded measurement, read from the column every time so the two can never disagree.
+    public var timing: DictationTiming? { DictationTiming.decode(timingJSON) }
 
     public var isRegeneration: Bool = false
 
@@ -51,7 +63,8 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
                 sourceFileURL: String? = nil, sourceAppName: String? = nil,
                 sourceWindowTitle: String? = nil, sourceURL: String? = nil,
                 modelUsed: String? = nil, wasFallback: Bool = false, rawTranscription: String? = nil,
-                styleUsed: String? = nil, isRegeneration: Bool = false) {
+                styleUsed: String? = nil, cleanupModel: String? = nil, cleanupError: String? = nil,
+                timingJSON: String? = nil, isRegeneration: Bool = false) {
         self.id = id
         self.timestamp = timestamp
         self.fileName = fileName
@@ -67,13 +80,16 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
         self.wasFallback = wasFallback
         self.rawTranscription = rawTranscription
         self.styleUsed = styleUsed
+        self.cleanupModel = cleanupModel
+        self.cleanupError = cleanupError
+        self.timingJSON = timingJSON
         self.isRegeneration = isRegeneration
     }
 
     enum CodingKeys: String, CodingKey {
         case id, timestamp, fileName, transcription, duration, status, progress, sourceFileURL
         case sourceAppName, sourceWindowTitle, sourceURL, modelUsed, wasFallback, rawTranscription
-        case styleUsed
+        case styleUsed, cleanupModel, cleanupError, timingJSON
     }
 
     public static func == (lhs: Recording, rhs: Recording) -> Bool {
@@ -83,6 +99,8 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
                lhs.transcription == rhs.transcription &&
                lhs.rawTranscription == rhs.rawTranscription &&
                lhs.styleUsed == rhs.styleUsed &&
+               lhs.cleanupModel == rhs.cleanupModel &&
+               lhs.cleanupError == rhs.cleanupError &&
                lhs.isRegeneration == rhs.isRegeneration
     }
 
@@ -124,6 +142,9 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
         static let modelUsed = Column(CodingKeys.modelUsed)
         static let wasFallback = Column(CodingKeys.wasFallback)
         static let rawTranscription = Column(CodingKeys.rawTranscription)
+        static let cleanupModel = Column(CodingKeys.cleanupModel)
+        static let cleanupError = Column(CodingKeys.cleanupError)
+        static let timingJSON = Column(CodingKeys.timingJSON)
     }
 }
 
@@ -187,6 +208,21 @@ public class RecordingStore: ObservableObject {
         }
     }
 
+    /// The row as the database has it now, by id.
+    ///
+    /// For a caller that would otherwise act on a value it read earlier: a row keeps changing
+    /// after it is first shown — the timing write lands after the insert (#262), a rerun clears
+    /// it, a restyle rewrites the text — so anything built from a held copy can be one write
+    /// stale. One row, one primary-key lookup.
+    public nonisolated func fetchRecording(id: UUID) async throws -> Recording? {
+        // The column filter, not the primary-key helper: it is the idiom the rest of this file
+        // uses for an id, so the lookup is known to encode the UUID the way the rows were
+        // written (a 16-byte blob, not the TEXT the column is declared as).
+        try await dbQueue.read { db in
+            try Recording.filter(Recording.Columns.id == id).fetchOne(db)
+        }
+    }
+
     func getPendingRecordings() -> [Recording] {
         do {
             return try dbQueue.read { db in
@@ -223,6 +259,7 @@ public class RecordingStore: ObservableObject {
             do {
                 try await insertRecording(recording)
                 await MainActor.run {
+                    RecordingsDiskUsage.shared.recordingSaved(at: recording.url)
                     NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
                 }
                 // Keep the store within the retention limit right after a new
@@ -235,11 +272,20 @@ public class RecordingStore: ObservableObject {
         }
     }
     
-    func addRecordingSync(_ recording: Recording) async throws {
+    /// Inserts the row and returns once it is in the store.
+    ///
+    /// `addRecording` is a fire-and-forget `Task`, so a caller that writes to the same row again
+    /// immediately afterwards — the pipeline's post-delivery timing update (#262) — has no
+    /// guarantee the insert has run. Awaited callers use this instead. The retention pass is
+    /// announced here, in its own task, so every insert keeps the policy without any caller
+    /// having to remember it and without holding the caller up.
+    public func addRecordingSync(_ recording: Recording) async throws {
         try await insertRecording(recording)
         await MainActor.run {
+            RecordingsDiskUsage.shared.recordingSaved(at: recording.url)
             NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
         }
+        Task { _ = await enforceRetentionPolicy() }
     }
     
     private nonisolated func insertRecording(_ recording: Recording) async throws {
@@ -262,18 +308,56 @@ public class RecordingStore: ObservableObject {
     }
     
     /// Replaces a row's text with the same dictation rewritten in another writing style, from
-    /// the history (#160). The engine's original stays as it was.
-    public func restyle(_ recording: Recording, transcription: String, styleUsed: String?) async throws {
-        var updated = recording
-        updated.transcription = transcription
-        updated.styleUsed = styleUsed
-        try await updateRecordingSync(updated)
+    /// the history (#160). The engine's original stays as it was. The pass that just ran replaces
+    /// the outcome the row kept from the previous one.
+    ///
+    /// The row is re-read here and only these four fields are written. Copying the caller's
+    /// `Recording` back wholesale would revert anything that changed since they read it — the
+    /// timing blob above all, which lands after the row is first inserted (#262) — and could
+    /// resurrect a blob a rerun had cleared.
+    public func restyle(_ recording: Recording, transcription: String, styleUsed: String?,
+                        cleanup: CleanupOutcome) async throws {
+        let id = recording.id
+        let cleanupModel = cleanup.model
+        let cleanupError = cleanup.failureReason
+        try await dbQueue.write { db in
+            guard var row = try Recording.fetchOne(db, key: id) else { return }
+            row.transcription = transcription
+            row.styleUsed = styleUsed
+            row.cleanupModel = cleanupModel
+            row.cleanupError = cleanupError
+            try row.update(db)
+        }
+        NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
     }
 
-    func updateRecordingSync(_ recording: Recording) async throws {
-        try await updateRecordingInDB(recording)
-        await MainActor.run {
+    /// Writes the measurement again once the dictation has finished, because the row is created
+    /// before the text is inserted: `insertMs` and `totalMs` do not exist at that first write
+    /// (#262).
+    ///
+    /// The caller re-encodes the COMPLETE blob. Patching two keys into the stored JSON is the one
+    /// shape this must never take: a half-merged blob reads as a real measurement.
+    ///
+    /// When no row was written (history off, or no text), the UPDATE matches nothing and the
+    /// cache lookup finds no id: both halves are a no-op. Never insert here.
+    public func updateTimingSync(_ id: UUID, timingJSON: String?) async {
+        do {
+            _ = try await dbQueue.write { db -> Int in
+                try Recording
+                    .filter(Recording.Columns.id == id)
+                    .updateAll(db, Recording.Columns.timingJSON.set(to: timingJSON))
+            }
+            if let index = recordings.firstIndex(where: { $0.id == id }) {
+                recordings[index].timingJSON = timingJSON
+            }
+            // Every other writer announces its change, and this one lands after the row already
+            // exists: without the post, a list loaded at insert time keeps the pre-delivery blob
+            // and a report filed from it prints `total —` and `insert —` (#262).
             NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
+        } catch {
+            // The first blob stays intact with `insertMs`/`totalMs` nil: "could not record the
+            // end", never "instant".
+            print("Failed to update recording timing: \(error)")
         }
     }
     
@@ -288,7 +372,10 @@ public class RecordingStore: ObservableObject {
     /// - Parameter rawTranscription: replaces the kept original when given. An import or a rerun
     ///   passes its own text, which is the engine's: the original kept from a dictation no
     ///   longer goes with the new text, and nil stays reserved for rows older than the column.
-    func updateRecordingProgressOnlySync(_ id: UUID, transcription: String, progress: Float, status: RecordingStatus, isRegeneration: Bool? = nil, modelUsed: String? = nil, wasFallback: Bool? = nil, rawTranscription: String? = nil) async {
+    /// - Parameter clearTiming: a rerun starts a new engine run, so the previous run's
+    ///   measurement must not survive it. A `Bool` rather than a `String?` because nil there
+    ///   would mean both "leave alone" and "set nil" (#262).
+    func updateRecordingProgressOnlySync(_ id: UUID, transcription: String, progress: Float, status: RecordingStatus, isRegeneration: Bool? = nil, modelUsed: String? = nil, wasFallback: Bool? = nil, rawTranscription: String? = nil, clearTiming: Bool = false) async {
         do {
             _ = try await dbQueue.write { db -> Int in
                 var assignments = [
@@ -304,6 +391,12 @@ public class RecordingStore: ObservableObject {
                 }
                 if let rawTranscription {
                     assignments.append(Recording.Columns.rawTranscription.set(to: rawTranscription))
+                    // The new text is the engine's own, with no cleanup pass behind it.
+                    assignments.append(Recording.Columns.cleanupModel.set(to: nil))
+                    assignments.append(Recording.Columns.cleanupError.set(to: nil))
+                }
+                if clearTiming {
+                    assignments.append(Recording.Columns.timingJSON.set(to: nil))
                 }
                 return try Recording
                     .filter(Recording.Columns.id == id)
@@ -325,6 +418,11 @@ public class RecordingStore: ObservableObject {
                 }
                 if let rawTranscription {
                     updated.rawTranscription = rawTranscription
+                    updated.cleanupModel = nil
+                    updated.cleanupError = nil
+                }
+                if clearTiming {
+                    updated.timingJSON = nil
                 }
                 recordings[index] = updated
             }
@@ -356,30 +454,29 @@ public class RecordingStore: ObservableObject {
         }
     }
 
-    nonisolated func updateSourceFileURL(_ id: UUID, sourceURL: String) async throws {
-        try await dbQueue.write { db in
-            try Recording
-                .filter(Recording.Columns.id == id)
-                .updateAll(db, [
-                    Recording.Columns.sourceFileURL.set(to: sourceURL)
-                ])
-        }
-    }
-
-    func updateRecordingStatusOnly(_ id: UUID, progress: Float, status: RecordingStatus, isRegeneration: Bool? = nil) async {
+    /// - Parameter clearTiming: a rerun is a new engine run, so the previous measurement must
+    ///   not survive it (#262). Same `Bool`-not-optional reason as `updateRecordingProgressOnlySync`.
+    func updateRecordingStatusOnly(_ id: UUID, progress: Float, status: RecordingStatus, isRegeneration: Bool? = nil, clearTiming: Bool = false) async {
         do {
             _ = try await dbQueue.write { db -> Int in
-                try Recording
+                var assignments = [
+                    Recording.Columns.progress.set(to: progress),
+                    Recording.Columns.status.set(to: status.rawValue)
+                ]
+                if clearTiming {
+                    assignments.append(Recording.Columns.timingJSON.set(to: nil))
+                }
+                return try Recording
                     .filter(Recording.Columns.id == id)
-                    .updateAll(db, [
-                        Recording.Columns.progress.set(to: progress),
-                        Recording.Columns.status.set(to: status.rawValue)
-                    ])
+                    .updateAll(db, assignments)
             }
             if let index = recordings.firstIndex(where: { $0.id == id }) {
                 var updated = recordings[index]
                 updated.progress = progress
                 updated.status = status
+                if clearTiming {
+                    updated.timingJSON = nil
+                }
                 if let isRegeneration = isRegeneration {
                     updated.isRegeneration = isRegeneration
                 }
@@ -417,8 +514,10 @@ public class RecordingStore: ObservableObject {
         Task {
             do {
                 try await deleteRecordingFromDB(recording)
+                let removed = RecordingsDiskUsage.measure([recording.url])
                 try? FileManager.default.removeItem(at: recording.url)
                 await MainActor.run {
+                    RecordingsDiskUsage.shared.recordingsRemoved(removed)
                     NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
                 }
             } catch {
@@ -442,6 +541,7 @@ public class RecordingStore: ObservableObject {
                 }
                 try await deleteAllRecordingsFromDB()
                 await MainActor.run {
+                    RecordingsDiskUsage.shared.allRecordingsRemoved()
                     NotificationCenter.default.post(name: Self.recordingsDidUpdateNotification, object: nil)
                 }
             } catch {
@@ -478,11 +578,14 @@ public class RecordingStore: ObservableObject {
         guard !deleted.isEmpty else { return 0 }
 
         // Remove the stored audio files off the main actor.
-        await Task.detached(priority: .utility) {
+        let removed = await Task.detached(priority: .utility) {
+            let sizes = RecordingsDiskUsage.measure(deleted.map(\.url))
             for recording in deleted {
                 try? FileManager.default.removeItem(at: recording.url)
             }
+            return sizes
         }.value
+        RecordingsDiskUsage.shared.recordingsRemoved(removed)
 
         let deletedIds = Set(deleted.map { $0.id })
         recordings.removeAll { deletedIds.contains($0.id) }

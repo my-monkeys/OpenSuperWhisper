@@ -89,8 +89,7 @@ struct GeneralRubric: View {
                 HStack(spacing: 14) {
                     checkButton
                     Button("What's new") {
-                        AppNavigation.shared.closeSettings()
-                        AppNavigation.shared.helpOpen = true
+                        AppNavigation.shared.openHelp()
                     }
                     .buttonStyle(.plain)
                     .scaledFont(size: 13, weight: .semibold)

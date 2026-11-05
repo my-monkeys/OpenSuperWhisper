@@ -16,9 +16,9 @@ enum ContextAwareModelMode: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .ask: return "Ask on change"
-        case .auto: return "Auto · no prompt"
-        case .off: return "Off"
+        case .ask: return String(localized: "Ask on change")
+        case .auto: return String(localized: "Auto · no prompt")
+        case .off: return String(localized: "Off")
         }
     }
 
@@ -180,8 +180,9 @@ enum AppContextModelRules {
     }
 
     /// Resolved rule for the current context: a site-specific rule wins, else the
-    /// app-level rule.
+    /// app-level rule. nil while the app is switched off, site rules included.
     static func rule(for bundleID: String, host: String? = nil) -> DictationModelOption? {
+        guard PerAppSwitch.isOn(bundleID, disabled: AppPreferences.shared.perAppDisabledBundleIDs) else { return nil }
         let rules = all()
         if let host, !host.isEmpty, let site = rules["\(bundleID)|\(host)"] { return site }
         return rules[bundleID]

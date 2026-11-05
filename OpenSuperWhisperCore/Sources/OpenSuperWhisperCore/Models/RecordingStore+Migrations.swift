@@ -92,6 +92,57 @@ extension RecordingStore {
             }
         }
 
+        // Regenerating used to save a dictation's own recordings/<fileName> as its source file,
+        // which made Home show it as an imported file titled with the .wav name (#274). Matched
+        // on the path's tail because the storage root differs between machines.
+        migrator.registerMigration("v9_clear_own_recording_source") { db in
+            try db.execute(sql: """
+                UPDATE recordings SET sourceFileURL = NULL
+                WHERE substr(sourceFileURL, -length('/recordings/' || fileName)) = '/recordings/' || fileName
+                """)
+        }
+
+        // Nullable for the same reason as v6: older rows never recorded a cleanup pass, and an older
+        // build that opens the file afterwards still writes without knowing the columns.
+        migrator.registerMigration("v10_add_cleanup_outcome") { db in
+            let columnNames = try db.columns(in: Recording.databaseTableName).map { $0.name }
+            for column in ["cleanupModel", "cleanupError"] where !columnNames.contains(column) {
+                try db.alter(table: Recording.databaseTableName) { t in
+                    t.add(column: column, .text)
+                }
+            }
+        }
+
+        // Nullable and versioned inside the value: a row written before this build has no
+        // measurement, and an older build that opens the file afterwards still writes without
+        // knowing the column. The report gets its own copy because a report outlives its
+        // recording by design (#262).
+        migrator.registerMigration("v11_add_dictation_timing") { db in
+            let recordingColumns = try db.columns(in: Recording.databaseTableName).map { $0.name }
+            if !recordingColumns.contains("timingJSON") {
+                try db.alter(table: Recording.databaseTableName) { t in
+                    t.add(column: "timingJSON", .text)
+                }
+            }
+            let reportColumns = try db.columns(in: TranscriptionReport.databaseTableName).map { $0.name }
+            if !reportColumns.contains("timingJSON") {
+                try db.alter(table: TranscriptionReport.databaseTableName) { t in
+                    t.add(column: "timingJSON", .text)
+                }
+            }
+        }
+
+        // Appended after v11 rather than folded into it: v11 is already in this branch, and a
+        // database that recorded it would never receive a column added to the same migration.
+        migrator.registerMigration("v12_add_report_ending") { db in
+            let reportColumns = try db.columns(in: TranscriptionReport.databaseTableName).map { $0.name }
+            if !reportColumns.contains("ending") {
+                try db.alter(table: TranscriptionReport.databaseTableName) { t in
+                    t.add(column: "ending", .text)
+                }
+            }
+        }
+
         return migrator
     }
 }

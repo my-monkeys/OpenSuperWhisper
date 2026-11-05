@@ -37,8 +37,10 @@ final class AssistantsSettingsModel: ObservableObject {
     @Published private(set) var projects: [String] = []
     @Published private(set) var disabledProjects: [String] = []
 
-    /// The moments and projects only matter while some agent is answered.
-    var enabled: Bool { claudeOn || codexOn || piOn }
+    /// The moments and projects only matter while some agent is answered. Codex counts only
+    /// once its plugin is found: without it, Codex can't answer, so its switch is hidden and a
+    /// stored codexOn mustn't keep this on by itself.
+    var enabled: Bool { claudeOn || (codexOn && codexHasPlugin) || piOn }
 
     init() { refreshProjects() }
 

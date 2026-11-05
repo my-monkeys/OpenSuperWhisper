@@ -8,7 +8,7 @@ struct TextAICleanupGroup: View {
     /// The stock pattern, as `AppPreferences` declares it. Kept here to tell a customised one apart.
     static let defaultFillerPattern = "\\b(um|uh|uh huh|er|ah|hmm|mm)\\b,?\\s*"
 
-    /// One backend serves both this prose cleanup and the per-app formatting rules in Style, so
+    /// One backend serves both this prose cleanup and the per-app formatting rules, so
     /// its fields stay visible while either is on: someone using formatting only would otherwise
     /// have nowhere to pick a backend or download a model.
     private var showsEngine: Bool {
@@ -23,16 +23,22 @@ struct TextAICleanupGroup: View {
                 SSwitch(isOn: .constant(false))
             }
             SettingRow("Format with AI",
-                       hint: "Cleans up the text with a language model before inserting it.") {
+                       hint: "Cleans up the text with a language model before inserting it. Apps and sites can override this on the Per app page.") {
                 SSwitch(isOn: $viewModel.aiPostProcessingEnabled)
             }
             if showsEngine {
                 if !viewModel.aiPostProcessingEnabled {
-                    SettingNotice("The engine below is used by the per-app formatting rules in Style.")
+                    SettingNotice("The engine below is used by the per-app formatting rules.")
                 }
                 engineRow
                 TextAIBackendFields(viewModel: viewModel)
                 TextAIInstructions(viewModel: viewModel)
+                if viewModel.aiPostProcessingEnabled {
+                    SettingRow("Spoken punctuation",
+                               hint: "Say “comma”, “new line” or “in parentheses” and get the punctuation instead of the word.") {
+                        SSwitch(isOn: $viewModel.aiSpokenFormattingEnabled)
+                    }
+                }
                 SettingRow("If the AI fails, paste the raw text",
                            hint: "If the model errors or returns nothing usable, the transcription is inserted as it is.",
                            advanced: true) {
@@ -41,10 +47,9 @@ struct TextAICleanupGroup: View {
                         .foregroundColor(STheme.hint)
                 }
             }
-            SettingRow("Default style", hint: "Will be chosen on the Style page.", badge: ("Soon", .soon)) {
+            SettingRow("Default style", hint: "Chosen on the Style page.") {
                 Button("Style →") {
-                    AppNavigation.shared.closeSettings()
-                    AppNavigation.shared.go(.style)
+                    AppNavigation.shared.showDashboard(.style)
                 }
                 .buttonStyle(.sSecondary)
             }

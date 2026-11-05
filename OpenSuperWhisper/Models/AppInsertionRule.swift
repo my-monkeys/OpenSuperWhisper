@@ -1,4 +1,5 @@
 import Foundation
+import OpenSuperWhisperCore
 
 /// How a transcription should reach one particular app.
 ///
@@ -51,13 +52,23 @@ struct AppInsertionRule: Codable, Identifiable, Equatable {
     /// difficult app has to be able to be "type, but slower here" rather than only "paste".
     var typingPaceMilliseconds: Int?
 
+    /// The input source id ("com.apple.keylayout.US") the computer this app shows reads keys with,
+    /// or nil for the layout this Mac uses.
+    ///
+    /// Only honoured for `.type`, where it makes the text go in key by key (see
+    /// `RemoteSession.route`). Kept when the mode goes back to paste, so choosing Type again
+    /// finds it. Optional, so rules saved before it existed still decode.
+    var keyboardLayoutID: String?
+
     init(id: UUID = UUID(), bundleIdentifier: String = "", appName: String = "",
-         mode: AppInsertionMode = .paste, typingPaceMilliseconds: Int? = nil) {
+         mode: AppInsertionMode = .paste, typingPaceMilliseconds: Int? = nil,
+         keyboardLayoutID: String? = nil) {
         self.id = id
         self.bundleIdentifier = bundleIdentifier
         self.appName = appName
         self.mode = mode
         self.typingPaceMilliseconds = typingPaceMilliseconds
+        self.keyboardLayoutID = keyboardLayoutID
     }
 }
 
@@ -69,8 +80,9 @@ extension AppInsertionRule {
     /// Matched case-insensitively, because a bundle identifier typed by hand rarely comes out
     /// with the same capitalisation as the one the system reports. The first match wins, so a
     /// duplicated identifier behaves like the list reads rather than unpredictably.
-    static func rule(for bundleID: String?, in rules: [AppInsertionRule]) -> AppInsertionRule? {
-        guard let bundleID, !bundleID.isEmpty else { return nil }
+    static func rule(for bundleID: String?, in rules: [AppInsertionRule],
+                     disabled: [String]) -> AppInsertionRule? {
+        guard let bundleID, !bundleID.isEmpty, PerAppSwitch.isOn(bundleID, disabled: disabled) else { return nil }
         return rules.first {
             !$0.bundleIdentifier.isEmpty
                 && $0.bundleIdentifier.compare(bundleID, options: .caseInsensitive) == .orderedSame

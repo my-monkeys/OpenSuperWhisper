@@ -54,8 +54,13 @@ class OnboardingViewModel: ObservableObject {
     /// starts unavailable and the step redraws once the system has answered.
     @Published private(set) var appleSpeech: AppleSpeechOffer = .unavailable
 
+    /// The words the "Your words" step holds, written to the dictionary only by `commitWords`.
+    @Published var words: [String] = []
+    /// What is typed in that step's field and not yet turned into a chip.
+    @Published var wordDraft = ""
+
     private let modelManager = WhisperModelManager.shared
-    private let system: OnboardingSystem
+    let system: OnboardingSystem
     private var downloadTask: Task<Void, Error>?
     /// Set once the user picks a model, a server or a download. From then on the default
     /// stops following the language picker.

@@ -103,9 +103,16 @@ public enum AppleIntelligence {
 /// on). Nothing to download and nothing leaves the Mac, but the window is small (about 4k
 /// tokens), so a dictation that would not fit is sent back raw rather than truncated.
 struct AppleIntelligenceBackend: LLMCleanupBackend, CustomStringConvertible {
-    enum Failure: Error, Equatable {
+    enum Failure: LocalizedError, Equatable {
         case unavailable(AppleIntelligenceAvailability)
         case exceedsContext(tokens: Int, contextSize: Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .unavailable: return "Apple Intelligence is not available"
+            case .exceedsContext: return "Dictation too long for Apple Intelligence"
+            }
+        }
     }
 
     let model: (any OnDeviceLanguageModel)?
@@ -117,6 +124,8 @@ struct AppleIntelligenceBackend: LLMCleanupBackend, CustomStringConvertible {
     var availability: AppleIntelligenceAvailability {
         AppleIntelligence.availability(of: model, language: nil)
     }
+
+    var modelLabel: String { "Apple Intelligence" }
 
     var description: String { "Apple Intelligence (\(availability))" }
 

@@ -401,10 +401,11 @@ enum IndicatorProbe {
             let w = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 900, height: 700),
                              styleMask: [.titled], backing: .buffered, defer: false)
             w.appearance = NSAppearance(named: .darkAqua)
+            AppNavigation.shared.settingsRubric = .appearance
             w.contentView = NSHostingView(rootView:
                 Group {
                     if ProcessInfo.processInfo.environment["PROBE_SETTINGS"] != nil {
-                        AppShellView(page: .home, settings: .appearance)
+                        SettingsWindowView(viewModel: SettingsViewModel())
                     } else {
                         ScrollView { IndicatorLayoutEditor(viewModel: SettingsViewModel()).padding(20) }
                     }

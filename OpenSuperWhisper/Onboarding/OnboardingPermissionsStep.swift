@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Step 3: what macOS has to allow, each with its reason and the button that asks. The status
+/// What macOS has to allow, each with its reason and the button that asks. The status
 /// updates live: PermissionsManager polls while the window is key, and the onboarding re-reads
 /// Input Monitoring on the same beat. Nothing here blocks, the main window's status card asks
 /// again for anything still missing.

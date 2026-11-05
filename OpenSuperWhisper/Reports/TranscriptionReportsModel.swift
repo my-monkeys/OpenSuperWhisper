@@ -41,10 +41,18 @@ final class TranscriptionReportsModel: ObservableObject {
     }
 
     /// Saves the draft as a report on `recording`, with its own copy of the recording's audio.
+    ///
+    /// The row is read again first: the feed's value was copied before the post-delivery timing
+    /// update, so building from it could print `total —` and `insert —` for the two stages this
+    /// feature exists to measure (#262). A row deleted by retention falls back to the passed
+    /// value — the report the person already wrote is still worth keeping. A database read error
+    /// is not the same thing: it propagates, and the card reports the save as failed rather than
+    /// filing numbers known to be stale.
     func save(_ draft: ReportDraft, for recording: Recording) async throws {
-        guard let report = draft.report(for: recording, languageSetting: languageSetting(),
+        let current = try await store.recordingForReport(recording)
+        guard let report = draft.report(for: current, languageSetting: languageSetting(),
                                         appDetails: appDetails()) else { return }
-        try await store.saveReport(report, audioFrom: recording.url)
+        try await store.saveReport(report, audioFrom: current.url)
         drafts[recording.id] = nil
         await refresh()
     }
@@ -74,5 +82,15 @@ final class TranscriptionReportsModel: ObservableObject {
         try await Task.detached(priority: .userInitiated) {
             try TranscriptionReportArchive.write(reports, to: destination, exportedWith: exportedWith)
         }.value
+    }
+}
+
+extension RecordingStore {
+    /// The row as it stands now, or the caller's copy when retention has removed it. A read
+    /// error propagates: both report surfaces prefer a visible failure to filing numbers known
+    /// to be stale (#262). Shared by the saved report and the one-tap feedback message, so the
+    /// two can never disagree about which value they are reporting.
+    nonisolated func recordingForReport(_ recording: Recording) async throws -> Recording {
+        (try await fetchRecording(id: recording.id)) ?? recording
     }
 }

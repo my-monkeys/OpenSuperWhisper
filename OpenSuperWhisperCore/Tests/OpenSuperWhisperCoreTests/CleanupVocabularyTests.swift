@@ -91,14 +91,36 @@ final class CleanupVocabularyTests: CoreTestCase {
     }
 
     /// The section is built from the dictionary only while it is on, through `process`'s use of
-    /// `boostTerms`: punctuation rules and regex templates never reach the model as words.
+    /// `cleanupTerms`: punctuation rules and regex templates never reach the model as words.
     func testOnlyRealTermsReachThePrompt() {
-        let terms = CustomDictionary.boostTerms(entries: [
+        let terms = CustomDictionary.cleanupTerms(entries: [
             CustomDictionaryEntry(original: "rsets", replacement: "Rsets"),
             CustomDictionaryEntry(original: "open quote", replacement: "“", spacing: .attachesRight),
             CustomDictionaryEntry(original: "(\\w+) said", replacement: "$1 said", isRegex: true),
         ])
         XCTAssertEqual(LLMPostProcessor.vocabularySection(terms),
                        "Keep these words spelled exactly as written here: Rsets.")
+    }
+
+    /// The recognition switch is about the speech engine: a word switched off there, the very
+    /// one a cleanup model would otherwise "correct", still goes to the cleanup prompt.
+    func testAWordKeptFromRecognitionStillReachesTheCleanup() {
+        let entries = [CustomDictionaryEntry(original: "Maxime", replacement: "Maxim", boostsRecognition: false)]
+
+        XCTAssertEqual(CustomDictionary.boostTerms(entries: entries), [])
+        XCTAssertEqual(CustomDictionary.cleanupTerms(entries: entries), ["Maxim"])
+    }
+
+    /// A pattern that writes a plain word teaches the model that word; one that writes what it
+    /// matched does not.
+    func testAPatternWritingAWordReachesTheCleanup() {
+        let entries = [
+            CustomDictionaryEntry(original: "\\byou ?gardener\\b", replacement: "YouGardener", isRegex: true),
+            CustomDictionaryEntry(original: "(\\w+) said", replacement: "$1 said", isRegex: true),
+            CustomDictionaryEntry(original: "(\\w+) told", replacement: "\\1 told", isRegex: true),
+        ]
+
+        XCTAssertEqual(CustomDictionary.cleanupTerms(entries: entries), ["YouGardener"])
+        XCTAssertEqual(CustomDictionary.spellings(entries: entries), [])
     }
 }

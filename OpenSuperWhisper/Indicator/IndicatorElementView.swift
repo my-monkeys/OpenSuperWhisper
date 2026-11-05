@@ -19,6 +19,9 @@ struct IndicatorElementView: View {
     /// becomes a spinner of exactly its width, the label changes its words.
     var isDecoding = false
 
+    /// While decoding, the AI cleanup model is the one working: the label says so.
+    var isCleaningUp = false
+
     /// The bubble is mostly graphics, so its dimensions follow the text setting too — otherwise
     /// raising it moves the one small label and nothing else.
     @Environment(\.textScaleFactor) private var scale
@@ -59,6 +62,9 @@ struct IndicatorElementView: View {
                    enabled: !isDecoding) {
                 IndicatorWindowManager.shared.stopRecording()
             }
+        case .liveText:
+            // Drawn by the bubble itself, beside or in place of the label, not as a row element.
+            EmptyView()
         case .cancelButton:
             // Stays live through the transcription: changing your mind is exactly what happens
             // while you watch a slow model work, and until the text lands there is still
@@ -93,9 +99,13 @@ struct IndicatorElementView: View {
 
     private var labelText: String {
         if isDecoding {
-            return queued > 1 ? "Transcribing… · \(queued - 1) queued" : "Transcribing…"
+            let waiting = queued - 1
+            if isCleaningUp {
+                return waiting > 0 ? String(localized: "Cleaning up… · \(waiting) queued") : String(localized: "Cleaning up…")
+            }
+            return waiting > 0 ? String(localized: "Transcribing… · \(waiting) queued") : String(localized: "Transcribing…")
         }
-        return queued > 0 ? "Recording… · \(queued) queued" : "Recording…"
+        return queued > 0 ? String(localized: "Recording… · \(queued) queued") : String(localized: "Recording…")
     }
 
     private func button(symbol: String, size: CGFloat, help: String, enabled: Bool = true,

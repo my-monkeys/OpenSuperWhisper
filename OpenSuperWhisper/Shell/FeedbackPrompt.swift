@@ -151,7 +151,7 @@ final class FeedbackPromptScheduler {
             windowInFront: NSApp.isActive && NSApp.modalWindow == nil && window.isVisible
                 && window.isKeyWindow && window.attachedSheet == nil,
             onQuietHome: navigation.page == .home && navigation.searchText.isEmpty,
-            cardOpen: navigation.settingsRubric != nil || navigation.helpOpen || navigation.feedbackOpen
+            cardOpen: navigation.helpOpen || navigation.feedbackOpen
                 || navigation.reporting != nil || navigation.reportsOpen,
             busy: recorder.isRecording || recorder.isConnecting || recorder.isPlaying
                 || IndicatorWindowManager.shared.viewModel != nil

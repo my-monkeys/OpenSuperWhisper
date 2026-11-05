@@ -1,6 +1,6 @@
 # Scripts/smoke-release.sh report
 arch: arm64
-toolchain: Xcode 27A9275, SDK macosx27.0
+toolchain: Xcode 27B52, SDK macosx27.2
 run jfk/app: exit 0
 run jfk/app: text And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.
 run jfk/app: vad model <app>/Contents/Resources/ggml-silero-v5.1.2.bin
@@ -40,6 +40,7 @@ load: /System/Library/Frameworks/Foundation.framework/Versions/C/Foundation
 load: /System/Library/Frameworks/FoundationModels.framework/Versions/A/FoundationModels
 load: /System/Library/Frameworks/Metal.framework/Versions/A/Metal
 load: /System/Library/Frameworks/MetalKit.framework/Versions/A/MetalKit
+load: /System/Library/Frameworks/MetricKit.framework/Versions/A/MetricKit
 load: /System/Library/Frameworks/NaturalLanguage.framework/Versions/A/NaturalLanguage
 load: /System/Library/Frameworks/Security.framework/Versions/A/Security
 load: /System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement

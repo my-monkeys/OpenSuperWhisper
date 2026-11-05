@@ -54,12 +54,39 @@ enum InstalledApps {
         NSWorkspace.shared.icon(forFile: url.path)
     }
 
-    /// Best-effort icon for an already-stored bundle id (so existing profiles show the app icon
-    /// even though they only persist the identifier). Falls back to a generic app icon.
-    static func icon(forBundleIdentifier bundleIdentifier: String) -> NSImage {
+    static func isInstalled(bundleIdentifier: String) -> Bool {
+        applicationURL(forBundleIdentifier: bundleIdentifier) != nil
+    }
+
+    /// Where the app is installed. Launch Services matches the identifier's case exactly, while
+    /// rules are matched without regard to case and a stored one may be lowercased, so a miss
+    /// falls back to the standard folders compared case-insensitively.
+    static func applicationURL(forBundleIdentifier bundleIdentifier: String) -> URL? {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return url
+        }
+        return urlsByLowercasedID[bundleIdentifier.lowercased()]
+    }
+
+    /// Scanned once: rows ask on every redraw, and an app installed while this one runs is
+    /// picked up at the next launch.
+    private static let urlsByLowercasedID: [String: URL] = Dictionary(
+        all().map { ($0.bundleIdentifier.lowercased(), $0.url) }, uniquingKeysWith: { first, _ in first })
+
+    /// The icon shipped in the asset catalog for an app that has a built-in profile, so the
+    /// profile still shows it on a Mac that does not have the app. Named after the lowercased
+    /// bundle identifier, like the matching of rules. nil for any other app.
+    static func bundledIcon(forBundleIdentifier bundleIdentifier: String) -> NSImage? {
+        NSImage(named: "app-" + bundleIdentifier.lowercased())
+    }
+
+    /// Best-effort icon for an already-stored bundle id (so existing profiles show the app icon
+    /// even though they only persist the identifier): the installed app's own, else the bundled
+    /// one of a built-in profile, else a generic app icon.
+    static func icon(forBundleIdentifier bundleIdentifier: String) -> NSImage {
+        if let url = applicationURL(forBundleIdentifier: bundleIdentifier) {
             return NSWorkspace.shared.icon(forFile: url.path)
         }
-        return NSWorkspace.shared.icon(for: .applicationBundle)
+        return bundledIcon(forBundleIdentifier: bundleIdentifier) ?? NSWorkspace.shared.icon(for: .applicationBundle)
     }
 }

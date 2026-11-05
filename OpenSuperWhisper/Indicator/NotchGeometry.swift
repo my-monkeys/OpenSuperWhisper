@@ -66,10 +66,12 @@ struct NotchGeometry: Equatable {
         switch element {
         case .dot: return 16 * textScale
         case .waveform: return InputLevelMeter.width
-        // "Transcribing…" is the longest of the three words the label can hold, and it is set
-        // on one line whatever happens, so this is the width to keep clear.
+        // "Transcribing…" is the longest of the four words the label can hold ("Cleaning up…" is
+        // shorter, and so are its translations), and it is set on one line whatever happens, so
+        // this is the width to keep clear.
         case .label: return 96 * textScale
         case .stopButton, .cancelButton: return 24
+        case .liveText: return 0 // never part of a row
         }
     }
 

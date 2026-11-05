@@ -24,17 +24,45 @@ public class TranscriptionService: ObservableObject {
 
     private var currentEngine: TranscriptionEngine?
     private var loadedEngineKind: String?
+    private var engineGeneration = 0
     private var totalDuration: Float = 0.0
+    private let engineBuilder: (EngineKind) async -> TranscriptionEngine
 
     /// The model that actually produced the most recent transcription, and whether it
     /// came from the remote local-fallback. Read by the recording-save paths so history
     /// shows the real model (and flags fallbacks). Set on the main actor per run.
     public private(set) var lastUsedModel: DictationModelOption?
     public private(set) var lastUsedFallback = false
+    /// How the most recent run spent its time inside the engine gate (#262). Read right after
+    /// `transcribeAudio` returns, for the same reason as `lastUsedModel`: it is per-run state,
+    /// and the caller's snapshot has to be taken before any `await` can let another
+    /// transcription overwrite it.
+    ///
+    /// It is overwritten per run, so on a retried dictation it describes the successful attempt
+    /// while the caller's elapsed time covers both. Per-attempt splits are a non-goal.
+    public private(set) var lastRunTimings: RunTimings?
+
+    /// What one run inside `transcribeAudio` cost, in integer milliseconds. `engineLoadMs` is
+    /// nil when the engine never loaded (a thrown load), which is different from 0.
+    public struct RunTimings: Equatable, Sendable {
+        public let engineWaitMs: Int?
+        public let engineLoadMs: Int?
+
+        public init(engineWaitMs: Int?, engineLoadMs: Int?) {
+            self.engineWaitMs = engineWaitMs
+            self.engineLoadMs = engineLoadMs
+        }
+    }
+
+    /// Test seam: the clock the run timings are measured with. Production uses the house
+    /// monotonic clock.
+    var uptime: () -> UInt64 = UptimeClock.now
+    private var lastEngineLoadMs: Int?
     private var transcriptionTask: Task<String, Error>? = nil
     private var isCancelled = false
     
-    init() {
+    init(engineBuilder: @escaping (EngineKind) async -> TranscriptionEngine = TranscriptionService.buildEngine) {
+        self.engineBuilder = engineBuilder
         // Engines load lazily on first transcription (see ensureEngineLoaded), so
         // merely selecting an engine in Settings — or launching the app — never
         // triggers a model download. The download happens only when you actually
@@ -54,20 +82,23 @@ public class TranscriptionService: ObservableObject {
     }
     
     /// Initialize the engine matching the current preference if it isn't already
-    /// active. Called lazily from transcribeAudio, so selecting an engine in
-    /// Settings only records the choice — the model isn't downloaded/loaded until
-    /// you actually transcribe with it. Heavy work runs off the main actor.
-    private func ensureEngineLoaded() async {
+    /// active, and return it. Called lazily from transcribeAudio, so selecting an
+    /// engine in Settings only records the choice — the model isn't downloaded/loaded
+    /// until you actually transcribe with it. Heavy work runs off the main actor.
+    /// When `reloadEngine` runs during the load, the engine still goes to this caller,
+    /// whose model it is, but isn't kept: the next caller loads the current choice.
+    private func ensureEngineLoaded() async -> TranscriptionEngine? {
         let selectedEngine = CoreAccess.preferences.selectedEngine
-        if currentEngine != nil, loadedEngineKind == selectedEngine { return }
+        if let currentEngine, loadedEngineKind == selectedEngine { return currentEngine }
 
         isLoading = true
         engineError = nil
         print("Loading engine: \(selectedEngine)")
 
+        let generation = engineGeneration
         let kind = Self.engineKind(forSelectedEngine: selectedEngine)
-        let result = await Task.detached(priority: .userInitiated) { () -> Result<TranscriptionEngine?, Error> in
-            let engine: TranscriptionEngine? = await Self.buildEngine(kind)
+        let result = await Task.detached(priority: .userInitiated) { [engineBuilder] () -> Result<TranscriptionEngine?, Error> in
+            let engine: TranscriptionEngine? = await engineBuilder(kind)
 
             do {
                 try await engine?.initialize()
@@ -76,6 +107,11 @@ public class TranscriptionService: ObservableObject {
                 return .failure(error)
             }
         }.value
+
+        guard generation == engineGeneration else {
+            isLoading = false
+            return try? result.get()
+        }
 
         switch result {
         case .success(let engine):
@@ -89,6 +125,7 @@ public class TranscriptionService: ObservableObject {
             print("Failed to load engine: \(error)")
         }
         isLoading = false
+        return currentEngine
     }
 
     /// The engines `ensureEngineLoaded` can build. Named apart from the classes so the choice can
@@ -177,7 +214,9 @@ public class TranscriptionService: ObservableObject {
     /// (used when the engine selection or model changes). Intentionally does NOT
     /// load or download anything — that's deferred to next use. Clears any stale
     /// load error, since the invalidated engine gets a fresh attempt next time.
+    /// An engine still loading is invalidated too: it serves only the caller waiting on it.
     public func reloadEngine() {
+        engineGeneration += 1
         currentEngine = nil
         loadedEngineKind = nil
         engineError = nil
@@ -229,7 +268,9 @@ public class TranscriptionService: ObservableObject {
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
         // would crash or corrupt output. (parallel-recording #2)
+        let gateStart = uptime()
         await Self.engineGate.wait()
+        let engineWaitMs = UptimeClock.milliseconds(from: gateStart, to: uptime())
         // Apply a per-call model INSIDE the gate — the clip was recorded under this model, but a
         // later recording may since have switched the global one — so it can't leak to a concurrent
         // caller, and restore it before releasing. No-op when nil or already active. (#model-snapshot)
@@ -271,6 +312,13 @@ public class TranscriptionService: ObservableObject {
             self.totalDuration = durationInSeconds
         }
 
+        // Published on both the returning and the throwing path: a run that failed after
+        // spending 15 s waiting for a model is exactly what the measurement is for.
+        lastEngineLoadMs = nil
+        defer {
+            lastRunTimings = RunTimings(engineWaitMs: engineWaitMs,
+                                        engineLoadMs: lastEngineLoadMs)
+        }
         return try await transcribe(url: url, settings: settings, fallbackModel: nil)
     }
 
@@ -281,18 +329,25 @@ public class TranscriptionService: ObservableObject {
     private func transcribe(url: URL, settings: TranscriptionSettings, fallbackModel: DictationModelOption?) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
+            // The fallback engine is built AND initialized here, so a user on remote-with-
+            // fallback pays this cold load; leaving it nil hid it from the report.
+            let fallbackLoadStart = uptime()
             engine = try await makeEngine(for: fallbackModel)
+            lastEngineLoadMs = UptimeClock.milliseconds(from: fallbackLoadStart, to: uptime())
             lastUsedModel = fallbackModel
             lastUsedFallback = true
         } else {
             // Lazily initialize the selected engine on first use (downloads a local
             // model only now, never on mere engine selection in Settings).
-            await ensureEngineLoaded()
-            guard let loaded = currentEngine else {
+            let activeOption = ModelCatalog.activeOption()
+            let loadStart = uptime()
+            guard let loaded = await ensureEngineLoaded() else {
                 throw TranscriptionError.contextInitializationFailed
             }
+            // 0 when the engine was already up; left nil when the load never completed.
+            lastEngineLoadMs = UptimeClock.milliseconds(from: loadStart, to: uptime())
             engine = loaded
-            lastUsedModel = ModelCatalog.activeOption()
+            lastUsedModel = activeOption
             lastUsedFallback = false
         }
 
@@ -384,12 +439,19 @@ public class TranscriptionService: ObservableObject {
     /// off the main actor, like `ensureEngineLoaded`.
     private func makeEngine(for option: DictationModelOption) async throws -> TranscriptionEngine {
         let choice = Self.fallbackEngineChoice(for: option)
+        // Test seam: the real fallback engine needs a model file, so a test injects a stub to
+        // exercise the fallback path at all. Production keeps the real builder.
+        let build = fallbackEngineBuilder
         return try await Task.detached(priority: .userInitiated) { () -> TranscriptionEngine in
-            let engine = await Self.buildFallbackEngine(choice)
+            let engine = await build(choice)
             try await engine.initialize()
             return engine
         }.value
     }
+
+    /// Test seam: builds the engine the remote local-fallback runs on. Production builds the real
+    /// engine for the choice with `buildFallbackEngine`.
+    var fallbackEngineBuilder: (FallbackEngineChoice) async -> TranscriptionEngine = TranscriptionService.buildFallbackEngine
 
     /// The engines the remote local-fallback can build, with what each is given. Separate from
     /// `EngineKind` because this factory has its own quirks, kept as they are (see below).

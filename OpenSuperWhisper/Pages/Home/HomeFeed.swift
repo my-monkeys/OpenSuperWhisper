@@ -65,8 +65,8 @@ struct HomeFeed: View {
             onRegenerate: { model in
                 Task { await TranscriptionQueue.shared.requeueRecording(recording, model: model) }
             },
-            onRestyle: { style in
-                Task { await HistoryRestyle.run(recording, in: style) }
+            onCleanup: { request in
+                Task { await HistoryRestyle.run(recording, request) }
             },
             onReport: { AppNavigation.shared.openReport(for: recording) }
         )

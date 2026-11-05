@@ -452,6 +452,11 @@ final class AppPreferences {
     @UserDefault(key: "feedbackPromptLaunches", defaultValue: 0)
     var feedbackPromptLaunches: Int
 
+    /// Keep a copy of the portable settings in iCloud Drive (`ICloudSettingsBackup`). Local to
+    /// this Mac: a backup that switched itself on elsewhere would overwrite the one it came from.
+    @UserDefault(key: "iCloudSettingsBackupEnabled", defaultValue: false)
+    var iCloudSettingsBackupEnabled: Bool
+
     /// Raw store for `crashReportMode`. A plain string so an unknown value from a newer build reads
     /// as the default rather than failing to decode.
     @UserDefault(key: "crashReportMode", defaultValue: CrashReportMode.default.rawValue)
@@ -715,6 +720,12 @@ final class AppPreferences {
     @UserDefault(key: "aiRemoteModel", defaultValue: "llama-3.1-8b-instant")
     var aiRemoteModel: String
 
+    /// Asks the server not to reason before answering: a dictation cleanup gains nothing from it
+    /// and waits seconds for it. Nil until the user chooses; `RemoteService.disablesReasoning`
+    /// then resolves it, on for a known service and off for a Custom server.
+    @OptionalUserDefault(key: "aiRemoteDisableReasoning")
+    var aiRemoteDisableReasoning: Bool?
+
     /// Remote-LLM cleanup API key — Keychain-backed (a secret), not UserDefaults.
     /// nil/empty means send no Authorization header (no-auth/local servers).
     var aiRemoteAPIKey: String? {
@@ -745,6 +756,12 @@ final class AppPreferences {
     // Sent only while "Translate to English" is on. Kept apart from the general instruction
     // because a prompt that mentions translating confuses the model on every dictation that
     // isn't one (#86).
+    // Spoken punctuation and layout ("virgule", "à la ligne", "entre parenthèses") written as
+    // what they ask for during the cleanup pass (#265). On by default: it is what anyone who
+    // says them expects, and it only acts while cleanup itself is on.
+    @UserDefault(key: "aiSpokenFormattingEnabled", defaultValue: true)
+    var aiSpokenFormattingEnabled: Bool
+
     @UserDefault(key: "aiPostProcessingTranslation",
                  defaultValue: LLMPostProcessor.defaultTranslationInstruction)
     var aiPostProcessingTranslation: String
@@ -818,14 +835,60 @@ final class AppPreferences {
         set { customWritingStylesData = try? JSONEncoder().encode(newValue) }
     }
 
-    /// Bundle identifier, lowercased, to style id: an app that always gets the same voice.
+    /// Bundle identifier, lowercased, to style id: an app that always gets the same voice. A key
+    /// "bundleID|host" is the same for one site of a browser.
     @UserDefault(key: "appWritingStyles", defaultValue: [String: String]())
     var appWritingStyles: [String: String]
 
-    /// The style for a dictation into `bundleID`: the app's own if it has one, else the default.
-    func writingStyle(for bundleID: String?) -> WritingStyle {
-        let appStyle = bundleID.flatMap { appWritingStyles[$0.lowercased()] }
-        return WritingStyle.resolve(appStyle ?? writingStyleID, custom: customWritingStyles)
+    /// Same keys, to whether AI cleanup runs there: on or off whatever the global switch says.
+    /// Absent follows the global switch.
+    @UserDefault(key: "appCleanupOverrides", defaultValue: [String: Bool]())
+    var appCleanupOverrides: [String: Bool]
+
+    /// The style for a dictation into `bundleID` (and `host`, for a browser): the site's own, else
+    /// the app's, else the default. Own styles only count while the app is switched on.
+    func writingStyle(for bundleID: String?, host: String? = nil) -> WritingStyle {
+        let own = PerAppOverride.value(in: appWritingStyles, bundleID: bundleID, host: host,
+                                       disabled: perAppDisabledBundleIDs)
+        return WritingStyle.resolve(own ?? writingStyleID, custom: customWritingStyles)
+    }
+
+    /// Whether AI cleanup runs for a dictation into `bundleID` (and `host`): the site's own choice,
+    /// else the app's, else the global switch.
+    func cleanupEnabled(bundleID: String?, host: String? = nil) -> Bool {
+        PerAppOverride.value(in: appCleanupOverrides, bundleID: bundleID, host: host,
+                             disabled: perAppDisabledBundleIDs) ?? aiPostProcessingEnabled
+    }
+
+    /// Whether AI cleanup runs for at least some dictations: the global switch, or one app or site
+    /// set to clean up while its app is switched on.
+    var cleanupOnSomewhere: Bool {
+        aiPostProcessingEnabled || appCleanupOverrides.contains { key, on in
+            on && PerAppSwitch.isOn(String(key.prefix { $0 != "|" }), disabled: perAppDisabledBundleIDs)
+        }
+    }
+
+    /// Bundle identifiers (lowercased) of the apps whose per-app settings are switched off: none of
+    /// their profile, insertion rule, model rule or style applies, though all stay stored. See
+    /// `PerAppSwitch`. The built-in formatting profiles are added here when they arrive, so they
+    /// are opt-in.
+    @UserDefault(key: "perAppDisabledBundleIDs", defaultValue: [String]())
+    var perAppDisabledBundleIDs: [String]
+
+    /// Whether the built-in profile for this app is added switched off. Not a terminal that has a
+    /// seeded paste rule: the switch is per app, and turning it off would drop that fix with the
+    /// profile. Formatting is globally off until the user turns "Reformat per app" on anyway.
+    private func arrivesSwitchedOff(_ preset: AppContextProfile) -> Bool {
+        !AppInsertionRule.bundledTerminalPresets.contains {
+            $0.bundleIdentifier.caseInsensitiveCompare(preset.bundleIdentifier) == .orderedSame
+        }
+    }
+
+    private func switchOff(_ presets: [AppContextProfile]) {
+        let ids = presets.filter(arrivesSwitchedOff).map(\.bundleIdentifier)
+        perAppDisabledBundleIDs = ids.reduce(perAppDisabledBundleIDs) {
+            PerAppSwitch.setting($1, on: false, in: $0)
+        }
     }
 
     /// Flips true once the bundled presets have been seeded, so a user who deletes them keeps
@@ -833,14 +896,43 @@ final class AppPreferences {
     @UserDefault(key: "didSeedAppContextPresets", defaultValue: false)
     var didSeedAppContextPresets: Bool
 
-    /// One-time seed of the bundled app-context presets (Slack). Only populates an empty list so
-    /// it never clobbers user-authored profiles, and only runs once (the flag persists the choice).
+    /// Bundle identifiers of the built-in profiles this install has been offered, whether the
+    /// user kept, edited or deleted them. A profile in `AppContextProfile.defaultPresets` that is
+    /// not listed here is new to this install and gets added; one that is listed never comes back.
+    @UserDefault(key: "offeredAppContextPresets", defaultValue: [String]())
+    var offeredAppContextPresets: [String]
+
+    /// Seeds the bundled app-context presets. The first run only populates an empty list, so it
+    /// never clobbers user-authored profiles. Every later run appends the presets added to the app
+    /// since, once each: existing profiles are left as they are, and a user's own profile for an
+    /// app keeps the app's built-in one from being added next to it.
     private func seedAppContextPresetsIfNeeded() {
-        guard !didSeedAppContextPresets else { return }
-        if appContextProfiles.isEmpty {
-            appContextProfiles = AppContextProfile.defaultPresets
+        if !didSeedAppContextPresets {
+            if appContextProfiles.isEmpty {
+                appContextProfiles = AppContextProfile.defaultPresets
+                switchOff(AppContextProfile.defaultPresets)
+            }
+            offeredAppContextPresets = AppContextProfile.defaultPresets.map(\.bundleIdentifier)
+            didSeedAppContextPresets = true
+            return
         }
-        didSeedAppContextPresets = true
+        if offeredAppContextPresets.isEmpty {
+            // Seeded by a build from before the list was recorded: it offered the first two.
+            offeredAppContextPresets = AppContextProfile.firstShippedPresets.map(\.bundleIdentifier)
+        }
+        let fresh = AppContextProfile.defaultPresets.filter { !offeredAppContextPresets.contains($0.bundleIdentifier) }
+        guard !fresh.isEmpty else { return }
+        var profiles = appContextProfiles
+        var added: [AppContextProfile] = []
+        for preset in fresh where !profiles.contains(where: {
+            $0.bundleIdentifier.caseInsensitiveCompare(preset.bundleIdentifier) == .orderedSame
+        }) {
+            profiles.append(preset)
+            added.append(preset)
+        }
+        appContextProfiles = profiles
+        switchOff(added)
+        offeredAppContextPresets += fresh.map(\.bundleIdentifier)
     }
 
     /// Flips true once the terminal paste rules have been seeded, so a user who deletes them keeps

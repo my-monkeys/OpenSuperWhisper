@@ -63,6 +63,30 @@ final class TranscriptionReportTests: CoreTestCase {
         XCTAssertNil(report.audioFileName)
     }
 
+    /// The measurement is part of the snapshot: a report outlives the recording it came from, so
+    /// the numbers have to travel with it rather than be looked up later (#262).
+    func testReportCarriesTheMeasurement() {
+        var recording = Self.recording()
+        var timing = DictationTiming()
+        timing.finalizeMs = 120
+        timing.transcribeMs = 1_200
+        timing.transcribeAttempts = 2
+        timing.totalMs = 1_500
+        recording.timingJSON = timing.encoded
+
+        let report = Self.report(for: recording)
+
+        XCTAssertEqual(report.timing, timing)
+    }
+
+    /// A corrupt blob is "not measured", never a decode that takes the report list down with it.
+    func testACorruptMeasurementReadsAsNotMeasured() {
+        var recording = Self.recording()
+        recording.timingJSON = "{not json"
+
+        XCTAssertNil(Self.report(for: recording).timing)
+    }
+
     /// Where it was dictated (app, window title, URL) is private and says nothing about the
     /// transcription, so a report has nowhere to keep it.
     func testReportLeavesOutWhereItWasDictated() throws {
@@ -123,9 +147,48 @@ final class TranscriptionReportTests: CoreTestCase {
             "languageSetting|TEXT|0||0",
             "appDetails|TEXT|1||0",
             "audioFileName|TEXT|0||0",
+            "timingJSON|TEXT|0||0",
+            "ending|TEXT|0||0",
         ])
         let foreignKeys = try queue.read { try Row.fetchAll($0, sql: "PRAGMA foreign_key_list(transcription_reports)") }
         XCTAssertTrue(foreignKeys.isEmpty, "a report must not follow its recording out")
+    }
+
+    // MARK: - Ending
+
+    /// Only what the stored facts support: a failure from the status, an insertion from a
+    /// measured insertion, `noInsertion` for a measured completed row, and nil for a row that
+    /// carries no measurement at all (where even the insertion fact is unknown).
+    func testTheEndingIsWhatTheRowCanSupport() {
+        var inserted = Self.recording()
+        var insertionTiming = DictationTiming()
+        insertionTiming.insertMs = 100
+        insertionTiming.totalMs = 1_000
+        inserted.timingJSON = insertionTiming.encoded
+        XCTAssertEqual(Self.report(for: inserted).ending, TranscriptionReport.Ending.insertion)
+
+        var notInserted = Self.recording()
+        var noInsertionTiming = DictationTiming()
+        noInsertionTiming.totalMs = 4_300
+        notInserted.timingJSON = noInsertionTiming.encoded
+        XCTAssertEqual(Self.report(for: notInserted).ending, TranscriptionReport.Ending.noInsertion)
+
+        // A blob that never reached its terminal stamp (the post-delivery UPDATE failed, or the
+        // report was saved before it landed) cannot support even "no insertion".
+        var unfinished = Self.recording()
+        var unfinishedTiming = DictationTiming()
+        unfinishedTiming.transcribeMs = 1_200
+        unfinished.timingJSON = unfinishedTiming.encoded
+        XCTAssertNil(Self.report(for: unfinished).ending)
+
+        XCTAssertNil(Self.report(for: Self.recording()).ending)
+
+        var failed = Self.recording()
+        failed.status = .failed
+        var partial = DictationTiming()
+        partial.totalMs = 15_000
+        failed.timingJSON = partial.encoded
+        XCTAssertEqual(Self.report(for: failed).ending, TranscriptionReport.Ending.failure)
     }
 
     // MARK: - Store
