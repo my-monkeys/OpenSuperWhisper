@@ -45,13 +45,13 @@ final class FieldContextCapabilityTests: CoreTestCase {
         }
 
         XCTAssertEqual(kinds.count, TranscriptionService.EngineKind.allCases.count)
+        // Exactly one id per case, compared as cases rather than as descriptions: a count plus a
+        // membership check would still admit a duplicate, and `String(describing:)` would keep
+        // passing if a case were renamed to collide. This needs only `Equatable`.
         for kind in TranscriptionService.EngineKind.allCases {
-            XCTAssertTrue(kinds.contains(kind), "no engine id maps to \(kind)")
+            XCTAssertEqual(kinds.filter { $0 == kind }.count, 1,
+                           "engine kinds are not one-to-one; \(kind) appears a different number of times")
         }
-        // Same count and every case present still admits a duplicate, so say it outright.
-        let names = Set(kinds.map { String(describing: $0) })
-        XCTAssertEqual(names.count, TranscriptionService.EngineKind.allCases.count,
-                       "two engine ids share one kind: \(names.sorted())")
     }
 
     /// The gate the app actually calls, checked against the mode it is derived from, per engine.
