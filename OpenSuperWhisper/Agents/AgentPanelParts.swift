@@ -49,14 +49,16 @@ struct AgentAvatar: View {
         }
     }
 
+    /// The "pi" SF Symbol ships only from macOS 15.4; older releases get "terminal" instead.
+    private static let piSymbol = NSImage(systemSymbolName: "pi", accessibilityDescription: nil) != nil ? "pi" : "terminal"
+
     private static func fallbackSymbol(_ kind: AgentKind) -> String {
         switch kind {
         case .claudeCode: return "sparkle"
         case .codex: return "chevron.left.forwardslash.chevron.right"
         case .gemini: return "sparkles"
         case .cursor: return "cursorarrow"
-        // The "pi" SF Symbol requires macOS 15.4; on supported older releases, the badge has no glyph.
-        case .pi: return "pi"
+        case .pi: return piSymbol
         case .unknown: return "terminal"
         }
     }
