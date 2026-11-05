@@ -85,9 +85,10 @@ public enum EngineCapabilities {
         case "whisper":
             return .prose
         case "fluidaudio":
-            // `.terms` arrives only in the commit that adds the vocabulary consumer. A capable
-            // switch with nothing behind it is the #126 failure.
-            return .none
+            // A vocabulary list, reduced from the field's prose. It is flipped in the same
+            // commit as the engine that consumes it: a capable switch with nothing behind it is
+            // the #126 failure.
+            return .terms
         case "remote":
             // Not for want of a prompt: its prompt is posted to someone else's server, and this
             // text is the user's own writing.
