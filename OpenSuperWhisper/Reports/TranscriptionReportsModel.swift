@@ -41,10 +41,16 @@ final class TranscriptionReportsModel: ObservableObject {
     }
 
     /// Saves the draft as a report on `recording`, with its own copy of the recording's audio.
+    ///
+    /// The row is read again first: the feed's value was copied before the post-delivery timing
+    /// update, so building from it could print `total —` and `insert —` for the two stages this
+    /// feature exists to measure (#262). A row deleted by retention falls back to the passed
+    /// value — the report the person already wrote is still worth keeping.
     func save(_ draft: ReportDraft, for recording: Recording) async throws {
-        guard let report = draft.report(for: recording, languageSetting: languageSetting(),
+        let current = (try? await store.fetchRecording(id: recording.id)) ?? recording
+        guard let report = draft.report(for: current, languageSetting: languageSetting(),
                                         appDetails: appDetails()) else { return }
-        try await store.saveReport(report, audioFrom: recording.url)
+        try await store.saveReport(report, audioFrom: current.url)
         drafts[recording.id] = nil
         await refresh()
     }

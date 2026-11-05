@@ -98,9 +98,10 @@ final class ReportIssueLinkTests: XCTestCase {
     private func report(final: String = "Send the mockups & the plan + notes.",
                         raw: String? = "send the mock ups and the plan plus notes",
                         comment: String = "It wrote mock ups.\nTwice.",
+                        status: RecordingStatus = .completed,
                         timing: DictationTiming? = nil) -> TranscriptionReport {
         var recording = Recording(id: UUID(), timestamp: Date(timeIntervalSince1970: 1_760_000_000), fileName: "a.wav",
-                                  transcription: final, duration: 4.25, status: .completed, progress: 1,
+                                  transcription: final, duration: 4.25, status: status, progress: 1,
                                   sourceAppName: "Slack", sourceWindowTitle: "#secret-project",
                                   modelUsed: "Parakeet v3", wasFallback: true, rawTranscription: raw)
         recording.timingJSON = timing?.encoded
@@ -158,13 +159,14 @@ final class ReportIssueLinkTests: XCTestCase {
     }
 
     /// The maintainer reads the wait, stage by stage, in the same line order the contract fixes.
+    /// The engine split is nested because both spans are measured inside `transcribe`.
     func testBodyCarriesTheTimingBreakdownAfterTheLength() throws {
         var timing = DictationTiming()
         timing.finalizeMs = 100
         timing.queueWaitMs = 200
         timing.engineWaitMs = 0
-        timing.engineLoadMs = 2_100
-        timing.transcribeMs = 1_200
+        timing.engineLoadMs = 400
+        timing.transcribeMs = 1_300
         timing.cleanupMs = 600
         timing.insertMs = 100
         timing.totalMs = 4_300
@@ -173,9 +175,10 @@ final class ReportIssueLinkTests: XCTestCase {
 
         let body = ReportIssueLink.body(for: report(timing: timing))
 
-        XCTAssertTrue(body.contains("- Timing: total 4.3 s (finalize 0.1, queue 0.2, engine wait 0.0, "
-            + "model load 2.1, transcribe 1.2, cleanup 0.6, insert 0.1) · attempts 1 · "
-            + "thermal nominal · low power off"))
+        XCTAssertTrue(body.contains("- Timing: total 4.3 s (finalize 0.1, queue 0.2, "
+            + "transcribe 1.3 [engine wait 0.0, model load 0.4], cleanup 0.6, insert 0.1) · "
+            + "attempts 1 · thermal nominal · low power off · ended insertion · "
+            + "measured at dictation time"))
         let length = try XCTUnwrap(body.range(of: "- Length:"))
         let timingLine = try XCTUnwrap(body.range(of: "- Timing:"))
         let app = try XCTUnwrap(body.range(of: "- App:"))
@@ -184,11 +187,14 @@ final class ReportIssueLinkTests: XCTestCase {
     }
 
     /// "Not measured" is a fact, not a zero: rows older than the column, imports and reruns say so.
+    /// No terminal point is asserted for a row whose measurement is absent.
     func testBodySaysNotMeasuredWithoutTiming() {
         let body = ReportIssueLink.body(for: report())
 
         XCTAssertTrue(body.contains("- Timing: not measured"))
         XCTAssertFalse(body.contains("total 0.0 s"))
+        XCTAssertFalse(body.contains("ended"))
+        XCTAssertFalse(body.contains("measured at dictation time"))
     }
 
     /// A stage that did not run is an em dash; nothing is invented, and clauses with no value go.
@@ -198,10 +204,28 @@ final class ReportIssueLinkTests: XCTestCase {
 
         let body = ReportIssueLink.body(for: report(timing: timing))
 
-        XCTAssertTrue(body.contains("total — (finalize —, queue —, engine wait —, model load —, "
-            + "transcribe 1.2, cleanup —, insert —)"))
+        XCTAssertTrue(body.contains("total — (finalize —, queue —, "
+            + "transcribe 1.2 [engine wait —, model load —], cleanup —, insert —)"))
+        XCTAssertTrue(body.contains("ended no insertion"))
         XCTAssertFalse(body.contains("attempts"))
         XCTAssertFalse(body.contains("thermal"))
+    }
+
+    /// A failed dictation can be reported now: its own message is what the maintainer reads, the
+    /// stages it never reached are em dashes, and the terminal point says failure.
+    func testAFailedDictationIsReportedAsAFailureWithoutInventingStages() {
+        var timing = DictationTiming()
+        timing.finalizeMs = 100
+        timing.totalMs = 15_000
+
+        let body = ReportIssueLink.body(for: report(
+            final: "Transcription failed: the server timed out. Click ↻ to try again.",
+            raw: nil, status: .failed, timing: timing))
+
+        XCTAssertTrue(body.contains("Transcription failed: the server timed out."))
+        XCTAssertTrue(body.contains("ended failure"))
+        XCTAssertTrue(body.contains("cleanup —, insert —"))
+        XCTAssertFalse(body.contains("ended insertion"))
     }
 
     func testOneTextWhenTheOriginalIsTheSameOrWasNotKept() {

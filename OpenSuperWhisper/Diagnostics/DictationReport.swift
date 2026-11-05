@@ -69,7 +69,7 @@ enum DictationReport {
 
     /// A submission carrying the dictation's settings and text. The person's email is left blank:
     /// they can add one in the card, but a one-tap report does not ask for it. Trimmed to fit the
-    /// endpoint, dropping the raw text first, then shortening the output.
+    /// endpoint, dropping the timing line first, then the raw text, then shortening the output.
     static func submission(for draft: DictationReportDraft, email: String = "") -> FeedbackSubmission {
         let details = "OpenSuperWhisper \(draft.appVersion) · macOS \(draft.osVersion)"
         func make(outputLimit: Int, includeRaw: Bool, includeTiming: Bool = true) -> FeedbackSubmission {

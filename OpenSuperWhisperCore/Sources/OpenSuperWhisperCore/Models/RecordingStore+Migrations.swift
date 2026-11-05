@@ -132,6 +132,17 @@ extension RecordingStore {
             }
         }
 
+        // Appended after v11 rather than folded into it: v11 is already in this branch, and a
+        // database that recorded it would never receive a column added to the same migration.
+        migrator.registerMigration("v12_add_report_ending") { db in
+            let reportColumns = try db.columns(in: TranscriptionReport.databaseTableName).map { $0.name }
+            if !reportColumns.contains("ending") {
+                try db.alter(table: TranscriptionReport.databaseTableName) { t in
+                    t.add(column: "ending", .text)
+                }
+            }
+        }
+
         return migrator
     }
 }

@@ -48,6 +48,17 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
     /// The decoded measurement, read from the column every time so the two can never disagree.
     public var timing: DictationTiming? { DictationTiming.decode(timingJSON) }
 
+    /// How the dictation ended, as far as the report can know it (#262). `.noInsertion` is the
+    /// conservative catch-all: a completed row handed to an agent, recovered from `unfinished/`,
+    /// or left on the clipboard for a manual paste is not distinguishable here, and the report
+    /// does not guess. Nil when the row carries no measurement at all (an import, a rerun, or a
+    /// row older than v11), where even the insertion fact is unknown.
+    public enum Ending: String, Codable, Sendable {
+        case insertion, noInsertion, failure
+    }
+
+    public let ending: Ending?
+
     public init(id: UUID = UUID(), createdAt: Date = Date(), recording: Recording,
                 problem: Problem, comment: String = "", writtenAs: String? = nil, shouldBe: String? = nil,
                 languageSetting: String?, appDetails: String) {
@@ -67,7 +78,14 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
         self.languageSetting = languageSetting
         self.appDetails = appDetails
         self.timingJSON = recording.timingJSON
+        self.ending = Self.ending(for: recording)
         self.audioFileName = nil
+    }
+
+    private static func ending(for recording: Recording) -> Ending? {
+        if recording.status == .failed { return .failure }
+        guard let timing = recording.timing else { return nil }
+        return timing.insertMs != nil ? .insertion : .noInsertion
     }
 
     private static func nonBlank(_ text: String?) -> String? {
