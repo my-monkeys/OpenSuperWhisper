@@ -21,7 +21,11 @@ public enum DictionaryCandidates {
     }
 
     /// The spelling dictionary, asked about one word at a time.
-    public struct Spelling {
+    /// `@unchecked Sendable` so the host can hand it to core through a `@Sendable` provider
+    /// (`CoreConfiguration.fieldTermSpelling`). The struct is a value holding two closures; the
+    /// host builds it on the main actor and the only caller invokes it there, so crossing the
+    /// boundary carries no shared mutable state.
+    public struct Spelling: @unchecked Sendable {
         /// The word is spelled right, as written, in one of the user's languages.
         public let knows: (String) -> Bool
         /// The spelling dictionary would autocorrect the word into another one: a typo.

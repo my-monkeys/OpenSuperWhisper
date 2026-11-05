@@ -268,7 +268,6 @@ extension Settings {
             customDictionaryEnabled: false,
             customDictionaryBoostEnabled: false,
             customDictionaryEntries: [],
-            useSurroundingTextAsContext: false,
-            focusedText: nil)
+            useSurroundingTextAsContext: false)
     }
 }

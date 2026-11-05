@@ -21,7 +21,7 @@ private class ProgressContext {
     }
 }
 
-public class WhisperEngine: TranscriptionEngine {
+public class WhisperEngine: TranscriptionEngine, ProseContextEngine {
     var engineName: String { "Whisper" }
     
     /// Silero VAD, shipped in the app bundle (~0.9 MB). Used to cut non-speech audio out
@@ -115,6 +115,19 @@ public class WhisperEngine: TranscriptionEngine {
     }
 
     public func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+        try await transcribe(url: url, settings: settings, surroundingText: nil)
+    }
+
+    /// The same, told what the user was already writing (#89). The text arrives already gated by
+    /// the preference and resolved by `TranscriptionService`: an engine that receives prose has
+    /// been found able to use it.
+    func transcribeAudio(url: URL, settings: TranscriptionSettings,
+                         proseContext: String) async throws -> String {
+        try await transcribe(url: url, settings: settings, surroundingText: proseContext)
+    }
+
+    private func transcribe(url: URL, settings: TranscriptionSettings,
+                            surroundingText: String?) async throws -> String {
         // With idle-unloading on, the model isn't held between dictations: load it on
         // demand here and release it again once this transcription finishes (#171).
         let unloadWhenIdle = CoreAccess.preferences.unloadWhisperModelWhenIdle
@@ -187,14 +200,11 @@ public class WhisperEngine: TranscriptionEngine {
         params.temperature = Float(settings.temperature)
         params.noSpeechThold = Float(settings.noSpeechThreshold)
         let promptBoost = settings.recognitionBoostTerms.joined(separator: ", ")
-        // Read at record-start and carried on the clip, so a dictation queued behind another
+        // Captured at record-start and carried on the clip, so a dictation queued behind another
         // cannot be handed the field the newer one was started in. (parallel-recording)
-        let surrounding = TranscriptionPrompt.surroundingText(
-            enabled: settings.useSurroundingTextAsContext,
-            captured: settings.focusedText)
         let combinedPrompt = TranscriptionPrompt.combined(userPrompt: settings.initialPrompt,
                                                           dictionaryBoost: promptBoost,
-                                                          surroundingText: surrounding) ?? ""
+                                                          surroundingText: surroundingText) ?? ""
         params.initialPrompt = combinedPrompt.isEmpty ? nil : combinedPrompt
         // Otherwise the prompt only conditions the first 30s window, so a custom dictionary
         // stops being applied partway through a long dictation.

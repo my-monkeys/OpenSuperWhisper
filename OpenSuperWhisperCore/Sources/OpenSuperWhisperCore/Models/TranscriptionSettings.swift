@@ -24,16 +24,18 @@ public struct TranscriptionSettings: Sendable {
     /// switches. Set per clip, and only for a dictation: snippets are expanded by the host after
     /// the cleanup model, and nothing expands them in a dropped file or a CLI run.
     public var snippetTriggers: [String]
-    /// The field's contents at record-start, set per clip by the pipeline rather than read from
-    /// preferences: it belongs to one dictation, not to the app's standing configuration.
-    public var focusedText: String?
 
+    /// There is deliberately no field-text member here. This value is handed to every engine,
+    /// including the remote one, so a field on it would make the remote exclusion a convention —
+    /// a consumer choosing not to read it. The captured text travels as an argument to
+    /// `TranscriptionService` instead, and only reaches an engine that conforms to a context
+    /// protocol (#89).
     public init(selectedLanguage: String, translateToEnglish: Bool, suppressBlankAudio: Bool,
                 showTimestamps: Bool, temperature: Double, noSpeechThreshold: Double,
                 initialPrompt: String, useBeamSearch: Bool, beamSize: Int, useAsianAutocorrect: Bool,
                 customDictionaryEnabled: Bool, customDictionaryBoostEnabled: Bool,
                 customDictionaryEntries: [CustomDictionaryEntry], useSurroundingTextAsContext: Bool,
-                snippetTriggers: [String] = [], focusedText: String? = nil) {
+                snippetTriggers: [String] = []) {
         self.selectedLanguage = selectedLanguage
         self.translateToEnglish = translateToEnglish
         self.suppressBlankAudio = suppressBlankAudio
@@ -49,7 +51,6 @@ public struct TranscriptionSettings: Sendable {
         self.customDictionaryEntries = customDictionaryEntries
         self.useSurroundingTextAsContext = useSurroundingTextAsContext
         self.snippetTriggers = snippetTriggers
-        self.focusedText = focusedText
     }
 
     public var isAsianLanguage: Bool {

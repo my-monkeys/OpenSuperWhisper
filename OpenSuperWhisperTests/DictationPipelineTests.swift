@@ -99,7 +99,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let box = OrderBox()
-        pipeline.transcribeOverride = { url, _ in
+        pipeline.transcribeOverride = { url, _, _ in
             box.order.append(url.lastPathComponent)
             return "text for \(url.lastPathComponent)"
         }
@@ -145,7 +145,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let run = PhaseRun()
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             run.duringFilePass = pipeline.isTranscribing
             return "heard"
         }
@@ -192,7 +192,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let run = StageRun()
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             run.cleaningUpDuringFilePass = pipeline.isCleaningUp
             return "heard"
         }
@@ -247,7 +247,7 @@ final class DictationPipelineTests: XCTestCase {
         let pipeline = DictationPipeline.shared
         let box = OrderBox()
         // The engine must never be asked to transcribe: there is no file to hand it.
-        pipeline.transcribeOverride = { url, _ in
+        pipeline.transcribeOverride = { url, _, _ in
             box.order.append(url.lastPathComponent)
             return "the engine should not have run"
         }
@@ -294,7 +294,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let run = SnippetRun()
-        pipeline.transcribeOverride = { _, _ in heard }
+        pipeline.transcribeOverride = { _, _, _ in heard }
         pipeline.cleanupOverride = { text in
             run.cleanupSaw.append(text)
             return CleanupOutcome(text: cleaned, status: .notRun)

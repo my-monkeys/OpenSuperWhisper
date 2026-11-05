@@ -162,20 +162,28 @@ final class RemoteEngineRequestTests: XCTestCase {
 
     /// The remote engine forwards the user's prompt and nothing else: no dictionary boost and
     /// never the focused field's text, which would post the user's own writing to a third-party
-    /// server (#89).
+    /// server (#89). Since the field left `TranscriptionSettings` there is nothing on this value
+    /// for it to forward; the type-level test below is what keeps that true.
     func testClipParametersSendOnlyTheUserPrompt() {
         var settings = settings(language: "de", temperature: 0.3, prompt: "Mein Prompt")
         settings.customDictionaryEnabled = true
         settings.customDictionaryBoostEnabled = true
         settings.customDictionaryEntries = [CustomDictionaryEntry(original: "osw", replacement: "OpenSuperWhisper")]
         settings.useSurroundingTextAsContext = true
-        settings.focusedText = "Text already in the field"
 
         let clip = RemoteEngine.clipParameters(for: settings)
         XCTAssertEqual(clip.action, "transcriptions")
         XCTAssertEqual(clip.language, "de")
         XCTAssertEqual(clip.temperature, 0.3)
         XCTAssertEqual(clip.prompt, "Mein Prompt")
+    }
+
+    /// The structural half of #89. The remote engine has no context-bearing method to be handed
+    /// the field through, so the exclusion does not depend on it choosing not to read one. A
+    /// declared conformance here is a visible diff, and this reddens on it.
+    func testTheRemoteEngineConformsToNeitherContextProtocol() {
+        XCTAssertNil(RemoteEngine.self as? ProseContextEngine.Type)
+        XCTAssertNil(RemoteEngine.self as? TermContextEngine.Type)
     }
 
     /// The timeout lives on the session, since URLSession ignores a POST's own timeout: the
@@ -230,7 +238,6 @@ final class RemoteEngineRequestTests: XCTestCase {
         settings.customDictionaryBoostEnabled = true
         settings.customDictionaryEntries = [CustomDictionaryEntry(original: "osw", replacement: "OpenSuperWhisper")]
         settings.useSurroundingTextAsContext = true
-        settings.focusedText = "Text already in the field"
 
         let text = try await engine.transcribeAudio(url: try clipFile(), settings: settings)
 

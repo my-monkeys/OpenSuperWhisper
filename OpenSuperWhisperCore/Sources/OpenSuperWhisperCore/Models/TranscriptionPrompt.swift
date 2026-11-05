@@ -28,7 +28,8 @@ enum TranscriptionPrompt {
     ///
     /// Split out from `combined` because the decision to read someone's document is worth
     /// naming, and because a caller that forgets the flag should get nothing rather than
-    /// silently get the text.
+    /// silently get the text. Since the text left `TranscriptionSettings` this is called from
+    /// `TranscriptionService.resolveFieldContext`, at dispatch time, rather than from the engine.
     static func surroundingText(enabled: Bool, captured: String?) -> String? {
         guard enabled, let captured, !captured.isEmpty else { return nil }
         return captured

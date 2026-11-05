@@ -174,8 +174,8 @@ final class SurroundingContextTests: XCTestCase {
         let seen = Seen()
 
         let pipeline = DictationPipeline.shared
-        pipeline.transcribeOverride = { _, settings in
-            seen.fields.append(settings.focusedText)
+        pipeline.transcribeOverride = { _, _, field in
+            seen.fields.append(field)
             return "text"
         }
         defer { pipeline.transcribeOverride = nil }

@@ -12,6 +12,9 @@ enum AppCore {
         textFormatter: { AutocorrectWrapper.format($0) },
         computePolicy: .automatic,
         makeSettings: { Settings() },
+        // The field-term reducer asks the spelling dictionary in the language being dictated;
+        // `SpellingDictionary` already merges it with the user's preferred languages.
+        fieldTermSpelling: { SpellingDictionary.spelling(for: AppPreferences.shared.whisperLanguage) },
         confirmEnableHistory: { confirmEnableHistory() })
 
     /// Idempotent, because a SwiftUI preview never runs main and calls this from its body.
