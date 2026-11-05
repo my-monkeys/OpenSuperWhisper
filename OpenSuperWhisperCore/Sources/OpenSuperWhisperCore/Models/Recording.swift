@@ -257,7 +257,13 @@ public class RecordingStore: ObservableObject {
         }
     }
     
-    func addRecordingSync(_ recording: Recording) async throws {
+    /// Inserts the row and returns once it is in the store, without the retention pass.
+    ///
+    /// `addRecording` is a fire-and-forget `Task`, so a caller that writes to the same row again
+    /// immediately afterwards — the pipeline's post-delivery timing update (#262) — has no
+    /// guarantee the insert has run. Awaited callers use this instead; retention stays with them,
+    /// off the critical path.
+    public func addRecordingSync(_ recording: Recording) async throws {
         try await insertRecording(recording)
         await MainActor.run {
             RecordingsDiskUsage.shared.recordingSaved(at: recording.url)

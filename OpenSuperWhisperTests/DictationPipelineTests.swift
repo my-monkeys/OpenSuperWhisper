@@ -342,4 +342,125 @@ final class DictationPipelineTests: XCTestCase {
         XCTAssertEqual(run.agentReplies.map(\.send), [true], "the spoken submit still sends the reply")
         XCTAssertTrue(run.inserted.isEmpty)
     }
+
+    // MARK: - Timing (#262)
+
+    private final class ClockBox { var now: UInt64 = 0 }
+    private struct MoveFailure: Error {}
+
+    /// A throw AFTER the transcribe block must keep the span that block already measured: the
+    /// catch fills only what the run never recorded. Unguarded, the value would absorb the move
+    /// that failed, and the engine split would be re-read after an await, when it can belong to
+    /// another run.
+    ///
+    /// `moveOverride` throws where the recorder would publish the clip. The failure path keeps
+    /// the real recorder, so the clip is still saved and the `.failed` row is there to inspect.
+    func testAFailureAfterTranscriptionKeepsTheMeasuredSpan() async throws {
+        let scratch = ScratchPreferences()
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = true
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+
+        let pipeline = DictationPipeline.shared
+        let clock = ClockBox()
+        pipeline.uptime = { clock.now }
+        pipeline.transcribeOverride = { _, _ in
+            clock.now += 50
+            return "hello there"
+        }
+        pipeline.moveOverride = { _, _ in
+            clock.now += 500
+            throw MoveFailure()
+        }
+        // The catch would otherwise build an indicator panel in the test process.
+        pipeline.noticeOverride = { _ in }
+        defer {
+            pipeline.uptime = UptimeClock.now
+            pipeline.transcribeOverride = nil
+            pipeline.moveOverride = nil
+            pipeline.noticeOverride = nil
+            scratch.restore()
+        }
+
+        let before = Set(try await RecordingStore.shared.fetchRecordings(limit: 200, offset: 0).map(\.id))
+        let clip = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("osw-timing-\(UUID().uuidString).wav")
+        try Data("RIFF".utf8).write(to: clip)
+        pipeline.enqueue(tempURL: clip, startedAt: Date(), streamedFallback: "",
+                         context: DictationPipeline.ContextSnapshot(), modelOption: nil)
+
+        var saved: Recording?
+        for _ in 0..<300 where saved == nil {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            saved = try await RecordingStore.shared.fetchRecordings(limit: 200, offset: 0)
+                .first { !before.contains($0.id) }
+        }
+        let row = try XCTUnwrap(saved)
+        let timing = try XCTUnwrap(row.timing)
+
+        XCTAssertEqual(timing.transcribeMs, 50, "the span must not absorb the step that failed")
+        XCTAssertEqual(timing.transcribeAttempts, 1)
+        XCTAssertNil(timing.engineWaitMs, "never a split from another run")
+        XCTAssertNil(timing.engineLoadMs)
+
+        RecordingStore.shared.deleteRecording(row)
+    }
+
+    /// The recovered-clip path writes its measurement too, and its queue wait and total come from
+    /// the enqueue: the clip's own date can be days old (#262).
+    ///
+    /// The insert is awaited, so the hand-off's post-delivery UPDATE always finds the row — the
+    /// `totalMs` assertion is the one that would go missing if the UPDATE overtook the INSERT.
+    func testARecoveredClipWritesItsTotal() async throws {
+        let scratch = ScratchPreferences()
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = true
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+        prefs.postRecordHookEnabled = false
+
+        let pipeline = DictationPipeline.shared
+        let clock = ClockBox()
+        pipeline.uptime = { clock.now }
+        pipeline.transcribeOverride = { _, _ in
+            clock.now += 10
+            return "recovered words"
+        }
+        let recovered = OrderBox()
+        defer {
+            pipeline.uptime = UptimeClock.now
+            pipeline.transcribeOverride = nil
+            scratch.restore()
+        }
+
+        let before = Set(try await RecordingStore.shared.fetchRecordings(limit: 200, offset: 0).map(\.id))
+        pipeline.enqueue(
+            tempURL: URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("osw-recovered-\(UUID().uuidString).wav"),
+            startedAt: Date().addingTimeInterval(-2 * 24 * 3600),
+            streamedFallback: "",
+            context: DictationPipeline.ContextSnapshot(),
+            modelOption: nil,
+            onRecovered: { recovered.order.append($0) })
+
+        var saved: Recording?
+        for _ in 0..<300 where saved == nil {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            saved = try await RecordingStore.shared.fetchRecordings(limit: 200, offset: 0)
+                .first { !before.contains($0.id) }
+        }
+        let row = try XCTUnwrap(saved)
+        let timing = try XCTUnwrap(row.timing)
+
+        XCTAssertEqual(recovered.order, ["recovered words"])
+        XCTAssertEqual(timing.queueWaitMs, 0, "measured from the enqueue, never from the clip's own date")
+        XCTAssertEqual(timing.totalMs, 10, "the hand-off is this dictation's terminal point")
+        XCTAssertNil(timing.finalizeMs, "there was no stop press")
+        XCTAssertNil(timing.insertMs, "nothing was inserted into a field")
+
+        RecordingStore.shared.deleteRecording(row)
+    }
 }
