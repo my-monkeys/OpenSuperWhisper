@@ -173,6 +173,14 @@ final class TranscriptionReportTests: CoreTestCase {
         notInserted.timingJSON = noInsertionTiming.encoded
         XCTAssertEqual(Self.report(for: notInserted).ending, TranscriptionReport.Ending.noInsertion)
 
+        // A blob that never reached its terminal stamp (the post-delivery UPDATE failed, or the
+        // report was saved before it landed) cannot support even "no insertion".
+        var unfinished = Self.recording()
+        var unfinishedTiming = DictationTiming()
+        unfinishedTiming.transcribeMs = 1_200
+        unfinished.timingJSON = unfinishedTiming.encoded
+        XCTAssertNil(Self.report(for: unfinished).ending)
+
         XCTAssertNil(Self.report(for: Self.recording()).ending)
 
         var failed = Self.recording()

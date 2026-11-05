@@ -201,10 +201,11 @@ final class ReportIssueLinkTests: XCTestCase {
     func testTimingStagesThatDidNotRunAreDashesAndOptionalClausesAreOmitted() {
         var timing = DictationTiming()
         timing.transcribeMs = 1_200
+        timing.totalMs = 4_300
 
         let body = ReportIssueLink.body(for: report(timing: timing))
 
-        XCTAssertTrue(body.contains("total — (finalize —, queue —, "
+        XCTAssertTrue(body.contains("total 4.3 s (finalize —, queue —, "
             + "transcribe 1.2 [engine wait —, model load —], cleanup —, insert —)"))
         XCTAssertTrue(body.contains("ended no insertion"))
         XCTAssertFalse(body.contains("attempts"))

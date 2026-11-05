@@ -51,8 +51,9 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
     /// How the dictation ended, as far as the report can know it (#262). `.noInsertion` is the
     /// conservative catch-all: a completed row handed to an agent, recovered from `unfinished/`,
     /// or left on the clipboard for a manual paste is not distinguishable here, and the report
-    /// does not guess. Nil when the row carries no measurement at all (an import, a rerun, or a
-    /// row older than v11), where even the insertion fact is unknown.
+    /// does not guess. Nil when even that much is unknown: a row with no measurement at all (an
+    /// import, a rerun, or a row older than v11), or a blob that never reached its terminal stamp
+    /// (the post-delivery UPDATE failed, or the report was saved before it landed).
     public enum Ending: String, Codable, Sendable {
         case insertion, noInsertion, failure
     }
@@ -84,7 +85,9 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
 
     private static func ending(for recording: Recording) -> Ending? {
         if recording.status == .failed { return .failure }
-        guard let timing = recording.timing else { return nil }
+        // A blob without its terminal stamp cannot support even "no insertion": an insertion may
+        // have happened and only the record of it been lost.
+        guard let timing = recording.timing, timing.totalMs != nil else { return nil }
         return timing.insertMs != nil ? .insertion : .noInsertion
     }
 
