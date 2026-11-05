@@ -39,7 +39,7 @@ struct WatchedField: @unchecked Sendable {
         AXUIElementSetMessagingTimeout(element, timeout)
         let field = WatchedField(element: element, pid: pid)
         // A secure field reports bullets or nothing, but it is not ours to ask in the first place.
-        guard field.string(kAXSubroleAttribute) != (kAXSecureTextFieldSubrole as String) else { return nil }
+        guard !SecureTextFields.isSecure(field.string(kAXSubroleAttribute)) else { return nil }
         return field
     }
 

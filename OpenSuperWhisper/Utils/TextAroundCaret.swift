@@ -92,9 +92,13 @@ struct TextAroundCaret: Equatable {
 
     @MainActor
     private static func read(_ element: AXUIElement, with ax: TimedAccessibility) -> TextAroundCaret? {
-        // One request for both: each round trip to a slow app costs time on the main thread.
-        guard let answers = ax.copy([kAXSelectedTextRangeAttribute, kAXNumberOfCharactersAttribute], of: element),
-              answers.count == 2, let selection = range(from: answers[0]) else { return nil }
+        // One request for all three: each round trip to a slow app costs time on the main thread.
+        // The subrole comes along for the same reason, and a secure field is refused before its
+        // text is asked for.
+        guard let answers = ax.copy([kAXSelectedTextRangeAttribute, kAXNumberOfCharactersAttribute,
+                                     kAXSubroleAttribute], of: element),
+              answers.count == 3, let selection = range(from: answers[0]),
+              !SecureTextFields.isSecure(answers[2] as? String) else { return nil }
 
         if let length = answers[1] as? Int, let window = window(around: selection, length: length) {
             var cfWindow = CFRange(location: window.location, length: window.length)
