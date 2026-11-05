@@ -203,4 +203,28 @@ final class FieldContextStructuralGuardTests: XCTestCase {
         XCTAssertLessThan(rule.lowerBound, read.lowerBound,
                           "the field is read before the per-app rule picks the engine — F2 is back")
     }
+
+    /// The other half of F2: `captureFocusedText` asks whether it may read before it reads, so a
+    /// remote engine — or the switch turned off — returns without touching Accessibility at all.
+    ///
+    /// A behavioural version was proposed and would not discriminate here: call it with the
+    /// engine set to remote and assert `focusedText == nil`. The full path also produces nil in a
+    /// headless test process, because `SourceCapture.focusedText()` finds no frontmost app it is
+    /// allowed to read (our own bundle is skipped, and an unprivileged process cannot read
+    /// another app). Both branches would return nil and the test would be green for the wrong
+    /// reason. The discriminating observable is the position of the guard relative to the read.
+    func testTheGuardReturnsBeforeAnyAccessibilityRead() throws {
+        let path = "OpenSuperWhisper/AppContextModelRules.swift"
+        let text = try XCTUnwrap(try sources()[path])
+
+        let method = try XCTUnwrap(text.range(of: "func captureFocusedText()"))
+        let body = text[method.lowerBound...]
+        let guardAt = try XCTUnwrap(body.range(of: "wantsFieldText("),
+                                    "captureFocusedText no longer consults the gate")
+        let firstRead = try XCTUnwrap(body.range(of: "SourceCapture.focusedText("),
+                                      "captureFocusedText no longer reads the field")
+
+        XCTAssertLessThan(guardAt.lowerBound, firstRead.lowerBound,
+                          "the field is read before the gate says it may be — a secure or remote engine could be read")
+    }
 }
