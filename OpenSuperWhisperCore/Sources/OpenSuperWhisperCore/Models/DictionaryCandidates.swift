@@ -192,6 +192,18 @@ public enum DictionaryCandidates {
         return word.hasPrefix("@") || isLink(word) || isFileName(word) || isCode(word) || isQuantity(word)
     }
 
+    /// Whether the word's shape alone says it is a name, whatever a dictionary thinks: an email,
+    /// digits among letters ("GPT4"), a capital inside the word ("GitHub"), or an acronym
+    /// ("OSW"). The same shapes `isVocabulary` trusts, exposed to the field-term reducer, which
+    /// uses them to tell a real name from a common word that was merely capitalised (#89).
+    static func hasStrongShape(_ word: String) -> Bool {
+        if isEmail(word) { return true }
+        guard !isExcludedShape(word) else { return false }
+        let letters = word.filter(\.isLetter)
+        return word.contains(where: \.isNumber) || hasInnerCapital(word)
+            || (letters.count >= 2 && letters.allSatisfy(\.isUppercase))
+    }
+
     /// "package.json", "README.md", "main.swift". A capitalised name with a dot keeps being a
     /// name ("Node.js", "Vue.js"): files are written in lowercase or capitals, products in
     /// title case.
