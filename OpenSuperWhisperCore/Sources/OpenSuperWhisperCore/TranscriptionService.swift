@@ -274,6 +274,20 @@ public class TranscriptionService: ObservableObject {
     public func transcribeAudio(url: URL, settings: TranscriptionSettings,
                                 capturedFieldText: String? = nil,
                                 modelOverride: DictationModelOption? = nil) async throws -> String {
+        // Resolve the field's context before taking the gate when the engine that will run is
+        // already loaded. The spelling pass is synchronous main-thread work, and holding the
+        // process-wide permit through it delays whatever dictation is queued behind this one.
+        //
+        // Only when no per-call model swap can change the engine, and an engine of the selected
+        // kind is already loaded — the two conditions under which `ensureEngineLoaded` below
+        // returns this same instance. Every other path resolves after selection, as it did.
+        let readyContext: FieldContext? = modelOverride == nil
+            && loadedEngineKind == CoreAccess.preferences.selectedEngine
+            ? currentEngine.flatMap {
+                resolveFieldContext(capturedFieldText, for: $0, settings: settings)
+            }
+            : nil
+
         // Serialize every transcription across the app (dictation pipeline, file-drop queue,
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
@@ -330,7 +344,8 @@ public class TranscriptionService: ObservableObject {
                                         engineLoadMs: lastEngineLoadMs)
         }
         return try await transcribe(url: url, settings: settings, fallbackModel: nil,
-                                    capturedFieldText: capturedFieldText)
+                                    capturedFieldText: capturedFieldText,
+                                    preResolvedContext: readyContext)
     }
 
     /// Load the appropriate engine and transcribe. On a fallback-worthy remote error
@@ -339,7 +354,8 @@ public class TranscriptionService: ObservableObject {
     /// guarded out of the catch (`fallbackModel == nil`), so it can never loop.
     private func transcribe(url: URL, settings: TranscriptionSettings,
                             fallbackModel: DictationModelOption?,
-                            capturedFieldText: String?) async throws -> String {
+                            capturedFieldText: String?,
+                            preResolvedContext: FieldContext?) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
             // The fallback engine is built AND initialized here, so a user on remote-with-
@@ -367,7 +383,12 @@ public class TranscriptionService: ObservableObject {
         // Resolved here, after the engine is known: an engine receives context only if it
         // declared a context protocol, and the preference gate is evaluated at dispatch time so
         // a setting switched off between recording and transcription behaves as it did before.
-        let context = resolveFieldContext(capturedFieldText, for: engine, settings: settings)
+        //
+        // A value resolved before the gate is reused only if it fits the engine that actually
+        // ran. If a reload or an engine switch replaced that engine in the meantime, the value
+        // is discarded here and resolved again — never passed to an engine it does not match.
+        let context = preResolvedContext.flatMap { $0.matches(engine) ? $0 : nil }
+            ?? resolveFieldContext(capturedFieldText, for: engine, settings: settings)
         do {
             return try await runOnEngine(engine, url: url, settings: settings, context: context)
         } catch let error where fallbackModel == nil && Self.shouldUseFallback(for: error) {
@@ -380,8 +401,11 @@ public class TranscriptionService: ObservableObject {
             // The fallback re-resolves against its own engine. It is safe to pass the text on:
             // the record-time gate refused to capture it under the remote engine, so a
             // remote-then-local clip has nothing to pass.
+            // No pre-resolved value: the fallback engine is a different one, and resolves its
+            // own context from the same clip text.
             return try await transcribe(url: url, settings: settings, fallbackModel: fallback,
-                                        capturedFieldText: capturedFieldText)
+                                        capturedFieldText: capturedFieldText,
+                                        preResolvedContext: nil)
         }
     }
 

@@ -15,4 +15,15 @@ enum FieldContext {
     case prose(String)
     /// Terms, for an engine biased toward a vocabulary list.
     case terms([String])
+
+    /// Whether `engine` can be handed this value — the same check the dispatch cast makes, asked
+    /// before the value is chosen rather than after. Used when a context was resolved ahead of
+    /// the engine gate, against the engine that was loaded then: if a reload replaced it in the
+    /// meantime, the value is discarded and resolved again rather than silently dropped.
+    func matches(_ engine: TranscriptionEngine) -> Bool {
+        switch self {
+        case .prose: return engine is ProseContextEngine
+        case .terms: return engine is TermContextEngine
+        }
+    }
 }
