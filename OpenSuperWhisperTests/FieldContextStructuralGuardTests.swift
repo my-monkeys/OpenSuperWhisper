@@ -16,6 +16,11 @@ import XCTest
 /// cut (`TranscriptionService.transcribe` simply does not pass the argument to a non-conforming
 /// engine), and that is pinned by type, not by this scan. The remaining obligation is review:
 /// any new engine or sink has to be read against `FieldContext` by a person.
+///
+/// The type-level half of that defence lives in
+/// `RemoteEngineRequestTests.testTheRemoteEngineConformsToNeitherContextProtocol`, not here —
+/// beside the body-equality assertion whose comment cites it. A reviewer looking for it in this
+/// file will not find it, and the plan once listed it under a file that was never created.
 final class FieldContextStructuralGuardTests: XCTestCase {
 
     private var repoRoot: URL {
