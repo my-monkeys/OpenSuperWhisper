@@ -1065,7 +1065,7 @@ final class DictationPipelineTests: XCTestCase {
     /// process-wide snapshot happens to be nil in a fresh test process — the pipeline-level
     /// `engineWaitMs == nil` assertion would stay green with the guard removed (M7).
     func testEngineSplitIsClaimedOnlyForTheRealEngine() {
-        let run = TranscriptionService.RunTimings(engineWaitMs: 0, engineLoadMs: 2_100, runMs: 1_200)
+        let run = TranscriptionService.RunTimings(engineWaitMs: 0, engineLoadMs: 2_100)
 
         XCTAssertNil(DictationPipeline.engineSplit(replacedEngine: true, lastRun: run),
                      "a replaced engine's snapshot describes another run")

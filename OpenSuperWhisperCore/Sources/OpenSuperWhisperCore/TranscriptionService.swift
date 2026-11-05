@@ -47,14 +47,10 @@ public class TranscriptionService: ObservableObject {
     public struct RunTimings: Equatable, Sendable {
         public let engineWaitMs: Int?
         public let engineLoadMs: Int?
-        /// This run's own span inside the service. Named `runMs` because the pipeline also has a
-        /// `transcribeMs`, which is the wall time a retried call waited — two different spans.
-        public let runMs: Int?
 
-        public init(engineWaitMs: Int?, engineLoadMs: Int?, runMs: Int?) {
+        public init(engineWaitMs: Int?, engineLoadMs: Int?) {
             self.engineWaitMs = engineWaitMs
             self.engineLoadMs = engineLoadMs
-            self.runMs = runMs
         }
     }
 
@@ -319,12 +315,9 @@ public class TranscriptionService: ObservableObject {
         // Published on both the returning and the throwing path: a run that failed after
         // spending 15 s waiting for a model is exactly what the measurement is for.
         lastEngineLoadMs = nil
-        let runStart = uptime()
         defer {
-            lastRunTimings = RunTimings(
-                engineWaitMs: engineWaitMs,
-                engineLoadMs: lastEngineLoadMs,
-                runMs: UptimeClock.milliseconds(from: runStart, to: uptime()))
+            lastRunTimings = RunTimings(engineWaitMs: engineWaitMs,
+                                        engineLoadMs: lastEngineLoadMs)
         }
         return try await transcribe(url: url, settings: settings, fallbackModel: nil)
     }

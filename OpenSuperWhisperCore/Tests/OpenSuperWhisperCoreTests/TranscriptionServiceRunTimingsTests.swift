@@ -40,7 +40,6 @@ final class TranscriptionServiceRunTimingsTests: CoreTestCase {
         let timings = try XCTUnwrap(service.lastRunTimings)
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(timings.engineWaitMs), 0)
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(timings.engineLoadMs), 0)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(timings.runMs), 0)
     }
 
     /// A second run still measures its load stage even though the engine is already up: 0 is a
@@ -58,8 +57,10 @@ final class TranscriptionServiceRunTimingsTests: CoreTestCase {
 
     // MARK: - Scripted clock
 
-    /// Six stamps, in order: gate start, gate end, run start, load start, load end, run end.
-    /// A millisecond per stamp makes each stage's arithmetic checkable by hand.
+    /// Four stamps, in order: gate start, gate end, load start, load end. A millisecond per
+    /// stamp makes each stage's arithmetic checkable by hand. The assertions are the values the
+    /// stages produced, not the number of clock reads: an extra read outside a measured window
+    /// is harmless, while a stage that stops measuring still reddens its own delta.
     @MainActor
     func testEveryStageIsMeasuredWithTheClock() async throws {
         let service = service()
@@ -69,12 +70,12 @@ final class TranscriptionServiceRunTimingsTests: CoreTestCase {
             return stamps * 1_000_000
         }
 
-        _ = try await service.transcribeAudio(url: Fixtures.jfkWav, settings: Fixtures.pinnedSettings())
+        let text = try await service.transcribeAudio(url: Fixtures.jfkWav,
+                                                     settings: Fixtures.pinnedSettings())
 
         let timings = try XCTUnwrap(service.lastRunTimings)
         XCTAssertEqual(timings.engineWaitMs, 1, "gate start 0 → gate end 1")
-        XCTAssertEqual(timings.engineLoadMs, 1, "load start 3 → load end 4")
-        XCTAssertEqual(timings.runMs, 3, "run start 2 → run end 5")
-        XCTAssertEqual(stamps, 6, "one stamp per boundary, no double reads")
+        XCTAssertEqual(timings.engineLoadMs, 1, "load start 2 → load end 3")
+        XCTAssertEqual(text, "hello", "the run itself completed, not just its measurements")
     }
 }
