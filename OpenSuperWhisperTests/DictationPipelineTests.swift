@@ -679,6 +679,68 @@ final class DictationPipelineTests: XCTestCase {
         }
     }
 
+    /// `cleanupMs` keys on what the processor reported, not on the preference that predicted a
+    /// pass (COLD-5). Here the preferences say a pass is due but the processor reports `.notRun`,
+    /// so the stage must stay nil; a `.failed` pass did run and that time must be stamped even
+    /// though it produced no text.
+    func testCleanupIsStampedByWhatTheProcessorReportedNotWhatWasPredicted() async throws {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = true
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        // Predicts a pass, which is the whole point: the preference is not the signal.
+        prefs.aiPostProcessingEnabled = true
+        prefs.postRecordHookEnabled = false
+
+        let pipeline = DictationPipeline.shared
+        let clock = ClockBox()
+        var notices: [RecordingState] = []
+        runClock(pipeline, clock)
+        pipeline.transcribeOverride = { _, _ in
+            clock.now += 5
+            return "cleanup words"
+        }
+        pipeline.noticeOverride = { notices.append($0) }
+        pipeline.deliverOverride = { _, _ in .inserted }
+        defer { resetSeams(pipeline) }
+
+        // Predicted, but the processor says no pass ran: nil, not 0.
+        pipeline.cleanupOverride = { text in
+            clock.now += 25
+            return CleanupOutcome(text: text, status: .notRun)
+        }
+        let beforeNoPass = await recordingIDs()
+        pipeline.enqueue(tempURL: try makeClip("osw-cleanup-notrun"), startedAt: Date(),
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
+                         modelOption: nil, stoppedAtUptime: clock.now)
+        await drain(pipeline)
+        let noPassSaved = await newRecording(after: beforeNoPass)
+        let noPass = try XCTUnwrap(noPassSaved)
+        XCTAssertNil(try XCTUnwrap(noPass.timing).cleanupMs,
+                     "the processor reported .notRun, so no time was spent")
+        RecordingStore.shared.deleteRecording(noPass)
+
+        // A failed pass did run: its time is stamped, and the failure notice goes to the seam.
+        pipeline.cleanupOverride = { text in
+            clock.now += 30
+            return CleanupOutcome(text: text, status: .failed(model: "m", reason: "boom"))
+        }
+        let beforeFailure = await recordingIDs()
+        pipeline.enqueue(tempURL: try makeClip("osw-cleanup-failed"), startedAt: Date(),
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
+                         modelOption: nil, stoppedAtUptime: clock.now)
+        await drain(pipeline)
+        let failedSaved = await newRecording(after: beforeFailure)
+        let failed = try XCTUnwrap(failedSaved)
+        XCTAssertEqual(try XCTUnwrap(failed.timing).cleanupMs, 30,
+                       "a pass that ran and failed still cost time")
+        XCTAssertFalse(notices.isEmpty, "the cleanup-failure notice went through the seam")
+
+        RecordingStore.shared.deleteRecording(failed)
+    }
+
     /// The stop press is the origin of the whole measurement, and the view model is where it is
     /// taken. The stop override costs 40 on the scripted clock, so a `stopMark` taken on the
     /// first line makes `finalizeMs` 40; taken after the recorder, it would be 0. Nothing else
