@@ -140,7 +140,9 @@ final class RecordingContext {
         }
         // An element captured just now is the one the text is read from: no second lookup.
         // Without one (the user turned paste-back off), ask the frontmost app itself.
-        focusedText = focusTarget.map { SourceCapture.focusedText(in: $0.element) }
+        // `element` is optional: a focus target can be captured without one, in which case the
+        // frontmost app is asked instead.
+        focusedText = focusTarget?.element.map { SourceCapture.focusedText(in: $0) }
             ?? SourceCapture.focusedText()
     }
 
