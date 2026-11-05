@@ -40,7 +40,7 @@ public enum FieldContextTerms {
                 // from the output — but a run they admitted still emits the words that survive,
                 // so the flag reaches the answer through candidacy even when the word that
                 // admitted it is dropped.
-                guard run.allSatisfy({ startsName($0.text) }),
+                guard run.allSatisfy({ admitsToRun($0.text) }),
                       let candidate = DictionaryCandidates.term(
                           from: run, spelling: spelling, capitalMarksNames: capitalMarksNames)
                 else { continue }
@@ -73,8 +73,9 @@ public enum FieldContextTerms {
     /// prose is much weaker evidence, and a wrong term is not a suggestion — it changes what the
     /// engine hears, including words the user never said.
     ///
-    /// - A word that does not start with a capital or a digit is dropped: in someone's own prose
-    ///   a lowercase unknown is as likely a typo as jargon.
+    /// - A word that does not start with a capital or a digit is dropped, unless its shape is
+    ///   evidence on its own ("iOS", "eBay"): in someone's own prose a lowercase unknown is as
+    ///   likely a typo as jargon, but a lowercase-initial name with an inner capital is a name.
     /// - A capitalised word with no strong shape survives only when its lowercase form is
     ///   unknown. "Cherith" stays; "Parakeet" — and "Maxim" — do not. `isVocabulary` deliberately
     ///   keeps the latter, and that stays right for a dictionary suggestion. This is also what
@@ -82,13 +83,23 @@ public enum FieldContextTerms {
     ///   known word in lowercase, so its capital buys it nothing here.
     private static func survivesFieldGuard(_ word: String,
                                            spelling: DictionaryCandidates.Spelling) -> Bool {
-        guard startsName(word) else { return false }
+        // Shape is evidence on its own, whatever the first character is: "iOS", "macOS" and
+        // "eBay" carry an inner capital and are exactly the product names this exists for. This
+        // is the only door open to a lowercase-initial word. The other one stays shut — a
+        // lowercase word with no shape is still dropped, because in someone's prose it is as
+        // likely a typo as jargon.
         if DictionaryCandidates.hasStrongShape(word) { return true }
+        guard startsName(word) else { return false }
         return !spelling.knows(word.lowercased())
     }
 
     /// A word a run may start with — the same precondition `DictionaryCandidates.term` applies
-    /// to a multi-word name.
+    /// to a multi-word name, widened for the one case it cannot express: a lowercase-initial
+    /// name whose capital is inside the word. `term` still applies its own rules to the run.
+    private static func admitsToRun(_ word: String) -> Bool {
+        startsName(word) || DictionaryCandidates.hasStrongShape(word)
+    }
+
     private static func startsName(_ word: String) -> Bool {
         word.first.map { $0.isUppercase || $0.isNumber } ?? false
     }
