@@ -165,6 +165,8 @@ class IndicatorViewModel: ObservableObject {
         // but see the note in RecordingContext.captureFrontmost. (F2/F3)
         RecordingContext.shared.captureFrontmost()
         ContextModelSwitcher.applyForCurrentContext()
+        // After the rule, so the field is read only for the engine that will actually run. (F2)
+        RecordingContext.shared.captureFocusedText()
 
         // Show recording immediately and optimistically. Whether the mic needs a
         // connection is decided off the main thread inside `recorder.startRecording()`
