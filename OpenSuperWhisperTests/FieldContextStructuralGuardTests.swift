@@ -56,6 +56,10 @@ final class FieldContextStructuralGuardTests: XCTestCase {
     private static let contextIdentifiers = [
         "FieldContext", "proseContext", "focusedText", "fieldTerms", "surroundingText",
         "ProseContextEngine", "TermContextEngine",
+        // The parameter the text actually travels in. It contains none of the names above —
+        // "capturedFieldText" does not contain "focusedText" — so a network file could take it
+        // and the scan would have stayed green. Added after the security review found it.
+        "capturedFieldText",
     ]
 
     // MARK: - The scan
@@ -169,5 +173,30 @@ final class FieldContextStructuralGuardTests: XCTestCase {
             XCTAssertTrue(text.contains("!SecureTextFields.isSecure("),
                           "\(path) no longer refuses a secure field, or calls the guard without negating it")
         }
+    }
+
+    /// F2: the field is read only after the per-app model rule may have replaced the engine.
+    ///
+    /// The ordering is a convention between two adjacent lines, and the original defect was
+    /// exactly a call-order mistake, so it needs a guard that is not another reading of the same
+    /// two lines. Swapping them reddens this.
+    ///
+    /// Only the hotkey path is covered: the main window's record button calls
+    /// `applyForCurrentContext` but never `captureFocusedText`, because our own window is
+    /// frontmost there and `captureFrontmost` skips it — there is no ordering to pin.
+    ///
+    /// What this does NOT prove: that the read is skipped when the post-rule engine is remote.
+    /// That needs `captureFocusedText`'s Accessibility read to be injectable, and it is a direct
+    /// `SourceCapture` call today. The pure gate underneath is asserted in `FieldContextGateTests`.
+    func testTheFieldIsReadAfterTheModelRule() throws {
+        let path = "OpenSuperWhisper/Indicator/IndicatorWindow.swift"
+        let text = try XCTUnwrap(try sources()[path])
+
+        let rule = try XCTUnwrap(text.range(of: "ContextModelSwitcher.applyForCurrentContext()"),
+                                 "the model rule is no longer applied at record start")
+        let read = try XCTUnwrap(text.range(of: "RecordingContext.shared.captureFocusedText()"),
+                                 "the field is no longer read at record start")
+        XCTAssertLessThan(rule.lowerBound, read.lowerBound,
+                          "the field is read before the per-app rule picks the engine — F2 is back")
     }
 }
