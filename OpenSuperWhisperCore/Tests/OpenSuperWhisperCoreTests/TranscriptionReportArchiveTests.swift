@@ -52,8 +52,8 @@ final class TranscriptionReportArchiveTests: CoreTestCase {
         let entry = try XCTUnwrap(entries.first)
         XCTAssertEqual(Set(entry.keys), [
             "id", "createdAt", "recordedAt", "problem", "comment", "writtenAs", "shouldBe", "rawText",
-            "finalText", "model", "usedLocalFallback", "durationSeconds", "languageSetting", "appDetails",
-            "audioFile",
+            "finalText", "model", "usedLocalFallback", "durationSeconds", "timing", "languageSetting",
+            "appDetails", "audioFile",
         ])
         XCTAssertEqual(entry["problem"] as? String, "wrongWord")
         XCTAssertEqual(entry["rawText"] as? String, "um so the cube cuttle cluster")
@@ -61,6 +61,29 @@ final class TranscriptionReportArchiveTests: CoreTestCase {
         XCTAssertEqual(entry["model"] as? String, "Parakeet v3")
         XCTAssertEqual(entry["usedLocalFallback"] as? Bool, true)
         XCTAssertTrue(entry["audioFile"] is NSNull)
+        // A report that measured nothing still has the key, as null, like every other optional.
+        XCTAssertTrue(entry["timing"] is NSNull)
+    }
+
+    /// The measurement travels with the report: the zip is what the user attaches to an issue.
+    func testTheEntryCarriesTheTimingBlob() throws {
+        var recording = TranscriptionReportTests.recording()
+        var timing = DictationTiming()
+        timing.finalizeMs = 100
+        timing.totalMs = 4300
+        recording.timingJSON = timing.encoded
+        let report = TranscriptionReportTests.report(for: recording)
+
+        let data = try TranscriptionReportArchive.json(for: [report], audioPaths: [:],
+                                                       exportedAt: exportedAt, exportedWith: exportedWith)
+        let document = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let entries = try XCTUnwrap(document["reports"] as? [[String: Any]])
+        let timingObject = try XCTUnwrap(entries.first?["timing"] as? [String: Any])
+        XCTAssertEqual(timingObject["version"] as? Int, 1)
+        XCTAssertEqual(timingObject["finalizeMs"] as? Int, 100)
+        XCTAssertEqual(timingObject["totalMs"] as? Int, 4300)
+        // A stage that did not run stays absent from the JSON, not zero.
+        XCTAssertNil(timingObject["cleanupMs"])
     }
 
     #if os(macOS)

@@ -97,11 +97,13 @@ final class ReportIssueLinkTests: XCTestCase {
 
     private func report(final: String = "Send the mockups & the plan + notes.",
                         raw: String? = "send the mock ups and the plan plus notes",
-                        comment: String = "It wrote mock ups.\nTwice.") -> TranscriptionReport {
-        let recording = Recording(id: UUID(), timestamp: Date(timeIntervalSince1970: 1_760_000_000), fileName: "a.wav",
+                        comment: String = "It wrote mock ups.\nTwice.",
+                        timing: DictationTiming? = nil) -> TranscriptionReport {
+        var recording = Recording(id: UUID(), timestamp: Date(timeIntervalSince1970: 1_760_000_000), fileName: "a.wav",
                                   transcription: final, duration: 4.25, status: .completed, progress: 1,
                                   sourceAppName: "Slack", sourceWindowTitle: "#secret-project",
                                   modelUsed: "Parakeet v3", wasFallback: true, rawTranscription: raw)
+        recording.timingJSON = timing?.encoded
         return TranscriptionReport(recording: recording, problem: .wrongWord, comment: comment,
                                    writtenAs: "mock ups", shouldBe: "mockups", languageSetting: "en",
                                    appDetails: "OpenSuperWhisper 0.14.2 (65) · macOS 26.2 · Apple Silicon")
@@ -153,6 +155,53 @@ final class ReportIssueLinkTests: XCTestCase {
         let body = ReportIssueLink.body(for: report())
         XCTAssertFalse(body.contains("Slack"))
         XCTAssertFalse(body.contains("secret-project"))
+    }
+
+    /// The maintainer reads the wait, stage by stage, in the same line order the contract fixes.
+    func testBodyCarriesTheTimingBreakdownAfterTheLength() throws {
+        var timing = DictationTiming()
+        timing.finalizeMs = 100
+        timing.queueWaitMs = 200
+        timing.engineWaitMs = 0
+        timing.engineLoadMs = 2_100
+        timing.transcribeMs = 1_200
+        timing.cleanupMs = 600
+        timing.insertMs = 100
+        timing.totalMs = 4_300
+        timing.transcribeAttempts = 1
+        timing.machine = MachineState(thermalState: "nominal", lowPowerMode: false, loadAverage1m: nil)
+
+        let body = ReportIssueLink.body(for: report(timing: timing))
+
+        XCTAssertTrue(body.contains("- Timing: total 4.3 s (finalize 0.1, queue 0.2, engine wait 0.0, "
+            + "model load 2.1, transcribe 1.2, cleanup 0.6, insert 0.1) · attempts 1 · "
+            + "thermal nominal · low power off"))
+        let length = try XCTUnwrap(body.range(of: "- Length:"))
+        let timingLine = try XCTUnwrap(body.range(of: "- Timing:"))
+        let app = try XCTUnwrap(body.range(of: "- App:"))
+        XCTAssertLessThan(length.lowerBound, timingLine.lowerBound)
+        XCTAssertLessThan(timingLine.lowerBound, app.lowerBound)
+    }
+
+    /// "Not measured" is a fact, not a zero: rows older than the column, imports and reruns say so.
+    func testBodySaysNotMeasuredWithoutTiming() {
+        let body = ReportIssueLink.body(for: report())
+
+        XCTAssertTrue(body.contains("- Timing: not measured"))
+        XCTAssertFalse(body.contains("total 0.0 s"))
+    }
+
+    /// A stage that did not run is an em dash; nothing is invented, and clauses with no value go.
+    func testTimingStagesThatDidNotRunAreDashesAndOptionalClausesAreOmitted() {
+        var timing = DictationTiming()
+        timing.transcribeMs = 1_200
+
+        let body = ReportIssueLink.body(for: report(timing: timing))
+
+        XCTAssertTrue(body.contains("total — (finalize —, queue —, engine wait —, model load —, "
+            + "transcribe 1.2, cleanup —, insert —)"))
+        XCTAssertFalse(body.contains("attempts"))
+        XCTAssertFalse(body.contains("thermal"))
     }
 
     func testOneTextWhenTheOriginalIsTheSameOrWasNotKept() {

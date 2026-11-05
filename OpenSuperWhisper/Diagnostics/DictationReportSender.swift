@@ -34,6 +34,7 @@ enum DictationReportSender {
             output: recording.transcription,
             rawOutput: recording.distinctOriginal,
             appVersion: version,
-            osVersion: osString)
+            osVersion: osString,
+            timing: recording.timing)
     }
 }
