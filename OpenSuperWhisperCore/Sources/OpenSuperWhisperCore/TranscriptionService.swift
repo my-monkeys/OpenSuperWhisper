@@ -446,12 +446,19 @@ public class TranscriptionService: ObservableObject {
     /// off the main actor, like `ensureEngineLoaded`.
     private func makeEngine(for option: DictationModelOption) async throws -> TranscriptionEngine {
         let choice = Self.fallbackEngineChoice(for: option)
+        // Test seam: the real fallback engine needs a model file, so a test injects a stub to
+        // exercise the fallback path at all. Production keeps the real builder.
+        let build = fallbackEngineBuilder
         return try await Task.detached(priority: .userInitiated) { () -> TranscriptionEngine in
-            let engine = await Self.buildFallbackEngine(choice)
+            let engine = await build(choice)
             try await engine.initialize()
             return engine
         }.value
     }
+
+    /// Test seam: builds the engine the remote local-fallback runs on. Production builds the real
+    /// engine for the choice with `buildFallbackEngine`.
+    var fallbackEngineBuilder: (FallbackEngineChoice) async -> TranscriptionEngine = TranscriptionService.buildFallbackEngine
 
     /// The engines the remote local-fallback can build, with what each is given. Separate from
     /// `EngineKind` because this factory has its own quirks, kept as they are (see below).

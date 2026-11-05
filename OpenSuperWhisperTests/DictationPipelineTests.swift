@@ -374,6 +374,18 @@ final class DictationPipelineTests: XCTestCase {
         return nil
     }
 
+    /// All the rows that appeared since `before`, once there are at least `count` of them.
+    private func newRecordings(after before: Set<UUID>, count: Int,
+                               attempts: Int = 300) async -> [Recording] {
+        for _ in 0..<attempts {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            let rows = ((try? await RecordingStore.shared.fetchRecordings(limit: 200, offset: 0)) ?? [])
+                .filter { !before.contains($0.id) }
+            if rows.count >= count { return rows }
+        }
+        return []
+    }
+
     private func drain(_ pipeline: DictationPipeline, attempts: Int = 500) async {
         var waited = 0
         while pipeline.isProcessing && waited < attempts {
@@ -524,7 +536,8 @@ final class DictationPipelineTests: XCTestCase {
         defer { scratch.restore() }
         let prefs = AppPreferences.shared
         prefs.saveTranscriptionHistory = true
-        prefs.autoPasteTranscription = false
+        // On, because insertMs is measured only for text that actually went into a field (B3).
+        prefs.autoPasteTranscription = true
         prefs.autoCopyToClipboard = false
         prefs.aiPostProcessingEnabled = false
         prefs.appContextFormattingEnabled = false
@@ -566,6 +579,149 @@ final class DictationPipelineTests: XCTestCase {
         XCTAssertNil(timing.engineWaitMs, "the engine split is not measured through a replaced engine")
         XCTAssertNil(timing.engineLoadMs)
         XCTAssertEqual(timing.machine?.thermalState, "nominal")
+
+        RecordingStore.shared.deleteRecording(row)
+    }
+
+    /// A queued dictation waits behind the one in flight. The first run costs 50 on the scripted
+    /// clock, so the second row's queue wait is exactly that — measured from its own enqueue.
+    /// Every other timing test asserts `queueWaitMs == 0`, which a hardcoded zero would satisfy;
+    /// this is the one that would redden it.
+    func testAQueuedDictationMeasuresItsWaitBehindTheOneInFlight() async throws {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = true
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+        prefs.postRecordHookEnabled = false
+
+        let pipeline = DictationPipeline.shared
+        let clock = ClockBox()
+        runClock(pipeline, clock)
+        pipeline.transcribeOverride = { url, _ in
+            if url.lastPathComponent.contains("queue-first") { clock.now += 50 }
+            return "text for \(url.lastPathComponent)"
+        }
+        pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
+        pipeline.deliverOverride = { _, _ in .inserted }
+        defer { resetSeams(pipeline) }
+
+        let before = await recordingIDs()
+        // Distinct start times give each row a stable identity; both are enqueued while the
+        // clock is still 0, so nothing but the serial queue can explain a non-zero wait.
+        let firstDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let secondDate = Date(timeIntervalSince1970: 1_700_000_001)
+        pipeline.enqueue(tempURL: try makeClip("osw-queue-first"), startedAt: firstDate,
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
+                         modelOption: nil, stoppedAtUptime: clock.now)
+        pipeline.enqueue(tempURL: try makeClip("osw-queue-second"), startedAt: secondDate,
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
+                         modelOption: nil, stoppedAtUptime: clock.now)
+        await drain(pipeline)
+
+        let rows = await newRecordings(after: before, count: 2)
+        let first = try XCTUnwrap(rows.first { $0.timestamp == firstDate })
+        let second = try XCTUnwrap(rows.first { $0.timestamp == secondDate })
+        XCTAssertEqual(first.timing?.queueWaitMs, 0, "nothing was ahead of it")
+        XCTAssertEqual(second.timing?.queueWaitMs, 50, "it waited for the first run")
+        XCTAssertEqual(second.timing?.transcribeMs, 0, "its own run was instant")
+
+        for row in rows { RecordingStore.shared.deleteRecording(row) }
+    }
+
+    /// `insertMs` means text went into a field. Every delivery that put nothing there leaves it
+    /// nil while the rest of the run is still measured (B3).
+    func testInsertionIsMeasuredOnlyWhenTextActuallyWentIn() async throws {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = true
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+        prefs.postRecordHookEnabled = false
+
+        let pipeline = DictationPipeline.shared
+        let clock = ClockBox()
+        var notices: [RecordingState] = []
+        runClock(pipeline, clock)
+        pipeline.transcribeOverride = { _, _ in
+            clock.now += 5
+            return "some words"
+        }
+        pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
+        pipeline.noticeOverride = { notices.append($0) }
+        defer { resetSeams(pipeline) }
+
+        let cases: [(name: String, delivery: DictationPipeline.Delivery, autoPaste: Bool)] = [
+            ("held", .held, true),
+            ("on the clipboard", .onClipboardAnnounced, true),
+            ("auto-paste off", .inserted, false),
+        ]
+        for (index, testCase) in cases.enumerated() {
+            prefs.autoPasteTranscription = testCase.autoPaste
+            pipeline.deliverOverride = { _, _ in testCase.delivery }
+
+            let before = await recordingIDs()
+            pipeline.enqueue(tempURL: try makeClip("osw-insert-\(index)"), startedAt: Date(),
+                             streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
+                             modelOption: nil, stoppedAtUptime: clock.now)
+            await drain(pipeline)
+
+            let saved = await newRecording(after: before)
+            let row = try XCTUnwrap(saved, testCase.name)
+            let timing = try XCTUnwrap(row.timing)
+            XCTAssertNil(timing.insertMs, "\(testCase.name): nothing was inserted")
+            XCTAssertNotNil(timing.transcribeMs, "\(testCase.name): the run was still measured")
+
+            RecordingStore.shared.deleteRecording(row)
+        }
+    }
+
+    /// The stop press is the origin of the whole measurement, and the view model is where it is
+    /// taken. The stop override costs 40 on the scripted clock, so a `stopMark` taken on the
+    /// first line makes `finalizeMs` 40; taken after the recorder, it would be 0. Nothing else
+    /// in the suite produces these two fields (M3).
+    func testTheStopPressAndTheMachineAreMeasuredByTheStopHandler() async throws {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = true
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+        prefs.postRecordHookEnabled = false
+
+        let clip = try makeClip("osw-stop-mark")
+        let pipeline = DictationPipeline.shared
+        let clock = ClockBox()
+        let viewModel = IndicatorViewModel()
+        viewModel.uptime = { clock.now }
+        viewModel.stopRecordingOverride = {
+            clock.now += 40
+            return .clip(clip)
+        }
+        runClock(pipeline, clock)
+        pipeline.transcribeOverride = { _, _ in
+            clock.now += 10
+            return "measured from the stop"
+        }
+        pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
+        pipeline.deliverOverride = { _, _ in .inserted }
+        defer { resetSeams(pipeline) }
+
+        let before = await recordingIDs()
+        viewModel.startDecoding()
+        await drain(pipeline)
+
+        let saved = await newRecording(after: before)
+        let row = try XCTUnwrap(saved)
+        let timing = try XCTUnwrap(row.timing)
+        XCTAssertEqual(timing.finalizeMs, 40, "stop press → the clip is on its way")
+        XCTAssertNotNil(timing.machine, "the Mac at the stop instant")
+        XCTAssertEqual(timing.transcribeMs, 10)
+        XCTAssertEqual(timing.totalMs, 50, "stop press → insertion finished")
 
         RecordingStore.shared.deleteRecording(row)
     }
@@ -624,7 +780,8 @@ final class DictationPipelineTests: XCTestCase {
         defer { scratch.restore() }
         let prefs = AppPreferences.shared
         prefs.saveTranscriptionHistory = true
-        prefs.autoPasteTranscription = false
+        // On, so the zero here means "ran and cost nothing", not "did not run" (B3).
+        prefs.autoPasteTranscription = true
         prefs.autoCopyToClipboard = false
         prefs.aiPostProcessingEnabled = false
         prefs.postRecordHookEnabled = false
@@ -736,8 +893,43 @@ final class DictationPipelineTests: XCTestCase {
         XCTAssertFalse(notices.isEmpty, "the no-speech notice went through the seam, not a panel")
     }
 
-    /// A dictation the user threw away is not measured and not persisted.
-    func testADiscardedDictationWritesNoTimingRow() async throws {
+    /// History off means no row at all, so there is nowhere for a measurement to land — and the
+    /// feature must not write one just to hold timings (path 3 of the write-path matrix).
+    func testADictationWithHistoryOffWritesNoTimingRow() async throws {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = false
+        prefs.autoPasteTranscription = true
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+        prefs.postRecordHookEnabled = false
+
+        let pipeline = DictationPipeline.shared
+        let clock = ClockBox()
+        runClock(pipeline, clock)
+        pipeline.transcribeOverride = { _, _ in
+            clock.now += 10
+            return "words with no history"
+        }
+        pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .notRun) }
+        pipeline.deliverOverride = { _, _ in .inserted }
+        defer { resetSeams(pipeline) }
+
+        let before = await recordingIDs()
+        pipeline.enqueue(tempURL: try makeClip("osw-history-off"), startedAt: Date(),
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
+                         modelOption: nil, stoppedAtUptime: clock.now)
+        await drain(pipeline)
+
+        let after = await recordingIDs()
+        XCTAssertEqual(after, before, "no row, so nothing may try to persist a timing")
+    }
+
+    /// A discard that lands before the loop dequeues anything: there is no run to measure, and
+    /// nothing is persisted. The in-flight case is the next test — this one would pass even if
+    /// the in-flight check were missing, which is why it is not the only one.
+    func testADiscardBeforeTheLoopStartsWritesNothing() async throws {
         let scratch = ScratchPreferences()
         defer { scratch.restore() }
         let prefs = AppPreferences.shared
@@ -760,6 +952,58 @@ final class DictationPipelineTests: XCTestCase {
         XCTAssertEqual(after, before, "a thrown-away dictation is not persisted")
     }
 
+    /// A discard that lands while the clip is already being transcribed: the run returns its
+    /// text, finds the dictation thrown away, and must not persist a row or a measurement. The
+    /// continuation holds the run open until the discard has been applied, so this exercises
+    /// the success branch's discard check rather than the queue-emptying one.
+    func testAnInFlightDiscardWritesNoTimingRow() async throws {
+        let scratch = ScratchPreferences()
+        defer { scratch.restore() }
+        let prefs = AppPreferences.shared
+        prefs.saveTranscriptionHistory = true
+        prefs.autoPasteTranscription = false
+        prefs.autoCopyToClipboard = false
+        prefs.aiPostProcessingEnabled = false
+
+        let pipeline = DictationPipeline.shared
+        var release: CheckedContinuation<Void, Never>?
+        pipeline.transcribeOverride = { _, _ in
+            await withCheckedContinuation { release = $0 }
+            return "words nobody kept"
+        }
+        defer { resetSeams(pipeline) }
+
+        let before = await recordingIDs()
+        pipeline.enqueue(tempURL: try makeClip("osw-timing-discard-inflight"), startedAt: Date(),
+                         streamedFallback: "", context: DictationPipeline.ContextSnapshot(),
+                         modelOption: nil)
+        var waited = 0
+        while release == nil && waited < 500 {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            waited += 1
+        }
+        let resume = try XCTUnwrap(release, "the run should reach the engine")
+        pipeline.discardEverything()
+        resume.resume()
+        await drain(pipeline)
+
+        let after = await recordingIDs()
+        XCTAssertEqual(after, before, "a dictation thrown away mid-run is not persisted")
+    }
+
+    /// The engine split may only be claimed when the real engine ran. Pure, because the
+    /// process-wide snapshot happens to be nil in a fresh test process — the pipeline-level
+    /// `engineWaitMs == nil` assertion would stay green with the guard removed (M7).
+    func testEngineSplitIsClaimedOnlyForTheRealEngine() {
+        let run = TranscriptionService.RunTimings(engineWaitMs: 0, engineLoadMs: 2_100, runMs: 1_200)
+
+        XCTAssertNil(DictationPipeline.engineSplit(replacedEngine: true, lastRun: run),
+                     "a replaced engine's snapshot describes another run")
+        XCTAssertEqual(DictationPipeline.engineSplit(replacedEngine: false, lastRun: run), run)
+        XCTAssertNil(DictationPipeline.engineSplit(replacedEngine: false, lastRun: nil),
+                     "no run, no split")
+    }
+
     /// The one real-clock test. Bounds only: every stage non-negative, and the total at least as
     /// large as each of them. The stop instant comes from the SAME clock the pipeline reads,
     /// immediately before the enqueue, which makes the comparison an invariant rather than an
@@ -769,7 +1013,8 @@ final class DictationPipelineTests: XCTestCase {
         defer { scratch.restore() }
         let prefs = AppPreferences.shared
         prefs.saveTranscriptionHistory = true
-        prefs.autoPasteTranscription = false
+        // On, so the insertion stage is part of the bounds check (B3).
+        prefs.autoPasteTranscription = true
         prefs.autoCopyToClipboard = false
         prefs.aiPostProcessingEnabled = true
         prefs.postRecordHookEnabled = false

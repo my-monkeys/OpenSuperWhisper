@@ -45,7 +45,10 @@ final class RecordingTimingStoreTests: CoreTestCase {
         let fetched = try XCTUnwrap(saved)
         XCTAssertNil(fetched.timingJSON, "a new engine run must not inherit the old numbers")
         XCTAssertEqual(fetched.status, .pending)
-        XCTAssertTrue(fetched.isRegeneration)
+        XCTAssertEqual(fetched.progress, 0)
+        // `isRegeneration` is not a column: it lives on the in-memory value the caller updates,
+        // and every row read back from the database carries false
+        // (RecordingMigrationTests.testEveryColumnRoundTrips asserts exactly that).
     }
 
     /// The contrast that proves `clearTiming` is the mechanism rather than the update clobbering:
@@ -79,6 +82,31 @@ final class RecordingTimingStoreTests: CoreTestCase {
         XCTAssertEqual(fetched.timingJSON, row.timingJSON, "a restyle measures no new run")
         XCTAssertEqual(fetched.transcription, "restyled text")
         XCTAssertEqual(fetched.styleUsed, "Pro")
+    }
+
+    /// A restyle rewrites only the text fields, from a fresh read. Handing it a `Recording` the
+    /// caller has held since before the post-delivery update must not put the old blob back —
+    /// the version that writes that struct wholesale reverts `insertMs`/`totalMs` (B2).
+    func testRestyleFromAStaleCopyDoesNotRevertTheStoredBlob() async throws {
+        let row = recording()
+        try await store.addRecordingSync(row)
+        // What a caller holds after reading the row: from before the post-delivery update lands.
+        let stale = row
+
+        var finished = try XCTUnwrap(row.timing)
+        finished.insertMs = 40
+        finished.totalMs = 940
+        await store.updateTimingSync(row.id, timingJSON: finished.encoded)
+
+        try await store.restyle(stale, transcription: "restyled text", styleUsed: "Pro",
+                                cleanup: CleanupOutcome(text: "restyled text",
+                                                        status: .cleaned(model: "m")))
+
+        let saved = try await fetch(row.id)
+        let fetched = try XCTUnwrap(saved)
+        XCTAssertEqual(fetched.timing, finished,
+                       "a stale copy must not put the pre-delivery blob back")
+        XCTAssertEqual(fetched.transcription, "restyled text")
     }
 
     /// The post-delivery write re-encodes the whole blob. It must carry the stages that were on
