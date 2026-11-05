@@ -16,10 +16,10 @@ final class SecureFieldGuardTests: XCTestCase {
         XCTAssertFalse(SecureTextFields.isSecure(kAXTextFieldSubrole as String))
     }
 
-    /// An app that does not report a subrole has not said the field is secure. Treating silence
-    /// as refusal would stop reading the field in every app that keeps its subrole to itself.
-    func testSilenceIsNotRefused() {
-        XCTAssertFalse(SecureTextFields.isSecure(nil))
-        XCTAssertFalse(SecureTextFields.isSecure(""))
+    /// An app that does not report a subrole has not said the field is safe, and a gate for a
+    /// privacy control opens only on a positive answer. Silence and an empty answer both refuse.
+    func testSilenceIsRefused() {
+        XCTAssertTrue(SecureTextFields.isSecure(nil))
+        XCTAssertTrue(SecureTextFields.isSecure(""))
     }
 }

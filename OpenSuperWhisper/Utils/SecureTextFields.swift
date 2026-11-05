@@ -10,9 +10,20 @@ import ApplicationServices
 /// not read and then discarded.
 enum SecureTextFields {
 
-    /// `nil` is not secure. An app that does not report a subrole has not said the field is one,
-    /// and refusing every field with no answer would turn this guard into an outage.
+    /// A missing answer counts as secure: the read is refused unless the element positively
+    /// reports a non-secure subrole.
+    ///
+    /// The trade-off is deliberate. This is a privacy gate, and one that opens when the answer is
+    /// missing is the wrong default for it: "we could not tell" must not mean "read it". The cost
+    /// is real and falls on apps that report no subrole — their fields are no longer read, so
+    /// field context does nothing there, caret fitting (`TextAroundCaret`) has nothing to fit to,
+    /// and the correction watch (`WatchedField`) stops watching. A feature that does not fire is
+    /// a better failure than a password box that does.
+    ///
+    /// An empty subrole is treated like a missing one: an element that answers with nothing has
+    /// not told us it is safe either.
     static func isSecure(_ subrole: String?) -> Bool {
-        subrole == (kAXSecureTextFieldSubrole as String)
+        guard let subrole, !subrole.isEmpty else { return true }
+        return subrole == (kAXSecureTextFieldSubrole as String)
     }
 }
