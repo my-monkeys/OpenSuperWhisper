@@ -1,7 +1,7 @@
 import XCTest
 @testable import OpenSuperWhisperCore
 
-final class TextDiffTests: XCTestCase {
+final class TextDiffTests: CoreTestCase {
     private func diff(_ old: String, _ new: String) -> [TextDiff.Segment] {
         TextDiff.segments(from: old, to: new)
     }
