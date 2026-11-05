@@ -19,6 +19,9 @@ final class AssistantsSettingsModel: ObservableObject {
     @Published var codexOn = AppPreferences.shared.agentKindEnabled(.codex) {
         didSet { AppPreferences.shared.setAgentKind(.codex, enabled: codexOn) }
     }
+    @Published var piOn = AppPreferences.shared.agentKindEnabled(.pi) {
+        didSet { AppPreferences.shared.setAgentKind(.pi, enabled: piOn) }
+    }
     @Published var askOnStop = AppPreferences.shared.agentAskOnStop {
         didSet { AppPreferences.shared.agentAskOnStop = askOnStop }
     }
@@ -37,7 +40,7 @@ final class AssistantsSettingsModel: ObservableObject {
     /// The moments and projects only matter while some agent is answered. Codex counts only
     /// once its plugin is found: without it, Codex can't answer, so its switch is hidden and a
     /// stored codexOn mustn't keep this on by itself.
-    var enabled: Bool { claudeOn || (codexOn && codexHasPlugin) }
+    var enabled: Bool { claudeOn || (codexOn && codexHasPlugin) || piOn }
 
     init() { refreshProjects() }
 

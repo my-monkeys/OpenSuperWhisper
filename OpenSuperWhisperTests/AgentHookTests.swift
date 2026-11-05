@@ -250,6 +250,44 @@ final class AgentHookTests: XCTestCase {
         XCTAssertEqual(AgentKind.detect(input: [:], environment: ["GEMINI_SESSION_ID": "g", "CLAUDE_PROJECT_DIR": "/p"]), .gemini)
     }
 
+    func testPiAndOhMyPiAreKnownByTheirMarker() {
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["OSW_AGENT": "pi"]), .pi)
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["OSW_AGENT": "omp"]), .pi)
+    }
+
+    func testThePiMarkerWinsOverEveryOtherAgentsSigns() {
+        let environment = ["OSW_AGENT": "omp", "CLAUDE_PROJECT_DIR": "/p", "PLUGIN_ROOT": "/p",
+                           "CURSOR_VERSION": "2", "GEMINI_SESSION_ID": "g"]
+        XCTAssertEqual(AgentKind.detect(input: ["prompt_id": "p", "turn_id": "t"], environment: environment), .pi)
+    }
+
+    func testAnUnknownMarkerValueIsIgnored() {
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["OSW_AGENT": "vim", "CLAUDE_PROJECT_DIR": "/p"]), .claudeCode)
+        XCTAssertEqual(AgentKind.detect(input: [:], environment: ["OSW_AGENT": ""]), .unknown)
+    }
+
+    func testThePanelNamesThePiHostThatIsWaiting() {
+        XCTAssertEqual(AgentKind.pi.label(environment: ["OSW_AGENT": "omp"]), "oh-my-pi")
+        XCTAssertEqual(AgentKind.pi.label(environment: ["OSW_AGENT": "pi"]), "pi")
+        XCTAssertEqual(AgentKind.claudeCode.label(environment: ["OSW_AGENT": "omp"]), "Claude Code")
+    }
+
+    func testPiIsAnsweredWithClaudeCodeTurnedOff() {
+        let prefs = AppPreferences.shared
+        let saved = (prefs.agentEnabledKinds, prefs.agentRecentProjects)
+        defer { (prefs.agentEnabledKinds, prefs.agentRecentProjects) = saved }
+        prefs.agentEnabledKinds = [AgentKind.pi.rawValue]
+        prefs.agentRecentProjects = []
+        var request = stopRequest(cwd: "/code/pi-only")
+        request.source = .pi
+        XCTAssertTrue(AgentHookCommand.shouldAsk(request))
+        request.source = .claudeCode
+        XCTAssertFalse(AgentHookCommand.shouldAsk(request))
+        prefs.agentEnabledKinds = [AgentKind.claudeCode.rawValue]
+        request.source = .pi
+        XCTAssertFalse(AgentHookCommand.shouldAsk(request))
+    }
+
     func testAnAgentTheUserDidNotTurnOnGetsNothing() {
         let prefs = AppPreferences.shared
         let saved = (prefs.agentEnabledKinds, prefs.agentRecentProjects)

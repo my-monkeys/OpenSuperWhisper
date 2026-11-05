@@ -1,7 +1,7 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// Settings › Assistants: the Claude Code plugin and Codex, the moments that bring the answer
+/// Settings › Assistants: the Claude Code plugin, Codex and pi, the moments that bring the answer
 /// panel up, and how the panel behaves. Ported from the old Agents pane.
 struct AssistantsRubric: View {
     @StateObject private var model = AssistantsSettingsModel()
@@ -16,6 +16,10 @@ struct AssistantsRubric: View {
               keywords: "codex openai plugin hooks agent"),
         .init(title: "Answer Codex", rubric: .assistants,
               keywords: "codex agent répondre panneau hooks"),
+        .init(title: "pi and oh-my-pi", rubric: .assistants,
+              keywords: "pi oh-my-pi omp extension agent"),
+        .init(title: "Answer pi and oh-my-pi", rubric: .assistants,
+              keywords: "pi oh-my-pi omp agent répondre panneau"),
         .init(title: "Finishes a task", rubric: .assistants,
               keywords: "notifications stop done agent tâche terminée prévenir"),
         .init(title: "Needs a permission", rubric: .assistants,
@@ -25,7 +29,7 @@ struct AssistantsRubric: View {
         .init(title: "Notification sound", rubric: .assistants, advanced: true,
               keywords: "sound notifications son alerte"),
         .init(title: "Followed projects", rubric: .assistants, advanced: true,
-              keywords: "projects folders projets dossiers suivis claude codex"),
+              keywords: "projects folders projets dossiers suivis claude codex pi"),
         .init(title: "Answer by voice", rubric: .assistants, advanced: true,
               keywords: "voice shortcut dictation répondre à la voix raccourci"),
         .init(title: "Panel position", rubric: .assistants, advanced: true,
@@ -35,7 +39,7 @@ struct AssistantsRubric: View {
     ]
 
     var body: some View {
-        RubricPage(.assistants, intro: "Dictate your answers to Claude Code and Codex, and hear when they are waiting.") {
+        RubricPage(.assistants, intro: "Dictate your answers to Claude Code, Codex and pi, and hear when they are waiting.") {
             connectionsGroup
             notifyGroup
             panelGroup
@@ -79,6 +83,15 @@ struct AssistantsRubric: View {
                 }
                 SettingNotice("Codex's questions still show in the terminal, not in the panel.")
             }
+            SettingRow("pi and oh-my-pi",
+                       hint: "Install the pi-opensuperwhisper extension in pi or oh-my-pi, then turn on Answer pi and oh-my-pi below.") {
+                EmptyView()
+            }
+            SettingRow("Answer pi and oh-my-pi",
+                       hint: "Off, pi and oh-my-pi wait in their terminal as if the extension were not installed.",
+                       indented: true) {
+                SSwitch(isOn: $model.piOn)
+            }
         }
     }
 
@@ -117,7 +130,7 @@ struct AssistantsRubric: View {
     private var notifyGroup: some View {
         SettingsGroup("Notify me when") {
             if !model.enabled {
-                SettingNotice("Turn on Claude Code or Codex above to choose when the panel shows.")
+                SettingNotice("Turn on Claude Code, Codex or pi above to choose when the panel shows.")
             }
             Group {
                 SettingRow("Finishes a task") { SSwitch(isOn: $model.askOnStop) }

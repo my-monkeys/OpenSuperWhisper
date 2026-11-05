@@ -55,6 +55,8 @@ struct AgentAvatar: View {
         case .codex: return "chevron.left.forwardslash.chevron.right"
         case .gemini: return "sparkles"
         case .cursor: return "cursorarrow"
+        // The "pi" SF Symbol requires macOS 15.4; on supported older releases, the badge has no glyph.
+        case .pi: return "pi"
         case .unknown: return "terminal"
         }
     }
@@ -65,6 +67,7 @@ struct AgentAvatar: View {
         case .codex: return Color(white: 0.12)
         case .gemini: return Color(red: 0.26, green: 0.52, blue: 0.96)
         case .cursor: return Color(white: 0.2)
+        case .pi: return Color(red: 0.42, green: 0.36, blue: 0.90)
         case .unknown: return Color.gray
         }
     }

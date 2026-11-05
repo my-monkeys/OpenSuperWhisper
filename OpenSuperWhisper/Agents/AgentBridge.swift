@@ -65,7 +65,12 @@ enum AgentKind: String, Codable, CaseIterable {
     case codex
     case cursor
     case gemini
+    case pi
     case unknown
+
+    /// Hosts without Claude Code-style hooks set this when they run `agent-hook`, naming
+    /// themselves: `pi` and `omp` (oh-my-pi) map to `.pi`.
+    static let markerVariable = "OSW_AGENT"
 
     var displayName: String {
         switch self {
@@ -73,6 +78,7 @@ enum AgentKind: String, Codable, CaseIterable {
         case .codex: return "Codex"
         case .cursor: return "Cursor"
         case .gemini: return "Gemini CLI"
+        case .pi: return "pi"
         case .unknown: return "Coding agent"
         }
     }
@@ -83,15 +89,28 @@ enum AgentKind: String, Codable, CaseIterable {
         case .claudeCode: return "com.anthropic.claudefordesktop"
         case .codex: return "com.openai.codex"
         case .cursor: return "com.todesktop.230313mzl4w4u92"
-        case .gemini, .unknown: return nil
+        case .gemini, .pi, .unknown: return nil
         }
+    }
+
+    /// What the panel calls the agent. pi and oh-my-pi share `.pi` (one extension, one switch),
+    /// but the request still says which of the two is waiting.
+    func label(environment: [String: String]) -> String {
+        if self == .pi, environment[Self.markerVariable] == "omp" { return "oh-my-pi" }
+        return displayName
     }
 
     /// Reads the hook's stdin and environment. No field names the agent outright, so this goes
     /// by what each one adds: Codex sends a `turn_id` on every turn and sets `PLUGIN_ROOT`
     /// without `CLAUDE_PROJECT_DIR`; Cursor and Gemini set `CLAUDE_PROJECT_DIR` for
-    /// compatibility, so they are checked before Claude Code's own markers.
+    /// compatibility, so they are checked before Claude Code's own markers. Hosts that name
+    /// themselves through `OSW_AGENT` are checked first, so a `CLAUDE_PROJECT_DIR` or
+    /// `PLUGIN_ROOT` they inherit doesn't matter.
     static func detect(input: [String: Any], environment: [String: String]) -> AgentKind {
+        switch environment[markerVariable] {
+        case "pi", "omp": return .pi
+        default: break
+        }
         if input["turn_id"] != nil
             || (environment["PLUGIN_ROOT"] != nil && environment["CLAUDE_PROJECT_DIR"] == nil) {
             return .codex

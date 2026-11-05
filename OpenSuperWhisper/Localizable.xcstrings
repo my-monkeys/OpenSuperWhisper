@@ -16653,6 +16653,52 @@
         }
       }
     },
+    "Answer pi and oh-my-pi": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi und oh-my-pi antworten"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Responder a pi y oh-my-pi"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Répondre à pi et oh-my-pi"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rispondi a pi e oh-my-pi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Responder ao pi e ao oh-my-pi"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trả lời pi và oh-my-pi"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回复 pi 和 oh-my-pi"
+          }
+        }
+      }
+    },
     "Any OpenAI-compatible server.": {
       "localizations": {
         "de": {
@@ -20701,48 +20747,48 @@
         }
       }
     },
-    "Dictate your answers to Claude Code and Codex, and hear when they are waiting.": {
+    "Dictate your answers to Claude Code, Codex and pi, and hear when they are waiting.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Diktiere deine Antworten an Claude Code und Codex und erfahre, wenn sie warten."
+            "value": "Diktiere deine Antworten an Claude Code, Codex und pi und erfahre, wenn sie warten."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dicta tus respuestas a Claude Code y Codex, y entérate cuando estén esperando."
+            "value": "Dicta tus respuestas a Claude Code, Codex y pi, y entérate cuando estén esperando."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dictez vos réponses à Claude Code et Codex, et soyez prévenu quand ils attendent."
+            "value": "Dictez vos réponses à Claude Code, Codex et pi, et soyez prévenu quand ils attendent."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Detta le tue risposte a Claude Code e Codex, e sappi quando sono in attesa."
+            "value": "Detta le tue risposte a Claude Code, Codex e pi, e sappi quando sono in attesa."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dite suas respostas ao Claude Code e ao Codex, e saiba quando eles estão esperando."
+            "value": "Dite suas respostas ao Claude Code, ao Codex e ao pi, e saiba quando eles estão esperando."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đọc chính tả câu trả lời cho Claude Code và Codex, và nghe báo khi chúng đang chờ."
+            "value": "Đọc chính tả câu trả lời cho Claude Code, Codex và pi, và nghe báo khi chúng đang chờ."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "把你的回答听写给 Claude Code 和 Codex，并在它们等待时听到提示音。"
+            "value": "把你的回答听写给 Claude Code、Codex 和 pi，并在它们等待时听到提示音。"
           }
         }
       }
@@ -24791,6 +24837,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "将最近一次听写重新插入到光标所在的位置。"
+          }
+        }
+      }
+    },
+    "Install the pi-opensuperwhisper extension in pi or oh-my-pi, then turn on Answer pi and oh-my-pi below.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installiere die Erweiterung pi-opensuperwhisper in pi oder oh-my-pi und schalte dann unten pi und oh-my-pi antworten ein."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instala la extensión pi-opensuperwhisper en pi u oh-my-pi y activa después Responder a pi y oh-my-pi abajo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installez l'extension pi-opensuperwhisper dans pi ou oh-my-pi, puis activez Répondre à pi et oh-my-pi ci-dessous."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installa l'estensione pi-opensuperwhisper in pi o oh-my-pi, poi attiva Rispondi a pi e oh-my-pi qui sotto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instale a extensão pi-opensuperwhisper no pi ou no oh-my-pi e depois ative Responder ao pi e ao oh-my-pi abaixo."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cài tiện ích pi-opensuperwhisper trong pi hoặc oh-my-pi, rồi bật Trả lời pi và oh-my-pi ở dưới."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 pi 或 oh-my-pi 中安装 pi-opensuperwhisper 扩展，然后开启下方的“回复 pi 和 oh-my-pi”。"
           }
         }
       }
@@ -28889,6 +28981,52 @@
         }
       }
     },
+    "Off, pi and oh-my-pi wait in their terminal as if the extension were not installed.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn aus, warten pi und oh-my-pi in ihrem Terminal, als wäre die Erweiterung nicht installiert."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desactivado, pi y oh-my-pi esperan en su terminal como si la extensión no estuviera instalada."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désactivé, pi et oh-my-pi attendent dans leur terminal comme si l'extension n'était pas installée."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se disattivato, pi e oh-my-pi attendono nel loro terminale come se l'estensione non fosse installata."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desativado, o pi e o oh-my-pi esperam no terminal como se a extensão não estivesse instalada."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi tắt, pi và oh-my-pi chờ trong terminal như thể chưa cài tiện ích."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭后，pi 和 oh-my-pi 会在终端中等待，如同未安装扩展一样。"
+          }
+        }
+      }
+    },
     "Off: nothing on screen is read.": {
       "localizations": {
         "de": {
@@ -29805,6 +29943,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开系统设置"
+          }
+        }
+      }
+    },
+    "pi and oh-my-pi": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi und oh-my-pi"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi y oh-my-pi"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi et oh-my-pi"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi e oh-my-pi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi e oh-my-pi"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi và oh-my-pi"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pi 和 oh-my-pi"
           }
         }
       }
@@ -40067,48 +40251,48 @@
         }
       }
     },
-    "Turn on Claude Code or Codex above to choose when the panel shows.": {
+    "Turn on Claude Code, Codex or pi above to choose when the panel shows.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Schalte oben Claude Code oder Codex ein, um festzulegen, wann das Feld erscheint."
+            "value": "Schalte oben Claude Code, Codex oder pi ein, um festzulegen, wann das Feld erscheint."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Activa Claude Code o Codex arriba para elegir cuándo aparece el panel."
+            "value": "Activa Claude Code, Codex o pi arriba para elegir cuándo aparece el panel."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Activez Claude Code ou Codex ci-dessus pour choisir quand le panneau s'affiche."
+            "value": "Activez Claude Code, Codex ou pi ci-dessus pour choisir quand le panneau s'affiche."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Attiva Claude Code o Codex qui sopra per scegliere quando mostrare il pannello."
+            "value": "Attiva Claude Code, Codex o pi qui sopra per scegliere quando mostrare il pannello."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ative o Claude Code ou o Codex acima para escolher quando o painel aparece."
+            "value": "Ative o Claude Code, o Codex ou o pi acima para escolher quando o painel aparece."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bật Claude Code hoặc Codex ở trên để chọn khi nào bảng hiển thị."
+            "value": "Bật Claude Code, Codex hoặc pi ở trên để chọn khi nào bảng hiển thị."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先在上方开启 Claude Code 或 Codex，才能选择面板何时显示。"
+            "value": "请先在上方开启 Claude Code、Codex 或 pi，才能选择面板何时显示。"
           }
         }
       }

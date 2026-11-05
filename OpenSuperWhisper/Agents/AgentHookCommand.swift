@@ -85,7 +85,7 @@ enum AgentHookCommand {
         var request = AgentRequest(
             id: UUID().uuidString,
             kind: kind,
-            agent: agent.displayName,
+            agent: agent.label(environment: environment),
             sessionID: sessionID,
             title: title(for: agent, sessionID: sessionID, transcriptPath: json["transcript_path"] as? String),
             cwd: (json["cwd"] as? String) ?? FileManager.default.currentDirectoryPath,
