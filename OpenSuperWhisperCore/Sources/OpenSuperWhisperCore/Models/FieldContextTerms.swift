@@ -19,7 +19,6 @@ public enum FieldContextTerms {
     /// can assert rather than whatever a set happens to iterate first.
     public static func terms(from text: String,
                              spelling: DictionaryCandidates.Spelling,
-                             capitalMarksNames: Bool,
                              limit: Int = 10) -> [String] {
         guard !text.isEmpty, limit > 0 else { return [] }
 
@@ -33,9 +32,14 @@ public enum FieldContextTerms {
             // Longest run first: "Claude Code" is one name, not two words.
             for length in stride(from: min(3, words.count - index), through: 1, by: -1) {
                 let run = Array(words[index..<(index + length)])
+                // `capitalMarksNames: true` is the permissive reading, and `survivesFieldGuard`
+                // below is what narrows it. Passing the language's real value here would change
+                // no output — every word whose verdict it changes is one whose lowercase the
+                // dictionary knows, and the guard drops those in either case — so a parameter
+                // that reads like a control but cannot move the answer is not carried.
                 guard run.allSatisfy({ startsName($0.text) }),
                       let candidate = DictionaryCandidates.term(
-                          from: run, spelling: spelling, capitalMarksNames: capitalMarksNames)
+                          from: run, spelling: spelling, capitalMarksNames: true)
                 else { continue }
 
                 // The guard is per word, so "Code" falls out of "Claude Code" and "Claude"
@@ -70,7 +74,9 @@ public enum FieldContextTerms {
     ///   a lowercase unknown is as likely a typo as jargon.
     /// - A capitalised word with no strong shape survives only when its lowercase form is
     ///   unknown. "Cherith" stays; "Parakeet" — and "Maxim" — do not. `isVocabulary` deliberately
-    ///   keeps the latter, and that stays right for a dictionary suggestion.
+    ///   keeps the latter, and that stays right for a dictionary suggestion. This is also what
+    ///   rejects the nouns of a language that capitalises every one of them: a German noun is a
+    ///   known word in lowercase, so its capital buys it nothing here.
     private static func survivesFieldGuard(_ word: String,
                                            spelling: DictionaryCandidates.Spelling) -> Bool {
         guard startsName(word) else { return false }
