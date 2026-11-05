@@ -45,9 +45,11 @@ final class TranscriptionReportsModel: ObservableObject {
     /// The row is read again first: the feed's value was copied before the post-delivery timing
     /// update, so building from it could print `total —` and `insert —` for the two stages this
     /// feature exists to measure (#262). A row deleted by retention falls back to the passed
-    /// value — the report the person already wrote is still worth keeping.
+    /// value — the report the person already wrote is still worth keeping. A database read error
+    /// is not the same thing: it propagates, and the card reports the save as failed rather than
+    /// filing numbers known to be stale.
     func save(_ draft: ReportDraft, for recording: Recording) async throws {
-        let current = (try? await store.fetchRecording(id: recording.id)) ?? recording
+        let current = (try await store.fetchRecording(id: recording.id)) ?? recording
         guard let report = draft.report(for: current, languageSetting: languageSetting(),
                                         appDetails: appDetails()) else { return }
         try await store.saveReport(report, audioFrom: current.url)
