@@ -18,6 +18,16 @@ final class FieldContextTermsTests: CoreTestCase {
         knows: { FieldContextTermsTests.known.contains($0.lowercased()) },
         correctsTypo: { _ in false })
 
+    /// The same dictionary, with "github" unknown.
+    ///
+    /// `isVocabulary` answers `!known` for an inner-capital word, so a dictionary that knows
+    /// "github" makes "GitHub" invisible on its own. The candidacy row needs exactly that, and
+    /// `testStrongShapesSurvive` needs the opposite — one word, two rows, two stub answers. Each
+    /// row keeps its own assertion rather than either being weakened to fit a shared stub.
+    private let spellingWithoutGitHub = DictionaryCandidates.Spelling(
+        knows: { $0.lowercased() != "github" && FieldContextTermsTests.known.contains($0.lowercased()) },
+        correctsTypo: { _ in false })
+
     private func terms(_ text: String, capitalMarksNames: Bool = true, limit: Int = 10) -> [String] {
         FieldContextTerms.terms(from: text, spelling: spelling,
                                 capitalMarksNames: capitalMarksNames, limit: limit)
@@ -67,8 +77,14 @@ final class FieldContextTermsTests: CoreTestCase {
     }
 
     /// Shape alone is evidence, so these survive even capitalised mid-sentence.
+    ///
+    /// Its own stub, because the shared one knows "github" for the candidacy row below — see
+    /// `spellingWithoutGitHub`.
     func testStrongShapesSurvive() {
-        XCTAssertEqual(terms("the GitHub, the OSW, and GPT4."), ["GitHub", "OSW", "GPT4"])
+        XCTAssertEqual(FieldContextTerms.terms(from: "the GitHub, the OSW, and GPT4.",
+                                               spelling: spellingWithoutGitHub,
+                                               capitalMarksNames: true),
+                       ["GitHub", "OSW", "GPT4"])
     }
 
     /// Lowercase unknown words are as likely a typo as jargon, so the field path does not boost
