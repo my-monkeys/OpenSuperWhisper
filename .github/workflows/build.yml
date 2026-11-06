@@ -285,6 +285,141 @@ jobs:
             exit 1
           fi
 
+  # Measures the Parakeet over-boost risk as a number rather than an assumption (#89, #235).
+  #
+  # The benchmark wants a folder of WAVs with a `_refs.json`; those are local material that is not
+  # in the repo, and a runner has the hardware but not the fixtures. So the clips are synthesised
+  # here with `say`, carrying the benchmark's own `spokenTerms` in ordinary sentences.
+  #
+  # READ THE RESULT WITH THIS CAVEAT: synthetic speech is cleaner than human speech — no accent,
+  # no room noise, no hesitation — so these counts BOUND the false-replacement risk. They do not
+  # reproduce #235's numbers, and a low count here is not evidence that a dictation in a noisy
+  # room is safe.
+  #
+  # Manual only: it downloads the ASR and CTC models and takes the better part of an hour, and no
+  # pull request depends on it.
+  parakeet-overboost:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      # The setup below mirrors `core-tests`: the benchmark builds against the same native
+      # slices, the same patched FluidAudio checkout, and the same workspace pins.
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: brew install cmake rust
+      - name: Compute the native build cache key
+        id: native-key
+        run: |
+          inputs=$( (git submodule status libwhisper | awk '{print $1, $2}'; xcodebuild -version; cmake --version) | shasum -a 256 | cut -d' ' -f1)
+          echo "key=native-${inputs}" >> "$GITHUB_OUTPUT"
+      - name: Restore the native xcframeworks, iOS slices included
+        id: native-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-key.outputs.key }}-all-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
+      - name: Build the native slices for macOS and iOS
+        timeout-minutes: 45
+        run: Scripts/fetch-sherpa.sh && Scripts/build-native.sh all
+      - name: Save the native xcframeworks
+        if: ${{ steps.native-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: OpenSuperWhisperCore/Binaries
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+      - name: Build with run.sh
+        timeout-minutes: 30
+        run: ./run.sh build
+      - name: Synthesise labelled clips
+        run: |
+          mkdir -p clips
+          python3 - <<'PY' > clips/sentences.txt
+          sentences = [
+              "We drove to Sintra before the rain started.",
+              "The Marianas trench is deeper than anything on land.",
+              "Dunlap said the meeting would move to Thursday.",
+              "Bennet left the keys on the kitchen table.",
+              "Nyiragongo erupted again last year.",
+              "Book the flight to Sintra and call Dunlap from the airport.",
+              "Bennet and Nyiragongo appear in the same paragraph of the report.",
+          ]
+          for sentence in sentences:
+              print(sentence)
+          PY
+          i=0
+          while IFS= read -r sentence; do
+            say -o "clips/clip-$i.aiff" "$sentence"
+            afconvert -f WAVE -d LEI16@16000 -c 1 "clips/clip-$i.aiff" "clips/clip-$i.wav"
+            rm "clips/clip-$i.aiff"
+            i=$((i + 1))
+          done < clips/sentences.txt
+          python3 - <<'PY'
+          import json
+          sentences = [line.rstrip("\n") for line in open("clips/sentences.txt", encoding="utf-8")
+                       if line.strip()]
+          refs = [{"file": f"clip-{i}.wav", "ref": sentence} for i, sentence in enumerate(sentences)]
+          with open("clips/_refs.json", "w", encoding="utf-8") as handle:
+              json.dump(refs, handle, indent=1)
+          PY
+          ls -l clips
+      # `TEST_RUNNER_` is how xcodebuild forwards an environment variable into the test process,
+      # and `Scripts/test-core.sh` documents it. Without the prefix the benchmark skips itself and
+      # the step would pass having measured nothing — which is what the report check below is for.
+      - name: Run the benchmark
+        timeout-minutes: 40
+        run: |
+          TEST_RUNNER_OSW_PARAKEET_BENCH="$PWD/clips" \
+          TEST_RUNNER_OSW_PARAKEET_BENCH_OUT="$PWD/bench.json" \
+            Scripts/test-core.sh macos \
+              -only-testing:OpenSuperWhisperCoreTests/ParakeetBoostBenchmark
+      - name: Report the bait counts and fail if the boost adds any
+        run: |
+          if [[ ! -f bench.json ]]; then
+            echo "::error::the benchmark wrote no report — it skipped, so the environment did not reach the test process"
+            exit 1
+          fi
+          cat bench.json
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          with open("bench.json", encoding="utf-8") as handle:
+              report = json.load(handle)
+
+          none = report["none"]["baits"]
+          terms = report["terms"]["baits"]
+          lines = [
+              "### Parakeet over-boost benchmark (synthetic clips)",
+              "",
+              "| arm | bait replacements | WER |",
+              "|---|---|---|",
+              f"| no terms | {none} | {report['none']['wer']:.3f} |",
+              f"| terms | {terms} | {report['terms']['wer']:.3f} |",
+              "",
+              "Synthetic speech is cleaner than human speech, so this bounds the risk; it does not",
+              "reproduce #235's numbers.",
+          ]
+          summary = "\n".join(lines)
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+              handle.write(summary + "\n")
+
+          if terms > none:
+              sys.exit(f"the boost added {terms - none} bait replacement(s): {none} -> {terms}")
+          PY
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: parakeet-overboost-report
+          path: bench.json
+          if-no-files-found: warn
+
   # Records the tree a green pull request run tested, for `decide` on the push that merges it.
   # A pull request from a fork gets a read-only token and records nothing, so its merge runs
   # in full, as before.
