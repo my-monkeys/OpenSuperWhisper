@@ -218,10 +218,19 @@ class FocusUtils {
     /// How much text is already in the focused field, and where the caret sits in it.
     ///
     /// Sizes and offsets only, never the text itself: this exists to be written to a diagnostic
-    /// log, and the numbers are what the diagnosis needs. Read from the frontmost application's
-    /// own element rather than the system-wide one, which answers `cannotComplete` in cases where
-    /// asking the application directly works. nil when accessibility cannot say, which is a real
-    /// answer here rather than a failure: an app that reports nothing is itself a finding.
+    /// log, and the numbers are what the diagnosis needs. The length comes from
+    /// `kAXNumberOfCharactersAttribute`, not from reading the value and counting it — producing
+    /// one integer is not a reason to bring someone's text into this process, which is the same
+    /// rule the secure-field guard enforces. It is the AX count (UTF-16 units), not Swift's
+    /// grapheme count, so logs from before and after this change are not strictly comparable.
+    ///
+    /// A secure field is not measured at all. Even its length is a fact about a password, and
+    /// this line outlives the dictation in a diagnostic log.
+    ///
+    /// Read from the frontmost application's own element rather than the system-wide one, which
+    /// answers `cannotComplete` in cases where asking the application directly works. nil when
+    /// accessibility cannot say, which is a real answer here rather than a failure: an app that
+    /// reports nothing is itself a finding, and so is one that will not report a count.
     static func focusedTextMetrics() -> (length: Int, caret: Int?)? {
         guard AXIsProcessTrusted(),
               let front = NSWorkspace.shared.frontmostApplication else { return nil }
@@ -237,10 +246,16 @@ class FocusUtils {
         let element = focused as! AXUIElement
         AXUIElementSetMessagingTimeout(element, axMessagingTimeout)
 
-        var value: CFTypeRef?
+        var subroleRef: CFTypeRef?
+        let subrole = AXUIElementCopyAttributeValue(
+            element, kAXSubroleAttribute as CFString, &subroleRef
+        ) == .success ? subroleRef as? String : nil
+        guard !SecureTextFields.isSecure(subrole) else { return nil }
+
+        var countRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
-            element, kAXValueAttribute as CFString, &value
-        ) == .success, let text = value as? String else { return nil }
+            element, kAXNumberOfCharactersAttribute as CFString, &countRef
+        ) == .success, let length = countRef as? Int else { return nil }
 
         var caret: Int?
         var rangeRef: CFTypeRef?
@@ -251,6 +266,6 @@ class FocusUtils {
             if AXValueGetValue(rangeRef as! AXValue, .cfRange, &range) { caret = range.location }
         }
 
-        return (text.count, caret)
+        return (length, caret)
     }
 }

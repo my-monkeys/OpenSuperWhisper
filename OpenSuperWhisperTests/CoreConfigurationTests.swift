@@ -55,6 +55,8 @@ final class CoreConfigurationTests: XCTestCase {
             textFormatter: { calls.record(); return $0 },
             computePolicy: .cpuOnly,
             makeSettings: { calls.record(); return Settings(freshInstallLanguage: "en") },
+            fieldTermSpelling: { _ in calls.record()
+                return DictionaryCandidates.Spelling(knows: { _ in false }, correctsTypo: { _ in false }) },
             confirmEnableHistory: { calls.record(); return false })
     }
 }

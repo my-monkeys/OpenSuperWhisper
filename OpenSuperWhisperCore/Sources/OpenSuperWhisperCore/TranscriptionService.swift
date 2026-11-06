@@ -130,7 +130,9 @@ public class TranscriptionService: ObservableObject {
 
     /// The engines `ensureEngineLoaded` can build. Named apart from the classes so the choice can
     /// be made, and tested, without instantiating anything (an engine's init may load a model).
-    enum EngineKind: Equatable {
+    /// `CaseIterable` so `EngineCapabilities.allEngineIds` can be pinned against every kind:
+    /// a new kind whose id never reaches the list is otherwise invisible to the capability test.
+    enum EngineKind: Equatable, CaseIterable {
         case whisper, fluidAudio, senseVoice, remote, appleSpeech
     }
 
@@ -263,7 +265,29 @@ public class TranscriptionService: ObservableObject {
         }
     }
     
-    public func transcribeAudio(url: URL, settings: TranscriptionSettings, modelOverride: DictationModelOption? = nil) async throws -> String {
+    /// - Parameter capturedFieldText: what was already written in the field the dictation started
+    ///   in, captured at record-start by the host and carried per clip. It is resolved into a
+    ///   `FieldContext` only after the engine is known, and reaches an engine only through a
+    ///   context protocol — see `resolveFieldContext`. Chosen over a member on
+    ///   `TranscriptionSettings` because that value is handed to every engine, including the
+    ///   remote one (#89).
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings,
+                                capturedFieldText: String? = nil,
+                                modelOverride: DictationModelOption? = nil) async throws -> String {
+        // Resolve the field's context before taking the gate when the engine that will run is
+        // already loaded. The spelling pass is synchronous main-thread work, and holding the
+        // process-wide permit through it delays whatever dictation is queued behind this one.
+        //
+        // Only when no per-call model swap can change the engine, and an engine of the selected
+        // kind is already loaded — the two conditions under which `ensureEngineLoaded` below
+        // returns this same instance. Every other path resolves after selection, as it did.
+        let readyContext: FieldContext? = modelOverride == nil
+            && loadedEngineKind == CoreAccess.preferences.selectedEngine
+            ? currentEngine.flatMap {
+                resolveFieldContext(capturedFieldText, for: $0, settings: settings)
+            }
+            : nil
+
         // Serialize every transcription across the app (dictation pipeline, file-drop queue,
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
@@ -319,14 +343,19 @@ public class TranscriptionService: ObservableObject {
             lastRunTimings = RunTimings(engineWaitMs: engineWaitMs,
                                         engineLoadMs: lastEngineLoadMs)
         }
-        return try await transcribe(url: url, settings: settings, fallbackModel: nil)
+        return try await transcribe(url: url, settings: settings, fallbackModel: nil,
+                                    capturedFieldText: capturedFieldText,
+                                    preResolvedContext: readyContext)
     }
 
     /// Load the appropriate engine and transcribe. On a fallback-worthy remote error
     /// (server unreachable / 5xx after retries), re-runs once with the configured local
     /// fallback model. Recursive by design: the `fallbackModel != nil` attempt is
     /// guarded out of the catch (`fallbackModel == nil`), so it can never loop.
-    private func transcribe(url: URL, settings: TranscriptionSettings, fallbackModel: DictationModelOption?) async throws -> String {
+    private func transcribe(url: URL, settings: TranscriptionSettings,
+                            fallbackModel: DictationModelOption?,
+                            capturedFieldText: String?,
+                            preResolvedContext: FieldContext?) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
             // The fallback engine is built AND initialized here, so a user on remote-with-
@@ -351,8 +380,17 @@ public class TranscriptionService: ObservableObject {
             lastUsedFallback = false
         }
 
+        // Resolved here, after the engine is known: an engine receives context only if it
+        // declared a context protocol, and the preference gate is evaluated at dispatch time so
+        // a setting switched off between recording and transcription behaves as it did before.
+        //
+        // A value resolved before the gate is reused only if it fits the engine that actually
+        // ran. If a reload or an engine switch replaced that engine in the meantime, the value
+        // is discarded here and resolved again — never passed to an engine it does not match.
+        let context = preResolvedContext.flatMap { $0.matches(engine) ? $0 : nil }
+            ?? resolveFieldContext(capturedFieldText, for: engine, settings: settings)
         do {
-            return try await runOnEngine(engine, url: url, settings: settings)
+            return try await runOnEngine(engine, url: url, settings: settings, context: context)
         } catch let error where fallbackModel == nil && Self.shouldUseFallback(for: error) {
             guard CoreAccess.preferences.remoteFallbackEnabled,
                   CoreAccess.preferences.selectedEngine == "remote",
@@ -360,14 +398,90 @@ public class TranscriptionService: ObservableObject {
                 throw error
             }
             print("Remote transcription failed (\(error)); falling back to local model \(fallback.displayName)")
-            return try await transcribe(url: url, settings: settings, fallbackModel: fallback)
+            // The fallback re-resolves against its own engine. It is safe to pass the text on:
+            // the record-time gate refused to capture it under the remote engine, so a
+            // remote-then-local clip has nothing to pass.
+            // No pre-resolved value: the fallback engine is a different one, and resolves its
+            // own context from the same clip text.
+            return try await transcribe(url: url, settings: settings, fallbackModel: fallback,
+                                        capturedFieldText: capturedFieldText,
+                                        preResolvedContext: nil)
         }
+    }
+
+    /// The language the spelling dictionary should judge the field's words in, or nil for "the
+    /// user's own languages".
+    ///
+    /// The clip's language, not the app's preference: a dictation transcribed in French must not
+    /// have its field checked against whichever language happened to be selected earlier.
+    ///
+    /// "auto" maps to nil, because it is not a language a dictionary can look a word up in — the
+    /// engine detects it from audio that had not been spoken when this text was written. Nil asks
+    /// the dictionary for the user's preferred languages, which is what the old preference-read
+    /// path did whenever the preference was "auto", and is the only honest answer available.
+    ///
+    /// The keyboard-layout selection code never reaches here: `DictationPipeline.process`
+    /// resolves it into a concrete language before these settings are built.
+    nonisolated static func spellingLanguage(for selectedLanguage: String) -> String? {
+        selectedLanguage == "auto" ? nil : selectedLanguage
+    }
+
+    /// What this engine is allowed to see of the field, or nil when it is allowed nothing.
+    ///
+    /// The two gates are deliberate: the preference (the user asked) and the conformance (this
+    /// engine has somewhere to put it). Neither alone is a reason to hand over someone's
+    /// document. A non-conforming engine reaches the `nil` return and is then called with the
+    /// plain `transcribeAudio(url:settings:)` — the argument is never passed, which is the
+    /// defensive strip in its only honest form.
+    private func resolveFieldContext(_ text: String?, for engine: TranscriptionEngine,
+                                     settings: TranscriptionSettings) -> FieldContext? {
+        guard let text = TranscriptionPrompt.surroundingText(
+            enabled: settings.useSurroundingTextAsContext, captured: text) else { return nil }
+
+        // The mode, not only the conformance. The capture gate already refused to read the field
+        // for an engine that cannot use it, but that is one layer, and the layer that is easy to
+        // bypass — a test stub, a future engine, a fallback path. Checking the selected id here
+        // means a conforming engine selected as `remote` still receives nothing, so the refusal
+        // holds even when the gate did not run.
+        guard EngineCapabilities.supportsFieldContext(engine: CoreAccess.preferences.selectedEngine)
+        else { return nil }
+
+        if engine is ProseContextEngine { return .prose(text) }
+        // The spelling pass runs only here: a prose engine returned above, and an engine with
+        // nowhere to put a term list returns below without one.
+        guard engine is TermContextEngine else { return nil }
+        let terms = FieldContextTerms.terms(
+            from: text,
+            spelling: CoreAccess.fieldTermSpelling(
+                Self.spellingLanguage(for: settings.selectedLanguage)),
+            capitalMarksNames: LanguageUtil.marksNamesWithCapitals(settings.selectedLanguage))
+        return terms.isEmpty ? nil : .terms(terms)
+    }
+
+    /// Dispatch one transcription, passing the field context only to an engine that declared it
+    /// can use it. `nonisolated` because it runs where the transcription runs, off the main actor.
+    ///
+    /// The final branch is the defensive strip in its only honest form: on every path that does
+    /// not match a conforming engine the context argument is simply not passed, so a mistaken
+    /// capability flip drops the context rather than sending it.
+    private nonisolated static func transcribe(_ engine: TranscriptionEngine, url: URL,
+                                               settings: TranscriptionSettings,
+                                               context: FieldContext?) async throws -> String {
+        if case .prose(let text)? = context, let proseEngine = engine as? ProseContextEngine {
+            return try await proseEngine.transcribeAudio(url: url, settings: settings, proseContext: text)
+        }
+        if case .terms(let terms)? = context, let termEngine = engine as? TermContextEngine {
+            return try await termEngine.transcribeAudio(url: url, settings: settings, terms: terms)
+        }
+        return try await engine.transcribeAudio(url: url, settings: settings)
     }
 
     /// Run one transcription on a specific engine: wire its progress callback, run it
     /// off the main actor, and honor cancellation. Any engine error propagates so the
     /// caller (`transcribe`) can decide whether to fall back.
-    private func runOnEngine(_ engine: TranscriptionEngine, url: URL, settings: TranscriptionSettings) async throws -> String {
+    private func runOnEngine(_ engine: TranscriptionEngine, url: URL,
+                             settings: TranscriptionSettings,
+                             context: FieldContext?) async throws -> String {
         if let whisperEngine = engine as? WhisperEngine {
             whisperEngine.onProgressUpdate = { [weak self] newProgress in
                 Task { @MainActor in
@@ -400,7 +514,7 @@ public class TranscriptionService: ObservableObject {
             }
             guard !cancelled else { throw CancellationError() }
 
-            let result = try await engine.transcribeAudio(url: url, settings: settings)
+            let result = try await Self.transcribe(engine, url: url, settings: settings, context: context)
 
             try Task.checkCancellation()
 

@@ -64,6 +64,14 @@ extension Fixtures {
         return url
     }
 
+    /// A spelling dictionary that knows no words and corrects nothing. Deterministic, so a test
+    /// that does not care about the field-term reducer never depends on the machine's installed
+    /// languages. A test that asserts the reduction injects its own through
+    /// `CoreConfiguration.replaceForTesting`.
+    static var spelling: DictionaryCandidates.Spelling {
+        DictionaryCandidates.Spelling(knows: { _ in false }, correctsTypo: { _ in false })
+    }
+
     /// Everything that reaches the engine pinned to fixed values, so no preference can change a
     /// transcript. The same 15 values as the hosted helper: the app's fresh-install defaults,
     /// English chosen explicitly and every prompt source empty.
@@ -81,8 +89,7 @@ extension Fixtures {
                               customDictionaryEnabled: false,
                               customDictionaryBoostEnabled: false,
                               customDictionaryEntries: [],
-                              useSurroundingTextAsContext: false,
-                              focusedText: nil)
+                              useSurroundingTextAsContext: false)
     }
 }
 

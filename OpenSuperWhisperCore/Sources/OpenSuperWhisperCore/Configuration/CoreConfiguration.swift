@@ -12,6 +12,18 @@ public struct CoreConfiguration: Sendable {
     public var textFormatter: @Sendable (String) -> String
     public var computePolicy: ComputePolicy
     public var makeSettings: @MainActor @Sendable () -> TranscriptionSettings
+    /// The spelling dictionary the field-term reducer is judged against (#89), for a language.
+    ///
+    /// The language is the clip's, not a preference the host reads for itself: a dictation can
+    /// run in a different language from the one selected when it was queued, and the dictionary
+    /// is judging words that were already on the page. Nil means the caller has no language to
+    /// name — the host falls back to the user's own preferred languages.
+    ///
+    /// Required, not defaulted. `Spelling` cannot express "I don't know": `knows = { false }`
+    /// disables the guard and over-boosts every capitalised common word, and `knows = { true }`
+    /// drops every term and makes the setting a no-op. A default would silently pick one of
+    /// those, so a host that forgets becomes a compile error instead.
+    public var fieldTermSpelling: @MainActor @Sendable (String?) -> DictionaryCandidates.Spelling
     public var confirmEnableHistory: @MainActor @Sendable () async -> Bool
 
     public init(preferences: @escaping @Sendable () -> any CorePreferences,
@@ -20,6 +32,7 @@ public struct CoreConfiguration: Sendable {
                 textFormatter: @escaping @Sendable (String) -> String = { $0 },
                 computePolicy: ComputePolicy = .automatic,
                 makeSettings: @escaping @MainActor @Sendable () -> TranscriptionSettings,
+                fieldTermSpelling: @escaping @MainActor @Sendable (String?) -> DictionaryCandidates.Spelling,
                 confirmEnableHistory: @escaping @MainActor @Sendable () async -> Bool) {
         self.preferences = preferences
         self.storageRoot = storageRoot
@@ -27,6 +40,7 @@ public struct CoreConfiguration: Sendable {
         self.textFormatter = textFormatter
         self.computePolicy = computePolicy
         self.makeSettings = makeSettings
+        self.fieldTermSpelling = fieldTermSpelling
         self.confirmEnableHistory = confirmEnableHistory
     }
 }

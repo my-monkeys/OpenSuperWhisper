@@ -20,6 +20,22 @@ public class LanguageUtil {
         return names
     }()
 
+    /// True where a capital in the middle of a sentence marks a name; false in the languages
+    /// that capitalise every noun, where the capital is grammar and says nothing about the word.
+    ///
+    /// Pure and platform-neutral so both sides can share it: the app's caret matching decides
+    /// whether to adjust case with it (`CaretTextMatcher.adjustsCase` delegates here), and the
+    /// field-term reducer decides whether a capital is evidence. An unknown or unresolved
+    /// language is treated as case-marking — the guess the existing paths already make.
+    public static func marksNamesWithCapitals(_ language: String?) -> Bool {
+        guard let language else { return true }
+        let primary = language.lowercased().split(whereSeparator: { $0 == "-" || $0 == "_" }).first
+        return !nounCapitalisingLanguages.contains(primary.map(String.init) ?? "")
+    }
+
+    /// German, Luxembourgish and Swiss German.
+    static let nounCapitalisingLanguages: Set<String> = ["de", "lb", "gsw"]
+
     /// Whisper's own names are lowercase and occasionally terse, so ours win where we have one.
     public static func displayName(for code: String) -> String {
         curatedNames[code] ?? whisperName(for: code) ?? code

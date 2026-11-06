@@ -99,7 +99,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let box = OrderBox()
-        pipeline.transcribeOverride = { url, _ in
+        pipeline.transcribeOverride = { url, _, _ in
             box.order.append(url.lastPathComponent)
             return "text for \(url.lastPathComponent)"
         }
@@ -145,7 +145,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let run = PhaseRun()
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             run.duringFilePass = pipeline.isTranscribing
             return "heard"
         }
@@ -192,7 +192,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let run = StageRun()
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             run.cleaningUpDuringFilePass = pipeline.isCleaningUp
             return "heard"
         }
@@ -247,7 +247,7 @@ final class DictationPipelineTests: XCTestCase {
         let pipeline = DictationPipeline.shared
         let box = OrderBox()
         // The engine must never be asked to transcribe: there is no file to hand it.
-        pipeline.transcribeOverride = { url, _ in
+        pipeline.transcribeOverride = { url, _, _ in
             box.order.append(url.lastPathComponent)
             return "the engine should not have run"
         }
@@ -294,7 +294,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         let run = SnippetRun()
-        pipeline.transcribeOverride = { _, _ in heard }
+        pipeline.transcribeOverride = { _, _, _ in heard }
         pipeline.cleanupOverride = { text in
             run.cleanupSaw.append(text)
             return CleanupOutcome(text: cleaned, status: .notRun)
@@ -438,7 +438,7 @@ final class DictationPipelineTests: XCTestCase {
         let pipeline = DictationPipeline.shared
         let clock = ClockBox()
         pipeline.uptime = { clock.now }
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 50)
             return "hello there"
         }
@@ -497,7 +497,7 @@ final class DictationPipelineTests: XCTestCase {
         let pipeline = DictationPipeline.shared
         let clock = ClockBox()
         pipeline.uptime = { clock.now }
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 10)
             return "recovered words"
         }
@@ -554,7 +554,7 @@ final class DictationPipelineTests: XCTestCase {
         let pipeline = DictationPipeline.shared
         let clock = ClockBox()
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 50)
             return "measured words"
         }
@@ -608,7 +608,7 @@ final class DictationPipelineTests: XCTestCase {
         let pipeline = DictationPipeline.shared
         let clock = ClockBox()
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { url, _ in
+        pipeline.transcribeOverride = { url, _, _ in
             if url.lastPathComponent.contains("queue-first") { clock.advance(ms: 50) }
             return "text for \(url.lastPathComponent)"
         }
@@ -654,7 +654,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         var notices: [RecordingState] = []
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 5)
             return "some words"
         }
@@ -706,7 +706,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         var notices: [RecordingState] = []
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 5)
             return "cleanup words"
         }
@@ -773,7 +773,7 @@ final class DictationPipelineTests: XCTestCase {
             return .clip(clip)
         }
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 10)
             return "measured from the stop"
         }
@@ -812,7 +812,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         var notices: [RecordingState] = []
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 40)
             throw MoveFailure()
         }
@@ -860,7 +860,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         var attempts = 0
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             attempts += 1
             if attempts == 1 {
                 clock.advance(ms: 20)
@@ -906,7 +906,7 @@ final class DictationPipelineTests: XCTestCase {
         let clock = ClockBox()
         var replies: [(text: String, id: String, send: Bool)] = []
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 30)
             return "reply words"
         }
@@ -978,7 +978,7 @@ final class DictationPipelineTests: XCTestCase {
         let pipeline = DictationPipeline.shared
         let clock = ClockBox()
         runClock(pipeline, clock)
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             clock.advance(ms: 10)
             return "words with no history"
         }
@@ -1037,7 +1037,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         var release: CheckedContinuation<Void, Never>?
-        pipeline.transcribeOverride = { _, _ in
+        pipeline.transcribeOverride = { _, _, _ in
             await withCheckedContinuation { release = $0 }
             return "words nobody kept"
         }
@@ -1091,7 +1091,7 @@ final class DictationPipelineTests: XCTestCase {
 
         let pipeline = DictationPipeline.shared
         pipeline.uptime = UptimeClock.now
-        pipeline.transcribeOverride = { _, _ in "bounds words" }
+        pipeline.transcribeOverride = { _, _, _ in "bounds words" }
         pipeline.cleanupOverride = { text in CleanupOutcome(text: text, status: .cleaned(model: "m")) }
         pipeline.deliverOverride = { _, _ in .inserted }
         defer { resetSeams(pipeline) }

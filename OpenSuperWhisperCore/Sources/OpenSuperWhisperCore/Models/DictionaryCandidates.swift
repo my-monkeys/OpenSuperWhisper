@@ -21,7 +21,11 @@ public enum DictionaryCandidates {
     }
 
     /// The spelling dictionary, asked about one word at a time.
-    public struct Spelling {
+    /// `@unchecked Sendable` so the host can hand it to core through a `@Sendable` provider
+    /// (`CoreConfiguration.fieldTermSpelling`). The struct is a value holding two closures; the
+    /// host builds it on the main actor and the only caller invokes it there, so crossing the
+    /// boundary carries no shared mutable state.
+    public struct Spelling: @unchecked Sendable {
         /// The word is spelled right, as written, in one of the user's languages.
         public let knows: (String) -> Bool
         /// The spelling dictionary would autocorrect the word into another one: a typo.
@@ -186,6 +190,18 @@ public enum DictionaryCandidates {
         if isEmail(word) { return false }
         guard (2...maxTermLength).contains(word.count), word.contains(where: \.isLetter) else { return true }
         return word.hasPrefix("@") || isLink(word) || isFileName(word) || isCode(word) || isQuantity(word)
+    }
+
+    /// Whether the word's shape alone says it is a name, whatever a dictionary thinks: an email,
+    /// digits among letters ("GPT4"), a capital inside the word ("GitHub"), or an acronym
+    /// ("OSW"). The same shapes `isVocabulary` trusts, exposed to the field-term reducer, which
+    /// uses them to tell a real name from a common word that was merely capitalised (#89).
+    static func hasStrongShape(_ word: String) -> Bool {
+        if isEmail(word) { return true }
+        guard !isExcludedShape(word) else { return false }
+        let letters = word.filter(\.isLetter)
+        return word.contains(where: \.isNumber) || hasInnerCapital(word)
+            || (letters.count >= 2 && letters.allSatisfy(\.isUppercase))
     }
 
     /// "package.json", "README.md", "main.swift". A capitalised name with a dot keeps being a

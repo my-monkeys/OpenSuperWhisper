@@ -97,7 +97,10 @@ final class DictationPipeline: ObservableObject {
 
     /// Test seam: when set, used instead of the real engine so unit tests can exercise queue
     /// ordering / pendingCount / no-speech / failure paths without a model. nil in production.
-    var transcribeOverride: ((URL, Settings) async throws -> String)?
+    /// It takes the clip's captured field text for the same reason the production call does:
+    /// the text no longer travels inside `Settings`, and a seam that cannot see it cannot pin
+    /// one clip's field against another's (#89).
+    var transcribeOverride: ((URL, Settings, String?) async throws -> String)?
     /// Test seam: the clock the stage stamps are measured with, so a test can assert exact
     /// milliseconds. Production uses the house monotonic clock (#262).
     var uptime: () -> UInt64 = UptimeClock.now
@@ -235,7 +238,6 @@ final class DictationPipeline: ObservableObject {
         var engineAttempts = 0
         var transcribeStart: UInt64?
         var settings = Settings()
-        settings.focusedText = item.context.focusedText
         // Only a dictation expands snippets, so only a dictation is biased toward their triggers.
         settings.snippetTriggers = AppPreferences.shared.dictationSnippetTriggers
         settings.selectedLanguage = KeyboardLanguage.language(for: settings.selectedLanguage,
@@ -253,10 +255,12 @@ final class DictationPipeline: ObservableObject {
                     self.notify(.info(String(localized: "Transcription failed, trying once more…")))
                 }) {
                     if let transcribeOverride {
-                        return try await transcribeOverride(clip, settings)
+                        return try await transcribeOverride(clip, settings, item.context.focusedText)
                     }
                     return try await self.transcriptionService.transcribeAudio(
-                        url: clip, settings: settings, modelOverride: item.modelOption)
+                        url: clip, settings: settings,
+                        capturedFieldText: item.context.focusedText,
+                        modelOverride: item.modelOption)
                 }
                 item.timing.transcribeMs = UptimeClock.milliseconds(from: started, to: uptime())
                 item.timing.transcribeAttempts = engineAttempts

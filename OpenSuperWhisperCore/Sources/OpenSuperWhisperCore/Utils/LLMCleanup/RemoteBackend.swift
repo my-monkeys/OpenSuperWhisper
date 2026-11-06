@@ -18,7 +18,13 @@ struct RemoteBackend: LLMCleanupBackend {
     /// The id as the user typed it, e.g. `google/gemini-2.5-flash-lite`.
     var modelLabel: String { model.trimmingCharacters(in: .whitespaces) }
 
-    func generate(system: String, user: String) async throws -> String {
+    /// The cleanup request exactly as `generate` would send it.
+    ///
+    /// Split out so a test can inspect what leaves the machine: with the build and the send in
+    /// one function there is no moment at which the request exists, and this is one of the sinks
+    /// the field's text must never reach (#89). Not `async` because it has nothing to wait for —
+    /// the caller wraps it, the test may not need to.
+    func request(for user: String, system: String) throws -> URLRequest {
         guard let url = LLMPostProcessor.chatEndpoint(base: endpoint) else {
             throw URLError(.badURL)
         }
@@ -38,8 +44,15 @@ struct RemoteBackend: LLMCleanupBackend {
         ]
         body.merge(Self.reasoningFields(endpoint: endpoint, model: model, disabled: disableReasoning)) { $1 }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+    func generate(system: String, user: String) async throws -> String {
+        // Named apart from the method: a local called `request` would be in scope in its own
+        // initializer and the call would not resolve.
+        let urlRequest = try request(for: user, system: system)
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw CleanupHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
         }

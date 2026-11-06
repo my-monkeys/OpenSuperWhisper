@@ -156,7 +156,13 @@ struct PrivacyRubric: View {
 
     private var modelContextHint: LocalizedStringKey {
         if viewModel.useSurroundingTextAsContext {
-            return "On: the model reads the sentence before your cursor. It stays on your Mac and is never saved."
+            // The preference outlives an engine change, so it can be on while the capture path
+            // refuses to read anything: saying the field is read here is the lie #126 exists to
+            // prevent, told on the one page that is about privacy.
+            guard viewModel.canUseFieldContext else {
+                return "On, but this engine does not use it: the field is not read."
+            }
+            return "On: the text before your cursor is read to help the model recognise names. It stays on your Mac and is used only for this transcription."
         }
         return viewModel.matchTextAroundCaret || watchesCorrections
             ? "Off: the model is given nothing from the screen."

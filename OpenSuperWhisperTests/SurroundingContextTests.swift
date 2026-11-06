@@ -127,14 +127,15 @@ final class SurroundingContextTests: XCTestCase {
 
     // MARK: - Which engines can be told anything at all
 
-    /// Whisper conditions on an initial prompt. Parakeet takes a vocabulary list, Apple takes
-    /// contextual strings, SenseVoice takes nothing, so the field's contents have nowhere to go.
-    /// The toggle is disabled there rather than left live: #99 is what a switch that flips and
-    /// changes nothing costs.
-    func testOnlyWhisperCanBeToldWhatToExpect() {
+    /// Whisper takes the field's prose; Parakeet takes the terms reduced from it. Apple takes
+    /// contextual strings only through a module this app does not use, and SenseVoice takes
+    /// nothing, so on those two the field's contents have nowhere to go. Their toggle stays
+    /// disabled rather than live: #99 is what a switch that flips and changes nothing costs.
+    func testWhichEnginesCanBeToldWhatToExpect() {
         XCTAssertTrue(EngineCapabilities.supportsFieldContext(engine: "whisper"))
+        XCTAssertTrue(EngineCapabilities.supportsFieldContext(engine: "fluidaudio"))
 
-        for engine in ["fluidaudio", "apple", "sensevoice"] {
+        for engine in ["apple", "sensevoice"] {
             XCTAssertFalse(EngineCapabilities.supportsFieldContext(engine: engine), engine)
         }
     }
@@ -174,8 +175,8 @@ final class SurroundingContextTests: XCTestCase {
         let seen = Seen()
 
         let pipeline = DictationPipeline.shared
-        pipeline.transcribeOverride = { _, settings in
-            seen.fields.append(settings.focusedText)
+        pipeline.transcribeOverride = { _, _, field in
+            seen.fields.append(field)
             return "text"
         }
         defer { pipeline.transcribeOverride = nil }

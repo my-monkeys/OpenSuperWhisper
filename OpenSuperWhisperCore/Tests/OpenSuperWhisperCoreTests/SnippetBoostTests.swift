@@ -36,6 +36,27 @@ final class SnippetBoostTests: CoreTestCase {
                        ["GitHub", "Calendly", "my email"])
     }
 
+    /// The field's terms join the same list, last, under the same dedupe (#89).
+    ///
+    /// `field:` defaults to empty, so without a row that passes it the order and the cross-list
+    /// dedupe only ever run over two lists — and a caller that forgets the argument drops the
+    /// field's terms with nothing to notice. Mutations: move `field` before the dictionary and
+    /// the order changes; delete the `seen` set and "calendly" and "github" reappear.
+    func testFieldTermsComeLastAndAreDeduplicatedAcrossAllThreeLists() {
+        XCTAssertEqual(RecognitionBoost.terms(dictionary: ["GitHub", "Calendly"],
+                                              snippets: ["calendly", "my email"],
+                                              field: ["Cherith", "github", "Nyiragongo"]),
+                       ["GitHub", "Calendly", "my email", "Cherith", "Nyiragongo"])
+    }
+
+    /// The dictionary's spelling wins over the field's, which is the order's whole point: someone
+    /// writing "github" mid-sentence must not displace the "GitHub" their dictionary insists on.
+    func testTheFieldDoesNotDisplaceADictionarySpelling() {
+        XCTAssertEqual(RecognitionBoost.terms(dictionary: ["GitHub"], snippets: [],
+                                              field: ["github", "Nyiragongo"]),
+                       ["GitHub", "Nyiragongo"])
+    }
+
     // MARK: - One clip's settings
 
     private func settings(dictionaryBoost: Bool, snippetTriggers: [String]) -> TranscriptionSettings {

@@ -2,11 +2,19 @@ import Foundation
 import AVFoundation
 import FluidAudio
 
-class FluidAudioEngine: TranscriptionEngine {
+class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     var engineName: String { "FluidAudio" }
-    
+
     private var asrManager: AsrManager?
     private var asrModels: AsrModels?
+    /// The CTC models the vocabulary path spots with, loaded the first time a boost is actually
+    /// used: ~64 MB a user with no dictionary boost, no snippet boost and no field context never
+    /// pays for.
+    ///
+    /// No cache key: the CTC model is chosen by `CtcModelVariant`, not by the ASR model version.
+    /// The file path this replaced always asked for `.ctc110m` whatever `AsrModelVersion` ran,
+    /// so one load serves every dictation this engine transcribes.
+    private var ctcModels: CtcModels?
     private var isCancelled = false
     private var transcriptionTask: Task<String, Error>?
     private var progressTask: Task<Void, Never>?
@@ -39,10 +47,23 @@ class FluidAudioEngine: TranscriptionEngine {
     }
     
     func transcribeAudio(url: URL, settings: TranscriptionSettings) async throws -> String {
+        try await transcribe(url: url, settings: settings, fieldTerms: [])
+    }
+
+    /// The same, biased toward terms reduced from the focused field (#89). The terms arrive
+    /// already gated by the preference and resolved by `TranscriptionService`, and are merged
+    /// with the dictionary and snippet lists here — one place, so the three can never drift.
+    func transcribeAudio(url: URL, settings: TranscriptionSettings,
+                         terms: [String]) async throws -> String {
+        try await transcribe(url: url, settings: settings, fieldTerms: terms)
+    }
+
+    private func transcribe(url: URL, settings: TranscriptionSettings,
+                            fieldTerms: [String]) async throws -> String {
         guard let asrManager = asrManager else {
             throw TranscriptionError.contextInitializationFailed
         }
-        
+
         isCancelled = false
         
         // Notify start
@@ -86,7 +107,7 @@ class FluidAudioEngine: TranscriptionEngine {
         // boost are applied afterwards by rescoring its result against the audio, as
         // FluidAudio's own batch transcription does (#235). They used to send the file through
         // the sliding-window decoder instead, which reloaded every model on each dictation.
-        let boostTerms = activeBoostTerms(settings)
+        let boostTerms = activeBoostTerms(settings, fieldTerms: fieldTerms)
         let samples = try await Self.samplesIfNeeded(url: url, forBoosting: !boostTerms.isEmpty)
         // A fresh TDT decoder state per file keeps transcriptions independent.
         var decoderState = TdtDecoderState.make(decoderLayers: await asrManager.decoderLayerCount)
@@ -128,24 +149,41 @@ class FluidAudioEngine: TranscriptionEngine {
             engine: "fluidaudio", fluidAudioModelVersion: CoreAccess.preferences.fluidAudioModelVersion)
     }
 
-    /// The custom-dictionary terms and the clip's snippet triggers to bias recognition toward,
-    /// or `[]` when neither boost is on. Same list as Whisper's prompt boost and the live
-    /// streaming preview (`RecognitionBoost`).
+    /// The custom-dictionary terms, the clip's snippet triggers and the field's terms to bias
+    /// recognition toward, or `[]` when none is on. Same list as Whisper's prompt boost and the
+    /// live streaming preview (`RecognitionBoost`).
     ///
-    /// Boosting is opt-in for both (separate from the always-on replacement): only bias the
+    /// Boosting is opt-in for all three (separate from the always-on replacement): only bias the
     /// decoder when the user explicitly enabled it (#over-boost).
-    private func activeBoostTerms(_ settings: TranscriptionSettings) -> [String] {
-        RecognitionBoost.terms(dictionary: CoreAccess.preferences.dictionaryBoostTerms,
-                               snippets: settings.snippetTriggers)
+    ///
+    /// The cap applies to the field's contribution only. The other two lists had no cap before
+    /// this feature and dictionaries have no entry limit, so capping the merged list would
+    /// truncate an existing user's boost — a regression for someone who changed nothing.
+    /// Internal rather than private so a core test can pin the cross-clip rule directly: clip B
+    /// must never be boosted with clip A's field terms, and the merged list is where that is
+    /// visible without running a model.
+    func activeBoostTerms(_ settings: TranscriptionSettings,
+                          fieldTerms: [String]) -> [String] {
+        let dictionary = CoreAccess.preferences.dictionaryBoostTerms
+        let base = RecognitionBoost.terms(dictionary: dictionary, snippets: settings.snippetTriggers)
+        let allowance = max(0, Self.mergedTermLimit - base.count)
+        return RecognitionBoost.terms(dictionary: dictionary,
+                                      snippets: settings.snippetTriggers,
+                                      field: Array(fieldTerms.prefix(allowance)))
     }
 
-    /// The rescorer's settings for dictation. FluidAudio's tests on short terms: the taper took
-    /// false replacements of common words by unspoken short terms from 12 to 0, and turning the
-    /// spotter rescue off cut false positives by about 80% while raising recall (#235).
+    /// FluidAudio's own bands: 1–50 excellent, 50–100 good, 100–230 tested. Only the field's
+    /// share is held to it.
+    static let mergedTermLimit = 50
+
+    /// The rescorer's settings for dictation. The short-term taper scales the added boost down by
+    /// token count — a reduction, not a guard: a scaled boost can still flip the comparison, and
+    /// it knows nothing about vocabulary-ness. The sourced figure is the spotter rescue: off, it
+    /// took false positives from ~94 to ~19 on a 90-clip set (`ContextBiasingConstants.swift`).
     static let rescorerConfig = VocabularyRescorer.Config(shortTermCbwTaperPivot: 5, spotterRescueEnabled: false)
 
-    /// The boosting session for the last term list: its CTC models load and its terms are
-    /// tokenised once, then it serves every dictation until the dictionary or the snippets change.
+    /// The boosting session for the last term list: its terms are tokenised once, then it serves
+    /// every dictation until the dictionary, the snippets or the field's terms change.
     private var boosting: (terms: [String], session: VocabularyBoostingSession)?
 
     /// The transcript rescored toward the boost terms, or nil to keep it. Never throws: boosting
@@ -163,16 +201,25 @@ class FluidAudioEngine: TranscriptionEngine {
     private func boostingSession(for terms: [String]) async throws -> VocabularyBoostingSession {
         let terms = terms.filter { !$0.isEmpty }
         if let boosting, boosting.terms == terms { return boosting.session }
-        let vocabularyURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("OpenSuperWhisper-ParakeetVocabulary-\(UUID().uuidString)")
-            .appendingPathExtension("txt")
-        try terms.joined(separator: "\n").write(to: vocabularyURL, atomically: true, encoding: .utf8)
-        defer { try? FileManager.default.removeItem(at: vocabularyURL) }
-        let loaded = try await CustomVocabularyContext.loadWithCtcTokens(from: vocabularyURL.path)
-        let session = try await VocabularyBoostingSession(vocabulary: loaded.vocab, ctcModels: loaded.models,
+        // Built in code. The path this replaced joined the terms with newlines into a temporary
+        // file, where a term containing ":", a leading "#", a newline or "{" would have been
+        // read as the loader's own syntax. Terms reduced from a field of prose are the first
+        // that can contain any of those.
+        let vocabulary = CustomVocabularyContext(terms: terms.map { CustomVocabularyTerm(text: $0) })
+        let session = try await VocabularyBoostingSession(vocabulary: vocabulary,
+                                                          ctcModels: try await vocabularyModels(),
                                                           config: Self.rescorerConfig)
         boosting = (terms, session)
         return session
+    }
+
+    /// The CTC models, loaded once and reused. The session is rebuilt whenever the term list
+    /// changes; the models it runs on are the same for every list.
+    private func vocabularyModels() async throws -> CtcModels {
+        if let ctcModels { return ctcModels }
+        let models = try await CtcModels.downloadAndLoad(variant: .ctc110m)
+        ctcModels = models
+        return models
     }
 
     /// Samples to hand FluidAudio in place of the file, or nil to let it read the file itself.

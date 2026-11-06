@@ -152,7 +152,6 @@ final class SettingsResolutionTests: XCTestCase {
         XCTAssertEqual(settings.customDictionaryBoostEnabled, true)
         XCTAssertEqual(settings.customDictionaryEntries, [entry])
         XCTAssertEqual(settings.useSurroundingTextAsContext, true)
-        XCTAssertNil(settings.focusedText, "set per clip by the pipeline, never from preferences")
 
         XCTAssertTrue(settings.isAsianLanguage)
         XCTAssertFalse(settings.shouldApplyAsianAutocorrect)
@@ -178,7 +177,6 @@ final class SettingsResolutionTests: XCTestCase {
         XCTAssertEqual(settings.customDictionaryBoostEnabled, false)
         XCTAssertEqual(settings.customDictionaryEntries, [])
         XCTAssertEqual(settings.useSurroundingTextAsContext, false)
-        XCTAssertNil(settings.focusedText)
         XCTAssertFalse(settings.shouldApplyCustomDictionary)
     }
 

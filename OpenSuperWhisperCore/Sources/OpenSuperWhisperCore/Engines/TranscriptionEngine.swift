@@ -11,6 +11,53 @@ protocol TranscriptionEngine: AnyObject {
     func getSupportedLanguages() -> [String]
 }
 
+/// An engine that can be told, in free text, what the speaker was already writing (#89).
+///
+/// Internal, like `TranscriptionEngine` itself: a public protocol cannot refine an internal one.
+/// Nothing outside the module consumes these; `TranscriptionService` dispatches by conformance,
+/// so an engine that does not declare one cannot be handed the text at all.
+protocol ProseContextEngine: TranscriptionEngine {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings,
+                         proseContext: String) async throws -> String
+}
+
+/// An engine that can be biased toward a list of terms taken from the field (#89).
+protocol TermContextEngine: TranscriptionEngine {
+    func transcribeAudio(url: URL, settings: TranscriptionSettings,
+                         terms: [String]) async throws -> String
+}
+
+/// What an engine can do with the text already written in the field being dictated into (#89).
+///
+/// `none` and `remoteExcluded` are separate because "cannot" and "will not, on purpose" are
+/// different things for the UI to say, and because a second hand-maintained list of remote
+/// engine ids is a drift hazard.
+public enum FieldContextMode: Sendable {
+    /// Nowhere to put it.
+    case none
+    /// Whisper: free text, as an initial prompt.
+    case prose
+    /// Parakeet: a vocabulary list.
+    case terms
+    /// An input exists and it must never be used: the text would leave the machine.
+    case remoteExcluded
+
+    /// Whether this engine consumes the field.
+    ///
+    /// An exhaustive switch, deliberately not `self != .none`: `remoteExcluded` is not `.none`,
+    /// so that shorthand would mark the one engine that must never see the field as capable and
+    /// open its capture gate. A fifth case makes this a compile error rather than a silent
+    /// "incapable".
+    public var suppliesFieldContext: Bool {
+        switch self {
+        case .prose, .terms:
+            return true
+        case .none, .remoteExcluded:
+            return false
+        }
+    }
+}
+
 /// Static engine capabilities keyed by the stored engine id (`AppPreferences.selectedEngine`),
 /// so the UI can gate features without instantiating an engine.
 public enum EngineCapabilities {
@@ -25,16 +72,35 @@ public enum EngineCapabilities {
         translationCapableEngines.contains(engine)
     }
 
-    /// Engines that can be told, in free text, what the speaker is about to say. Whisper
-    /// conditions on an initial prompt; Parakeet takes a vocabulary list, Apple takes
-    /// contextual strings and SenseVoice takes nothing, so the contents of the field have
-    /// nowhere to go there. The remote engine is left out deliberately rather than for lack of
-    /// a prompt: its prompt is posted to someone else's server, and this text is the user's own
-    /// writing (#89).
-    static let fieldContextCapableEngines: Set<String> = ["whisper"]
+    /// The mode table: the single enumeration of every engine id and what it can do with the
+    /// field's text (#89). `allEngineIds` is derived from it, so an id cannot exist in one place
+    /// and be missing from the other — the drift the old pair of hand-maintained lists allowed.
+    ///
+    /// The stored ids are a persisted contract, so they stay strings.
+    static let fieldContextModes: [String: FieldContextMode] = [
+        "whisper": .prose,
+        // A vocabulary list, reduced from the field's prose.
+        "fluidaudio": .terms,
+        // Not for want of a prompt: its prompt is posted to someone else's server, and this text
+        // is the user's own writing.
+        "remote": .remoteExcluded,
+        "sensevoice": .none,
+        "apple": .none,
+    ]
 
+    /// Every engine id this build knows, sorted so the order does not depend on hashing.
+    public static let allEngineIds: [String] = fieldContextModes.keys.sorted()
+
+    /// What one engine can do with the focused field's text (#89). An id this table does not
+    /// describe has nowhere to put it: `.none` rather than a guess, because a wrong `.prose`
+    /// would read someone's document for nothing.
+    public static func fieldContextMode(for engine: String) -> FieldContextMode {
+        fieldContextModes[engine] ?? .none
+    }
+
+    /// The single gate for the Settings switch and the capture path.
     public static func supportsFieldContext(engine: String) -> Bool {
-        fieldContextCapableEngines.contains(engine)
+        fieldContextMode(for: engine).suppliesFieldContext
     }
 
     /// Whisper can translate, but the turbo models cannot, whatever their documentation says.

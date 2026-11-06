@@ -61,6 +61,8 @@ enum SourceCapture {
     /// The same, from a focused element already in hand.
     static func focusedText(in element: AXUIElement) -> String? {
         AXUIElementSetMessagingTimeout(element, FocusUtils.axMessagingTimeout)
+        // A password box is not read and then thrown away: it is not read at all.
+        guard !SecureTextFields.isSecure(subrole(of: element)) else { return nil }
 
         var valueRef: AnyObject?
         guard AXUIElementCopyAttributeValue(
@@ -68,6 +70,15 @@ enum SourceCapture {
         ) == .success, let text = valueRef as? String, !text.isEmpty else { return nil }
 
         return tail(of: text, upTo: caretOffset(in: element) ?? text.count)
+    }
+
+    /// The element's subrole, or nil when the app does not answer.
+    private static func subrole(of element: AXUIElement) -> String? {
+        var subroleRef: AnyObject?
+        guard AXUIElementCopyAttributeValue(
+            element, kAXSubroleAttribute as CFString, &subroleRef
+        ) == .success else { return nil }
+        return subroleRef as? String
     }
 
     /// Where the caret sits in the focused element, as a character offset.
