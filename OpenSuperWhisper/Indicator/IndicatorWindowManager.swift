@@ -56,12 +56,13 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         let targetScreen = point.flatMap { FocusUtils.screenContaining(point: $0) } ?? NSScreen.main
         newViewModel.physicalNotch = targetScreen.flatMap { NotchMetrics.physicalNotch(for: $0) }
 
-        // A fresh panel for every take. One panel kept for the app's whole life ends up never
-        // composited: after hours of uptime or a sleep, the window server reports it
-        // `onscreen=false` while its frame, level, alpha and spaces are all right, and ordering
-        // it front again does not bring it back. The recording still runs, so all that is left
-        // of the bubble is the start sound. Measured on 0.14.3 after 7 hours, outside any
-        // full-screen space; the same state was first seen in July on an 8-hour process.
+        // A fresh panel for every take. One panel kept for the app's whole life ends up no longer
+        // composited over other apps' full-screen spaces: after hours of uptime, the window server
+        // reports it `onscreen=false` there while its frame, level, alpha and collection behavior
+        // are all right, and it still shows on the desktop. The recording runs either way, so
+        // all that is left of the bubble is the start sound. Measured on 0.14.3 after 7 hours
+        // over a full-screen Warp, while a panel built fresh the same way, from an accessory app,
+        // showed over a full-screen browser. The same state was first seen in July.
         retireWindow()
         let panel = Self.makePanel()
         window = panel
