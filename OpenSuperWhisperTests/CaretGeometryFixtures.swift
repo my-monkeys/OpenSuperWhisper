@@ -90,10 +90,11 @@ enum CaretGeometryFixtures {
 
     // MARK: Measured on the owner's Mac, 2026-11-07
 
-    /// An element that answers like Chrome, an empty caret at the bottom edge of the 1117 pt
-    /// primary display at offset 0, but whose field is its whole window. The app was not logged.
+    /// Dia, a Chromium browser, on a page whose editable area fills the window. It answers like
+    /// Chrome, an empty caret at the bottom edge of the 1117 pt primary display, at offset 0. The
+    /// log does not name the app: the owner was on Dia, and the answer has Chromium's shape.
     static func windowSizedField() -> RecordedTextElement {
-        RecordedTextElement("window-sized field",
+        RecordedTextElement("Dia, window-sized editable area",
                             selection: CFRange(location: 0, length: 0),
                             bounds: ["0+0": CGRect(x: 0, y: 1117, width: 0, height: 0)],
                             frame: CGRect(x: 190, y: 81, width: 1532, height: 1030))
