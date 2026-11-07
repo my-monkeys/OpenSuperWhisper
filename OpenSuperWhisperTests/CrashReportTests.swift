@@ -118,9 +118,9 @@ final class CallStackTreeTests: XCTestCase {
         let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp))
 
         XCTAssertEqual(parsed.frames, [
-            "OpenSuperWhisper 0x10439a58c +0x39a58c",
-            "libdyld.dylib 0x1ab69db24 +0x1b24",
             "OpenSuperWhisper 0x10439a54c +0x39a54c",
+            "libdyld.dylib 0x1ab69db24 +0x1b24",
+            "OpenSuperWhisper 0x10439a58c +0x39a58c",
         ])
     }
 
@@ -150,7 +150,7 @@ final class CallStackTreeTests: XCTestCase {
         let parsed = CallStackTree.parse(tree(attributedFrames: appDyldApp), limit: 2)
 
         XCTAssertEqual(parsed.frames, [
-            "OpenSuperWhisper 0x10439a58c +0x39a58c",
+            "OpenSuperWhisper 0x10439a54c +0x39a54c",
             "libdyld.dylib 0x1ab69db24 +0x1b24",
         ])
         XCTAssertEqual(parsed.images, [
@@ -159,7 +159,8 @@ final class CallStackTreeTests: XCTestCase {
         ])
     }
 
-    /// A linear chain `depth` frames deep: `f0` is the thread's entry, `f<depth-1>` the crash site.
+    /// A linear chain `depth` frames deep, shaped as MetricKit sends a crash: `f0`, the root, is the
+    /// crash site and `f<depth-1>` the thread's entry.
     private func chain(depth: Int) -> Data {
         var json = #"{"binaryName": "f\#(depth - 1)", "address": \#(depth - 1)}"#
         for index in stride(from: depth - 2, through: 0, by: -1) {
@@ -174,13 +175,13 @@ final class CallStackTreeTests: XCTestCase {
         let parsed = CallStackTree.parse(chain(depth: depth))
 
         XCTAssertEqual(parsed.frames.count, limit)
-        XCTAssertEqual(parsed.frames.first, "f\(depth - 1) 0x\(String(depth - 1, radix: 16))")
-        XCTAssertEqual(parsed.frames.last, "f\(depth - limit) 0x\(String(depth - limit, radix: 16))")
-        XCTAssertFalse(parsed.frames.contains { $0.hasPrefix("f0 ") })
+        XCTAssertEqual(parsed.frames.first, "f0 0x0")
+        XCTAssertEqual(parsed.frames.last, "f\(limit - 1) 0x\(String(limit - 1, radix: 16))")
+        XCTAssertFalse(parsed.frames.contains { $0.hasPrefix("f\(depth - 1) ") })
     }
 
     func testTheImageLinesCoverOnlyTheFramesKept() {
-        let json = #"{"binaryName": "Entry", "binaryUUID": "E", "address": 1, "subFrames": [{"binaryName": "Crash", "binaryUUID": "C", "address": 2}]}"#
+        let json = #"{"binaryName": "Crash", "binaryUUID": "C", "address": 2, "subFrames": [{"binaryName": "Entry", "binaryUUID": "E", "address": 1}]}"#
         let parsed = CallStackTree.parse(tree(attributedFrames: json), limit: 1)
 
         XCTAssertEqual(parsed.frames, ["Crash 0x2"])
