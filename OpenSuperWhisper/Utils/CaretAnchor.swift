@@ -44,7 +44,9 @@ enum CaretAnchor {
     ///    is one: it places no range at all and its field is a whole terminal surface, so the
     ///    field put the bubble at the surface's top-left corner (#155). Its prompt can be
     ///    anywhere on that surface, at the top after a `clear`, so no edge of it is a better guess
-    ///    than the pointer.
+    ///    than the pointer. A field taller than `maxAnchoringFieldHeight` follows the mouse too: an
+    ///    element that answers the caret query with an empty rect and spans its whole window has
+    ///    no corner worth pointing at, and the bubble landed near the top-left of the screen.
     ///
     /// An app with a believable caret is asked one question. nil when nothing usable comes back,
     /// leaving the caller to fall back to the mouse.
@@ -61,9 +63,15 @@ enum CaretAnchor {
         if let character, let edge = trailingEdge(of: character, field: field) {
             return Choice(rect: edge, source: .characterBefore)
         }
-        guard caret != nil else { return nil }
-        return field.map { Choice(rect: $0, source: .field) }
+        guard caret != nil, let anchoring = field, anchoring.height <= maxAnchoringFieldHeight
+        else { return nil }
+        return Choice(rect: anchoring, source: .field)
     }
+
+    /// The tallest field whose corner still says where the typing happens. Chrome's inputs and
+    /// textareas measured 22 to 99 pt (#143); past a few lines a "field" is a whole editor or a
+    /// window's content, and the pointer is the better guess.
+    static let maxAnchoringFieldHeight: CGFloat = 200
 
     /// The bounds of the character just before the selection, when they have height.
     ///
