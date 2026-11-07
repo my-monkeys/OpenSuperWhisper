@@ -24,6 +24,12 @@ final class CaretAnchorRectTests: XCTestCase {
         }
     }
 
+    /// The same answers from a field the size of its window: its corner is the top-left of the
+    /// screen, nowhere near the typing, so the bubble follows the mouse.
+    func testAWindowSizedFieldFollowsTheMouse() {
+        XCTAssertNil(choose(CaretGeometryFixtures.windowSizedField()))
+    }
+
     // MARK: A real caret is used as reported
 
     /// TextEdit reports its caret above the text view's own frame. It is still the right place,
