@@ -56,37 +56,17 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         let targetScreen = point.flatMap { FocusUtils.screenContaining(point: $0) } ?? NSScreen.main
         newViewModel.physicalNotch = targetScreen.flatMap { NotchMetrics.physicalNotch(for: $0) }
 
-        if window == nil {
-            // Create window if it doesn't exist - using NSPanel for full-screen compatibility
-            let panel = NSPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 380, height: 120),
-                styleMask: [.borderless, .nonactivatingPanel],
-                backing: .buffered,
-                defer: false
-            )
-            
-            panel.isFloatingPanel = true
-            panel.backgroundColor = .clear
-            panel.isOpaque = false
-            panel.hasShadow = false
-            // Fully click-through by default, matching the my-monkeys baseline: the
-            // indicator never intercepts clicks meant for the app underneath. When the
-            // opt-in on-bubble Stop/Cancel buttons are enabled, this is flipped per
-            // show() below so they're tappable.
-            panel.ignoresMouseEvents = true
-            panel.hidesOnDeactivate = false
-            // Belt-and-suspenders: the window is sized manually + non-animated via
-            // `resizeToContent` (#19), and this also stops AppKit from animating the frame on
-            // its own. Size changes should snap, never animate (macOS 26 recursion guard).
-            panel.animationBehavior = .none
-            // Grabbing the bubble anywhere that is not a button moves it. Only reachable when the
-            // panel accepts mouse events at all, which is the opt-in below.
-            panel.isMovableByWindowBackground = true
+        // A fresh panel for every take. One panel kept for the app's whole life ends up never
+        // composited: after hours of uptime or a sleep, the window server reports it
+        // `onscreen=false` while its frame, level, alpha and spaces are all right, and ordering
+        // it front again does not bring it back. The recording still runs, so all that is left
+        // of the bubble is the start sound. Measured on 0.14.3 after 7 hours, outside any
+        // full-screen space; the same state was first seen in July on an 8-hour process.
+        retireWindow()
+        let panel = Self.makePanel()
+        window = panel
+        observeDrag(of: panel)
 
-            self.window = panel
-            observeDrag(of: panel)
-        }
-        
         // Host the SwiftUI content and size the window to it *ourselves* (see `resizeToContent`).
         // We deliberately do NOT use `sizingOptions = [.preferredContentSize]`: that auto-resize
         // runs animated on macOS 26 (NSHostingView.updateAnimatedWindowSize) and recurses into
@@ -192,8 +172,51 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         window?.level = .screenSaver
         window?.collectionBehavior = [.fullScreenAuxiliary, .stationary, .canJoinAllSpaces, .ignoresCycle]
 
-        if !offScreen { window?.orderFront(nil) }
+        // Regardless: the app is not active when the bubble comes up, it is the app being
+        // dictated into that is.
+        if !offScreen { window?.orderFrontRegardless() }
         return newViewModel
+    }
+
+    /// The bubble's window, using NSPanel for full-screen compatibility.
+    private static func makePanel() -> NSPanel {
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 120),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = false
+        // Fully click-through by default, matching the my-monkeys baseline: the
+        // indicator never intercepts clicks meant for the app underneath. When the
+        // opt-in on-bubble Stop/Cancel buttons are enabled, this is flipped per
+        // show() so they're tappable.
+        panel.ignoresMouseEvents = true
+        panel.hidesOnDeactivate = false
+        // Belt-and-suspenders: the window is sized manually + non-animated via
+        // `resizeToContent` (#19), and this also stops AppKit from animating the frame on
+        // its own. Size changes should snap, never animate (macOS 26 recursion guard).
+        panel.animationBehavior = .none
+        // Grabbing the bubble anywhere that is not a button moves it. Only reachable when the
+        // panel accepts mouse events at all, which is the opt-in in show().
+        panel.isMovableByWindowBackground = true
+        return panel
+    }
+
+    /// Takes the previous take's panel off screen along with everything observing it.
+    private func retireWindow() {
+        if let resizeObserver { NotificationCenter.default.removeObserver(resizeObserver) }
+        if let dragObserver { NotificationCenter.default.removeObserver(dragObserver) }
+        resizeObserver = nil
+        dragObserver = nil
+        dragStart = nil
+        lastPlacedOrigin = nil
+        window?.orderOut(nil)
+        window?.contentViewController = nil
+        window = nil
     }
 
     /// The canvas the window starts on, before SwiftUI has measured anything.
