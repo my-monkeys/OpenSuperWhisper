@@ -93,20 +93,31 @@ struct ReportCard: View {
     }
 
     private func save() {
+        saveThen {}
+    }
+
+    /// The first screen's main action: the report is kept on this Mac first, so a failed send
+    /// still leaves it saved, with Send offered again on the next screen.
+    private func saveAndSend() {
+        saveThen(sendToDeveloper)
+    }
+
+    private func saveThen(_ next: @escaping () -> Void) {
         status = .saving
         Task {
             do {
                 try await reports.save(draft, for: recording)
                 status = .saved
+                next()
             } catch {
                 status = .failed
             }
         }
     }
 
-    /// Sends the text of the report to the developer, with the dictation's recording only when the
-    /// audio switch is on. Offered once the local save is done, so the full report with its audio
-    /// is already kept whatever the network does.
+    /// Sends the text of the report to the developer, with the dictation's recording when the
+    /// audio switch is on. Only ever after the local save, so the full report with its audio is
+    /// already kept whatever the network does.
     private func sendToDeveloper() {
         sendStatus = .sending
         Task {
@@ -263,7 +274,20 @@ struct ReportCard: View {
 
     // MARK: - Footer and saved state
 
+    /// The audio switch sits with the buttons rather than at the end of the form: the audio goes
+    /// by default, so what Save and send will take must be in view next to it, not below the fold.
     private var footer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if audio.eligibility != .noAudio {
+                audioSwitch
+            }
+            footerButtons
+        }
+        .padding(.horizontal, 26).padding(.vertical, 16)
+        .overlay(alignment: .top) { Rectangle().fill(STheme.border).frame(height: 1) }
+    }
+
+    private var footerButtons: some View {
         HStack(spacing: 10) {
             if status == .failed {
                 Label {
@@ -280,12 +304,13 @@ struct ReportCard: View {
             Button("Cancel", action: cancel)
                 .buttonStyle(.sSecondary)
             Button("Save report", action: save)
+                .buttonStyle(.sSecondary)
+                .disabled(!draft.canSave || status == .saving)
+            Button("Save and send", action: saveAndSend)
                 .buttonStyle(.sPrimary)
                 .disabled(!draft.canSave || status == .saving)
                 .keyboardShortcut(.return, modifiers: .command)
         }
-        .padding(.horizontal, 26).padding(.vertical, 16)
-        .overlay(alignment: .top) { Rectangle().fill(STheme.border).frame(height: 1) }
     }
 
     private var saved: some View {
@@ -298,7 +323,7 @@ struct ReportCard: View {
                     Text("Report saved")
                         .scaledFont(size: 18, weight: .bold)
                         .foregroundColor(STheme.textBright)
-                    Text("It stays on this Mac with the audio. Send it to the developer so it can be fixed, or export the whole report as a zip from Reports.")
+                    savedMessage
                         .scaledFont(size: 13)
                         .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
@@ -307,8 +332,9 @@ struct ReportCard: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 26).padding(.vertical, 28)
-            if audio.eligibility != .noAudio {
-                audioRow
+            if audio.eligibility != .noAudio && !sendStarted {
+                audioSwitch
+                    .padding(.horizontal, 26).padding(.bottom, 16)
             }
             // Sending is what the saved report is for, so it takes the primary place on the right.
             // There is no Done beside it: the card closes from its ✕, Esc or a click outside.
@@ -324,9 +350,20 @@ struct ReportCard: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Whether the recording goes too, under the saved message: on by default, disabled with its
-    /// reason when the file is over what the endpoint takes.
-    private var audioRow: some View {
+    /// Sent, or on its way: the saved screen then only shows the report, with nothing to change.
+    private var sendStarted: Bool {
+        sendStatus == .sending || sendStatus == .sent
+    }
+
+    private var savedMessage: Text {
+        sendStarted
+            ? Text("It stays on this Mac with the audio, and a copy is going to the developer. The whole report can be exported as a zip from Reports.")
+            : Text("It stays on this Mac with the audio. Send it to the developer so it can be fixed, or export the whole report as a zip from Reports.")
+    }
+
+    /// Whether the recording goes too, on both screens until it is sent: on by default, disabled
+    /// with its reason when the file is over what the endpoint takes.
+    private var audioSwitch: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Include the audio")
@@ -345,7 +382,6 @@ struct ReportCard: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.advancedBg))
-        .padding(.horizontal, 26).padding(.bottom, 16)
     }
 
     private var audioHint: Text {

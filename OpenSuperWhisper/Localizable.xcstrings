@@ -61952,6 +61952,98 @@
           }
         }
       }
+    },
+    "Save and send": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speichern und senden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar y enviar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer et envoyer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva e invia"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvar e enviar"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lưu và gửi"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存并发送"
+          }
+        }
+      }
+    },
+    "It stays on this Mac with the audio, and a copy is going to the developer. The whole report can be exported as a zip from Reports.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sie bleibt mit dem Audio auf diesem Mac, und eine Kopie geht an den Entwickler. Die ganze Meldung lässt sich unter „Meldungen“ als ZIP exportieren."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se queda en este Mac con el audio, y una copia va al desarrollador. Puedes exportar el informe completo como zip desde Informes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il reste sur ce Mac avec l'audio, et une copie part chez le développeur. Le signalement complet peut être exporté en zip depuis Signalements."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resta su questo Mac con l'audio, e una copia va allo sviluppatore. La segnalazione completa si può esportare come zip da Segnalazioni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ele fica neste Mac com o áudio, e uma cópia vai para o desenvolvedor. O relato completo pode ser exportado como zip em Relatos."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Báo cáo được lưu trên máy Mac này cùng âm thanh, và một bản sao đang được gửi cho nhà phát triển. Có thể xuất toàn bộ báo cáo dạng zip từ mục Báo cáo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报告连同音频保存在这台 Mac 上，一份副本正在发送给开发者。可在“报告”中将完整报告导出为 zip。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
