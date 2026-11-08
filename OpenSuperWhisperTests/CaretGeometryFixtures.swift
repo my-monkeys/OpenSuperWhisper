@@ -100,6 +100,18 @@ enum CaretGeometryFixtures {
                             frame: CGRect(x: 190, y: 81, width: 1532, height: 1030))
     }
 
+    /// Dia again, with the typing in a page: the same empty caret, and a field of an input's
+    /// size reported 176 pt above the top of the screen.
+    static func diaOffscreenField() -> RecordedTextElement {
+        RecordedTextElement("Dia, field above the screen",
+                            selection: CFRange(location: 0, length: 0),
+                            bounds: ["0+0": CGRect(x: 0, y: 1117, width: 0, height: 0)],
+                            frame: CGRect(x: 210, y: -176, width: 331, height: 22))
+    }
+
+    /// The display both Dia recordings were made on.
+    static let diaDisplays = [CGRect(x: 0, y: 0, width: 1728, height: 1117)]
+
     // MARK: Not measured: shaped after what is known of the app
 
     /// Terminal.app, shaped after the owner's check on #155: an empty caret at a position with no

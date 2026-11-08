@@ -44,13 +44,15 @@ enum CaretAnchor {
     ///    is one: it places no range at all and its field is a whole terminal surface, so the
     ///    field put the bubble at the surface's top-left corner (#155). Its prompt can be
     ///    anywhere on that surface, at the top after a `clear`, so no edge of it is a better guess
-    ///    than the pointer. A field taller than `maxAnchoringFieldHeight` follows the mouse too: an
-    ///    element that answers the caret query with an empty rect and spans its whole window has
-    ///    no corner worth pointing at, and the bubble landed near the top-left of the screen.
+    ///    than the pointer. A field that is not believable follows the mouse too (see
+    ///    `isBelievable`): taller than a few lines, or off every display.
     ///
     /// An app with a believable caret is asked one question. nil when nothing usable comes back,
     /// leaving the caller to fall back to the mouse.
-    static func choose(selection: CFRange, in element: TextElementGeometry) -> Choice? {
+    ///
+    /// `displays` are the screens' bounds in the same AX coordinates as the element's answers.
+    static func choose(selection: CFRange, in element: TextElementGeometry,
+                       displays: [CGRect]) -> Choice? {
         let caret = element.bounds(of: selection)
         if let caret, caret.height > 0 {
             return Choice(rect: caret, source: .caret)
@@ -63,9 +65,19 @@ enum CaretAnchor {
         if let character, let edge = trailingEdge(of: character, field: field) {
             return Choice(rect: edge, source: .characterBefore)
         }
-        guard caret != nil, let anchoring = field, anchoring.height <= maxAnchoringFieldHeight
+        guard caret != nil, let anchoring = field, isBelievable(field: anchoring, on: displays)
         else { return nil }
         return Choice(rect: anchoring, source: .field)
+    }
+
+    /// Whether the field's corner says where the typing happens, the bubble being placed above it.
+    ///
+    /// Not when the field is a whole editor: Dia answered with a 1532 x 1030 field, its window's
+    /// content. Not when the corner is on no display: with the typing in a page, Dia reports a
+    /// 331 x 22 field 176 pt above the top of the screen. Both put the bubble against the
+    /// top-left of the screen.
+    private static func isBelievable(field: CGRect, on displays: [CGRect]) -> Bool {
+        field.height <= maxAnchoringFieldHeight && displays.contains { $0.contains(field.origin) }
     }
 
     /// The tallest field whose corner still says where the typing happens. Chrome's inputs and

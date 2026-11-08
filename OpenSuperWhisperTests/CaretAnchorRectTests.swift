@@ -9,8 +9,14 @@ import XCTest
 /// the bubble goes.
 final class CaretAnchorRectTests: XCTestCase {
 
-    private func choose(_ element: RecordedTextElement) -> CaretAnchor.Choice? {
-        CaretAnchor.choose(selection: element.selection, in: element)
+    /// The Chrome and TextEdit recordings were made on a second 2560 x 1440 display, right of a
+    /// primary one of the same size.
+    private static let twoDisplays = [CGRect(x: 0, y: 0, width: 2560, height: 1440),
+                                      CGRect(x: 2560, y: 0, width: 2560, height: 1440)]
+
+    private func choose(_ element: RecordedTextElement,
+                        displays: [CGRect] = twoDisplays) -> CaretAnchor.Choice? {
+        CaretAnchor.choose(selection: element.selection, in: element, displays: displays)
     }
 
     // MARK: Chrome stays on the field (#144)
@@ -27,7 +33,24 @@ final class CaretAnchorRectTests: XCTestCase {
     /// The same answers from a field the size of its window: its corner is the top-left of the
     /// screen, nowhere near the typing, so the bubble follows the mouse.
     func testAWindowSizedFieldFollowsTheMouse() {
-        XCTAssertNil(choose(CaretGeometryFixtures.windowSizedField()))
+        XCTAssertNil(choose(CaretGeometryFixtures.windowSizedField(),
+                            displays: CaretGeometryFixtures.diaDisplays))
+    }
+
+    /// A field of an input's size, but above the top of the screen: placed there, the bubble was
+    /// pushed back against the top-left of the screen.
+    func testAFieldOffEveryDisplayFollowsTheMouse() {
+        XCTAssertNil(choose(CaretGeometryFixtures.diaOffscreenField(),
+                            displays: CaretGeometryFixtures.diaDisplays))
+    }
+
+    /// The same field on the display is a field like Chrome's, and the bubble goes there.
+    func testTheSameFieldOnTheDisplayIsUsed() {
+        let onScreen = RecordedTextElement("Dia, field on the screen",
+                                           selection: CFRange(location: 0, length: 0),
+                                           bounds: ["0+0": CGRect(x: 0, y: 1117, width: 0, height: 0)],
+                                           frame: CGRect(x: 210, y: 176, width: 331, height: 22))
+        XCTAssertEqual(choose(onScreen, displays: CaretGeometryFixtures.diaDisplays)?.source, .field)
     }
 
     // MARK: A real caret is used as reported
