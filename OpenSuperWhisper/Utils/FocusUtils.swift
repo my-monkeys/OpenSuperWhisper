@@ -61,19 +61,9 @@ class FocusUtils {
               let rangeRef,
               AXValueGetValue(rangeRef as! AXValue, .cfRange, &selection) else { return nil }
 
-        let choice = CaretAnchor.choose(selection: selection, in: AXTextElementGeometry(element: element),
-                                        displays: displayBoundsInAXCoordinates())
+        let choice = CaretAnchor.choose(selection: selection, in: AXTextElementGeometry(element: element))
         Diag.mark("caret anchor: \(choice?.source.rawValue ?? "none, following the mouse")")
         return choice?.rect
-    }
-
-    /// Every active display's bounds, in the global top-left coordinates Accessibility answers in.
-    static func displayBoundsInAXCoordinates() -> [CGRect] {
-        var count: UInt32 = 0
-        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return [] }
-        var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
-        guard CGGetActiveDisplayList(count, &displays, &count) == .success else { return [] }
-        return displays.prefix(Int(count)).map { CGDisplayBounds($0) }
     }
 
     /// Converts a point from AX API coordinate system (Quartz: origin at top-left of primary screen, Y increases downward)

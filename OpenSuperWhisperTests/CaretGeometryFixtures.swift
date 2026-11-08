@@ -88,29 +88,26 @@ enum CaretGeometryFixtures {
                             frame: CGRect(x: 2936, y: 102, width: 586, height: 382))
     }
 
-    // MARK: Measured on the owner's Mac, 2026-11-07
+    // MARK: Measured on the owner's Mac, Dia, 2026-11-07 and 08
 
-    /// Dia, a Chromium browser, on a page whose editable area fills the window. It answers like
-    /// Chrome, an empty caret at the bottom edge of the 1117 pt primary display, at offset 0. The
-    /// log does not name the app: the owner was on Dia, and the answer has Chromium's shape.
-    static func windowSizedField() -> RecordedTextElement {
+    /// Dia, a Chromium browser, on a page whose editable area fills the window: an empty caret
+    /// at the bottom edge of the 1117 pt primary display, at offset 0, and the window's content
+    /// as the field.
+    static func diaWindowSizedField() -> RecordedTextElement {
         RecordedTextElement("Dia, window-sized editable area",
                             selection: CFRange(location: 0, length: 0),
                             bounds: ["0+0": CGRect(x: 0, y: 1117, width: 0, height: 0)],
                             frame: CGRect(x: 190, y: 81, width: 1532, height: 1030))
     }
 
-    /// Dia again, with the typing in a page: the same empty caret, and a field of an input's
-    /// size reported 176 pt above the top of the screen.
+    /// Dia with the typing in a page: the same empty caret, and a field of an input's size
+    /// reported 176 pt above the top of the screen.
     static func diaOffscreenField() -> RecordedTextElement {
         RecordedTextElement("Dia, field above the screen",
                             selection: CFRange(location: 0, length: 0),
                             bounds: ["0+0": CGRect(x: 0, y: 1117, width: 0, height: 0)],
                             frame: CGRect(x: 210, y: -176, width: 331, height: 22))
     }
-
-    /// The display both Dia recordings were made on.
-    static let diaDisplays = [CGRect(x: 0, y: 0, width: 1728, height: 1117)]
 
     // MARK: Not measured: shaped after what is known of the app
 
