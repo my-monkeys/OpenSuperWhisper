@@ -1,27 +1,34 @@
 import XCTest
 @testable import OpenSuperWhisper
 
-/// "Cursor" mode anchors the bubble to whatever the focused text element reports about its caret.
-/// Chrome answers with an empty rect nowhere near the field (#143), so since #144 such a caret is
-/// discarded for the field. Terminal.app answers the same way, and its field is the whole window,
-/// which put the bubble at the window's corner (#155), as did Ghostty, which refuses to place
-/// anything. These replay what each app reports, see `CaretGeometryFixtures`, and pin down where
-/// the bubble goes.
+/// "Cursor" mode anchors the bubble to the caret the focused text element reports, or to the end
+/// of the character before it, and otherwise follows the mouse. Chrome and Dia answer with an
+/// empty caret nowhere near the typing (#143), Terminal.app with one but a well-placed character
+/// (#155), Ghostty with nothing. These replay what each app reports, see `CaretGeometryFixtures`,
+/// and pin down where the bubble goes.
 final class CaretAnchorRectTests: XCTestCase {
 
     private func choose(_ element: RecordedTextElement) -> CaretAnchor.Choice? {
         CaretAnchor.choose(selection: element.selection, in: element)
     }
 
-    // MARK: Chrome stays on the field (#144)
+    // MARK: Chromium follows the mouse
 
-    func testChromeFieldsAnchorToTheFieldWhenNeitherCaretNorCharacterHasHeight() {
+    /// Neither the caret nor the character before it has height: the bubble follows the mouse,
+    /// and the frame is not asked for.
+    func testChromeFieldsFollowTheMouse() {
         for element in [CaretGeometryFixtures.chromeOmnibox(), CaretGeometryFixtures.chromeInput(),
                         CaretGeometryFixtures.chromeTextarea(), CaretGeometryFixtures.chromeContentEditable()] {
-            let choice = choose(element)
-            XCTAssertEqual(choice?.source, .field, element.name)
-            XCTAssertEqual(choice?.rect, element.frame, element.name)
+            XCTAssertNil(choose(element), element.name)
+            XCTAssertFalse(element.asked.contains("frame"), element.name)
         }
+    }
+
+    /// Dia's fields put the bubble at the top-left of the screen while the field was an anchor:
+    /// one is the whole window, the other sits above the screen.
+    func testDiaFieldsFollowTheMouse() {
+        XCTAssertNil(choose(CaretGeometryFixtures.diaWindowSizedField()))
+        XCTAssertNil(choose(CaretGeometryFixtures.diaOffscreenField()))
     }
 
     // MARK: A real caret is used as reported
@@ -88,18 +95,18 @@ final class CaretAnchorRectTests: XCTestCase {
                                           selection: CFRange(location: 8, length: 0),
                                           bounds: ["8+0": .zero, "7+1": field.insetBy(dx: -1, dy: -1)],
                                           frame: field)
-        XCTAssertEqual(choose(element), .init(rect: field, source: .field))
+        XCTAssertNil(choose(element))
     }
 
     /// A character with height can be as misplaced as Chrome's caret (#143): here at the
-    /// primary display's bottom edge, nowhere near the field. The field is used, as before.
+    /// primary display's bottom edge, nowhere near the field. The bubble follows the mouse.
     func testCharacterOutsideTheFieldIsNotUsed() {
         let field = CGRect(x: 4061, y: 517, width: 402, height: 82)
         let element = RecordedTextElement("misplaced character",
                                           selection: CFRange(location: 8, length: 0),
                                           bounds: ["8+0": .zero, "7+1": CGRect(x: 0, y: 1440, width: 7, height: 15)],
                                           frame: field)
-        XCTAssertEqual(choose(element), .init(rect: field, source: .field))
+        XCTAssertNil(choose(element))
     }
 
     /// Text can be reported just outside its view's frame, as TextEdit's caret is: within a line
@@ -113,8 +120,7 @@ final class CaretAnchorRectTests: XCTestCase {
     }
 
     /// Some text views refuse a zero-length range but place a character. The character is used;
-    /// had it been misplaced, the bubble would follow the mouse rather than the field, since the
-    /// element never answered for its caret.
+    /// had it been misplaced, the bubble would follow the mouse.
     func testRefusedCaretFallsBackToTheCharacterBeforeThenTheMouse() {
         let field = CGRect(x: 300, y: 380, width: 400, height: 200)
         let placed = RecordedTextElement("refused caret", selection: CFRange(location: 2, length: 0),
