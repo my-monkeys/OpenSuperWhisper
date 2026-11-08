@@ -23,6 +23,8 @@ final class FocusReturnTests: XCTestCase {
         var focuses = true
         /// Who is in front once an accepted activation has settled.
         var frontmostAfterActivation: pid_t? = FocusReturnTests.targetPID
+        /// Who is in front once the LaunchServices request has settled.
+        var frontmostAfterReopen: pid_t? = FocusReturnTests.targetPID
         /// What the field holds once it has the focus back.
         var field: FieldSnapshot?
         private(set) var selected: [NSRange] = []
@@ -37,6 +39,11 @@ final class FocusReturnTests: XCTestCase {
             calls.append("activate")
             if activates { frontmost.append(frontmostAfterActivation) }
             return activates
+        }
+        func reopen(_ target: FocusTarget) -> Bool {
+            calls.append("reopen")
+            frontmost.append(frontmostAfterReopen)
+            return true
         }
         func focus(_ target: FocusTarget) -> Bool { calls.append("focus"); return focuses }
         func field(_ target: FocusTarget) -> FieldSnapshot? { calls.append("field"); return field }
@@ -103,15 +110,40 @@ final class FocusReturnTests: XCTestCase {
         XCTAssertFalse(system.calls.contains("focus"))
     }
 
-    /// An activation the system accepted but never carried out would otherwise paste into the
-    /// app the user moved to.
+    /// An activation the system accepted but never carried out, and a LaunchServices request
+    /// that did no better, would otherwise paste into the app the user moved to.
     func testAnActivationThatDidNotHappenIsCaughtBeforeInserting() async {
+        let system = FakeSystem(frontmost: Self.otherPID)
+        system.frontmostAfterActivation = Self.otherPID
+        system.frontmostAfterReopen = Self.otherPID
+
+        let outcome = await FocusReturn.bringBack(target(), using: system)
+
+        XCTAssertEqual(outcome, .unreachable)
+        XCTAssertEqual(system.calls.filter { $0 == "reopen" }.count, 1)
+    }
+
+    /// Dia answers the accessibility request with a success and stays behind: LaunchServices
+    /// brings it forward, and the field gets the focus once it is in front.
+    func testAnAppThatIgnoredTheActivationIsReopenedAndRefocused() async {
         let system = FakeSystem(frontmost: Self.otherPID)
         system.frontmostAfterActivation = Self.otherPID
 
         let outcome = await FocusReturn.bringBack(target(), using: system)
 
-        XCTAssertEqual(outcome, .unreachable)
+        XCTAssertEqual(outcome, .refocused)
+        XCTAssertEqual(system.calls, ["running", "activate", "focus", "field", "settle",
+                                      "reopen", "settle", "focus", "field", "settle"])
+    }
+
+    /// An app that came forward on the first request gets no reopen event, which would make one
+    /// with no window open a new one.
+    func testAnAppThatCameForwardIsNotReopened() async {
+        let system = FakeSystem(frontmost: Self.otherPID)
+
+        _ = await FocusReturn.bringBack(target(), using: system)
+
+        XCTAssertFalse(system.calls.contains("reopen"))
     }
 
     // MARK: - Same app in front
