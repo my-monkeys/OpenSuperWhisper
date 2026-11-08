@@ -441,16 +441,11 @@ final class AppPreferences {
     @UserDefault(key: "hasCompletedOnboarding", defaultValue: false)
     var hasCompletedOnboarding: Bool
 
-    /// The one-time request for feedback on the rebuilt interface is behind us (#206): the card
-    /// was shown, or feedback was sent from anywhere. Set the moment the card appears, so a quit
-    /// or a crash while it is up does not bring it back. Nothing sets it back to false.
-    @UserDefault(key: "feedbackPromptDone", defaultValue: false)
-    var feedbackPromptDone: Bool
-
-    /// Launches that started with onboarding already done, counted only up to
-    /// `FeedbackPrompt.minimumLaunches`: all the request needs to know is whether it is reached.
-    @UserDefault(key: "feedbackPromptLaunches", defaultValue: 0)
-    var feedbackPromptLaunches: Int
+    /// The request for feedback the app last made, or that feedback sent from anywhere answered
+    /// (`FeedbackPrompt.campaign`). Set the moment the card appears, so a quit or a crash while
+    /// it is up does not bring it back. A new request is a new campaign name, asked once more.
+    @OptionalUserDefault(key: "feedbackPromptCampaign")
+    var feedbackPromptCampaign: String?
 
     /// Keep a copy of the portable settings in iCloud Drive (`ICloudSettingsBackup`). Local to
     /// this Mac: a backup that switched itself on elsewhere would overwrite the one it came from.

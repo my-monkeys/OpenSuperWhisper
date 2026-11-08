@@ -217,7 +217,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
             mainWindow?.orderOut(nil)
         }
         MainActor.assumeIsolated {
-            FeedbackPromptScheduler.shared.recordLaunch(onboarded: onboarded, startedHidden: startsHidden)
+            FeedbackPromptScheduler.shared.recordLaunch(onboarded: onboarded)
             CrashReporter.shared.start()
         }
 

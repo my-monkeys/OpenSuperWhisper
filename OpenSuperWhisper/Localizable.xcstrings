@@ -52569,94 +52569,140 @@
         }
       }
     },
-    "How does the new OpenSuperWhisper feel?": {
+    "We're hunting bugs": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wie gefällt dir das neue OpenSuperWhisper?"
+            "value": "Wir sind auf Fehlerjagd"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "¿Qué te parece el nuevo OpenSuperWhisper?"
+            "value": "Estamos a la caza de errores"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Comment trouvez-vous le nouvel OpenSuperWhisper ?"
+            "value": "Nous sommes à la chasse aux bugs"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Come ti sembra il nuovo OpenSuperWhisper?"
+            "value": "Siamo a caccia di bug"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O que você achou do novo OpenSuperWhisper?"
+            "value": "Estamos caçando bugs"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bạn thấy OpenSuperWhisper mới thế nào?"
+            "value": "Chúng tôi đang săn lỗi"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "新版 OpenSuperWhisper 用起来感觉如何？"
+            "value": "我们正在集中排查 Bug"
           }
         }
       }
     },
-    "We just rebuilt the whole interface. A few words about what works and what doesn't would help a lot.": {
+    "This update is all about stability. Tell us anything that goes wrong, even something small, and leave your email so we can follow up with you.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wir haben gerade die ganze Oberfläche neu gebaut. Ein paar Worte dazu, was funktioniert und was nicht, würden sehr helfen."
+            "value": "In diesem Update geht es um Stabilität. Melde uns alles, was schiefgeht, auch Kleinigkeiten, und hinterlass deine E-Mail, damit wir uns bei dir melden können."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Acabamos de rehacer toda la interfaz. Unas palabras sobre qué funciona y qué no nos ayudarían mucho."
+            "value": "Esta actualización se centra en la estabilidad. Cuéntanos cualquier cosa que falle, aunque sea pequeña, y deja tu correo para que podamos responderte."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nous venons de refaire toute l'interface. Quelques mots sur ce qui marche et ce qui ne marche pas nous aideraient beaucoup."
+            "value": "Cette mise à jour est consacrée à la stabilité. Signalez-nous tout ce qui ne marche pas, même un détail, et laissez votre e-mail pour que nous puissions revenir vers vous."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abbiamo appena rifatto tutta l'interfaccia. Due parole su cosa funziona e cosa no ci aiuterebbero molto."
+            "value": "Questo aggiornamento è dedicato alla stabilità. Segnalaci qualsiasi cosa non funzioni, anche piccola, e lascia la tua email così possiamo ricontattarti."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Acabamos de refazer toda a interface. Algumas palavras sobre o que funciona e o que não funciona ajudariam muito."
+            "value": "Esta atualização é focada em estabilidade. Conte para a gente qualquer coisa que dê errado, mesmo pequena, e deixe seu e-mail para podermos falar com você."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chúng tôi vừa làm lại toàn bộ giao diện. Vài lời về điều gì ổn và điều gì không sẽ giúp ích rất nhiều."
+            "value": "Bản cập nhật này tập trung vào độ ổn định. Hãy báo cho chúng tôi mọi lỗi, dù nhỏ, và để lại email để chúng tôi có thể liên hệ lại với bạn."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "我们刚刚重建了整个界面。简单说说哪里好用、哪里不好用，都会帮上大忙。"
+            "value": "这次更新专注于稳定性。遇到任何问题，哪怕很小，都请告诉我们，并留下邮箱，方便我们联系你。"
+          }
+        }
+      }
+    },
+    "Your email, so we can follow up with you": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine E-Mail, damit wir uns bei dir melden können"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu correo, para que podamos responderte"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre e-mail, pour que nous puissions revenir vers vous"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua email, così possiamo ricontattarti"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seu e-mail, para podermos falar com você"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email của bạn, để chúng tôi có thể liên hệ lại"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的邮箱，方便我们联系你"
           }
         }
       }

@@ -59,8 +59,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "didSeedAppContextPresets",
         "didSeedTerminalInsertionRules",
         "escCancelWithoutConfirmation",
-        "feedbackPromptDone",
-        "feedbackPromptLaunches",
+        "feedbackPromptCampaign",
         "fillerWordsPattern",
         "fluidAudioModelVersion",
         "glassBubbleSize",
@@ -238,8 +237,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("startHidden") { prefs.startHidden = true }
         assertWrites("liveTranscriptionEnabled") { prefs.liveTranscriptionEnabled = true }
         assertWrites("hasCompletedOnboarding") { prefs.hasCompletedOnboarding = true }
-        assertWrites("feedbackPromptDone") { prefs.feedbackPromptDone = true }
-        assertWrites("feedbackPromptLaunches") { prefs.feedbackPromptLaunches = 2 }
+        assertWrites("feedbackPromptCampaign") { prefs.feedbackPromptCampaign = FeedbackPrompt.campaign }
         assertWrites("iCloudSettingsBackupEnabled") { prefs.iCloudSettingsBackupEnabled = true }
         assertWrites("useAsianAutocorrect") { prefs.useAsianAutocorrect = false }
         assertWrites("selectedMicrophoneData") { prefs.selectedMicrophoneData = Data([1]) }

@@ -5,7 +5,8 @@ import SwiftUI
 /// before it goes and switch off. GitHub and the betas stay one click away underneath.
 ///
 /// `asked`: the app opened it itself, the one time it asks (#206). The same form, under a note
-/// that says why it came up.
+/// that says why it came up, set to a bug, with the email asked for by name: the bug hunt wants
+/// a way to come back to whoever reports one.
 struct FeedbackOverlay: View {
     @ObservedObject var model: FeedbackFormModel
     var asked = false
@@ -34,10 +35,20 @@ struct FeedbackOverlay: View {
                 }
             }
         }
+        .onAppear(perform: startOnABugWhenAsked)
     }
 
     private func close() {
         navigation.feedbackOpen = false
+    }
+
+    private var emailLabel: LocalizedStringKey {
+        asked ? "Your email, so we can follow up with you" : "Email (optional, if you'd like an answer)"
+    }
+
+    /// The bug hunt is about bugs: an asked card starts there, unless a draft already chose.
+    private func startOnABugWhenAsked() {
+        if asked && model.message.isEmpty { model.kind = .bug }
     }
 
     private func cancel() {
@@ -76,11 +87,11 @@ struct FeedbackOverlay: View {
     /// message box.
     private var askedIntro: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("How does the new OpenSuperWhisper feel?")
+            Text("We're hunting bugs")
                 .scaledFont(size: 22, weight: .bold)
                 .foregroundColor(STheme.textBright)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("We just rebuilt the whole interface. A few words about what works and what doesn't would help a lot.")
+            Text("This update is all about stability. Tell us anything that goes wrong, even something small, and leave your email so we can follow up with you.")
                 .scaledFont(size: 13)
                 .foregroundColor(STheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -100,7 +111,7 @@ struct FeedbackOverlay: View {
             // small window, what goes with the message is still in view above Send.
             detailsRow
             VStack(alignment: .leading, spacing: 6) {
-                Text("Email (optional, if you'd like an answer)")
+                Text(emailLabel)
                     .scaledFont(size: 13, weight: .semibold)
                     .foregroundColor(STheme.textBright)
                 // Not an address as the prompt: a localized key turns one into a blue link.

@@ -2,36 +2,32 @@ import AppKit
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// Asking, once ever, for feedback on the interface rebuilt in 0.14 (#206). The Feedback card is
-/// only found by those who look for it, so the app opens it itself one time, with a note on top,
-/// for anyone who has never sent feedback. Whether they then send, cancel or close it, it is
-/// never asked again.
+/// Asking, once per campaign, for feedback (#206). The Feedback card is only found by those who
+/// look for it, so the app opens it itself one time, with a note on top saying why. Whether they
+/// then send, cancel or close it, that campaign is never asked again.
+///
+/// The campaign now is the bug hunt: the update after 0.15.0 is about stability, and a report
+/// with an email to answer is worth more than a guess at what went wrong. It is asked the first
+/// time the main window comes up after the update, including in a launch that started in the
+/// menu bar, which is how most people run a dictation app.
 ///
 /// The decision is `shouldAsk`, a function of plain values. `FeedbackPromptScheduler` gathers
 /// them from the app and opens the card.
 enum FeedbackPrompt {
-    /// Launches, this one included, that must have started with onboarding already done. Two
-    /// rather than one: someone updating from 0.13 sees the new interface for the first time on
-    /// their first launch of this version, and is asked how it feels on the next one, after
-    /// having used it. A fresh install's first launch runs onboarding and does not count, so it
-    /// is asked on its third launch at the earliest.
-    static let minimumLaunches = 2
+    /// Stored in `AppPreferences.feedbackPromptCampaign` once asked or answered. A new campaign
+    /// is a new name, and the note on the card says what it is about.
+    static let campaign = "bug-hunt-2026-11"
 
     /// How long the main window has to stay in front before the card opens: not the first thing
     /// on screen, and not over a window someone has just brought up to do something else.
     static let settleDelay: Duration = .seconds(4)
 
     struct Moment: Equatable {
-        /// `AppPreferences.feedbackPromptDone`: shown before, or feedback already sent.
+        /// This campaign was asked before, or feedback was sent since it began.
         var done: Bool
-        /// `AppPreferences.feedbackPromptLaunches`, this launch counted.
-        var launches: Int
         /// Onboarding was done when this launch started. False through the launch that runs it,
         /// even once it is finished and the main window has taken over.
         var onboardedAtLaunch: Bool
-        /// This launch started in the menu bar. The window opened later in it is not asked over:
-        /// that is someone reaching for something. A later launch that shows the window will be.
-        var startedHidden: Bool
         /// The main window is visible and key, in the active app, with no sheet or alert over it.
         var windowInFront: Bool
         /// Home, with the search field empty: not the dictionary editor or a style picker, and
@@ -47,24 +43,22 @@ enum FeedbackPrompt {
     static func shouldAsk(_ moment: Moment) -> Bool {
         !moment.done
             && moment.onboardedAtLaunch
-            && !moment.startedHidden
-            && moment.launches >= minimumLaunches
             && moment.windowInFront
             && moment.onQuietHome
             && !moment.cardOpen
             && !moment.busy
     }
 
-    /// The count once a launch starts. It stops at the minimum, so the preference never grows
-    /// past what the decision reads.
-    static func launches(after count: Int, onboardedAtLaunch: Bool) -> Int {
-        onboardedAtLaunch ? min(count + 1, minimumLaunches) : count
+    /// Whether `stored`, the campaign last asked or answered, is this one. An answer to an
+    /// earlier campaign does not count.
+    static func isDone(stored: String?) -> Bool {
+        stored == campaign
     }
 
-    /// Feedback sent from anywhere answers the question: the card is never opened on its own.
+    /// Feedback sent from anywhere answers the campaign: the card is never opened on its own.
     @MainActor
     static func markDone() {
-        AppPreferences.shared.feedbackPromptDone = true
+        AppPreferences.shared.feedbackPromptCampaign = campaign
     }
 }
 
@@ -75,27 +69,19 @@ enum FeedbackPrompt {
 final class FeedbackPromptScheduler {
     static let shared = FeedbackPromptScheduler()
 
-    private struct Launch {
-        let onboarded: Bool
-        let startedHidden: Bool
-    }
-
-    /// Nil until `recordLaunch`, and for good in a test process: nothing is asked without it.
-    private var launch: Launch?
+    /// Whether onboarding was done when this launch started. Nil until `recordLaunch`, and for
+    /// good in a test process: nothing is asked without it.
+    private var onboardedAtLaunch: Bool?
     private weak var window: NSWindow?
     private var keyObserver: NSObjectProtocol?
     private var pending: Task<Void, Never>?
 
     private init() {}
 
-    /// From `applicationDidFinishLaunching`, with what the launch decided about the window.
-    func recordLaunch(onboarded: Bool, startedHidden: Bool) {
+    /// From `applicationDidFinishLaunching`.
+    func recordLaunch(onboarded: Bool) {
         guard !DefaultsStore.isRunningTests else { return }
-        launch = Launch(onboarded: onboarded, startedHidden: startedHidden)
-        let prefs = AppPreferences.shared
-        guard !prefs.feedbackPromptDone else { return }
-        let count = FeedbackPrompt.launches(after: prefs.feedbackPromptLaunches, onboardedAtLaunch: onboarded)
-        if count != prefs.feedbackPromptLaunches { prefs.feedbackPromptLaunches = count }
+        onboardedAtLaunch = onboarded
     }
 
     /// The main window's content joined a window, or left it (nil).
@@ -105,7 +91,7 @@ final class FeedbackPromptScheduler {
         keyObserver = nil
         pending?.cancel()
         self.window = window
-        guard let window, !AppPreferences.shared.feedbackPromptDone else { return }
+        guard let window, !Self.isDone else { return }
         keyObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
         ) { [weak self] _ in
@@ -134,20 +120,21 @@ final class FeedbackPromptScheduler {
 
     /// Recorded before the card opens: whatever happens next, it is never shown again.
     static func ask(prefs: AppPreferences, navigation: AppNavigation) {
-        prefs.feedbackPromptDone = true
+        prefs.feedbackPromptCampaign = FeedbackPrompt.campaign
         navigation.askForFeedback()
     }
 
+    private static var isDone: Bool {
+        FeedbackPrompt.isDone(stored: AppPreferences.shared.feedbackPromptCampaign)
+    }
+
     private func currentMoment() -> FeedbackPrompt.Moment? {
-        guard let launch, let window else { return nil }
-        let prefs = AppPreferences.shared
+        guard let onboardedAtLaunch, let window else { return nil }
         let navigation = AppNavigation.shared
         let recorder = AudioRecorder.shared
         return FeedbackPrompt.Moment(
-            done: prefs.feedbackPromptDone,
-            launches: prefs.feedbackPromptLaunches,
-            onboardedAtLaunch: launch.onboarded,
-            startedHidden: launch.startedHidden,
+            done: Self.isDone,
+            onboardedAtLaunch: onboardedAtLaunch,
             windowInFront: NSApp.isActive && NSApp.modalWindow == nil && window.isVisible
                 && window.isKeyWindow && window.attachedSheet == nil,
             onQuietHome: navigation.page == .home && navigation.searchText.isEmpty,
