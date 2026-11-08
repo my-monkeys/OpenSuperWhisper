@@ -27,7 +27,9 @@ trap '[ -z "$TMP" ] || rm -rf "$TMP"' EXIT
 fetch_verified() {
   local archive=$1 expected=$2 actual
   TMP="$(mktemp -d)"
-  curl -fsSL "${BASE}/${archive}" -o "$TMP/$archive"
+  # GitHub's release downloads answer 504 in bursts that can last hours, so a
+  # single miss must not fail the whole build.
+  curl -fsSL --retry 8 --retry-delay 15 --retry-all-errors "${BASE}/${archive}" -o "$TMP/$archive"
   actual="$(shasum -a 256 "$TMP/$archive" | cut -d' ' -f1)"
   if [ "$actual" != "$expected" ]; then
     echo "fetch-sherpa: error: $archive has SHA-256 $actual, expected $expected" >&2
