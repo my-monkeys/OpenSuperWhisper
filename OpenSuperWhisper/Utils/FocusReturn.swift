@@ -77,6 +77,9 @@ protocol FocusControlling {
     func stillFocused(_ target: FocusTarget) -> Bool?
     /// Brings the app in front. false when the system refused.
     func activate(_ target: FocusTarget) -> Bool
+    /// Brings the app in front through LaunchServices, for an app that let `activate` through
+    /// and stayed behind. false when the request could not be made.
+    func reopen(_ target: FocusTarget) -> Bool
     /// Raises the element's window and focuses the element. false when the element is gone or
     /// would not take the focus.
     func focus(_ target: FocusTarget) -> Bool
@@ -119,9 +122,26 @@ enum FocusReturn {
         guard system.activate(target) else { return .unreachable }
         let outcome: Outcome = refocus(target, using: system) ? .refocused : .appOnly
         await system.settle()
-        // An activation the system accepted and then did not carry out leaves someone else in
-        // front, and the text would land there.
-        return system.frontmostPID() == target.pid ? outcome : .unreachable
+        if system.frontmostPID() == target.pid { return outcome }
+        return await reopen(target, using: system)
+    }
+
+    /// The second attempt, for an app still behind after an activation the system accepted.
+    ///
+    /// Dia takes the accessibility request with a success and stays where it is, and the
+    /// workspace request is refused to an app that is not active itself, as this one is not
+    /// while it transcribes. LaunchServices brings it forward, as `open` does, in about 50 ms.
+    /// It is not the first attempt because it also sends the app a reopen event, which makes an
+    /// app with no window open a new one. Still behind after that, someone else is in front and
+    /// the text would land there.
+    @MainActor
+    private static func reopen(_ target: FocusTarget, using system: FocusControlling) async -> Outcome {
+        guard system.reopen(target) else { return .unreachable }
+        await system.settle()
+        guard system.frontmostPID() == target.pid else { return .unreachable }
+        let outcome: Outcome = refocus(target, using: system) ? .refocused : .appOnly
+        await system.settle()
+        return outcome
     }
 
     @MainActor
@@ -203,6 +223,14 @@ final class LiveFocusControl: FocusControlling {
         let app = AXUIElementCreateApplication(target.pid)
         if set(kAXFrontmostAttribute, of: app, to: kCFBooleanTrue) == .success { return true }
         return NSRunningApplication(processIdentifier: target.pid)?.activate(options: []) ?? false
+    }
+
+    func reopen(_ target: FocusTarget) -> Bool {
+        guard let url = NSRunningApplication(processIdentifier: target.pid)?.bundleURL else { return false }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: nil)
+        return true
     }
 
     func focus(_ target: FocusTarget) -> Bool {
