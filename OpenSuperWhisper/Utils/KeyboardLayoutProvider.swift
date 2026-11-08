@@ -1,5 +1,6 @@
 import Carbon
 import AppKit
+import os
 
 struct KeyboardLayoutInfo {
     let labels: [UInt16: String]
@@ -95,7 +96,22 @@ final class KeyboardLayoutProvider {
     
     /// The languages the active input source declares, in the order it declares them, the first
     /// being its primary. Empty for a layout that declares none.
+    ///
+    /// Only the main thread reads the input source: HIToolbox asserts it is on the main queue and
+    /// traps anywhere else, which is how 0.15.0 crashed when the AI cleanup resolved its backend,
+    /// and so the dictation language, from a background task. Off the main thread this answers
+    /// with the last main-thread read, which the recording's own read at its start keeps current:
+    /// the layout the user spoke in, not the one they switched to since.
     static func inputSourceLanguages() -> [String] {
+        guard Thread.isMainThread else { return lastLanguagesRead.withLock { $0 } }
+        let languages = readInputSourceLanguages()
+        lastLanguagesRead.withLock { $0 = languages }
+        return languages
+    }
+
+    private static let lastLanguagesRead = OSAllocatedUnfairLock<[String]>(initialState: [])
+
+    private static func readInputSourceLanguages() -> [String] {
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
               let ptr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages)
         else { return [] }
