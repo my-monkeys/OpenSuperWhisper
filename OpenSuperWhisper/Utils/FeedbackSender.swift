@@ -13,6 +13,8 @@ struct FeedbackSubmission: Equatable {
     var email: String
     /// The app details line, or nil when the user switched it off.
     var details: String?
+    /// The dictation whose audio goes with the message, only when the user picked one.
+    var audio: DictationAudioChoice?
 
     /// Sent as the API's free-text `context`, the one field it keeps besides the message and
     /// the email: where the message came from, what it is about, and the details if allowed.
@@ -30,6 +32,8 @@ enum FeedbackSendError: Error, Equatable {
     case refused(status: Int)
     /// Offline, timed out, or a server error: the same message may go through later.
     case unreachable
+    /// The attached recording could not be read or fitted into the limit, so nothing was sent.
+    case audioUnavailable
 }
 
 /// Posts a feedback message to the same endpoint as the form on opensuperwhisper.com. The API is
@@ -41,6 +45,8 @@ struct FeedbackSender {
     static let endpoint = URL(string: "https://git.my-monkey.fr/api/feedback")!
     static let product = "opensuperwhisper"
     static let timeout: TimeInterval = 15
+    /// With a recording attached the request carries megabytes, over a connection that may be slow.
+    static let uploadTimeout: TimeInterval = 120
     /// The API stores the User-Agent with each message. The system's own names the build, the
     /// CFNetwork and the Darwin version, which would go out even with the app details off.
     static let userAgent = "OpenSuperWhisper"
@@ -52,6 +58,7 @@ struct FeedbackSender {
     static let maxBodyBytes = 8 * 1024
 
     var transport: Transport = { try await FeedbackSender.session.data(for: $0) }
+    var loadAudio: (DictationAudioChoice) async throws -> FeedbackAttachment = DictationAudioLoader.load
 
     /// No cookies, no cache, no credentials kept between sends, and the neutral User-Agent.
     static let sessionConfiguration: URLSessionConfiguration = {
@@ -69,7 +76,13 @@ struct FeedbackSender {
     private static let session = URLSession(configuration: sessionConfiguration)
 
     func send(_ submission: FeedbackSubmission) async throws {
-        let request = try Self.request(for: submission)
+        var attachment: FeedbackAttachment?
+        do {
+            if let audio = submission.audio { attachment = try await loadAudio(audio) }
+        } catch {
+            throw FeedbackSendError.audioUnavailable
+        }
+        let request = try Self.request(for: submission, attachment: attachment)
         let response: URLResponse
         do {
             (_, response) = try await transport(request)
@@ -92,15 +105,33 @@ struct FeedbackSender {
         return body.count <= maxBodyBytes
     }
 
-    static func request(for submission: FeedbackSubmission) throws -> URLRequest {
+    /// JSON, or `multipart/form-data` with the same fields when a recording goes along.
+    static func request(for submission: FeedbackSubmission,
+                        attachment: FeedbackAttachment? = nil) throws -> URLRequest {
         var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData,
-                                 timeoutInterval: timeout)
+                                 timeoutInterval: attachment == nil ? timeout : uploadTimeout)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.httpShouldHandleCookies = false
-        request.httpBody = try body(for: submission)
+        if let attachment {
+            let form = multipartForm(for: submission, attachment: attachment)
+            request.setValue(form.contentType, forHTTPHeaderField: "Content-Type")
+            request.httpBody = form.body
+        } else {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try body(for: submission)
+        }
         return request
+    }
+
+    static func multipartForm(for submission: FeedbackSubmission, attachment: FeedbackAttachment) -> MultipartForm {
+        var form = MultipartForm()
+        form.fields = [("message", submission.trimmedMessage)]
+        if !submission.trimmedEmail.isEmpty { form.fields.append(("email", submission.trimmedEmail)) }
+        form.fields += [("product", product), ("context", submission.context)]
+        form.files = [.init(name: "files", filename: attachment.filename,
+                            contentType: attachment.contentType, data: attachment.data)]
+        return form
     }
 
     private static func body(for submission: FeedbackSubmission) throws -> Data {

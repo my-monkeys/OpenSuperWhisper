@@ -23,6 +23,10 @@ struct ReportCard: View {
     @State private var added: (wrong: String, right: String)?
     /// The one-tap text copy to the developer, offered after the local save.
     @State private var sendStatus: SendStatus = .idle
+    /// Whether the dictation's recording goes with the text. Off until the person switches it on.
+    @State private var includeAudio = false
+    /// Read once for the card: the audio's presence and size decide what the switch offers.
+    @State private var audio: DictationAudioChoice
 
     private static let editorBaseHeight: CGFloat = 76
     private static let editorMaxHeight: CGFloat = 110
@@ -31,6 +35,7 @@ struct ReportCard: View {
     /// For the snapshot probe: a draft already filled in, or the card after Save.
     static var snapshotDraft: ReportDraft?
     static var snapshotSaved = false
+    static var snapshotIncludeAudio = false
     #endif
 
     init(recording: Recording, dictionaryEnabled: Binding<Bool>,
@@ -44,9 +49,11 @@ struct ReportCard: View {
         #if DEBUG
         draft = Self.snapshotDraft ?? draft
         status = Self.snapshotSaved ? .saved : status
+        _includeAudio = State(initialValue: Self.snapshotIncludeAudio)
         #endif
         _draft = State(initialValue: draft)
         _status = State(initialValue: status)
+        _audio = State(initialValue: DictationAudioChoice.forRecording(recording))
     }
 
     var body: some View {
@@ -90,14 +97,16 @@ struct ReportCard: View {
         }
     }
 
-    /// Sends the text of the report, never the audio, to the developer. Offered once the local save
-    /// is done, so the full report with its audio is already kept whatever the network does.
+    /// Sends the text of the report to the developer, with the dictation's recording only when the
+    /// audio switch is on. Offered once the local save is done, so the full report with its audio
+    /// is already kept whatever the network does.
     private func sendToDeveloper() {
         sendStatus = .sending
         Task {
             do {
                 try await DictationReportSender.send(recording: recording,
-                                                     problem: draft.problem, comment: draft.comment)
+                                                     problem: draft.problem, comment: draft.comment,
+                                                     includeAudio: includeAudio)
                 sendStatus = .sent
             } catch {
                 sendStatus = .failed
@@ -291,6 +300,9 @@ struct ReportCard: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 26).padding(.vertical, 28)
+            if audio.eligibility != .noAudio {
+                audioRow
+            }
             HStack(spacing: 10) {
                 sendButton
                 Spacer(minLength: 0)
@@ -306,19 +318,56 @@ struct ReportCard: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Text only: the settings and both transcripts, never the audio. Offered after the save, so
-    /// the full local report is already safe whatever the network does.
+    /// The opt-in for the recording, under the saved message: off by default, disabled with its
+    /// reason when the file is over what the endpoint takes.
+    private var audioRow: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Include the audio")
+                    .scaledFont(size: 14, weight: .semibold)
+                    .foregroundColor(STheme.textBright)
+                audioHint
+                    .scaledFont(size: 12)
+                    .foregroundColor(audio.isAttachable ? STheme.hint : STheme.warn)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+            Spacer(minLength: 0)
+            SSwitch(isOn: $includeAudio)
+                .accessibilityLabel(Text("Include the audio"))
+                .disabled(!audio.isAttachable || sendStatus == .sending || sendStatus == .sent)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.advancedBg))
+        .padding(.horizontal, 26).padding(.bottom, 16)
+    }
+
+    private var audioHint: Text {
+        audio.isAttachable ? Text("Sends the recording of this dictation along with the text.")
+                           : Text("Too large to attach (over 25 MB)")
+    }
+
+    private var sendTitle: LocalizedStringKey {
+        includeAudio ? "Send text and audio" : "Send text to developer"
+    }
+
+    private var sentTitle: LocalizedStringKey {
+        includeAudio ? "Text and audio sent" : "Text sent"
+    }
+
+    /// The settings and both transcripts, plus the audio when its switch is on. Offered after the
+    /// save, so the full local report is already safe whatever the network does.
     @ViewBuilder private var sendButton: some View {
         switch sendStatus {
         case .idle:
-            Button("Send text to developer", action: sendToDeveloper)
+            Button(sendTitle, action: sendToDeveloper)
                 .buttonStyle(.sSecondary)
         case .sending:
             Button("Sending…") {}
                 .buttonStyle(.sSecondary)
                 .disabled(true)
         case .sent:
-            Label("Text sent", systemImage: "checkmark")
+            Label(sentTitle, systemImage: "checkmark")
                 .scaledFont(size: 13, weight: .semibold)
                 .foregroundColor(STheme.ok)
         case .failed:

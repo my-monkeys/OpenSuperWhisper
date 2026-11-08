@@ -36,6 +36,7 @@ struct FeedbackOverlay: View {
             }
         }
         .onAppear(perform: startOnABugWhenAsked)
+        .task { await model.refreshRecentDictations() }
     }
 
     private func close() {
@@ -108,8 +109,10 @@ struct FeedbackOverlay: View {
             .disabled(!model.isEditable)
             messageField
             // Right under the message, before the optional email: at the largest text size in a
-            // small window, what goes with the message is still in view above Send.
+            // small window, what goes with the message is still in view above Send. The audio
+            // row follows, nothing attached by default so a single line, for the same reason.
             detailsRow
+            audioRow
             VStack(alignment: .leading, spacing: 6) {
                 Text(emailLabel)
                     .scaledFont(size: 13, weight: .semibold)
@@ -167,7 +170,7 @@ struct FeedbackOverlay: View {
                     .strikethrough(!model.includeDetails, color: STheme.faint)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Nothing else is sent: no dictations, audio, logs or settings.")
+                Text(disclosureText)
                     .scaledFont(size: 12)
                     .foregroundColor(STheme.hint)
                     .fixedSize(horizontal: false, vertical: true)
@@ -180,6 +183,126 @@ struct FeedbackOverlay: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.advancedBg))
+    }
+
+    private var pickerTitle: LocalizedStringKey { model.isPickingAudio ? "Close" : "Choose…" }
+
+    private var disclosureText: LocalizedStringKey {
+        switch model.disclosure {
+        case .textOnly: "Nothing else is sent: no dictations, audio, logs or settings."
+        case .withRecording: "The recording you attached is sent too. Nothing else: no other dictations, logs or settings."
+        }
+    }
+
+    // MARK: - Attached audio
+
+    private var audioRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Attach a dictation's audio")
+                        .scaledFont(size: 14, weight: .semibold)
+                        .foregroundColor(STheme.textBright)
+                    Text("Optional. Pick a recent dictation so we can reproduce a transcription problem.")
+                        .scaledFont(size: 12)
+                        .foregroundColor(STheme.hint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .layoutPriority(1)
+                Spacer(minLength: 0)
+                if model.attachedAudio == nil {
+                    Button(pickerTitle) { model.isPickingAudio.toggle() }
+                        .buttonStyle(.sSecondary)
+                        .disabled(!model.isEditable)
+                }
+            }
+            if let audio = model.attachedAudio {
+                attachedChip(audio)
+            } else if model.isPickingAudio {
+                audioPicker
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.advancedBg))
+    }
+
+    private func attachedChip(_ audio: DictationAudioChoice) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "waveform")
+                .scaledFont(size: 14, weight: .semibold)
+                .foregroundColor(STheme.accent)
+            audioLabel(audio, detail: audioSizeDetail(audio))
+            Spacer(minLength: 0)
+            Button { model.detachAudio() } label: {
+                Image(systemName: "xmark")
+                    .scaledFont(size: 12, weight: .bold)
+                    .foregroundColor(STheme.hint)
+                    .padding(6)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!model.isEditable)
+            .accessibilityLabel(Text("Remove the attached recording"))
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(STheme.cardBg))
+    }
+
+    private var audioPicker: some View {
+        Group {
+            if model.recentDictations.isEmpty {
+                Text("No recent dictations to attach.")
+                    .scaledFont(size: 12)
+                    .foregroundColor(STheme.hint)
+            } else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(model.recentDictations) { audioPickerRow($0) }
+                    }
+                }
+                .frame(maxHeight: 190 * textScale)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func audioPickerRow(_ audio: DictationAudioChoice) -> some View {
+        Button { model.attach(audio) } label: {
+            HStack(spacing: 12) {
+                audioLabel(audio, detail: audioDetail(audio))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!audio.isAttachable)
+        .opacity(audio.isAttachable ? 1 : 0.55)
+    }
+
+    private func audioDetail(_ audio: DictationAudioChoice) -> Text {
+        switch audio.eligibility {
+        case .eligible: audioSizeDetail(audio)
+        case .tooLarge: Text("Too large to attach (over 25 MB)")
+        case .noAudio: Text("No audio kept for this dictation")
+        }
+    }
+
+    private func audioLabel(_ audio: DictationAudioChoice, detail: Text) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: "\(audio.timestamp.formatted(.dateTime.month(.abbreviated).day().hour().minute().locale(locale))) · \(audio.preview)")
+                .scaledFont(size: 13, weight: .medium)
+                .foregroundColor(STheme.textBright)
+                .lineLimit(1)
+            detail
+                .scaledFont(size: 12)
+                .foregroundColor(STheme.hint)
+        }
+    }
+
+    private func audioSizeDetail(_ audio: DictationAudioChoice) -> Text {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(audio.fileSize ?? 0), countStyle: .file)
+        return Text(verbatim: "\(TextUtil.formatDuration(audio.duration)) · \(size)")
     }
 
     /// The ways out of the app this card replaced, for those who would rather use them.
@@ -236,6 +359,8 @@ struct FeedbackOverlay: View {
             case .messageTooLong: warning("Too long to send. Shorten it, or open an issue on GitHub.")
             case .emailTooLong: warning("That email address is too long.")
             }
+        } else if model.status == .audioFailed {
+            warning("The recording couldn't be sent. Remove it, or try again later.")
         } else if model.status == .refused {
             warning("It was turned down as it is. Shorten it, or open an issue on GitHub.")
         } else if model.status == .failed {
