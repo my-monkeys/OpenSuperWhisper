@@ -21,9 +21,11 @@ enum CallStackTree {
     /// The walk gives up past this many frames, so a malformed or absurdly deep tree cannot spin.
     private static let maxWalkedFrames = 2000
 
-    /// The attributed thread's frames, crash site first: the tree lists the root (outermost) frame
-    /// then its sub-frames depth first, so the walk is reversed before `limit` cuts it, and what
-    /// the cut drops is the thread's entry, never the frame that faulted. Anything unexpected in
+    /// The attributed thread's frames, crash site first: the tree's root frame is the one that
+    /// faulted and each sub-frame is its caller, so the walk is already in that order and what
+    /// `limit` cuts is the thread's entry, never the frame that faulted. The 0.15.0 reports, which
+    /// printed the walk as is, show it: libdispatch's trap at #0, the Swift job runner last, and
+    /// every app frame a caller of the one above it. Anything unexpected in
     /// the shape yields fewer frames rather than a throw: a report with a short stack still helps
     /// and one that crashes the reporter helps no one.
     static func parse(_ json: Data, limit: Int = defaultFrameLimit) -> ParsedCallStack {
@@ -57,7 +59,7 @@ enum CallStackTree {
         }
         rootFrames.forEach(walk)
 
-        let kept = walked.reversed().prefix(max(0, limit))
+        let kept = walked.prefix(max(0, limit))
         var images: [String] = []
         for case let image? in kept.map(\.image) where !images.contains(image) {
             images.append(image)

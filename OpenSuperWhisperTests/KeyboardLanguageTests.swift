@@ -8,6 +8,7 @@
 //
 
 import XCTest
+import os
 @testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
 
@@ -100,5 +101,24 @@ final class KeyboardLanguageTests: XCTestCase {
         defer { prefs.whisperLanguage = saved }
 
         XCTAssertEqual(Settings().selectedLanguage, "cs")
+    }
+
+    /// HIToolbox traps when an input source is read off the main queue, which is how 0.15.0
+    /// crashed in the AI cleanup's backend lookup. Off the main thread the answer is the last
+    /// main-thread read, and the input source is not touched.
+    func testAnOffMainReadAnswersWithTheLastMainThreadRead() {
+        XCTAssertTrue(Thread.isMainThread)
+        let onMain = KeyboardLayoutProvider.inputSourceLanguages()
+        let offMain = OSAllocatedUnfairLock<[String]?>(initialState: nil)
+        let read = expectation(description: "read off the main thread")
+
+        DispatchQueue.global().async {
+            let languages = KeyboardLayoutProvider.inputSourceLanguages()
+            offMain.withLock { $0 = languages }
+            read.fulfill()
+        }
+        wait(for: [read], timeout: 5)
+
+        XCTAssertEqual(offMain.withLock { $0 }, onMain)
     }
 }
