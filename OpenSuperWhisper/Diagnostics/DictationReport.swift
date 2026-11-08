@@ -1,11 +1,11 @@
 import Foundation
 import OpenSuperWhisperCore
 
-/// A dictation the person flagged as wrong, reduced to what diagnoses it without the audio.
+/// A dictation the person flagged as wrong, reduced to what diagnoses it, without the audio unless they add it.
 ///
 /// Plain fields, not a `Recording`, so building the message and keeping it under the endpoint's
-/// limit can be tested on their own. The audio stays on this Mac; only what the person chose to
-/// send when they tapped "report" goes out, and never where they were dictating.
+/// limit can be tested on their own. The audio stays on this Mac unless the person switches it on;
+/// only what they chose to send when they tapped "report" goes out, and never where they were dictating.
 struct DictationReportDraft: Equatable {
     /// What the person typed about what went wrong, if anything (e.g. "spoke French, got English").
     var note: String

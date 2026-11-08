@@ -8,6 +8,14 @@ final class FeedbackFormModel: ObservableObject {
         /// `failed`: worth another try. `refused`: the API turned this message down, so the
         /// same text will never get through.
         case editing, sending, sent, failed, refused
+        /// The recording could not be read, or the API would not take it (too big, or too
+        /// many bytes from this connection this hour): the message may go without it.
+        case audioFailed
+    }
+
+    /// What the card says it sends besides the text, shown word for word under the app details.
+    enum Disclosure: Equatable {
+        case textOnly, withRecording
     }
 
     /// What keeps a message within the API's limits from being sent as it stands.
@@ -24,18 +32,25 @@ final class FeedbackFormModel: ObservableObject {
     @Published var email = ""
     @Published var includeDetails = true
     @Published private(set) var status: Status = .editing
+    /// The dictation whose audio goes with the message. Nothing is attached unless the user picks one.
+    @Published private(set) var attachedAudio: DictationAudioChoice?
+    @Published private(set) var recentDictations: [DictationAudioChoice] = []
+    @Published var isPickingAudio = false
 
     private let sender: FeedbackSender
     private let appDetails: @MainActor () -> String
+    private let loadRecentDictations: @MainActor () async -> [DictationAudioChoice]
     /// Run once a message got through: whoever sent one is never asked for feedback (#206).
     private let onSent: @MainActor () -> Void
 
     /// Nonisolated so the main window can create it as the default of its own initializer.
     nonisolated init(sender: FeedbackSender = FeedbackSender(),
                      appDetails: @escaping @MainActor () -> String = { FeedbackAppDetails.current() },
+                     recentDictations: @escaping @MainActor () async -> [DictationAudioChoice] = { await DictationAudioChoice.recent() },
                      onSent: @escaping @MainActor () -> Void = FeedbackPrompt.markDone) {
         self.sender = sender
         self.appDetails = appDetails
+        self.loadRecentDictations = recentDictations
         self.onSent = onSent
     }
 
@@ -65,7 +80,24 @@ final class FeedbackFormModel: ObservableObject {
 
     var submission: FeedbackSubmission {
         FeedbackSubmission(kind: kind, message: message, email: email,
-                           details: includeDetails ? details : nil)
+                           details: includeDetails ? details : nil, audio: attachedAudio)
+    }
+
+    var disclosure: Disclosure { attachedAudio == nil ? .textOnly : .withRecording }
+
+    func refreshRecentDictations() async {
+        recentDictations = await loadRecentDictations()
+    }
+
+    func attach(_ audio: DictationAudioChoice) {
+        guard isEditable, audio.isAttachable else { return }
+        attachedAudio = audio
+        isPickingAudio = false
+    }
+
+    func detachAudio() {
+        guard isEditable else { return }
+        attachedAudio = nil
     }
 
     func send() async {
@@ -76,8 +108,10 @@ final class FeedbackFormModel: ObservableObject {
             onSent()
             clearDraft()
             status = .sent
-        } catch FeedbackSendError.refused {
-            status = .refused
+        } catch FeedbackSendError.refused(let code) {
+            status = attachedAudio != nil && (code == 413 || code == 429) ? .audioFailed : .refused
+        } catch FeedbackSendError.audioUnavailable {
+            status = .audioFailed
         } catch {
             status = .failed
         }
@@ -102,10 +136,18 @@ final class FeedbackFormModel: ObservableObject {
         message = ""
         email = ""
         includeDetails = true
+        attachedAudio = nil
+        isPickingAudio = false
     }
 
     #if DEBUG
     /// For the snapshot probe, which shows the thank-you without sending anything.
     func stageStatus(_ status: Status) { self.status = status }
+
+    func stageAudio(_ audio: DictationAudioChoice?, choices: [DictationAudioChoice], picking: Bool = false) {
+        attachedAudio = audio
+        recentDictations = choices
+        isPickingAudio = picking
+    }
     #endif
 }

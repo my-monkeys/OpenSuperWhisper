@@ -80,6 +80,12 @@ enum UISnapshotProbe {
             return feedbackCard(stagedBug: true)
         },
         "feedback-form-too-long": { feedbackCard(message: String(repeating: "Log line: dictation stopped. ", count: 140)) },
+        "feedback-audio-attached": { feedbackCard(stagedBug: true, audio: .attached) },
+        "feedback-audio-attached-large-text": {
+            AppPreferences.shared.textScale = TextScale.maximum
+            return feedbackCard(stagedBug: true, audio: .attached)
+        },
+        "feedback-audio-picker": { feedbackCard(stagedBug: true, audio: .picking) },
         "feedback-sent": { feedbackCard(status: .sent) },
         "feedback-asked": { feedbackCard(asked: true) },
         "feedback-asked-large-text": {
@@ -244,9 +250,11 @@ enum UISnapshotProbe {
     /// ever being made: the endpoint notifies the owner, and a snapshot is never meant to.
     private static func feedbackCard(stagedBug: Bool = false, message: String? = nil,
                                      status: FeedbackFormModel.Status = .editing,
-                                     asked: Bool = false) -> AnyView {
+                                     asked: Bool = false, audio: StagedAudio? = nil) -> AnyView {
+        // The picker's list is the staged one too: the view's own refresh would read the probe's store.
+        let choices = audio == nil ? [] : stagedAudioChoices()
         let model = FeedbackFormModel(sender: FeedbackSender(transport: { _ in throw URLError(.cancelled) }),
-                                      onSent: {})
+                                      recentDictations: { choices }, onSent: {})
         if let message {
             model.kind = .bug
             model.message = message
@@ -257,12 +265,33 @@ enum UISnapshotProbe {
             model.email = "camille@example.com"
         }
         model.stageStatus(status)
+        if let audio {
+            model.stageAudio(audio == .attached ? choices[0] : nil, choices: choices, picking: audio == .picking)
+        }
         if asked {
             AppNavigation.shared.askForFeedback()
         } else {
             AppNavigation.shared.openFeedback()
         }
         return AnyView(AppShellView(page: .home, feedback: model))
+    }
+
+    enum StagedAudio { case attached, picking }
+
+    /// Made-up dictations with the sizes the picker tells apart: fine, fine, gone, over the limit.
+    private static func stagedAudioChoices() -> [DictationAudioChoice] {
+        let samples: [(String, TimeInterval, Int?)] = [
+            ("The bubble stays on screen after I stop dictating in Mail and I have to click elsewhere", 32, 1_024_000),
+            ("Add a search field and a button to clear the input in the history view.", 6, 192_000),
+            ("An idea for this weekend: turn my reading notes into index cards.", 9, nil),
+            ("Let me walk you through the whole planning document from the beginning", 520, 31_400_000),
+        ]
+        return samples.enumerated().map { index, sample in
+            let recording = Recording(id: UUID(), timestamp: Date().addingTimeInterval(Double(-index) * 3_600 - 600),
+                                      fileName: "staged-\(index).wav", transcription: sample.0,
+                                      duration: sample.1, status: .completed, progress: 1)
+            return DictationAudioChoice(recording: recording, fileSize: sample.2)
+        }
     }
 
     static func run(outputDir: String, names: [String]) -> Never {

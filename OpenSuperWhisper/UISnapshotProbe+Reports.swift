@@ -26,6 +26,11 @@ extension UISnapshotProbe {
             ReportCard.snapshotSaved = true
             return reportCard(stagedWord: true)
         },
+        "report-saved-text-only": {
+            ReportCard.snapshotSaved = true
+            ReportCard.snapshotIncludeAudio = false
+            return reportCard(stagedWord: true)
+        },
         "reports-list": { reportsList() },
         "reports-list-large-text": {
             AppPreferences.shared.textScale = TextScale.maximum
@@ -39,6 +44,7 @@ extension UISnapshotProbe {
         FeedRow.snapshotShowsOriginals = false
         ReportCard.snapshotDraft = nil
         ReportCard.snapshotSaved = false
+        ReportCard.snapshotIncludeAudio = nil
     }
 
     /// The seeded dictation the cleanup changed, read back from the store.

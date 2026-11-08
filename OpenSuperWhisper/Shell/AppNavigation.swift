@@ -90,7 +90,8 @@ final class AppNavigation: ObservableObject {
         didSet { if !feedbackOpen { feedbackAsked = false } }
     }
     /// The open Feedback card was opened by the app asking, once (#206), rather than by the user:
-    /// it leads with a note on the new interface. Cleared whenever the card closes.
+    /// it leads with a note on what is being asked (`FeedbackPrompt.campaign`). Cleared whenever
+    /// the card closes.
     @Published private(set) var feedbackAsked = false
     /// The dictation the Report card is about (#168); nil when the card is closed.
     @Published var reporting: Recording?

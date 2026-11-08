@@ -23,6 +23,12 @@ struct ReportCard: View {
     @State private var added: (wrong: String, right: String)?
     /// The one-tap text copy to the developer, offered after the local save.
     @State private var sendStatus: SendStatus = .idle
+    /// Whether the dictation's recording goes with the text. On whenever the file can go: a
+    /// transcription report rarely reproduces without the audio it was made from, and the switch
+    /// is right above Send for whoever would rather keep it.
+    @State private var includeAudio: Bool
+    /// Read once for the card: the audio's presence and size decide what the switch offers.
+    @State private var audio: DictationAudioChoice
 
     private static let editorBaseHeight: CGFloat = 76
     private static let editorMaxHeight: CGFloat = 110
@@ -31,6 +37,7 @@ struct ReportCard: View {
     /// For the snapshot probe: a draft already filled in, or the card after Save.
     static var snapshotDraft: ReportDraft?
     static var snapshotSaved = false
+    static var snapshotIncludeAudio: Bool?
     #endif
 
     init(recording: Recording, dictionaryEnabled: Binding<Bool>,
@@ -45,8 +52,15 @@ struct ReportCard: View {
         draft = Self.snapshotDraft ?? draft
         status = Self.snapshotSaved ? .saved : status
         #endif
+        let audio = DictationAudioChoice.forRecording(recording)
+        var includeAudio = audio.isAttachable
+        #if DEBUG
+        includeAudio = Self.snapshotIncludeAudio ?? includeAudio
+        #endif
         _draft = State(initialValue: draft)
         _status = State(initialValue: status)
+        _audio = State(initialValue: audio)
+        _includeAudio = State(initialValue: includeAudio)
     }
 
     var body: some View {
@@ -79,25 +93,38 @@ struct ReportCard: View {
     }
 
     private func save() {
+        saveThen {}
+    }
+
+    /// The first screen's main action: the report is kept on this Mac first, so a failed send
+    /// still leaves it saved, with Send offered again on the next screen.
+    private func saveAndSend() {
+        saveThen(sendToDeveloper)
+    }
+
+    private func saveThen(_ next: @escaping () -> Void) {
         status = .saving
         Task {
             do {
                 try await reports.save(draft, for: recording)
                 status = .saved
+                next()
             } catch {
                 status = .failed
             }
         }
     }
 
-    /// Sends the text of the report, never the audio, to the developer. Offered once the local save
-    /// is done, so the full report with its audio is already kept whatever the network does.
+    /// Sends the text of the report to the developer, with the dictation's recording when the
+    /// audio switch is on. Only ever after the local save, so the full report with its audio is
+    /// already kept whatever the network does.
     private func sendToDeveloper() {
         sendStatus = .sending
         Task {
             do {
                 try await DictationReportSender.send(recording: recording,
-                                                     problem: draft.problem, comment: draft.comment)
+                                                     problem: draft.problem, comment: draft.comment,
+                                                     includeAudio: includeAudio)
                 sendStatus = .sent
             } catch {
                 sendStatus = .failed
@@ -247,7 +274,20 @@ struct ReportCard: View {
 
     // MARK: - Footer and saved state
 
+    /// The audio switch sits with the buttons rather than at the end of the form: the audio goes
+    /// by default, so what Save and send will take must be in view next to it, not below the fold.
     private var footer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if audio.eligibility != .noAudio {
+                audioSwitch
+            }
+            footerButtons
+        }
+        .padding(.horizontal, 26).padding(.vertical, 16)
+        .overlay(alignment: .top) { Rectangle().fill(STheme.border).frame(height: 1) }
+    }
+
+    private var footerButtons: some View {
         HStack(spacing: 10) {
             if status == .failed {
                 Label {
@@ -264,12 +304,13 @@ struct ReportCard: View {
             Button("Cancel", action: cancel)
                 .buttonStyle(.sSecondary)
             Button("Save report", action: save)
+                .buttonStyle(.sSecondary)
+                .disabled(!draft.canSave || status == .saving)
+            Button("Save and send", action: saveAndSend)
                 .buttonStyle(.sPrimary)
                 .disabled(!draft.canSave || status == .saving)
                 .keyboardShortcut(.return, modifiers: .command)
         }
-        .padding(.horizontal, 26).padding(.vertical, 16)
-        .overlay(alignment: .top) { Rectangle().fill(STheme.border).frame(height: 1) }
     }
 
     private var saved: some View {
@@ -282,7 +323,7 @@ struct ReportCard: View {
                     Text("Report saved")
                         .scaledFont(size: 18, weight: .bold)
                         .foregroundColor(STheme.textBright)
-                    Text("It stays on this Mac with the audio. You can send the text to the developer below, or export the whole report as a zip from Reports.")
+                    savedMessage
                         .scaledFont(size: 13)
                         .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
@@ -291,14 +332,17 @@ struct ReportCard: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 26).padding(.vertical, 28)
+            if audio.eligibility != .noAudio && !sendStarted {
+                audioSwitch
+                    .padding(.horizontal, 26).padding(.bottom, 16)
+            }
+            // Sending is what the saved report is for, so it takes the primary place on the right.
+            // There is no Done beside it: the card closes from its ✕, Esc or a click outside.
             HStack(spacing: 10) {
-                sendButton
-                Spacer(minLength: 0)
                 Button("Show reports") { navigation.openReports() }
                     .buttonStyle(.sSecondary)
-                Button("Done", action: close)
-                    .buttonStyle(.sPrimary)
-                    .keyboardShortcut(.defaultAction)
+                Spacer(minLength: 0)
+                sendButton
             }
             .padding(.horizontal, 26).padding(.vertical, 16)
             .overlay(alignment: .top) { Rectangle().fill(STheme.border).frame(height: 1) }
@@ -306,25 +350,73 @@ struct ReportCard: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Text only: the settings and both transcripts, never the audio. Offered after the save, so
-    /// the full local report is already safe whatever the network does.
+    /// Sent, or on its way: the saved screen then only shows the report, with nothing to change.
+    private var sendStarted: Bool {
+        sendStatus == .sending || sendStatus == .sent
+    }
+
+    private var savedMessage: Text {
+        sendStarted
+            ? Text("It stays on this Mac with the audio, and a copy is going to the developer. The whole report can be exported as a zip from Reports.")
+            : Text("It stays on this Mac with the audio. Send it to the developer so it can be fixed, or export the whole report as a zip from Reports.")
+    }
+
+    /// Whether the recording goes too, on both screens until it is sent: on by default, disabled
+    /// with its reason when the file is over what the endpoint takes.
+    private var audioSwitch: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Include the audio")
+                    .scaledFont(size: 14, weight: .semibold)
+                    .foregroundColor(STheme.textBright)
+                audioHint
+                    .scaledFont(size: 12)
+                    .foregroundColor(audio.isAttachable ? STheme.hint : STheme.warn)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+            Spacer(minLength: 0)
+            SSwitch(isOn: $includeAudio)
+                .accessibilityLabel(Text("Include the audio"))
+                .disabled(!audio.isAttachable || sendStatus == .sending || sendStatus == .sent)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(STheme.advancedBg))
+    }
+
+    private var audioHint: Text {
+        audio.isAttachable ? Text("Sends the recording of this dictation along with the text.")
+                           : Text("Too large to attach (over 25 MB)")
+    }
+
+    private var sendTitle: LocalizedStringKey {
+        includeAudio ? "Send text and audio" : "Send text to developer"
+    }
+
+    private var sentTitle: LocalizedStringKey {
+        includeAudio ? "Text and audio sent" : "Text sent"
+    }
+
+    /// The settings and both transcripts, plus the audio when its switch is on. Offered after the
+    /// save, so the full local report is already safe whatever the network does.
     @ViewBuilder private var sendButton: some View {
         switch sendStatus {
         case .idle:
-            Button("Send text to developer", action: sendToDeveloper)
-                .buttonStyle(.sSecondary)
+            Button(sendTitle, action: sendToDeveloper)
+                .buttonStyle(.sPrimary)
+                .keyboardShortcut(.defaultAction)
         case .sending:
             Button("Sending…") {}
-                .buttonStyle(.sSecondary)
+                .buttonStyle(.sPrimary)
                 .disabled(true)
         case .sent:
-            Label("Text sent", systemImage: "checkmark")
+            Label(sentTitle, systemImage: "checkmark")
                 .scaledFont(size: 13, weight: .semibold)
                 .foregroundColor(STheme.ok)
         case .failed:
             Button("Couldn't send — retry", action: sendToDeveloper)
-                .buttonStyle(.sSecondary)
-                .foregroundColor(STheme.warn)
+                .buttonStyle(.sPrimary)
+                .keyboardShortcut(.defaultAction)
         }
     }
 }
