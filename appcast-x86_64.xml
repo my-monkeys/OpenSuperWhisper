@@ -5,6 +5,19 @@
     <description>Updates for OpenSuperWhisper — Intel (x86_64) builds</description>
     <language>en</language>
     <item>
+      <title>0.15.1</title>
+      <link>https://github.com/my-monkeys/OpenSuperWhisper/releases/tag/v0.15.1</link>
+      <sparkle:version>72</sparkle:version>
+      <sparkle:shortVersionString>0.15.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sun, 08 Nov 2026 13:05:18 +0000</pubDate>
+      <enclosure
+        url="https://github.com/my-monkeys/OpenSuperWhisper/releases/download/v0.15.1/OpenSuperWhisper-x86_64-0.15.1.dmg"
+        sparkle:edSignature="LmKSMUj3KzWsWD5+s2WeJFQAOE0Ah2l+tDHcUELIsTBMHvSZ3+NvSBXnlz0WiQVLVt0jGUQCZ7ZT/eX1kAo7DQ=="
+        length="29337367"
+        type="application/octet-stream" />
+    </item>
+    <item>
       <title>0.15.0</title>
       <link>https://github.com/my-monkeys/OpenSuperWhisper/releases/tag/v0.15.0</link>
       <sparkle:version>71</sparkle:version>
