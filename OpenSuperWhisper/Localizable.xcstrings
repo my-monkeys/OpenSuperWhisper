@@ -61906,6 +61906,52 @@
           }
         }
       }
+    },
+    "It stays on this Mac with the audio. Send it to the developer so it can be fixed, or export the whole report as a zip from Reports.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sie bleibt mit dem Audio auf diesem Mac. Schick sie an den Entwickler, damit der Fehler behoben werden kann, oder exportiere die ganze Meldung unter „Meldungen“ als ZIP."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se queda en este Mac con el audio. Envíalo al desarrollador para que pueda corregirse, o exporta el informe completo como zip desde Informes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il reste sur ce Mac avec l'audio. Envoyez-le au développeur pour que le problème soit corrigé, ou exportez le signalement complet en zip depuis Signalements."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resta su questo Mac con l'audio. Inviala allo sviluppatore perché il problema possa essere corretto, oppure esporta la segnalazione completa come zip da Segnalazioni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ele fica neste Mac com o áudio. Envie ao desenvolvedor para que o problema possa ser corrigido, ou exporte o relato completo como zip em Relatos."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Báo cáo được lưu trên máy Mac này cùng âm thanh. Hãy gửi cho nhà phát triển để lỗi được sửa, hoặc xuất toàn bộ báo cáo dạng zip từ mục Báo cáo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报告连同音频保存在这台 Mac 上。发送给开发者以便修复，或在“报告”中将完整报告导出为 zip。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -18,9 +18,10 @@ enum FeedbackPrompt {
     /// is a new name, and the note on the card says what it is about.
     static let campaign = "bug-hunt-2026-11"
 
-    /// How long the main window has to stay in front before the card opens: not the first thing
-    /// on screen, and not over a window someone has just brought up to do something else.
-    static let settleDelay: Duration = .seconds(4)
+    /// How long the main window has to stay in front before the card opens: long enough for the
+    /// window to finish appearing, so the card does not land on a half-drawn one. Four seconds
+    /// read as the app hesitating.
+    static let settleDelay: Duration = .seconds(1)
 
     struct Moment: Equatable {
         /// This campaign was asked before, or feedback was sent since it began.

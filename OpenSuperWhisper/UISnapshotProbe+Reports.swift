@@ -26,9 +26,9 @@ extension UISnapshotProbe {
             ReportCard.snapshotSaved = true
             return reportCard(stagedWord: true)
         },
-        "report-saved-audio": {
+        "report-saved-text-only": {
             ReportCard.snapshotSaved = true
-            ReportCard.snapshotIncludeAudio = true
+            ReportCard.snapshotIncludeAudio = false
             return reportCard(stagedWord: true)
         },
         "reports-list": { reportsList() },
@@ -44,7 +44,7 @@ extension UISnapshotProbe {
         FeedRow.snapshotShowsOriginals = false
         ReportCard.snapshotDraft = nil
         ReportCard.snapshotSaved = false
-        ReportCard.snapshotIncludeAudio = false
+        ReportCard.snapshotIncludeAudio = nil
     }
 
     /// The seeded dictation the cleanup changed, read back from the store.

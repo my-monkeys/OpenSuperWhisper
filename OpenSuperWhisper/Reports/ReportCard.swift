@@ -23,8 +23,10 @@ struct ReportCard: View {
     @State private var added: (wrong: String, right: String)?
     /// The one-tap text copy to the developer, offered after the local save.
     @State private var sendStatus: SendStatus = .idle
-    /// Whether the dictation's recording goes with the text. Off until the person switches it on.
-    @State private var includeAudio = false
+    /// Whether the dictation's recording goes with the text. On whenever the file can go: a
+    /// transcription report rarely reproduces without the audio it was made from, and the switch
+    /// is right above Send for whoever would rather keep it.
+    @State private var includeAudio: Bool
     /// Read once for the card: the audio's presence and size decide what the switch offers.
     @State private var audio: DictationAudioChoice
 
@@ -35,7 +37,7 @@ struct ReportCard: View {
     /// For the snapshot probe: a draft already filled in, or the card after Save.
     static var snapshotDraft: ReportDraft?
     static var snapshotSaved = false
-    static var snapshotIncludeAudio = false
+    static var snapshotIncludeAudio: Bool?
     #endif
 
     init(recording: Recording, dictionaryEnabled: Binding<Bool>,
@@ -49,11 +51,16 @@ struct ReportCard: View {
         #if DEBUG
         draft = Self.snapshotDraft ?? draft
         status = Self.snapshotSaved ? .saved : status
-        _includeAudio = State(initialValue: Self.snapshotIncludeAudio)
+        #endif
+        let audio = DictationAudioChoice.forRecording(recording)
+        var includeAudio = audio.isAttachable
+        #if DEBUG
+        includeAudio = Self.snapshotIncludeAudio ?? includeAudio
         #endif
         _draft = State(initialValue: draft)
         _status = State(initialValue: status)
-        _audio = State(initialValue: DictationAudioChoice.forRecording(recording))
+        _audio = State(initialValue: audio)
+        _includeAudio = State(initialValue: includeAudio)
     }
 
     var body: some View {
@@ -291,7 +298,7 @@ struct ReportCard: View {
                     Text("Report saved")
                         .scaledFont(size: 18, weight: .bold)
                         .foregroundColor(STheme.textBright)
-                    Text("It stays on this Mac with the audio. You can send the text to the developer below, or export the whole report as a zip from Reports.")
+                    Text("It stays on this Mac with the audio. Send it to the developer so it can be fixed, or export the whole report as a zip from Reports.")
                         .scaledFont(size: 13)
                         .foregroundColor(STheme.hint)
                         .fixedSize(horizontal: false, vertical: true)
@@ -303,14 +310,13 @@ struct ReportCard: View {
             if audio.eligibility != .noAudio {
                 audioRow
             }
+            // Sending is what the saved report is for, so it takes the primary place on the right.
+            // There is no Done beside it: the card closes from its ✕, Esc or a click outside.
             HStack(spacing: 10) {
-                sendButton
-                Spacer(minLength: 0)
                 Button("Show reports") { navigation.openReports() }
                     .buttonStyle(.sSecondary)
-                Button("Done", action: close)
-                    .buttonStyle(.sPrimary)
-                    .keyboardShortcut(.defaultAction)
+                Spacer(minLength: 0)
+                sendButton
             }
             .padding(.horizontal, 26).padding(.vertical, 16)
             .overlay(alignment: .top) { Rectangle().fill(STheme.border).frame(height: 1) }
@@ -318,7 +324,7 @@ struct ReportCard: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// The opt-in for the recording, under the saved message: off by default, disabled with its
+    /// Whether the recording goes too, under the saved message: on by default, disabled with its
     /// reason when the file is over what the endpoint takes.
     private var audioRow: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -361,10 +367,11 @@ struct ReportCard: View {
         switch sendStatus {
         case .idle:
             Button(sendTitle, action: sendToDeveloper)
-                .buttonStyle(.sSecondary)
+                .buttonStyle(.sPrimary)
+                .keyboardShortcut(.defaultAction)
         case .sending:
             Button("Sending…") {}
-                .buttonStyle(.sSecondary)
+                .buttonStyle(.sPrimary)
                 .disabled(true)
         case .sent:
             Label(sentTitle, systemImage: "checkmark")
@@ -372,8 +379,8 @@ struct ReportCard: View {
                 .foregroundColor(STheme.ok)
         case .failed:
             Button("Couldn't send — retry", action: sendToDeveloper)
-                .buttonStyle(.sSecondary)
-                .foregroundColor(STheme.warn)
+                .buttonStyle(.sPrimary)
+                .keyboardShortcut(.defaultAction)
         }
     }
 }
