@@ -8,8 +8,8 @@ import SwiftUI
 import OpenSuperWhisperCore
 
 extension KeyboardShortcuts.Name {
-    static let toggleRecord = Self("toggleRecord", default: .init(.backtick, modifiers: .option))
-    static let escape = Self("escape", default: .init(.escape))
+    static let toggleRecord = Self("toggleRecord", initial: .init(.backtick, modifiers: .option))
+    static let escape = Self("escape", initial: .init(.escape))
     /// Re-pastes the last transcription. Deliberately unbound by default — it is opt-in, and
     /// claiming a global combination for every user isn't ours to do. ⌃⌘V is a natural pick: it
     /// sits next to ⌘V without colliding with it or with paste-and-match-style (⌥⇧⌘V).
@@ -33,6 +33,9 @@ extension KeyboardShortcuts.Name {
     static let recordTriggerSlotLimit = 16
 }
 
+// KeyboardShortcuts 3 makes its whole API main-actor isolated, and every caller here is the
+// app's own UI or the event tap, which already run on the main thread.
+@MainActor
 class ShortcutManager {
     static let shared = ShortcutManager()
 
@@ -54,7 +57,7 @@ class ShortcutManager {
     /// A latch landing sooner than this after the recording started would put its chime on top of
     /// the recording-start one — two beeps that read as a stutter, not as two events. Comfortably
     /// wider than the double-tap window, which is the case that produces it.
-    static let latchSoundQuietWindow: TimeInterval = 0.6
+    nonisolated static let latchSoundQuietWindow: TimeInterval = 0.6
 
     private init() {
         print("ShortcutManager init")
@@ -155,11 +158,11 @@ class ShortcutManager {
     /// under `AudioRecorder.minimumUsableDuration`, which is dropped without a word, so the bubble
     /// opened and closed while the user went on talking into nothing (#220). That take carries on
     /// as a toggle instead. A hold-only trigger always ends on release, as its name says.
-    static func releaseEndsTake(heldFor: TimeInterval, holdOnly: Bool) -> Bool {
+    nonisolated static func releaseEndsTake(heldFor: TimeInterval, holdOnly: Bool) -> Bool {
         holdOnly || heldFor >= AudioRecorder.minimumUsableDuration
     }
 
-    static func isDoubleTap(now: TimeInterval, previous: TimeInterval, threshold: TimeInterval) -> Bool {
+    nonisolated static func isDoubleTap(now: TimeInterval, previous: TimeInterval, threshold: TimeInterval) -> Bool {
         now - previous < threshold
     }
 
@@ -170,7 +173,7 @@ class ShortcutManager {
     /// as confirmation of a second thing. Latching later — the hold-then-Space case, where the
     /// recording has been running a while and you may not be looking at the indicator — is exactly
     /// when the sound earns its place.
-    static func shouldPlayLatchSound(sinceRecordingStart: TimeInterval,
+    nonisolated static func shouldPlayLatchSound(sinceRecordingStart: TimeInterval,
                                      quietWindow: TimeInterval = latchSoundQuietWindow) -> Bool {
         sinceRecordingStart >= quietWindow
     }

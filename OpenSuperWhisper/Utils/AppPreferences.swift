@@ -73,12 +73,22 @@ final class AppPreferences {
         // real domain: every test process would start with their binding. Tests get what a fresh
         // install gets.
         let legacyShortcut = DefaultsStore.isRunningTests
-            ? KeyboardShortcuts.Name.toggleRecord.defaultShortcut
-            : KeyboardShortcuts.getShortcut(for: .toggleRecord)
+            ? KeyboardShortcuts.Name.toggleRecord.initialShortcut
+            : Self.storedShortcut(for: .toggleRecord)
         recordingTriggers = RecordingTriggerSet.migrated(
             mouseRaw: mouseButtonHotkey,
             modifierRaw: modifierOnlyHotkey,
             shortcut: legacyShortcut).json
+    }
+
+    /// The shortcut KeyboardShortcuts keeps for `name`, read the way it stores it: a JSON-encoded
+    /// shortcut under "KeyboardShortcuts_<name>", or `false` once the user cleared it. Read here
+    /// rather than through `KeyboardShortcuts.getShortcut`, which version 3 confines to the main
+    /// actor, because the preferences can be first touched off it.
+    static func storedShortcut(for name: KeyboardShortcuts.Name) -> KeyboardShortcuts.Shortcut? {
+        guard let json = UserDefaults.standard.string(forKey: "KeyboardShortcuts_\(name.rawValue)"),
+              let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(KeyboardShortcuts.Shortcut.self, from: data)
     }
 
     /// Onboarding's Right ⌥ choice is the list's job now. It used to land only in the old
