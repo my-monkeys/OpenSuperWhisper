@@ -1,8 +1,8 @@
 diff --git a/Sources/FluidAudio/ASR/Parakeet/SlidingWindow/CustomVocabulary/Rescorer/VocabularyRescorer+TokenRescoring.swift b/Sources/FluidAudio/ASR/Parakeet/SlidingWindow/CustomVocabulary/Rescorer/VocabularyRescorer+TokenRescoring.swift
-index b234679a..abf10179 100644
+index f9d14948..5397cfea 100644
 --- a/Sources/FluidAudio/ASR/Parakeet/SlidingWindow/CustomVocabulary/Rescorer/VocabularyRescorer+TokenRescoring.swift
 +++ b/Sources/FluidAudio/ASR/Parakeet/SlidingWindow/CustomVocabulary/Rescorer/VocabularyRescorer+TokenRescoring.swift
-@@ -281,7 +281,7 @@ extension VocabularyRescorer {
+@@ -285,7 +285,7 @@ extension VocabularyRescorer {
                  return aBucket > bBucket
              }
              if a.candidate.spanLength != b.candidate.spanLength {
