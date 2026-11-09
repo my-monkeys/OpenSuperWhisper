@@ -60,7 +60,7 @@ struct IndicatorElementView: View {
             button(symbol: "stop.circle", size: 19,
                    help: isDecoding ? "Already stopped" : "Finish recording",
                    enabled: !isDecoding) {
-                IndicatorWindowManager.shared.stopRecording()
+                ShortcutManager.shared.stopTakeFromBubble()
             }
         case .liveText:
             // Drawn by the bubble itself, beside or in place of the label, not as a row element.

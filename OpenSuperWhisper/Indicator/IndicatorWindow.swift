@@ -288,6 +288,9 @@ class IndicatorViewModel: ObservableObject {
     }
 
     func startDecoding() {
+        // A second stop on a take that is already transcribing has nothing left to stop; it
+        // would find the recorder empty and report the dictation as lost.
+        guard state != .decoding else { return }
         // The stop press is the origin of the whole measurement (#262), so it is taken on the
         // first line: everything below it — cancel-confirmation reset, the live-preview hand-off,
         // the agent-reply disarm — is time the user waits after letting go.
@@ -686,7 +689,7 @@ struct IndicatorWindow: View {
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 } action: {
-                    IndicatorWindowManager.shared.stopRecording()
+                    ShortcutManager.shared.stopTakeFromBubble()
                 } help: {
                     "Finish recording"
                 }
@@ -833,7 +836,7 @@ struct IndicatorWindow: View {
             // would animate the content apart from the glass.
             visible: viewModel.isVisible,
             countdown: viewModel.isConfirmingCancel ? IndicatorViewModel.cancelConfirmationWindow : nil,
-            onStop: layout.contains(.stopButton) ? { IndicatorWindowManager.shared.stopRecording() } : nil,
+            onStop: layout.contains(.stopButton) ? { ShortcutManager.shared.stopTakeFromBubble() } : nil,
             // Recording: discard the take. Transcribing: throw the transcription away, as the
             // legacy cancel does — changing your mind while a slow model works is the point.
             onCancel: layout.contains(.cancelButton) ? {

@@ -36,7 +36,8 @@ extension KeyboardShortcuts.Name {
 class ShortcutManager {
     static let shared = ShortcutManager()
 
-    private var activeVm: IndicatorViewModel?
+    /// The take the trigger keys control. Internal so tests can stand one up.
+    var activeVm: IndicatorViewModel?
     private var holdWorkItem: DispatchWorkItem?
     private let holdThreshold: TimeInterval = 0.3
     private var holdMode = false
@@ -56,7 +57,7 @@ class ShortcutManager {
     /// wider than the double-tap window, which is the case that produces it.
     static let latchSoundQuietWindow: TimeInterval = 0.6
 
-    private init() {
+    init() {
         print("ShortcutManager init")
         // A test host would grab the hotkeys the daily app holds and rewrite the user's bindings
         // in UserDefaults.standard, which KeyboardShortcuts always uses. Checked here rather than
@@ -121,9 +122,7 @@ class ShortcutManager {
         Task { @MainActor in
             guard self.activeVm != nil else { return }
             if self.latched {
-                IndicatorWindowManager.shared.stopRecording()
-                self.activeVm = nil
-                LatchKeyMonitor.shared.stop()
+                self.endTake()
             } else {
                 self.enterLatch()
             }
@@ -222,18 +221,27 @@ class ShortcutManager {
         }
 
         KeyboardShortcuts.onKeyUp(for: .escape) { [weak self] in
-            Task { @MainActor in
-                // requestCancel() discards immediately for short recordings, but a long
-                // one arms a confirmation and returns false — leave activeVm set so the
-                // next Esc (within the window) confirms the cancel.
-                if self?.activeVm != nil, IndicatorWindowManager.shared.requestCancel() {
-                    self?.activeVm = nil
-                }
-            }
+            Task { @MainActor in self?.handleEscape() }
         }
         KeyboardShortcuts.disable(.escape)
     }
     
+    /// Esc cancels the take that is recording, or else the one the bubble is still transcribing:
+    /// stopping clears `activeVm`, so the transcribing case has to be asked of the bubble, as
+    /// the cancel button does.
+    @MainActor func handleEscape() {
+        if activeVm != nil {
+            // requestCancel() discards immediately for short recordings, but a long one arms a
+            // confirmation and returns false — leave activeVm set so the next Esc (within the
+            // window) confirms the cancel.
+            if IndicatorWindowManager.shared.requestCancel() {
+                activeVm = nil
+            }
+        } else {
+            IndicatorWindowManager.shared.discardDecoding()
+        }
+    }
+
     private func setupRecordingTrigger() {
         // Tears down and re-installs event taps on the main thread: logged, so a slow re-arm
         // shows up in the diagnostics rather than as a vague stutter.
@@ -370,12 +378,29 @@ class ShortcutManager {
             // Nothing to end: these have no meaning outside a recording.
             guard let vm = self.activeVm else { return }
             if submit { vm.submitAfterInsert = true }
-            self.holdWorkItem?.cancel()
-            self.holdWorkItem = nil
-            self.holdMode = false
-            IndicatorWindowManager.shared.stopRecording()
-            self.activeVm = nil
+            self.endTake()
         }
+    }
+
+    /// The bubble's own stop button. It used to reach the view model directly and leave
+    /// `activeVm` set until the bubble hid, so the next trigger press took the stop branch on a
+    /// take that was already transcribing and reported it as lost. Ignored when no take is
+    /// running: the bubble may only be showing the transcription of one that already ended.
+    @MainActor func stopTakeFromBubble() {
+        guard activeVm != nil else { return }
+        endTake()
+    }
+
+    /// The one way a running take ends. Every stop path clears the same state here, so a press
+    /// that follows starts a fresh recording instead of stopping the old one a second time.
+    @MainActor private func endTake() {
+        holdWorkItem?.cancel()
+        holdWorkItem = nil
+        holdMode = false
+        latched = false
+        IndicatorWindowManager.shared.stopRecording()
+        activeVm = nil
+        LatchKeyMonitor.shared.stop()
     }
 
     /// `holdOnly` is for the hold-only triggers: the recording lasts exactly as long as the key
@@ -429,10 +454,7 @@ class ShortcutManager {
                 // never reached the app, which is a different bug from one that reached it and
                 // did nothing.
                 Diag.mark("keyDown → stop recording")
-                IndicatorWindowManager.shared.stopRecording()
-                self.activeVm = nil
-                self.holdMode = false
-                LatchKeyMonitor.shared.stop()
+                self.endTake()
             }
         }
         
@@ -467,10 +489,7 @@ class ShortcutManager {
                 return
             }
             Diag.mark("keyUp → stop recording (hold)")
-            IndicatorWindowManager.shared.stopRecording()
-            self.activeVm = nil
-            LatchKeyMonitor.shared.stop()
-            self.holdMode = false
+            self.endTake()
         }
     }
 }
