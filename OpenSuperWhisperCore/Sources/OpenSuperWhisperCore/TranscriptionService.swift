@@ -60,6 +60,14 @@ public class TranscriptionService: ObservableObject {
     private var lastEngineLoadMs: Int?
     private var transcriptionTask: Task<String, Error>? = nil
     private var isCancelled = false
+
+    /// Runs inside `transcribeAudio`, by the operation id their caller chose, so a cancel can tell
+    /// its own run from someone else's: `open` is every run in the call (waiting for the gate
+    /// included), `active` the one holding it, `cancelled` the open ones whose caller gave up.
+    /// An id is only ever remembered while its run is open, so none outlives it.
+    private var openOperations: Set<UUID> = []
+    private var cancelledOperations: Set<UUID> = []
+    private(set) var activeOperation: UUID?
     
     init(engineBuilder: @escaping (EngineKind) async -> TranscriptionEngine = TranscriptionService.buildEngine) {
         self.engineBuilder = engineBuilder
@@ -69,7 +77,17 @@ public class TranscriptionService: ObservableObject {
         // transcribe with that engine.
     }
 
-    public func cancelTranscription() {
+    /// Cancels the run that belongs to `operation` and nothing else. Whatever holds the engine
+    /// gate when that run is still waiting for it is somebody else's transcription, and aborting
+    /// it made that caller fail (and, for a dictation, retry) for a cancel that was not its own.
+    /// A run still waiting for the gate ends as soon as it gets it, without touching the engine.
+    public func cancelTranscription(operation: UUID) {
+        guard openOperations.contains(operation) else { return }
+        cancelledOperations.insert(operation)
+        if activeOperation == operation { abortActiveRun() }
+    }
+
+    private func abortActiveRun() {
         isCancelled = true
         currentEngine?.cancelTranscription()
         transcriptionTask?.cancel()
@@ -263,14 +281,25 @@ public class TranscriptionService: ObservableObject {
         }
     }
     
-    public func transcribeAudio(url: URL, settings: TranscriptionSettings, modelOverride: DictationModelOption? = nil) async throws -> String {
+    /// `operation` names this run for `cancelTranscription(operation:)`.
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings, modelOverride: DictationModelOption? = nil,
+                                operation: UUID = UUID()) async throws -> String {
         // Serialize every transcription across the app (dictation pipeline, file-drop queue,
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
         // would crash or corrupt output. (parallel-recording #2)
+        openOperations.insert(operation)
+        defer {
+            openOperations.remove(operation)
+            cancelledOperations.remove(operation)
+        }
         let gateStart = uptime()
         await Self.engineGate.wait()
         let engineWaitMs = UptimeClock.milliseconds(from: gateStart, to: uptime())
+        if cancelledOperations.contains(operation) || Task.isCancelled {
+            await Self.engineGate.signal()
+            throw CancellationError()
+        }
         // Apply a per-call model INSIDE the gate — the clip was recorded under this model, but a
         // later recording may since have switched the global one — so it can't leak to a concurrent
         // caller, and restore it before releasing. No-op when nil or already active. (#model-snapshot)
@@ -279,6 +308,8 @@ public class TranscriptionService: ObservableObject {
             restoreModel()
             Task { await Self.engineGate.signal() }
         }
+        activeOperation = operation
+        defer { activeOperation = nil }
 
         await MainActor.run {
             self.progress = 0.0
@@ -368,6 +399,10 @@ public class TranscriptionService: ObservableObject {
     /// off the main actor, and honor cancellation. Any engine error propagates so the
     /// caller (`transcribe`) can decide whether to fall back.
     private func runOnEngine(_ engine: TranscriptionEngine, url: URL, settings: TranscriptionSettings) async throws -> String {
+        // The cancel can land while the engine is still loading, before there is a task to abort.
+        if let activeOperation, cancelledOperations.contains(activeOperation) {
+            throw CancellationError()
+        }
         if let whisperEngine = engine as? WhisperEngine {
             whisperEngine.onProgressUpdate = { [weak self] newProgress in
                 Task { @MainActor in
@@ -427,10 +462,12 @@ public class TranscriptionService: ObservableObject {
         do {
             return try await task.value
         } catch is CancellationError {
+            // A cancel is not a failure: callers tell the two apart, and a dictation the user
+            // threw away must not be saved as one that failed.
             await MainActor.run {
                 self.isCancelled = true
             }
-            throw TranscriptionError.processingFailed
+            throw CancellationError()
         }
     }
 
