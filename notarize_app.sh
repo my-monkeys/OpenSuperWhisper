@@ -205,4 +205,22 @@ codesign --sign "${CODE_SIGN_IDENTITY}" "${DMG_NAME}.dmg"
 xcrun notarytool submit "${DMG_NAME}.dmg" --wait ${NOTARY_AUTH}
 xcrun stapler staple "${DMG_NAME}.dmg"
 
+# Keep the dSYM of the binary that just shipped, outside build/. The next run starts with
+# rm -rf build, so in a two-arch release the x86_64 pass deleted the arm64 dSYM: 0.15.1's was
+# lost that way, and a crash report from that build can now only be read through the exported
+# symbols. Codesigning leaves LC_UUID alone, so the UUIDs must still match here.
+DSYM_PATH="${APP_PATH}.dSYM"
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${APP_PATH}/Contents/Info.plist")
+DSYM_DIR="${DSYM_ARCHIVE:-$HOME/osw-dsyms}/${VERSION}/${ARCH}"
+APP_UUID=$(dwarfdump --uuid --arch="${ARCH}" "${APP_PATH}/Contents/MacOS/${APP_NAME}" | awk '{print $2}')
+DSYM_UUID=$(dwarfdump --uuid --arch="${ARCH}" "${DSYM_PATH}" | awk '{print $2}')
+if [ -z "${APP_UUID}" ] || [ "${APP_UUID}" != "${DSYM_UUID}" ]; then
+  echo "❌ The dSYM does not match the app binary (app ${APP_UUID:-none}, dSYM ${DSYM_UUID:-none})."
+  exit 1
+fi
+rm -rf "${DSYM_DIR}"
+mkdir -p "${DSYM_DIR}"
+ditto "${DSYM_PATH}" "${DSYM_DIR}/${APP_NAME}.app.dSYM"
+echo "dSYM ${APP_UUID} archived in ${DSYM_DIR}"
+
 echo "Successfully notarized ${APP_NAME} (${ARCH}) → ${DMG_NAME}.dmg"
