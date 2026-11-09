@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Carbon
+import Combine
 import Cocoa
 import Foundation
 import KeyboardShortcuts
@@ -36,6 +37,11 @@ extension KeyboardShortcuts.Name {
 class ShortcutManager {
     static let shared = ShortcutManager()
 
+    /// Watches the two permissions the modifier and mouse triggers need, so granting one arms
+    /// them without a relaunch. Held here because nothing else keeps a manager alive for the
+    /// life of the app.
+    private var triggerPermissions: PermissionsManager?
+    private var permissionSubscription: AnyCancellable?
     /// The take the trigger keys control. Internal so tests can stand one up.
     var activeVm: IndicatorViewModel?
     private var holdWorkItem: DispatchWorkItem?
@@ -66,6 +72,12 @@ class ShortcutManager {
 
         setupKeyboardShortcuts()
         setupRecordingTrigger()
+        let permissions = PermissionsManager()
+        triggerPermissions = permissions
+        rearmTriggers(onChangeOf: permissions.$isAccessibilityPermissionGranted
+            .combineLatest(permissions.$isInputMonitoringPermissionGranted)
+            .map { TriggerPermissions(accessibility: $0, inputMonitoring: $1) }
+            .eraseToAnyPublisher()) { [weak self] in self?.setupRecordingTrigger() }
 
         // The latch tap itself is started per recording (see startLatchTapIfEnabled);
         // only the callback is wired up front.
@@ -88,6 +100,23 @@ class ShortcutManager {
         )
     }
     
+    struct TriggerPermissions: Equatable {
+        let accessibility: Bool
+        let inputMonitoring: Bool
+    }
+
+    /// Triggers are armed at launch and on a settings change only, and an event tap that cannot
+    /// be created without its permission just logs and stays off. Re-arming on a change, in
+    /// either direction, is what makes a grant take effect now. The first value is the state at
+    /// launch, which the launch arming already covered.
+    func rearmTriggers(onChangeOf permissions: AnyPublisher<TriggerPermissions, Never>,
+                       rearm: @escaping () -> Void) {
+        permissionSubscription = permissions
+            .removeDuplicates()
+            .dropFirst()
+            .sink { _ in rearm() }
+    }
+
     @objc private func indicatorWindowDidHide() {
         activeVm = nil
         holdMode = false
