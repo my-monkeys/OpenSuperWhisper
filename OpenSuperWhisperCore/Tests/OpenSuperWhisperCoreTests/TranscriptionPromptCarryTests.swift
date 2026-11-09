@@ -3,7 +3,7 @@ import XCTest
 
 /// Carrying the prompt into later windows is only worth it while the rolling history still fits
 /// beside it. Whisper's text context is 448 tokens, of which a window's prompt may use half.
-final class TranscriptionPromptCarryTests: XCTestCase {
+final class TranscriptionPromptCarryTests: CoreTestCase {
 
     private let whisperTextContext = 448
 

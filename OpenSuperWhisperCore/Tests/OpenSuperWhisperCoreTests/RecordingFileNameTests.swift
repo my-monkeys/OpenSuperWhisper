@@ -1,7 +1,7 @@
 import XCTest
 @testable import OpenSuperWhisperCore
 
-final class RecordingFileNameTests: XCTestCase {
+final class RecordingFileNameTests: CoreTestCase {
 
     private let second = Date(timeIntervalSince1970: 1_760_000_000)
 
