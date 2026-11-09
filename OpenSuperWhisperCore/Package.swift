@@ -19,7 +19,7 @@ let package = Package(
     dependencies: [
         // Same URL and requirement as the app's project, so the workspace resolves one checkout
         // and run.sh keeps patching it.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.5"),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.3"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.5.0"),
     ],
     targets: [
