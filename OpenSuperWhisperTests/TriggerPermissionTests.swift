@@ -10,6 +10,7 @@ import Combine
 import XCTest
 @testable import OpenSuperWhisper
 
+@MainActor
 final class TriggerPermissionTests: XCTestCase {
 
     private typealias Permissions = ShortcutManager.TriggerPermissions

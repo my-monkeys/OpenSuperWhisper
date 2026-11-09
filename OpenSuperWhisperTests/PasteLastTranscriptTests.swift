@@ -100,6 +100,6 @@ final class PasteLastTranscriptTests: XCTestCase {
     func testShortcutIsUnboundByDefault() {
         // Opt-in: the feature must not claim a global combination on upgrade. Users assign one in
         // Settings > Shortcuts.
-        XCTAssertNil(KeyboardShortcuts.Name.pasteLastTranscription.defaultShortcut)
+        XCTAssertNil(KeyboardShortcuts.Name.pasteLastTranscription.initialShortcut)
     }
 }

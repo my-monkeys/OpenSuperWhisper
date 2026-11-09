@@ -55,7 +55,7 @@ extension UISnapshotProbe {
                                    textScale: Double = TextScale.default) -> AnyView {
         PermissionsManager.snapshotGrantsAll = true
         // A fresh install's list, whatever the previous screen of the run recorded.
-        let fresh = KeyboardShortcuts.Name.toggleRecord.defaultShortcut.map { RecordingTrigger.keyCombo($0) }
+        let fresh = KeyboardShortcuts.Name.toggleRecord.initialShortcut.map { RecordingTrigger.keyCombo($0) }
         AppPreferences.shared.recordingTriggers = RecordingTriggerSet(triggers: fresh.map { [$0] } ?? []).json
         AppPreferences.shared.modifierOnlyHotkey = ModifierKey.none.rawValue
         let language = ProcessInfo.processInfo.environment["OSW_SNAPSHOT_LOCALE"] ?? "en"

@@ -200,6 +200,12 @@ class SettingsViewModel: ObservableObject {
         EngineCapabilities.supportsFieldContext(engine: selectedEngine)
     }
 
+    /// Whether the selected engine reads the instructions box at all. Disabled otherwise, with
+    /// the reason, for the same reason as `canUseFieldContext`.
+    var canUsePrompt: Bool {
+        EngineCapabilities.readsPrompt(engine: selectedEngine)
+    }
+
     /// Languages the selected engine+model can transcribe — filters the language picker (#155).
     var supportedLanguages: [String] {
         EngineCapabilities.supportedLanguages(engine: selectedEngine, fluidAudioModelVersion: fluidAudioModelVersion)
