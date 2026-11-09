@@ -62228,6 +62228,558 @@
           }
         }
       }
+    },
+    "Diagnostics": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnose"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnóstico"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostica"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnóstico"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chẩn đoán"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断"
+          }
+        }
+      }
+    },
+    "Send crash reports": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Absturzberichte senden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar informes de fallos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoyer les rapports de plantage"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia rapporti sugli arresti anomali"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar relatórios de falhas"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi báo cáo sự cố"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送崩溃报告"
+          }
+        }
+      }
+    },
+    "Ask each time": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jedes Mal fragen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preguntar cada vez"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demander à chaque fois"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiedi ogni volta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perguntar sempre"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hỏi mỗi lần"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每次询问"
+          }
+        }
+      }
+    },
+    "Send automatically": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch senden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar automáticamente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoyer automatiquement"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia automaticamente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar automaticamente"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tự động gửi"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动发送"
+          }
+        }
+      }
+    },
+    "Never send": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie senden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No enviar nunca"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne jamais envoyer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non inviare mai"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nunca enviar"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không bao giờ gửi"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从不发送"
+          }
+        }
+      }
+    },
+    "After a crash, OpenSuperWhisper asks before sending. A report says where the app stopped, its version and your macOS version. It never includes your dictations, your audio or your clipboard.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nach einem Absturz fragt OpenSuperWhisper dich, bevor etwas gesendet wird. Ein Bericht nennt die Stelle, an der die App angehalten hat, ihre Version und deine macOS-Version. Er enthält nie deine Diktate, dein Audio oder deine Zwischenablage."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tras un fallo, OpenSuperWhisper te pregunta antes de enviar nada. Un informe indica dónde se detuvo la app, su versión y tu versión de macOS. Nunca incluye tus dictados, tu audio ni tu portapapeles."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Après un plantage, OpenSuperWhisper vous demande avant d'envoyer quoi que ce soit. Un rapport indique où l'app s'est arrêtée, sa version et votre version de macOS. Il ne contient jamais vos dictées, votre audio ni votre presse-papiers."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dopo un arresto anomalo, OpenSuperWhisper ti chiede conferma prima di inviare. Un rapporto indica dove si è fermata l'app, la sua versione e la tua versione di macOS. Non contiene mai le tue dettature, il tuo audio o i tuoi appunti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Após uma falha, o OpenSuperWhisper pergunta antes de enviar. Um relatório informa onde o app parou, a versão dele e a sua versão do macOS. Ele nunca inclui seus ditados, seu áudio ou sua área de transferência."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sau khi gặp sự cố, OpenSuperWhisper sẽ hỏi bạn trước khi gửi. Báo cáo cho biết ứng dụng dừng ở đâu, phiên bản ứng dụng và phiên bản macOS của bạn. Báo cáo không bao giờ chứa nội dung đọc chính tả, âm thanh hay bảng nhớ tạm của bạn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发生崩溃后，OpenSuperWhisper 会先询问你再发送。报告包含应用停止的位置、应用版本和你的 macOS 版本，绝不包含你的听写内容、音频或剪贴板。"
+          }
+        }
+      }
+    },
+    "After a crash, a report is sent without asking. It says where the app stopped, its version and your macOS version, and never your dictations, your audio or your clipboard.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nach einem Absturz wird ein Bericht ohne Nachfrage gesendet. Er nennt die Stelle, an der die App angehalten hat, ihre Version und deine macOS-Version, aber nie deine Diktate, dein Audio oder deine Zwischenablage."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tras un fallo, se envía un informe sin preguntar. Indica dónde se detuvo la app, su versión y tu versión de macOS, y nunca tus dictados, tu audio ni tu portapapeles."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Après un plantage, un rapport est envoyé sans vous demander. Il indique où l'app s'est arrêtée, sa version et votre version de macOS, jamais vos dictées, votre audio ni votre presse-papiers."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dopo un arresto anomalo, un rapporto viene inviato senza chiedere. Indica dove si è fermata l'app, la sua versione e la tua versione di macOS, mai le tue dettature, il tuo audio o i tuoi appunti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Após uma falha, um relatório é enviado sem perguntar. Ele informa onde o app parou, a versão dele e a sua versão do macOS, e nunca seus ditados, seu áudio ou sua área de transferência."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sau khi gặp sự cố, báo cáo sẽ được gửi mà không hỏi. Báo cáo cho biết ứng dụng dừng ở đâu, phiên bản ứng dụng và phiên bản macOS của bạn, không bao giờ chứa nội dung đọc chính tả, âm thanh hay bảng nhớ tạm của bạn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发生崩溃后，报告会直接发送，不再询问。报告包含应用停止的位置、应用版本和你的 macOS 版本，绝不包含你的听写内容、音频或剪贴板。"
+          }
+        }
+      }
+    },
+    "Crashes are never reported.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abstürze werden nie gemeldet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los fallos nunca se notifican."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les plantages ne sont jamais signalés."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gli arresti anomali non vengono mai segnalati."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As falhas nunca são relatadas."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sự cố sẽ không bao giờ được báo cáo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从不报告崩溃。"
+          }
+        }
+      }
+    },
+    "OpenSuperWhisper closed unexpectedly": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper wurde unerwartet beendet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper se cerró inesperadamente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper s'est fermé de façon inattendue"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper si è chiuso inaspettatamente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O OpenSuperWhisper fechou inesperadamente"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper đã đóng đột ngột"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenSuperWhisper 意外退出"
+          }
+        }
+      }
+    },
+    "Send a report so this gets fixed? It contains where the app stopped, its version and your macOS version. It does not contain your dictations, your audio or your clipboard.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einen Bericht senden, damit das behoben wird? Er enthält die Stelle, an der die App angehalten hat, ihre Version und deine macOS-Version. Er enthält nicht deine Diktate, dein Audio oder deine Zwischenablage."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Enviar un informe para que se corrija? Contiene dónde se detuvo la app, su versión y tu versión de macOS. No contiene tus dictados, tu audio ni tu portapapeles."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoyer un rapport pour que ce soit corrigé ? Il contient l'endroit où l'app s'est arrêtée, sa version et votre version de macOS. Il ne contient pas vos dictées, votre audio ni votre presse-papiers."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviare un rapporto per far correggere il problema? Contiene il punto in cui l'app si è fermata, la sua versione e la tua versione di macOS. Non contiene le tue dettature, il tuo audio o i tuoi appunti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar um relatório para que isso seja corrigido? Ele contém onde o app parou, a versão dele e a sua versão do macOS. Ele não contém seus ditados, seu áudio ou sua área de transferência."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi báo cáo để lỗi này được khắc phục? Báo cáo chứa vị trí ứng dụng dừng, phiên bản ứng dụng và phiên bản macOS của bạn. Báo cáo không chứa nội dung đọc chính tả, âm thanh hay bảng nhớ tạm của bạn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送报告以便修复此问题？报告包含应用停止的位置、应用版本和你的 macOS 版本，不包含你的听写内容、音频或剪贴板。"
+          }
+        }
+      }
+    },
+    "Send Report": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bericht senden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar informe"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoyer le rapport"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia rapporto"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviar relatório"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi báo cáo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送报告"
+          }
+        }
+      }
+    },
+    "Never Send": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie senden"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No enviar nunca"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne jamais envoyer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non inviare mai"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nunca enviar"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không bao giờ gửi"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从不发送"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

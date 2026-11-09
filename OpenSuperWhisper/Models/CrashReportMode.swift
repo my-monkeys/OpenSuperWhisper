@@ -30,12 +30,4 @@ enum CrashReportMode: String, Codable, CaseIterable, Identifiable {
         case .off: return "Never send"
         }
     }
-
-    var subtitle: String {
-        switch self {
-        case .ask: return "Show what a crash report contains, then let you choose."
-        case .auto: return "Send a crash report on the next launch without asking."
-        case .off: return "Keep and send nothing."
-        }
-    }
 }
