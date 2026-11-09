@@ -42,7 +42,7 @@ let package = Package(
         ),
         // Core tests (docs/core-extraction.md, slice 5). Built and run only through the project's
         // OpenSuperWhisperCoreTests scheme with -clonedSourcePackagesDirPath SourcePackages, so they
-        // use the workspace pins and run.sh's patched FluidAudio.
+        // use the workspace pins and run.sh's package checkouts.
         .testTarget(
             name: "OpenSuperWhisperCoreTests",
             dependencies: ["OpenSuperWhisperCore",

@@ -90,7 +90,7 @@ jobs:
           key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('Scripts/build-native.sh', 'Scripts/fetch-sherpa.sh', 'libwhisper/CMakeLists.txt') }}
       - name: Build with run.sh
         run: ./run.sh build
-      # Serial, on run.sh's derived data, its patched FluidAudio checkout and the core's
+      # Serial, on run.sh's derived data, its package checkouts and the core's
       # xcframeworks it built or restored from the cache above. Only
       # KeyboardLayoutProviderTests is skipped here, because it switches the system keyboard
       # layout; tests that need a Bluetooth microphone or a notched screen skip themselves.
@@ -185,7 +185,7 @@ jobs:
         with:
           path: OpenSuperWhisperCore/Binaries
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
-      # Resolves SourcePackages, patches FluidAudio, and shows the app still builds.
+      # Resolves SourcePackages and shows the app still builds.
       - name: Build with run.sh
         timeout-minutes: 30
         run: ./run.sh build
