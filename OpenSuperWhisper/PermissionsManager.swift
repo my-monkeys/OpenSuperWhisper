@@ -10,6 +10,7 @@ enum Permission {
 class PermissionsManager: ObservableObject {
     @Published var isMicrophonePermissionGranted = false
     @Published var isAccessibilityPermissionGranted = false
+    @Published var isInputMonitoringPermissionGranted = false
 
     private var permissionCheckTimer: Timer?
     private var windowObservers: [NSObjectProtocol] = []
@@ -17,6 +18,7 @@ class PermissionsManager: ObservableObject {
     init() {
         checkMicrophonePermission()
         checkAccessibilityPermission()
+        checkInputMonitoringPermission()
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -73,6 +75,7 @@ class PermissionsManager: ObservableObject {
         permissionCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.checkMicrophonePermission()
             self?.checkAccessibilityPermission()
+            self?.checkInputMonitoringPermission()
         }
     }
 
@@ -123,6 +126,19 @@ class PermissionsManager: ObservableObject {
         #endif
         DispatchQueue.main.async { [weak self] in
             self?.isAccessibilityPermissionGranted = granted
+        }
+    }
+
+    func checkInputMonitoringPermission() {
+        #if DEBUG
+        if Self.snapshotGrantsAll {
+            DispatchQueue.main.async { [weak self] in self?.isInputMonitoringPermissionGranted = true }
+            return
+        }
+        #endif
+        let granted = CGPreflightListenEventAccess()
+        DispatchQueue.main.async { [weak self] in
+            self?.isInputMonitoringPermissionGranted = granted
         }
     }
 

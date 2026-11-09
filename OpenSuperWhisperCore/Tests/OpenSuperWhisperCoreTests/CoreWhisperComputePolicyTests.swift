@@ -35,7 +35,12 @@ final class CoreWhisperComputePolicyTests: CoreTestCase {
     }
 
     /// No gate: the one whisper inference CI runs, on macOS and on the simulator, on the CPU.
+    ///
+    /// On the iOS Simulator of a shared GitHub runner this pass went past CI's five-minute
+    /// default four times in early November 2026, each time finishing on a rerun: slow, not
+    /// stuck. It gets ten minutes; a real hang still fails.
     func testCPUOnlyTranscribesJFK() async throws {
+        executionTimeAllowance = 600
         let text = try await transcribe(Fixtures.jfkWav, policy: .cpuOnly)
         XCTAssertTrue(text.lowercased().contains("ask not what your country can do for you"), text)
     }

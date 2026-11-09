@@ -115,6 +115,12 @@ public struct Recording: Identifiable, Codable, FetchableRecord, PersistableReco
     public var url: URL {
         Self.recordingsDirectory.appendingPathComponent(fileName)
     }
+
+    /// The on-disk name of a recording. The id keeps two that start in the same second from
+    /// sharing, and overwriting, one file.
+    public static func fileName(startedAt timestamp: Date, id: UUID) -> String {
+        "\(Int(timestamp.timeIntervalSince1970))-\(id.uuidString.prefix(8)).wav"
+    }
     
     public var isPending: Bool {
         status == .pending || status == .converting || status == .transcribing
