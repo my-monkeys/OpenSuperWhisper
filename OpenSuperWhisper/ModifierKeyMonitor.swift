@@ -83,6 +83,26 @@ enum ModifierKey: String, CaseIterable, Identifiable, Codable {
         }
     }
     
+    /// Whether this physical key is down in `flags`. The generic masks above say only that some
+    /// key of the kind is held, so releasing the right Option while the left one stayed down
+    /// never read as a release and the trigger went dead. The device bits tell the sides apart.
+    func isDown(in flags: CGEventFlags) -> Bool {
+        let device: Int32
+        switch self {
+        case .none: return false
+        case .fn: return flags.contains(.maskSecondaryFn)
+        case .leftCommand: device = NX_DEVICELCMDKEYMASK
+        case .rightCommand: device = NX_DEVICERCMDKEYMASK
+        case .leftOption: device = NX_DEVICELALTKEYMASK
+        case .rightOption: device = NX_DEVICERALTKEYMASK
+        case .leftShift: device = NX_DEVICELSHIFTKEYMASK
+        case .rightShift: device = NX_DEVICERSHIFTKEYMASK
+        case .leftControl: device = NX_DEVICELCTLKEYMASK
+        case .rightControl: device = NX_DEVICERCTLKEYMASK
+        }
+        return flags.rawValue & UInt64(device) != 0
+    }
+
     var isCommandOrOption: Bool {
         switch self {
         case .leftCommand, .rightCommand, .leftOption, .rightOption:
@@ -210,7 +230,7 @@ class ModifierKeyMonitor {
 
         guard let key = watched[keyCode] else { return }
 
-        let isPressed = flags.contains(key.cgEventFlag)
+        let isPressed = key.isDown(in: flags)
 
         if isPressed, pressedKey == nil {
             // A second modifier pressed mid-recording is ignored: the first owns this take.
