@@ -29,6 +29,7 @@ load: /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Applic
 load: /System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork
 load: /System/Library/Frameworks/Carbon.framework/Versions/A/Carbon
 load: /System/Library/Frameworks/Combine.framework/Versions/A/Combine
+load: /System/Library/Frameworks/CoreAI.framework/Versions/A/CoreAI
 load: /System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio
 load: /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation
 load: /System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics
