@@ -76,14 +76,14 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
             let alert = NSAlert()
-            alert.messageText = "OpenSuperWhisper closed unexpectedly"
-            alert.informativeText = """
+            alert.messageText = String(localized: "OpenSuperWhisper closed unexpectedly")
+            alert.informativeText = String(localized: """
             Send a report so this gets fixed? It contains where the app stopped, its version and \
             your macOS version. It does not contain your dictations, your audio or your clipboard.
-            """
-            alert.addButton(withTitle: "Send Report")
-            alert.addButton(withTitle: "Not Now")
-            alert.addButton(withTitle: "Never Send")
+            """)
+            alert.addButton(withTitle: String(localized: "Send Report"))
+            alert.addButton(withTitle: String(localized: "Not Now"))
+            alert.addButton(withTitle: String(localized: "Never Send"))
             switch alert.runModal() {
             case .alertFirstButtonReturn:
                 drafts.forEach(self.send)
