@@ -202,7 +202,7 @@ class AudioRecorder: NSObject, ObservableObject {
     /// Why a start cannot even be attempted, nil when it can. Said to the bubble, which has
     /// already shown "recording": without it the bubble stayed on that until the user stopped it.
     static func startBlocker(canRecord: Bool, microphoneAccess: AVAuthorizationStatus) -> String? {
-        guard canRecord else { return "No microphone available" }
+        guard canRecord else { return String(localized: "No microphone available") }
         switch microphoneAccess {
         case .denied, .restricted:
             return String(localized: "OpenSuperWhisper can't hear you until you allow the microphone in System Settings.")
@@ -362,7 +362,7 @@ class AudioRecorder: NSObject, ObservableObject {
             // No recording to protect, and nothing will call `stopRecording` for a start that
             // never happened — so release the assertion here or it is held for ever.
             endRecordingActivity()
-            reportStartFailure("Recording could not start")
+            reportStartFailure(String(localized: "Recording could not start"))
         }
     }
     
@@ -612,7 +612,7 @@ extension AudioRecorder: AVAudioRecorderDelegate {
             SpectrumAnalyzer.shared.stop()
             // Said out loud rather than left to be noticed. A take that captured nothing is
             // otherwise indistinguishable from one the user simply has not finished (#117).
-            IndicatorWindowManager.shared.reportRecordingFailure("Recording stopped: the microphone dropped out")
+            IndicatorWindowManager.shared.reportRecordingFailure(String(localized: "Recording stopped: the microphone dropped out"))
         }
     }
 
