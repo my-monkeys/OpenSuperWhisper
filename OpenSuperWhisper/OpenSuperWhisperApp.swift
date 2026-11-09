@@ -590,6 +590,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
                 submenu.addItem(originalAlternate(of: item, original: original))
             }
         }
+
+        if let latest = recentTranscripts.first {
+            submenu.addItem(.separator())
+            let copy = NSMenuItem(title: NSLocalizedString("Copy to Clipboard", comment: "Recent submenu, latest dictation"),
+                                  action: #selector(copyRecentTranscript(_:)), keyEquivalent: "")
+            copy.target = self
+            copy.representedObject = latest.transcription
+            submenu.addItem(copy)
+        }
+    }
+
+    /// Puts the latest dictation on the clipboard without pasting it anywhere.
+    @objc private func copyRecentTranscript(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     /// Shown in place of `item` while ⌥ is held: the same dictation as the engine wrote it,
