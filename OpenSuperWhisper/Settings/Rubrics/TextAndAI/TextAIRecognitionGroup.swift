@@ -9,11 +9,12 @@ struct TextAIRecognitionGroup: View {
     var body: some View {
         SettingsGroup("Recognition", advanced: true) {
             SettingRow("Instructions for the model",
-                       hint: "Words or style the model should expect. Whisper copies its style, so a few lines of your own writing teach it your punctuation. A file at ~/.config/opensuperwhisper/prompt.md replaces this box when it exists.",
+                       hint: promptHint,
                        badge: viewModel.initialPrompt.isEmpty ? nil : ("Customized", .custom),
                        advanced: true, stacked: true) {
                 TextAIEditor(text: $viewModel.initialPrompt,
                              placeholder: "Product meeting, terms: sprint, backlog, PR.")
+                    .disabled(!viewModel.canUsePrompt)
             }
             SettingRow("Use the text around the cursor", hint: fieldContextHint, advanced: true) {
                 SSwitch(isOn: $viewModel.useSurroundingTextAsContext)
@@ -27,6 +28,12 @@ struct TextAIRecognitionGroup: View {
                 }
             }
         }
+    }
+
+    private var promptHint: LocalizedStringKey {
+        viewModel.canUsePrompt
+            ? "Words or style the model should expect. Whisper copies its style, so a few lines of your own writing teach it your punctuation. A file at ~/.config/opensuperwhisper/prompt.md replaces this box when it exists."
+            : "Only Whisper and a remote server read these instructions. The current engine has nowhere to put them; your dictionary is how to teach it words."
     }
 
     /// Saying why the switch is off matters more than describing it: a switch that flips and

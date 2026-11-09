@@ -37,6 +37,15 @@ public enum EngineCapabilities {
         fieldContextCapableEngines.contains(engine)
     }
 
+    /// Engines that read the user's instructions for the model: Whisper as its initial prompt, the
+    /// remote engine as the API's `prompt` field. Parakeet, SenseVoice and Apple Speech have no
+    /// input for free text, so the box does nothing there.
+    static let promptReadingEngines: Set<String> = ["whisper", "remote"]
+
+    public static func readsPrompt(engine: String) -> Bool {
+        promptReadingEngines.contains(engine)
+    }
+
     /// Whisper can translate, but the turbo models cannot, whatever their documentation says.
     ///
     /// Measured on the same Czech clip: `ggml-small` returns English with `translate` set, while

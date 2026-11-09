@@ -62044,6 +62044,52 @@
           }
         }
       }
+    },
+    "Only Whisper and a remote server read these instructions. The current engine has nowhere to put them; your dictionary is how to teach it words.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur Whisper und ein Remote-Server lesen diese Anweisungen. Die aktuelle Engine kann sie nirgends unterbringen; Wörter bringst du ihr über dein Wörterbuch bei."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo Whisper y un servidor remoto leen estas instrucciones. El motor actual no tiene dónde ponerlas; para enseñarle palabras, usa tu diccionario."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seuls Whisper et un serveur distant lisent ces instructions. Le moteur actuel n'a nulle part où les mettre ; c'est votre dictionnaire qui lui apprend des mots."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo Whisper e un server remoto leggono queste istruzioni. Il motore attuale non ha dove metterle; per insegnargli parole usa il tuo dizionario."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só o Whisper e um servidor remoto leem estas instruções. O motor atual não tem onde colocá-las; para ensinar palavras a ele, use seu dicionário."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chỉ Whisper và máy chủ từ xa đọc các hướng dẫn này. Công cụ hiện tại không có chỗ để dùng chúng; hãy dùng từ điển của bạn để dạy nó các từ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有 Whisper 和远程服务器会读取这些说明。当前引擎无处使用它们；要教它认词，请使用你的词典。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
