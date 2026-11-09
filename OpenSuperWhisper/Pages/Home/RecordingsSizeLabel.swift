@@ -10,7 +10,7 @@ enum RecordingsSizeLabel {
         return RecordingsDiskUsage.sizeLabel(bytes: total.bytes, locale: locale)
     }
 
-    /// "7.7 GB · 11,664 recordings": the Privacy line, beside "Show in Finder".
+    /// "7.7 GB · 11,664 recordings": the Privacy line, under "Show in Finder".
     static func sizeAndCount(_ total: RecordingsDiskUsage.Total?, locale: Locale = .current) -> String? {
         guard let size = size(total, locale: locale), let total else { return nil }
         let count = String(AttributedString(localized: "^[\(total.count) recording](inflect: true)",

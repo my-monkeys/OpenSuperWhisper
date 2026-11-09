@@ -67,12 +67,16 @@ struct PrivacyRubric: View {
                 SSwitch(isOn: $viewModel.saveTranscriptionHistory)
             }
             SettingRow("Transcriptions folder", hint: LocalizedStringKey(Recording.recordingsDirectory.path)) {
-                HStack(spacing: 10) {
+                // Under the button rather than beside it: the label and its long path take the
+                // row's width first, and beside the button the weight was squeezed into a
+                // column a few letters wide.
+                VStack(alignment: .trailing, spacing: 6) {
+                    Button("Show in Finder") { NSWorkspace.shared.open(Recording.recordingsDirectory) }
+                        .buttonStyle(.sSecondary)
                     RecordingsSizeText(style: .sizeAndCount)
                         .scaledFont(size: 12)
                         .foregroundColor(STheme.hint)
-                    Button("Show in Finder") { NSWorkspace.shared.open(Recording.recordingsDirectory) }
-                        .buttonStyle(.sSecondary)
+                        .fixedSize()
                 }
             }
         }
