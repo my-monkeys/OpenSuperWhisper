@@ -427,7 +427,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         let submenu = NSMenu()
         
         let microphones = microphoneService.availableMicrophones
-        let currentMic = microphoneService.currentMicrophone
+        let pinnedID = microphoneService.selectedMicrophone?.id
+        
+        let automaticItem = NSMenuItem(
+            title: NSLocalizedString("System Default", comment: ""),
+            action: #selector(selectSystemDefaultMicrophone),
+            keyEquivalent: ""
+        )
+        automaticItem.target = self
+        automaticItem.state = MicrophoneSelection.isChecked(deviceID: nil, pinnedID: pinnedID) ? .on : .off
+        submenu.addItem(automaticItem)
+        submenu.addItem(NSMenuItem.separator())
         
         if microphones.isEmpty {
             let noDeviceItem = NSMenuItem(title: NSLocalizedString("No microphones available", comment: ""), action: nil, keyEquivalent: "")
@@ -438,19 +448,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
             let externalMicrophones = microphones.filter { !$0.isBuiltIn }
             
             for microphone in builtInMicrophones {
-                let item = NSMenuItem(
-                    title: microphone.displayName,
-                    action: #selector(selectMicrophone(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = microphone
-                
-                if let current = currentMic, current.id == microphone.id {
-                    item.state = .on
-                }
-                
-                submenu.addItem(item)
+                submenu.addItem(microphoneItem(microphone, pinnedID: pinnedID))
             }
             
             if !builtInMicrophones.isEmpty && !externalMicrophones.isEmpty {
@@ -458,19 +456,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
             }
             
             for microphone in externalMicrophones {
-                let item = NSMenuItem(
-                    title: microphone.displayName,
-                    action: #selector(selectMicrophone(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = microphone
-                
-                if let current = currentMic, current.id == microphone.id {
-                    item.state = .on
-                }
-                
-                submenu.addItem(item)
+                submenu.addItem(microphoneItem(microphone, pinnedID: pinnedID))
             }
         }
         
@@ -508,6 +494,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         updateStatusBarMenu()
     }
     
+    private func microphoneItem(_ microphone: MicrophoneService.AudioDevice, pinnedID: String?) -> NSMenuItem {
+        let item = NSMenuItem(
+            title: microphone.displayName,
+            action: #selector(selectMicrophone(_:)),
+            keyEquivalent: ""
+        )
+        item.target = self
+        item.representedObject = microphone
+        item.state = MicrophoneSelection.isChecked(deviceID: microphone.id, pinnedID: pinnedID) ? .on : .off
+        return item
+    }
+
+    @objc private func selectSystemDefaultMicrophone() {
+        microphoneService.resetToDefault()
+        updateStatusBarMenu()
+    }
+
     @objc private func selectMicrophone(_ sender: NSMenuItem) {
         guard let device = sender.representedObject as? MicrophoneService.AudioDevice else { return }
         microphoneService.selectMicrophone(device)
