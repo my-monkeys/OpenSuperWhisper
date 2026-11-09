@@ -43,6 +43,10 @@ class IndicatorViewModel: ObservableObject {
     @Published var physicalNotch: CGSize?
 
     var recordingStartedAt: Date?
+    /// The take has been stopped or cancelled. The recorder's state reaches the bubble through
+    /// the main queue, so a publication that was already on its way when the stop landed arrives
+    /// afterwards, and must not turn the decoding bubble back into a recording one.
+    private var takeEnded = false
     /// Set by the trigger when this take should be submitted after insertion (#50). Carried
     /// on the queued clip rather than read at paste time: transcription runs in the
     /// background now, so the next recording may already have started by then.
@@ -88,7 +92,7 @@ class IndicatorViewModel: ObservableObject {
         recorder.$isConnecting
             .receive(on: RunLoop.main)
             .sink { [weak self] isConnecting in
-                guard let self = self else { return }
+                guard let self = self, !self.takeEnded else { return }
                 if isConnecting {
                     self.state = .connecting
                     self.stopBlinking()
@@ -99,7 +103,7 @@ class IndicatorViewModel: ObservableObject {
         recorder.$isRecording
             .receive(on: RunLoop.main)
             .sink { [weak self] isRecording in
-                guard let self = self else { return }
+                guard let self = self, !self.takeEnded else { return }
                 if isRecording {
                     self.state = .recording
                     self.startBlinking()
@@ -174,6 +178,7 @@ class IndicatorViewModel: ObservableObject {
         // blocking call on the main thread — and the hotkey tap runs there (#freeze).
         state = .recording
         startBlinking()
+        takeEnded = false
         recordingStartedAt = Date()
         startListeningForSound()
 
@@ -291,6 +296,7 @@ class IndicatorViewModel: ObservableObject {
         // A second stop on a take that is already transcribing has nothing left to stop; it
         // would find the recorder empty and report the dictation as lost.
         guard state != .decoding else { return }
+        takeEnded = true
         // The stop press is the origin of the whole measurement (#262), so it is taken on the
         // first line: everything below it — cancel-confirmation reset, the live-preview hand-off,
         // the agent-reply disarm — is time the user waits after letting go.
@@ -446,6 +452,7 @@ class IndicatorViewModel: ObservableObject {
     }
 
     func cancelRecording() {
+        takeEnded = true
         stopListeningForSound()
         hideTimer?.invalidate()
         hideTimer = nil
