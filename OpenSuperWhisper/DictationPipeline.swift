@@ -388,7 +388,7 @@ final class DictationPipeline: ObservableObject {
                 // the same second from colliding on one on-disk file.
                 let timestamp = item.startedAt
                 let recordingId = item.id
-                let fileName = "\(Int(timestamp.timeIntervalSince1970))-\(recordingId.uuidString.prefix(8)).wav"
+                let fileName = Recording.fileName(startedAt: timestamp, id: recordingId)
                 let finalURL = Recording(
                     id: recordingId,
                     timestamp: timestamp,
@@ -685,7 +685,7 @@ final class DictationPipeline: ObservableObject {
     /// move failed (then the temp is discarded).
     private func persistFailedRecording(timestamp: Date, tempURL: URL) -> (id: UUID, timestamp: Date, fileName: String, url: URL)? {
         let id = UUID()
-        let fileName = "\(Int(timestamp.timeIntervalSince1970))-\(id.uuidString.prefix(8)).wav"
+        let fileName = Recording.fileName(startedAt: timestamp, id: id)
         let finalURL = Recording(
             id: id,
             timestamp: timestamp,

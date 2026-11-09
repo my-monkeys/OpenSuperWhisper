@@ -124,8 +124,7 @@ public class TranscriptionQueue: ObservableObject {
 
             let timestamp = Date()
             let id = UUID()
-            // Files dropped together share a second; the id keeps their recordings apart.
-            let fileName = "\(Int(timestamp.timeIntervalSince1970))-\(id.uuidString.prefix(8)).wav"
+            let fileName = Recording.fileName(startedAt: timestamp, id: id)
 
             let recording = Recording(
                 id: id,

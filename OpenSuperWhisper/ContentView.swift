@@ -115,7 +115,18 @@ class ContentViewModel: ObservableObject {
             if filter != .all {
                 newRecordings = (try? await recordingStore.fetchRecordings(filter: filter, query: query, limit: limit, offset: offset)) ?? []
             } else if query.isEmpty {
-                newRecordings = try await recordingStore.fetchRecordings(limit: limit, offset: offset)
+                do {
+                    newRecordings = try await recordingStore.fetchRecordings(limit: limit, offset: offset)
+                } catch {
+                    // The task is not throwing, so an uncaught error ended it silently with
+                    // `isLoadingMore` still set, and paging stalled until the next fresh load.
+                    // `canLoadMore` is left alone: the next scroll tries again.
+                    print("Failed to load recordings: \(error)")
+                    await MainActor.run {
+                        if generation == self.loadGeneration { self.isLoadingMore = false }
+                    }
+                    return
+                }
             } else {
                 newRecordings = await recordingStore.searchRecordingsAsync(query: query, limit: limit, offset: offset)
             }
@@ -319,8 +330,8 @@ class ContentViewModel: ObservableObject {
 
                         // Create a new Recording instance
                         let timestamp = Date()
-                        let fileName = "\(Int(timestamp.timeIntervalSince1970)).wav"
                         let recordingId = UUID()
+                        let fileName = Recording.fileName(startedAt: timestamp, id: recordingId)
                         let finalURL = Recording(
                             id: recordingId,
                             timestamp: timestamp,
