@@ -148,6 +148,9 @@ One invocation, per arch (~12 min each), runs end to end:
 6. Zip → `notarytool submit --wait` → `stapler staple` the app.
 7. Build the DMG with a pinned `dmgbuild` run through `uvx` (app + `/Applications` link, window
    laid out from `Scripts/dmg/`), codesign the DMG, notarize + staple **the DMG too**.
+8. Copy the app's dSYM to `~/osw-dsyms/<version>/<arch>/` (override the root with `DSYM_ARCHIVE`)
+   after checking its UUID matches the binary. The next run's `rm -rf build` would delete it
+   otherwise, which is how the arm64 dSYM of 0.15.1 was lost.
 
 Output: `./OpenSuperWhisper-arm64.dmg` (and `./OpenSuperWhisper-x86_64.dmg`).
 
