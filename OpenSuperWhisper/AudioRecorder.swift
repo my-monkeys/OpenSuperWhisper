@@ -199,10 +199,31 @@ class AudioRecorder: NSObject, ObservableObject {
     /// stopping a recording leaves none behind.
     var isHoldingRecordingActivity: Bool { recordingActivity != nil }
 
+    /// Why a start cannot even be attempted, nil when it can. Said to the bubble, which has
+    /// already shown "recording": without it the bubble stayed on that until the user stopped it.
+    static func startBlocker(canRecord: Bool, microphoneAccess: AVAuthorizationStatus) -> String? {
+        guard canRecord else { return String(localized: "No microphone available") }
+        switch microphoneAccess {
+        case .denied, .restricted:
+            return String(localized: "OpenSuperWhisper can't hear you until you allow the microphone in System Settings.")
+        default:
+            return nil
+        }
+    }
+
+    /// Clears the recording state and puts the reason where the user is looking. Not routed
+    /// through `flash`: the bubble is waiting on this very recording.
+    private func reportStartFailure(_ message: String) {
+        updateRecordingState(isRecording: false, isConnecting: false)
+        Task { @MainActor in IndicatorWindowManager.shared.reportRecordingFailure(message) }
+    }
+
     func startRecording() {
         Diag.mark("recorder.startRecording (canRecord=\(canRecord))")
-        guard canRecord else {
-            print("Cannot start recording - no audio input available")
+        if let blocker = Self.startBlocker(canRecord: canRecord,
+                                           microphoneAccess: AVCaptureDevice.authorizationStatus(for: .audio)) {
+            print("Cannot start recording: \(blocker)")
+            reportStartFailure(blocker)
             return
         }
 
@@ -341,7 +362,7 @@ class AudioRecorder: NSObject, ObservableObject {
             // No recording to protect, and nothing will call `stopRecording` for a start that
             // never happened — so release the assertion here or it is held for ever.
             endRecordingActivity()
-            updateRecordingState(isRecording: false, isConnecting: false)
+            reportStartFailure(String(localized: "Recording could not start"))
         }
     }
     
@@ -550,8 +571,16 @@ class AudioRecorder: NSObject, ObservableObject {
                 Diag.mark("recorder.connectionWait timed out after \(Int(elapsed * 1000))ms "
                     + "with \(totalGrowth) bytes written; going live anyway")
             }
-            self.stopConnectionMonitoring()
-            self.updateRecordingState(isRecording: true, isConnecting: false)
+            // Published from the main queue, after checking the take is still this one. This block
+            // runs on a background queue: a stop landing just after the guard above would publish
+            // `isRecording = false` and then have this one overwrite it with true, leaving the
+            // bubble recording a take that had ended.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.currentRecordingURL == url else { return }
+                self.stopConnectionMonitoring()
+                self.isRecording = true
+                self.isConnecting = false
+            }
         }
         connectionCheckTimer = timer
         timer.resume()
@@ -583,7 +612,7 @@ extension AudioRecorder: AVAudioRecorderDelegate {
             SpectrumAnalyzer.shared.stop()
             // Said out loud rather than left to be noticed. A take that captured nothing is
             // otherwise indistinguishable from one the user simply has not finished (#117).
-            IndicatorWindowManager.shared.reportRecordingFailure("Recording stopped: the microphone dropped out")
+            IndicatorWindowManager.shared.reportRecordingFailure(String(localized: "Recording stopped: the microphone dropped out"))
         }
     }
 

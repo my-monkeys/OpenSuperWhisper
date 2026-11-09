@@ -429,6 +429,12 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         viewModel?.startDecoding()
     }
 
+    /// Throws away the transcription the bubble is showing, as its cancel button does.
+    func discardDecoding() {
+        guard viewModel?.state == .decoding else { return }
+        DictationPipeline.shared.discardEverything()
+    }
+
     /// Reflect the hands-free latch in the bubble. No-op when nothing is showing.
     func setLatched(_ latched: Bool) {
         viewModel?.isLatched = latched

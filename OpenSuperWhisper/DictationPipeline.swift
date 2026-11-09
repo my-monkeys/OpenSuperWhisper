@@ -95,6 +95,10 @@ final class DictationPipeline: ObservableObject {
     /// recording, so by then there is nothing left to stop except the insertion itself.
     private var discarding = false
 
+    /// Names the file pass in flight to the transcription service, so a discard stops this
+    /// dictation's run and nothing else that may hold the engine, a file import for one.
+    private var fileOperation: UUID?
+
     /// Test seam: when set, used instead of the real engine so unit tests can exercise queue
     /// ordering / pendingCount / no-speech / failure paths without a model. nil in production.
     var transcribeOverride: ((URL, Settings) async throws -> String)?
@@ -130,7 +134,7 @@ final class DictationPipeline: ObservableObject {
         }
         queue.removeAll()
         refreshPendingCount()
-        transcriptionService.cancelTranscription()
+        if let fileOperation { transcriptionService.cancelTranscription(operation: fileOperation) }
     }
 
     private var queue: [PendingDictation] = []
@@ -244,7 +248,12 @@ final class DictationPipeline: ObservableObject {
             let rawText: String
             if let clip = item.tempURL {
                 filePassRunning = true
-                defer { filePassRunning = false }
+                let operation = UUID()
+                fileOperation = operation
+                defer {
+                    filePassRunning = false
+                    fileOperation = nil
+                }
                 engineAttempts = 1
                 let started = uptime()
                 transcribeStart = started
@@ -256,7 +265,7 @@ final class DictationPipeline: ObservableObject {
                         return try await transcribeOverride(clip, settings)
                     }
                     return try await self.transcriptionService.transcribeAudio(
-                        url: clip, settings: settings, modelOverride: item.modelOption)
+                        url: clip, settings: settings, modelOverride: item.modelOption, operation: operation)
                 }
                 item.timing.transcribeMs = UptimeClock.milliseconds(from: started, to: uptime())
                 item.timing.transcribeAttempts = engineAttempts
@@ -348,6 +357,12 @@ final class DictationPipeline: ObservableObject {
                 item.timing.cleanupMs = UptimeClock.milliseconds(from: cleanupStart, to: uptime())
             }
             isCleaningUp = false
+            // Cleanup is the longest wait after the engine, so a discard usually lands here:
+            // checked again before anything is saved or shown.
+            if discarding {
+                discardAudio(item.tempURL)
+                return
+            }
             CleanupSessionStatus.shared.record(cleanup)
             text = cleanup.text
 
@@ -373,7 +388,7 @@ final class DictationPipeline: ObservableObject {
                 // the same second from colliding on one on-disk file.
                 let timestamp = item.startedAt
                 let recordingId = item.id
-                let fileName = "\(Int(timestamp.timeIntervalSince1970))-\(recordingId.uuidString.prefix(8)).wav"
+                let fileName = Recording.fileName(startedAt: timestamp, id: recordingId)
                 let finalURL = Recording(
                     id: recordingId,
                     timestamp: timestamp,
@@ -411,6 +426,12 @@ final class DictationPipeline: ObservableObject {
                     timing: item.timing)
             } else if item.onRecovered == nil {
                 discardAudio(item.tempURL)
+            }
+
+            // The row write awaited too: last chance before the text goes anywhere.
+            if discarding {
+                discardAudio(item.tempURL)
+                return
             }
 
             // A recovered clip has no field to go back to. The text is safe on the clipboard
@@ -506,6 +527,12 @@ final class DictationPipeline: ObservableObject {
                 await recordingStore.updateTimingSync(item.id, timingJSON: item.timing.encoded)
             }
         } catch {
+            // Thrown away is not failed: a cancelled run comes back as an error, and saving it as
+            // a failed row with a notice would show the user what they just discarded.
+            if discarding {
+                discardAudio(item.tempURL)
+                return
+            }
             print("Dictation transcription failed: \(error)")
             // Said where the user looks, with the engine's own words: "Transcription failed" on
             // its own left a user with nine failures in ten and nothing to report but that.
@@ -540,8 +567,6 @@ final class DictationPipeline: ObservableObject {
                     transcription: String(localized: "Transcription failed: \(reason). Click ↻ to try again."),
                     rawTranscription: nil, status: .failed, progress: 0, context: item.context,
                     modelUsed: nil, wasFallback: false, timing: item.timing)
-            } else if discarding {
-                discardAudio(item.tempURL)
             } else {
                 keptForRecovery = item.tempURL != nil
             }
@@ -660,7 +685,7 @@ final class DictationPipeline: ObservableObject {
     /// move failed (then the temp is discarded).
     private func persistFailedRecording(timestamp: Date, tempURL: URL) -> (id: UUID, timestamp: Date, fileName: String, url: URL)? {
         let id = UUID()
-        let fileName = "\(Int(timestamp.timeIntervalSince1970))-\(id.uuidString.prefix(8)).wav"
+        let fileName = Recording.fileName(startedAt: timestamp, id: id)
         let finalURL = Recording(
             id: id,
             timestamp: timestamp,

@@ -21,6 +21,9 @@ public class TranscriptionQueue: ObservableObject {
     private let confirmEnableHistory: @MainActor @Sendable () async -> Bool
     private var processingTask: Task<Void, Never>?
     private var currentTranscriptionTask: Task<Void, Never>?
+    /// Names the running file's transcription to the service, so cancelling it or reading its
+    /// progress cannot touch a dictation that holds the engine instead.
+    private var currentOperation: UUID?
     private var cancelledRecordingIds: Set<UUID> = []
     private var progressCancellable: AnyCancellable?
     // One-off model for a specific rerun (keyed by recording id). Applied for
@@ -43,6 +46,8 @@ public class TranscriptionQueue: ObservableObject {
             .sink { [weak self] newProgress in
                 guard let self = self,
                       let recordingId = self.currentRecordingId,
+                      let operation = self.currentOperation,
+                      self.transcriptionService.activeOperation == operation,
                       newProgress > 0,
                       newProgress < 1.0 else { return }
                 
@@ -60,7 +65,7 @@ public class TranscriptionQueue: ObservableObject {
         cancelledRecordingIds.insert(recordingId)
 
         if currentRecordingId == recordingId {
-            transcriptionService.cancelTranscription()
+            if let currentOperation { transcriptionService.cancelTranscription(operation: currentOperation) }
             currentTranscriptionTask?.cancel()
         }
     }
@@ -119,8 +124,7 @@ public class TranscriptionQueue: ObservableObject {
 
             let timestamp = Date()
             let id = UUID()
-            // Files dropped together share a second; the id keeps their recordings apart.
-            let fileName = "\(Int(timestamp.timeIntervalSince1970))-\(id.uuidString.prefix(8)).wav"
+            let fileName = Recording.fileName(startedAt: timestamp, id: id)
 
             let recording = Recording(
                 id: id,
@@ -185,9 +189,12 @@ public class TranscriptionQueue: ObservableObject {
     private func processQueue() async {
         while let recording = recordingStore.getNextPendingRecording() {
             currentRecordingId = recording.id
+            let operation = UUID()
+            currentOperation = operation
             processingStartedAt = Date()
-            await processRecording(recording)
+            await processRecording(recording, operation: operation)
             currentRecordingId = nil
+            currentOperation = nil
             processingStartedAt = nil
             // Enforce the retention limit after each recording finishes so the
             // count is held as a fixed-size buffer. In-progress recordings stay
@@ -210,7 +217,7 @@ public class TranscriptionQueue: ObservableObject {
         return destination
     }
 
-    private func processRecording(_ recording: Recording) async {
+    private func processRecording(_ recording: Recording, operation: UUID) async {
         if isRecordingCancelled(recording.id) {
             clearCancellation(recording.id)
             return
@@ -270,7 +277,8 @@ public class TranscriptionQueue: ObservableObject {
 
                 let audioURL = try await audioToTranscribe(sourceURL, for: recording)
                 let settings = makeSettings()
-                let text = try await transcriptionService.transcribeAudio(url: audioURL, settings: settings, modelOverride: overrideOption)
+                let text = try await transcriptionService.transcribeAudio(
+                    url: audioURL, settings: settings, modelOverride: overrideOption, operation: operation)
 
                 if isRecordingCancelled(recording.id) || Task.isCancelled {
                     return

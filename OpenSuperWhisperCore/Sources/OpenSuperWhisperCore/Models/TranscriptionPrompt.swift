@@ -24,6 +24,17 @@ enum TranscriptionPrompt {
         return parts.joined(separator: " ")
     }
 
+    /// Whether the prompt may be carried into every 30 s window rather than only the first.
+    ///
+    /// whisper.cpp builds each window's prompt from at most half the model's text context: the
+    /// carried prompt first, then whatever room is left for what was just said. A prompt that
+    /// takes more than half of that budget leaves the rolling history almost nothing, and the
+    /// text of the previous window stops conditioning the next one. Past it the prompt still
+    /// conditions the first window, which is where the user's vocabulary matters most.
+    static func canCarry(promptTokens: Int, textContext: Int) -> Bool {
+        promptTokens > 0 && promptTokens <= max(1, (textContext / 2 - 1) / 2)
+    }
+
     /// The surrounding text to use, or nil when the setting is off.
     ///
     /// Split out from `combined` because the decision to read someone's document is worth

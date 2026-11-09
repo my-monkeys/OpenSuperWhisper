@@ -197,8 +197,11 @@ public class WhisperEngine: TranscriptionEngine {
                                                           surroundingText: surrounding) ?? ""
         params.initialPrompt = combinedPrompt.isEmpty ? nil : combinedPrompt
         // Otherwise the prompt only conditions the first 30s window, so a custom dictionary
-        // stops being applied partway through a long dictation.
-        params.carryInitialPrompt = !combinedPrompt.isEmpty
+        // stops being applied partway through a long dictation. Only a prompt small enough to
+        // leave the rolling history its room: see `TranscriptionPrompt.canCarry`.
+        let promptTokens = combinedPrompt.isEmpty ? 0 : context.tokenCount(text: combinedPrompt)
+        params.carryInitialPrompt = TranscriptionPrompt.canCarry(promptTokens: promptTokens,
+                                                                 textContext: context.nTextCtx)
 
         typealias GGMLAbortCallback = @convention(c) (UnsafeMutableRawPointer?) -> Bool
         let abortCallback: GGMLAbortCallback = { userData in
