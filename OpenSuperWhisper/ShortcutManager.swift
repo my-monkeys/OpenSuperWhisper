@@ -45,6 +45,10 @@ class ShortcutManager {
     /// life of the app.
     private var triggerPermissions: PermissionsManager?
     private var permissionSubscription: AnyCancellable?
+    /// Puts back a key combination that stopped listening. Held here for the same reason.
+    private var hotkeyKeeper: HotkeyKeeper?
+    /// The trigger slots that hold a key combination, for the keeper to watch.
+    private var boundComboSlots: [KeyboardShortcuts.Name] = []
     /// The take the trigger keys control. Internal so tests can stand one up.
     var activeVm: IndicatorViewModel?
     private var holdWorkItem: DispatchWorkItem?
@@ -75,6 +79,10 @@ class ShortcutManager {
 
         setupKeyboardShortcuts()
         setupRecordingTrigger()
+        let keeper = HotkeyKeeper(liveNames: { [weak self] in self?.liveKeyCombos() ?? [] },
+                                  takeRunning: { [weak self] in self?.activeVm != nil })
+        keeper.start()
+        hotkeyKeeper = keeper
         let permissions = PermissionsManager()
         triggerPermissions = permissions
         rearmTriggers(onChangeOf: permissions.$isAccessibilityPermissionGranted
@@ -339,8 +347,8 @@ class ShortcutManager {
             ModifierKeyMonitor.shared.start(modifierKeys: modifiers, chords: chords)
         }
 
-        bindKeyComboSlots(set.keyCombos, to: KeyboardShortcuts.Name.recordTriggerSlot)
-        bindKeyComboSlots(holdSet.keyCombos, to: KeyboardShortcuts.Name.holdTriggerSlot)
+        boundComboSlots = bindKeyComboSlots(set.keyCombos, to: KeyboardShortcuts.Name.recordTriggerSlot)
+            + bindKeyComboSlots(holdSet.keyCombos, to: KeyboardShortcuts.Name.holdTriggerSlot)
 
         useMouseButtonHotkey = !set.mouseButtons.isEmpty || !holdSet.mouseButtons.isEmpty
         useModifierOnlyHotkey = !set.modifiers.isEmpty || !holdSet.modifiers.isEmpty || !chords.isEmpty
@@ -355,8 +363,10 @@ class ShortcutManager {
     /// every settings change stacked duplicates, and one key press then ran the toggle twice —
     /// starting a recording and immediately ending it, which looked like the mic firing with no
     /// indicator.
+    ///
+    /// Returns the slots that now hold a combination.
     private func bindKeyComboSlots(_ combos: [KeyboardShortcuts.Shortcut],
-                                   to slotName: (Int) -> KeyboardShortcuts.Name) {
+                                   to slotName: (Int) -> KeyboardShortcuts.Name) -> [KeyboardShortcuts.Name] {
         for index in 0..<KeyboardShortcuts.Name.recordTriggerSlotLimit {
             let slot = slotName(index)
             if index < combos.count {
@@ -367,6 +377,14 @@ class ShortcutManager {
                 KeyboardShortcuts.disable(slot)
             }
         }
+        return (0..<min(combos.count, KeyboardShortcuts.Name.recordTriggerSlotLimit)).map(slotName)
+    }
+
+    /// The key combinations that should be listening now: the bound trigger slots and the
+    /// optional shortcuts the user set. Esc is left out: it only listens while the bubble shows.
+    private func liveKeyCombos() -> [KeyboardShortcuts.Name] {
+        let optional: [KeyboardShortcuts.Name] = [.toggleRecordAndSubmit, .pasteLastTranscription, .nextWritingStyle]
+        return boundComboSlots + optional.filter { KeyboardShortcuts.getShortcut(for: $0) != nil }
     }
 
     /// Stops the running take and asks for Return once its text lands. Deliberately cannot
