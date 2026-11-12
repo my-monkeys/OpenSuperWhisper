@@ -14,8 +14,20 @@ final class ICloudSettingsBackup {
     static let enabledKey = "iCloudSettingsBackupEnabled"
 
     nonisolated static var defaultFolder: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/OpenSuperWhisper", isDirectory: true)
+        iCloudDrive.appendingPathComponent("OpenSuperWhisper", isDirectory: true)
+    }
+
+    /// The test host is the app, and the Settings window it renders refreshes this backup: it
+    /// read the person's real file there, and once hung a whole run on the main thread inside
+    /// `open()`. Under XCTest iCloud Drive is a folder in the process's own storage that is never
+    /// created, so the backup reads as iCloud Drive turned off, as it does on CI.
+    nonisolated private static var iCloudDrive: URL {
+        guard DefaultsStore.isRunningTests else {
+            return FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
+        }
+        let root = AppIdentity.storageRoot() ?? FileManager.default.temporaryDirectory
+        return root.appendingPathComponent("iCloud Drive", isDirectory: true)
     }
 
     struct Backup {
