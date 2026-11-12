@@ -158,4 +158,13 @@ final class ICloudSettingsBackupTests: XCTestCase {
         XCTAssertTrue(model.isDownloading)
         XCTAssertFalse(backup.isEnabled)
     }
+
+    func testTheTestHostStaysOutOfTheRealICloudDrive() throws {
+        let folder = ICloudSettingsBackup.shared.folder.path
+        let storage = try XCTUnwrap(AppIdentity.storageRoot()).path
+
+        XCTAssertFalse(folder.contains("Mobile Documents"), folder)
+        XCTAssertTrue(folder.hasPrefix(storage), folder)
+        XCTAssertFalse(ICloudSettingsBackup.shared.isAvailable)
+    }
 }
