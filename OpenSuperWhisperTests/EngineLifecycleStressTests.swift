@@ -74,7 +74,7 @@ final class EngineLifecycleStressTests: XCTestCase {
             XCTAssertFalse(engine.isModelLoaded, "round \(round): whisper was not freed beside llama")
 
             let reply = llama?.generate(system: "Answer with one word.", user: "Is water wet?", maxTokens: 4)
-            XCTAssertFalse((reply ?? "").isEmpty, "round \(round): the llama context produced nothing")
+            XCTAssertFalse((reply?.text ?? "").isEmpty, "round \(round): the llama context produced nothing")
             llama = nil
         }
 
@@ -83,7 +83,7 @@ final class EngineLifecycleStressTests: XCTestCase {
         XCTAssertTrue(hot.isModelLoaded)
         var llama = LlamaContext(modelPath: modelPath)
         XCTAssertFalse((llama?.generate(system: "Answer with one word.", user: "Is fire hot?",
-                                        maxTokens: 4) ?? "").isEmpty, "the last llama context produced nothing")
+                                        maxTokens: 4).text ?? "").isEmpty, "the last llama context produced nothing")
         llama = nil
         XCTAssertTrue(hot.isModelLoaded)
         let text = try await hot.transcribeAudio(url: Fixtures.jfkWav, settings: Fixtures.pinnedSettings())

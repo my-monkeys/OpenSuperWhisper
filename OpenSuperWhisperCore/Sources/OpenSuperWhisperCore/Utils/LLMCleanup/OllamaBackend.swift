@@ -36,7 +36,15 @@ struct OllamaBackend: LLMCleanupBackend {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw CleanupHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
         }
-        return try JSONDecoder().decode(ChatResponse.self, from: data).message.content
+        return try Self.reply(from: data)
+    }
+
+    /// The content of an `/api/chat` answer that Ollama let finish. `done_reason: "length"` means
+    /// it stopped on `num_predict` or a full context, so the text ends partway through the dictation.
+    static func reply(from data: Data) throws -> String {
+        let response = try JSONDecoder().decode(ChatResponse.self, from: data)
+        if response.doneReason == "length" { throw CleanupReplyError.cutOff }
+        return response.message.content
     }
 
     /// Probes the Ollama server (GET /api/tags) and checks whether the configured model is
@@ -69,5 +77,11 @@ struct OllamaBackend: LLMCleanupBackend {
     private struct ChatResponse: Decodable {
         struct Message: Decodable { let content: String }
         let message: Message
+        let doneReason: String?
+
+        enum CodingKeys: String, CodingKey {
+            case message
+            case doneReason = "done_reason"
+        }
     }
 }
