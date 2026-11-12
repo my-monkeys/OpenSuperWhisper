@@ -16,6 +16,8 @@ enum UISnapshotProbe {
         "home-unfinished": { seedUnfinished(); return AnyView(AppShellView(page: .home)) },
         "home-unfinished-recovered": { seedUnfinished(recovered: true); return AnyView(AppShellView(page: .home)) },
         "home-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return AnyView(AppShellView(page: .home)) },
+        "home-cleanup-alert": { cleanupAlert() },
+        "home-cleanup-alert-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return cleanupAlert() },
         "dictionary": { seedDictionary(); return AnyView(AppShellView(page: .dictionary)) },
         "dictionary-editor": { seedDictionary(openEditor: true); return AnyView(AppShellView(page: .dictionary)) },
         "snippets": { seedSnippets(); return AnyView(AppShellView(page: .snippets)) },
@@ -196,6 +198,24 @@ enum UISnapshotProbe {
 
     /// The Home microphone popover, drawn as a card over Home: an off-screen window cannot show a
     /// real popover. Levels and volumes are staged, so no microphone is opened or changed.
+    /// The panel behind a failed cleanup's warning, drawn over Home where the popover opens.
+    private static func cleanupAlert() -> AnyView {
+        AppPreferences.shared.aiPostProcessingEnabled = true
+        let recording = Recording(id: UUID(), timestamp: Date(), fileName: "staged-cleanup.wav",
+                                  transcription: "Add a search field and a button to clear the input in the history view.",
+                                  duration: 6, status: .completed, progress: 1,
+                                  cleanupModel: "Qwen2.5 1.5B Instruct (Q4_K_M)",
+                                  cleanupError: "Reply cut off before the end")
+        let card = FeedRowCleanupAlertPanel(recording: recording, model: recording.cleanupModel ?? "",
+                                            reason: recording.cleanupError ?? "", onCleanup: { _ in }, onClose: {})
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(STheme.border, lineWidth: 1))
+            .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
+            .environment(\.appTextScale, AppPreferences.shared.textScale)
+        return AnyView(AppShellView(page: .home).overlay(alignment: .topLeading) {
+            card.padding(.top, 330).padding(.leading, 360)
+        })
+    }
+
     private static func microphonePicker(_ level: StagedLevel, volume: StagedVolume = .settable) -> AnyView {
         seedMicrophones(level, volume: volume)
         let card = MicrophonePickerList(microphoneService: MicrophoneService.shared)
