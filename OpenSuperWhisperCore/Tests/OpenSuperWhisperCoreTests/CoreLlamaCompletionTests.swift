@@ -48,7 +48,8 @@ final class CoreLlamaCompletionTests: CoreTestCase {
         """
 
     func testALongDictationIsCleanedToTheEnd() throws {
-        let context = try XCTUnwrap(LlamaContext(modelPath: try requireModel().path))
+        let model = try requireModel()
+        let context = try XCTUnwrap(LlamaContext(modelPath: model.path))
         let completion = context.generate(system: LLMPostProcessor.defaultInstruction, user: Self.longDictation)
         XCTAssertEqual(completion.stop, .finished)
         XCTAssertTrue(completion.text.localizedCaseInsensitiveContains("pelican"),
@@ -58,7 +59,8 @@ final class CoreLlamaCompletionTests: CoreTestCase {
     /// The flat budget the backend used to apply: the reply is now reported as cut, not returned
     /// as if it were whole.
     func testTheOldFlatBudgetIsReportedAsCut() throws {
-        let context = try XCTUnwrap(LlamaContext(modelPath: try requireModel().path))
+        let model = try requireModel()
+        let context = try XCTUnwrap(LlamaContext(modelPath: model.path))
         let completion = context.generate(system: LLMPostProcessor.defaultInstruction, user: Self.longDictation,
                                           maxTokens: 512)
         XCTAssertEqual(completion.stop, .tokenBudget)
@@ -66,7 +68,8 @@ final class CoreLlamaCompletionTests: CoreTestCase {
 
     /// Trimming the prompt's head used to drop the instructions and keep the dictation's tail.
     func testAPromptThatDoesNotFitIsRefusedNotTrimmed() throws {
-        let context = try XCTUnwrap(LlamaContext(modelPath: try requireModel().path, contextLength: 256))
+        let model = try requireModel()
+        let context = try XCTUnwrap(LlamaContext(modelPath: model.path, contextLength: 256))
         let completion = context.generate(system: LLMPostProcessor.defaultInstruction, user: Self.longDictation)
         XCTAssertEqual(completion, LlamaContext.Completion(text: "", stop: .promptTooLong))
     }
