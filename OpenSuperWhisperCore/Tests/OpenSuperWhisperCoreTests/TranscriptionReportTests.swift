@@ -35,7 +35,7 @@ final class TranscriptionReportTests: CoreTestCase {
                        createdAt: Date = Date(timeIntervalSince1970: 1_760_000_100)) -> TranscriptionReport {
         TranscriptionReport(createdAt: createdAt, recording: recording, problem: problem,
                             comment: "  It wrote cube cuttle.  \n", writtenAs: " cube cuttle ", shouldBe: "kubectl",
-                            languageSetting: "en", appDetails: "OpenSuperWhisper 0.14.2 (65) · macOS 26.2 · Apple Silicon")
+                            expectedText: " So the kubectl cluster.\n", languageSetting: "en", appDetails: "OpenSuperWhisper 0.14.2 (65) · macOS 26.2 · Apple Silicon")
     }
 
     private func writeAudio(for recording: Recording, bytes: String = "RIFF fake audio") throws {
@@ -59,6 +59,7 @@ final class TranscriptionReportTests: CoreTestCase {
         XCTAssertEqual(report.duration, 4.5)
         XCTAssertEqual(report.comment, "It wrote cube cuttle.")
         XCTAssertEqual(report.writtenAs, "cube cuttle")
+        XCTAssertEqual(report.expectedText, "So the kubectl cluster.")
         XCTAssertEqual(report.shouldBe, "kubectl")
         XCTAssertNil(report.audioFileName)
     }
@@ -100,11 +101,13 @@ final class TranscriptionReportTests: CoreTestCase {
 
     func testBlankWordFieldsAreNotKept() {
         let report = TranscriptionReport(recording: Self.recording(), problem: .other, comment: " ",
-                                         writtenAs: "  ", shouldBe: "\n", languageSetting: nil, appDetails: "x")
+                                         writtenAs: "  ", shouldBe: "\n", expectedText: " \n",
+                                         languageSetting: nil, appDetails: "x")
 
         XCTAssertEqual(report.comment, "")
         XCTAssertNil(report.writtenAs)
         XCTAssertNil(report.shouldBe)
+        XCTAssertNil(report.expectedText)
     }
 
     func testOnlyAWordOrANameConcernsTheDictionary() {
@@ -149,6 +152,7 @@ final class TranscriptionReportTests: CoreTestCase {
             "audioFileName|TEXT|0||0",
             "timingJSON|TEXT|0||0",
             "ending|TEXT|0||0",
+            "expectedText|TEXT|0||0",
         ])
         let foreignKeys = try queue.read { try Row.fetchAll($0, sql: "PRAGMA foreign_key_list(transcription_reports)") }
         XCTAssertTrue(foreignKeys.isEmpty, "a report must not follow its recording out")

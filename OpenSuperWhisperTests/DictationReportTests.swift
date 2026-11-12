@@ -6,6 +6,7 @@ import OpenSuperWhisperCore
 final class DictationReportTests: XCTestCase {
 
     private func draft(output: String = "Hello there.",
+                       expected: String? = nil,
                        raw: String? = nil,
                        note: String = "",
                        language: String? = "fr",
@@ -13,7 +14,7 @@ final class DictationReportTests: XCTestCase {
                        timing: DictationTiming? = nil) -> DictationReportDraft {
         DictationReportDraft(note: note, modelUsed: "Parakeet Ultra", languageSetting: language,
                              translateToEnglish: translate, durationSeconds: 4, output: output,
-                             rawOutput: raw, appVersion: "0.14.0 (63)", osVersion: "26.2",
+                             expected: expected, rawOutput: raw, appVersion: "0.14.0 (63)", osVersion: "26.2",
                              timing: timing)
     }
 
@@ -28,6 +29,21 @@ final class DictationReportTests: XCTestCase {
         XCTAssertTrue(message.contains("language: fr"))
         XCTAssertTrue(message.contains("duration: 4s"))
         XCTAssertTrue(message.contains("output: Hello there."))
+    }
+
+    /// The output alone comes out the same on the maintainer's Mac; what it should have been is
+    /// what says what went wrong.
+    func testTheCorrectionFollowsTheOutput() {
+        let message = DictationReport.message(for: draft(output: "Is it possible to make active T-mux pains more obvious?",
+                                                         expected: "Is it possible to make active tmux panes more obvious?"),
+                                              outputLimit: 2000, includeRaw: true)
+
+        XCTAssertTrue(message.contains("output: Is it possible to make active T-mux pains more obvious?\n"
+            + "expected: Is it possible to make active tmux panes more obvious?"))
+    }
+
+    func testNoExpectedLineWithoutACorrection() {
+        XCTAssertFalse(DictationReport.message(for: draft(), outputLimit: 2000, includeRaw: true).contains("expected:"))
     }
 
     func testAnEmptyNoteLeavesNoNoteLine() {
@@ -147,5 +163,47 @@ final class DictationReportTests: XCTestCase {
 
         XCTAssertTrue(FeedbackSender.fitsLimits(submission))
         XCTAssertTrue(submission.message.contains("output: 😀"))
+    }
+
+    // MARK: - Long corrections
+
+    func testTheChangedSpanKeepsSomeTextAroundTheChange() {
+        let span = DictationReport.changedSpan(output: "I'll meet on Thursday at noon",
+                                               expected: "I'll meet on Tuesday at noon", context: 5)
+
+        XCTAssertEqual(span.output, "… on Thursday …")
+        XCTAssertEqual(span.expected, "… on Tuesday …")
+    }
+
+    func testAChangeAtTheStartHasNoEllipsisThere() {
+        let span = DictationReport.changedSpan(output: "Thursday works", expected: "Tuesday works", context: 20)
+
+        XCTAssertEqual(span.output, "Thursday works")
+        XCTAssertEqual(span.expected, "Tuesday works")
+    }
+
+    /// A long dictation cannot go out twice in full, and shortening keeps the start of each text:
+    /// the correction near the end must still be in what is sent.
+    func testALongCorrectionSendsTheChangedPart() {
+        let opening = String(repeating: "We went over the roadmap again. ", count: 90)
+        let output = opening + "Let's meet on Thursday at noon."
+        let expected = opening + "Let's meet on Tuesday at noon."
+
+        let submission = DictationReport.submission(for: draft(output: output, expected: expected))
+
+        XCTAssertTrue(FeedbackSender.fitsLimits(submission))
+        let lines = submission.message.split(separator: "\n").map(String.init)
+        let sentOutput = lines.first { $0.hasPrefix("output: ") }
+        let sentExpected = lines.first { $0.hasPrefix("expected: ") }
+        XCTAssertTrue(sentOutput?.contains("meet on Thursday at noon") == true)
+        XCTAssertTrue(sentExpected?.contains("meet on Tuesday at noon") == true)
+        XCTAssertTrue(sentOutput?.hasPrefix("output: …") == true, "only the part around the change goes")
+    }
+
+    /// When both fit, both go whole: a short report is read as it was dictated.
+    func testAShortCorrectionSendsBothTextsWhole() {
+        let submission = DictationReport.submission(for: draft(output: "Meet on Thursday.", expected: "Meet on Tuesday."))
+
+        XCTAssertTrue(submission.message.contains("output: Meet on Thursday.\nexpected: Meet on Tuesday."))
     }
 }

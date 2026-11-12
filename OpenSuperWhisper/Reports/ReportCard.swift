@@ -1,9 +1,9 @@
 import SwiftUI
 import OpenSuperWhisperCore
 
-/// "Report this transcription", as a card over the main window (#168): what went wrong, an
-/// optional comment, and for a wrong word or name the fix for next time, added to the dictionary
-/// on the spot. The report is saved on this Mac with the audio; nothing is sent.
+/// "Report this transcription", as a card over the main window (#168): what went wrong, what it
+/// should have written, a comment, and for a wrong word or name the fix for next time, added to
+/// the dictionary on the spot. The report is saved on this Mac with the audio; nothing is sent.
 struct ReportCard: View {
     let recording: Recording
     /// Whether the dictionary rules run at all. Off by default, so an entry added here would
@@ -32,6 +32,9 @@ struct ReportCard: View {
 
     private static let editorBaseHeight: CGFloat = 76
     private static let editorMaxHeight: CGFloat = 110
+    /// Taller than the comment: it holds the whole dictation.
+    private static let expectedBaseHeight: CGFloat = 96
+    private static let expectedMaxHeight: CGFloat = 150
 
     #if DEBUG
     /// For the snapshot probe: a draft already filled in, or the card after Save.
@@ -46,7 +49,7 @@ struct ReportCard: View {
         self._dictionaryEnabled = dictionaryEnabled
         self.addToDictionary = addToDictionary
         self.reports = reports
-        var draft = reports.draft(for: recording.id)
+        var draft = reports.draft(for: recording)
         var status = Status.editing
         #if DEBUG
         draft = Self.snapshotDraft ?? draft
@@ -77,7 +80,7 @@ struct ReportCard: View {
             }
         }
         .onChange(of: draft) { _, draft in
-            reports.keepDraft(draft, for: recording.id)
+            reports.keepDraft(draft, for: recording)
         }
     }
 
@@ -124,6 +127,7 @@ struct ReportCard: View {
             do {
                 try await DictationReportSender.send(recording: recording,
                                                      problem: draft.problem, comment: draft.comment,
+                                                     expected: draft.correctedText,
                                                      includeAudio: includeAudio)
                 sendStatus = .sent
             } catch {
@@ -166,16 +170,21 @@ struct ReportCard: View {
                     }
                 }
             }
+            if draft.asksForExpectedText {
+                expectedField
+            }
             if draft.showsWordFields {
                 wordFix
             }
             VStack(alignment: .leading, spacing: 6) {
-                fieldTitle("Comment (optional)")
+                fieldTitle(commentTitle)
                 SEditor(text: $draft.comment,
                         height: min(Self.editorBaseHeight * textScale, Self.editorMaxHeight),
                         fontSize: 14, monospaced: false,
-                        placeholder: "What you said, what you expected, anything that helps.")
-                    .accessibilityLabel(Text("Comment (optional)"))
+                        placeholder: draft.asksForExpectedText
+                            ? "Anything else that helps."
+                            : "What you said, what you expected, anything that helps.")
+                    .accessibilityLabel(Text(commentTitle))
             }
         }
         .padding(.horizontal, 26).padding(.vertical, 20)
@@ -185,6 +194,28 @@ struct ReportCard: View {
         .onKeyPress(.escape) {
             close()
             return .handled
+        }
+    }
+
+    /// "Something else" has no text to correct, so its comment is what the report needs.
+    private var commentTitle: LocalizedStringKey {
+        draft.problem == .other ? "Comment" : "Comment (optional)"
+    }
+
+    /// The text it should have written, starting as the text it did write. Required: the same
+    /// audio gives the same text on the maintainer's Mac, so this is what says what was wrong.
+    private var expectedField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            fieldTitle("What it should have written")
+            Text("Starts as the text you got. Fix the words that came out wrong.")
+                .scaledFont(size: 12)
+                .foregroundColor(STheme.hint)
+                .fixedSize(horizontal: false, vertical: true)
+            SEditor(text: $draft.expected,
+                    height: min(Self.expectedBaseHeight * textScale, Self.expectedMaxHeight),
+                    fontSize: 14, monospaced: false,
+                    placeholder: "What you said")
+                .accessibilityLabel(Text("What it should have written"))
         }
     }
 
@@ -299,6 +330,12 @@ struct ReportCard: View {
                 }
                 .foregroundColor(STheme.warn)
                 .layoutPriority(1)
+            } else if let missing = draft.missing {
+                Text(missingHint(missing))
+                    .scaledFont(size: 12)
+                    .foregroundColor(STheme.hint)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
             }
             Spacer(minLength: 0)
             Button("Cancel", action: cancel)
@@ -310,6 +347,15 @@ struct ReportCard: View {
                 .buttonStyle(.sPrimary)
                 .disabled(!draft.canSave || status == .saving)
                 .keyboardShortcut(.return, modifiers: .command)
+        }
+    }
+
+    /// Why Save is greyed out, next to it.
+    private func missingHint(_ missing: ReportDraft.Missing) -> LocalizedStringKey {
+        switch missing {
+        case .problem: return "Pick what went wrong."
+        case .expectedText: return "Edit the text into what you said to save the report."
+        case .comment: return "Add a comment to save the report."
         }
     }
 
