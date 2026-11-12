@@ -260,10 +260,38 @@ final class LlamaContext {
 
     // MARK: - Generation
 
-    /// Runs a single-shot chat completion: formats the prompt, decodes the prompt
-    /// tokens, then greedily samples up to `maxTokens` tokens, stopping at EOG.
-    func generate(system: String, user: String, maxTokens: Int = 512) -> String {
-        guard let ctx, let sampler else { return "" }
+    /// How a completion ended. Only `.finished` hands back everything the model meant to say.
+    enum Stop: Equatable {
+        /// The model produced its end-of-generation token.
+        case finished
+        /// The reply ran out of tokens first, so the text stops partway.
+        case tokenBudget
+        /// The instructions and the input do not fit in the context. Nothing was generated.
+        case promptTooLong
+        /// `llama_decode` failed. Whatever text came before is incomplete.
+        case decodeFailed
+    }
+
+    struct Completion: Equatable {
+        let text: String
+        let stop: Stop
+    }
+
+    /// The reply budget when the caller sets none: twice the input, plus room for what a cleanup
+    /// adds (list markers, paragraph breaks). A cleanup rewrites its input, so a reply longer than
+    /// this is a model that loops, and stopping it there is reported like any cut reply.
+    static func replyBudget(inputTokens: Int) -> Int {
+        inputTokens * 2 + 256
+    }
+
+    /// Runs a single-shot chat completion: formats the prompt, decodes the prompt tokens, then
+    /// greedily samples until the end-of-generation token or the budget. `maxTokens` nil sizes
+    /// the budget on `user` (`replyBudget`); the room left in the context caps it either way.
+    ///
+    /// The stop reason is the point: a flat 512-token budget used to end long dictations partway
+    /// and the cut text was pasted as if complete (feedback of 2026-11-11).
+    func generate(system: String, user: String, maxTokens: Int? = nil) -> Completion {
+        guard let ctx, let sampler else { return Completion(text: "", stop: .decodeFailed) }
 
         // Every call is an independent completion, so start from an empty KV cache. This is not
         // optional hygiene: `llama_batch_get_one` carries no explicit positions, so llama continues
@@ -277,13 +305,12 @@ final class LlamaContext {
 
         let prompt = formatChatPrompt(system: system, user: user)
         var promptTokens = tokenize(prompt, addSpecial: true)
-        guard !promptTokens.isEmpty else { return "" }
+        guard !promptTokens.isEmpty else { return Completion(text: "", stop: .decodeFailed) }
 
+        // Refused, not trimmed: keeping the tail of a prompt that does not fit drops its head,
+        // which is the system instructions, and the model then answers the bare dictation.
         let nCtx = Int(llama_n_ctx(ctx))
-        if promptTokens.count >= nCtx {
-            // Truncate the prompt if it doesn't fit; leave room for the response.
-            promptTokens = Array(promptTokens.suffix(nCtx - 1))
-        }
+        guard promptTokens.count < nCtx else { return Completion(text: "", stop: .promptTooLong) }
 
         // Decode the prompt as one batch (llama_batch_get_one tracks positions for seq 0).
         var outputBytes: [UInt8] = []
@@ -291,15 +318,20 @@ final class LlamaContext {
             let batch = llama_batch_get_one(buf.baseAddress, Int32(buf.count))
             return llama_decode(ctx, batch) == 0
         }
-        guard batchOK else { return "" }
+        guard batchOK else { return Completion(text: "", stop: .decodeFailed) }
 
+        let limit = maxTokens ?? Self.replyBudget(inputTokens: tokenize(user, addSpecial: false).count)
+        let budget = min(limit, nCtx - promptTokens.count)
+        var stop = Stop.tokenBudget
         var generated = 0
-        let budget = min(maxTokens, max(0, nCtx - promptTokens.count))
         while generated < budget {
             // Sample the next token from the logits of the last decoded position.
             let nextToken = llama_sampler_sample(sampler, ctx, -1)
 
-            if isEndOfGeneration(nextToken) { break }
+            if isEndOfGeneration(nextToken) {
+                stop = .finished
+                break
+            }
 
             llama_sampler_accept(sampler, nextToken)
             outputBytes.append(contentsOf: pieceBytes(for: nextToken))
@@ -310,14 +342,18 @@ final class LlamaContext {
                 let batch = llama_batch_get_one(buf.baseAddress, Int32(buf.count))
                 return llama_decode(ctx, batch) == 0
             }
-            if !batchOK { break }
+            if !batchOK {
+                stop = .decodeFailed
+                break
+            }
 
             generated += 1
         }
 
         // One decode over the whole byte run, so multi-byte characters that straddled two tokens
         // survive intact.
-        return String(decoding: outputBytes, as: UTF8.self)
+        let text = String(decoding: outputBytes, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        return Completion(text: text, stop: stop)
     }
 }

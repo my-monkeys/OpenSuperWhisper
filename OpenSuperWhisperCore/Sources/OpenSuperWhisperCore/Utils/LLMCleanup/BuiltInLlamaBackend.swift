@@ -13,7 +13,17 @@ import Foundation
 public final class BuiltInLlamaBackend: LLMCleanupBackend {
     public static let shared = BuiltInLlamaBackend(computePolicy: CoreAccess.computePolicy)
 
-    enum BuiltInLlamaError: Error { case modelNotReady }
+    enum BuiltInLlamaError: LocalizedError {
+        case modelNotReady
+        case decodeFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .modelNotReady: return "The model could not be loaded"
+            case .decodeFailed: return "The model stopped with an error"
+            }
+        }
+    }
 
     /// Release the inference context (~1.2 GB resident, model + KV cache) after this long with no
     /// cleanup. An occasional dictation shouldn't hold a second model in RAM next to Whisper's own
@@ -71,10 +81,21 @@ public final class BuiltInLlamaBackend: LLMCleanupBackend {
                     continuation.resume(throwing: BuiltInLlamaError.modelNotReady)
                     return
                 }
-                let output = ctx.generate(system: system, user: user)
+                let completion = ctx.generate(system: system, user: user)
                 self.scheduleIdleUnloadOnQueue()
-                continuation.resume(returning: output)
+                continuation.resume(with: Result { try Self.reply(to: completion) })
             }
+        }
+    }
+
+    /// The text of a completion that ended on its own. Any other stop throws, so the caller keeps
+    /// the dictation as heard instead of pasting a reply that ends partway.
+    static func reply(to completion: LlamaContext.Completion) throws -> String {
+        switch completion.stop {
+        case .finished: return completion.text
+        case .tokenBudget: throw CleanupReplyError.cutOff
+        case .promptTooLong: throw CleanupReplyError.tooLong
+        case .decodeFailed: throw BuiltInLlamaError.decodeFailed
         }
     }
 

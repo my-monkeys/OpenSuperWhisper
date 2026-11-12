@@ -37,6 +37,23 @@ public struct CleanupOutcome: Equatable, Sendable {
     }
 }
 
+/// A reply that must not stand in for the dictation, whichever backend wrote it. Worded for the
+/// same one-line notice as `CleanupHTTPError`.
+enum CleanupReplyError: LocalizedError, Equatable {
+    /// The model stopped on a length limit, not because it had finished: the end of the dictation
+    /// is missing from the reply.
+    case cutOff
+    /// The instructions and the dictation do not fit in what the model can read at once.
+    case tooLong
+
+    var errorDescription: String? {
+        switch self {
+        case .cutOff: return "Reply cut off before the end"
+        case .tooLong: return "Dictation too long for the model"
+        }
+    }
+}
+
 /// A non-2xx answer from a cleanup server, worded for a one-line notice: "401 Invalid API key".
 struct CleanupHTTPError: LocalizedError, Equatable {
     let status: Int

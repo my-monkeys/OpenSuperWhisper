@@ -631,10 +631,25 @@ public enum LLMPostProcessor {
             .choices.first?.message.content
     }
 
+    /// The content of a chat completion that the server let finish. `finish_reason: "length"`
+    /// means it stopped on its token limit, so the text ends partway through the dictation.
+    static func chatReply(from data: Data) throws -> String {
+        guard let choice = (try? JSONDecoder().decode(ChatCompletionResponse.self, from: data))?.choices.first
+        else { throw URLError(.cannotParseResponse) }
+        if choice.finishReason == "length" { throw CleanupReplyError.cutOff }
+        return choice.message.content
+    }
+
     private struct ChatCompletionResponse: Decodable {
         struct Choice: Decodable {
             struct Message: Decodable { let content: String }
             let message: Message
+            let finishReason: String?
+
+            enum CodingKeys: String, CodingKey {
+                case message
+                case finishReason = "finish_reason"
+            }
         }
         let choices: [Choice]
     }

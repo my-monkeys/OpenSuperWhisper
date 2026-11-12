@@ -18,7 +18,7 @@ final class CoreLlamaComputePolicyTests: CoreTestCase {
     func testCPUOnlyContextLoadsAndGenerates() throws {
         let model = try requireModel()
         let context = try XCTUnwrap(LlamaContext(modelPath: model.path, gpuLayers: 0))
-        let output = context.generate(system: "Reply with one word.", user: "Say hello.", maxTokens: 16)
+        let output = context.generate(system: "Reply with one word.", user: "Say hello.", maxTokens: 16).text
         XCTAssertFalse(output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
