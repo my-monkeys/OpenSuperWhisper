@@ -93,7 +93,7 @@ public enum TranscriptionReportArchive {
         let audioFile: String?
 
         enum CodingKeys: String, CodingKey {
-            case id, createdAt, recordedAt, problem, comment, writtenAs, shouldBe, rawText, finalText
+            case id, createdAt, recordedAt, problem, comment, writtenAs, shouldBe, expectedText, rawText, finalText
             case model, usedLocalFallback, durationSeconds, languageSetting, appDetails, audioFile, timing
             case ending
         }
@@ -107,6 +107,7 @@ public enum TranscriptionReportArchive {
             try container.encode(report.comment, forKey: .comment)
             try container.encode(report.writtenAs, forKey: .writtenAs)
             try container.encode(report.shouldBe, forKey: .shouldBe)
+            try container.encode(report.expectedText, forKey: .expectedText)
             try container.encode(report.rawText, forKey: .rawText)
             try container.encode(report.finalText, forKey: .finalText)
             try container.encode(report.modelUsed, forKey: .model)

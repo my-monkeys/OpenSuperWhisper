@@ -27,6 +27,10 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
     /// For a wrong word or name: what the model wrote, and what it should have written.
     public var writtenAs: String?
     public var shouldBe: String?
+    /// The whole text the dictation should have produced, as the user corrected it. Without it a
+    /// report only says that something was wrong, and the same audio gives the same text on the
+    /// maintainer's Mac. Nil on reports made before it was asked for, and for "Something else".
+    public var expectedText: String?
     public let finalText: String
     /// The engine's text before the cleanup (`Recording.rawTranscription`), when the history kept it.
     public let rawText: String?
@@ -62,7 +66,7 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
 
     public init(id: UUID = UUID(), createdAt: Date = Date(), recording: Recording,
                 problem: Problem, comment: String = "", writtenAs: String? = nil, shouldBe: String? = nil,
-                languageSetting: String?, appDetails: String) {
+                expectedText: String? = nil, languageSetting: String?, appDetails: String) {
         self.id = id
         self.createdAt = createdAt
         self.recordingID = recording.id
@@ -71,6 +75,7 @@ public struct TranscriptionReport: Identifiable, Codable, FetchableRecord, Persi
         self.comment = comment.trimmingCharacters(in: .whitespacesAndNewlines)
         self.writtenAs = Self.nonBlank(writtenAs)
         self.shouldBe = Self.nonBlank(shouldBe)
+        self.expectedText = Self.nonBlank(expectedText)
         self.finalText = recording.transcription
         self.rawText = recording.rawTranscription
         self.modelUsed = recording.modelUsed

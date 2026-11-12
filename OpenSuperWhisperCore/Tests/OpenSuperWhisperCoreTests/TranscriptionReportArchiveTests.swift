@@ -51,7 +51,7 @@ final class TranscriptionReportArchiveTests: CoreTestCase {
         let entries = try XCTUnwrap(document["reports"] as? [[String: Any]])
         let entry = try XCTUnwrap(entries.first)
         XCTAssertEqual(Set(entry.keys), [
-            "id", "createdAt", "recordedAt", "problem", "comment", "writtenAs", "shouldBe", "rawText",
+            "id", "createdAt", "recordedAt", "problem", "comment", "writtenAs", "shouldBe", "expectedText", "rawText",
             "finalText", "model", "usedLocalFallback", "durationSeconds", "timing", "ending",
             "languageSetting", "appDetails", "audioFile",
         ])

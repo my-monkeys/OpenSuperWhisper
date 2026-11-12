@@ -17,6 +17,9 @@ struct DictationReportDraft: Equatable {
     var durationSeconds: Int
     /// The text the dictation produced, after cleanup and style.
     var output: String
+    /// What it should have written, as the person corrected it. The same audio gives the same
+    /// output on the maintainer's Mac, so this is what says what was wrong.
+    var expected: String? = nil
     /// The raw engine output, sent only when it differs from `output`, so a cleanup bug and an
     /// engine bug can be told apart.
     var rawOutput: String?
@@ -34,8 +37,14 @@ enum DictationReport {
     /// a very long dictation still sends its settings and the start of what it produced.
     static let maxTextLength = 2000
 
+    /// How much unchanged text an excerpt keeps on each side of the correction.
+    static let excerptContext = 150
+
+    /// `excerpt` sends only the corrected part of the output and the expected text, with some
+    /// text around it: for a dictation too long to send twice, where the correction may sit
+    /// past what a shortened copy would keep.
     static func message(for draft: DictationReportDraft, outputLimit: Int, includeRaw: Bool,
-                        includeTiming: Bool = true) -> String {
+                        includeTiming: Bool = true, excerpt: Bool = false) -> String {
         var lines = ["Dictation reported as wrong."]
         let note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         if !note.isEmpty { lines.append(note) }
@@ -44,11 +53,36 @@ enum DictationReport {
             + (draft.translateToEnglish ? " · translate to English: on" : ""))
         lines.append("duration: \(draft.durationSeconds)s")
         if includeTiming, let timing = draft.timing, let line = timingLine(timing) { lines.append(line) }
-        lines.append("output: \(String(draft.output.prefix(max(0, outputLimit))))")
+        var output = draft.output
+        var expected = draft.expected
+        if excerpt, let corrected = expected {
+            (output, expected) = changedSpan(output: output, expected: corrected, context: excerptContext)
+        }
+        lines.append("output: \(String(output.prefix(max(0, outputLimit))))")
+        if let expected {
+            lines.append("expected: \(String(expected.prefix(max(0, outputLimit))))")
+        }
         if includeRaw, let raw = draft.rawOutput, raw != draft.output {
             lines.append("raw: \(String(raw.prefix(max(0, outputLimit))))")
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// The part of each text between their common start and their common end, with `context`
+    /// characters of the shared text around it and "…" where text was left out.
+    static func changedSpan(output: String, expected: String, context: Int) -> (output: String, expected: String) {
+        let got = Array(output), wanted = Array(expected)
+        let shorter = min(got.count, wanted.count)
+        var prefix = 0
+        while prefix < shorter, got[prefix] == wanted[prefix] { prefix += 1 }
+        var suffix = 0
+        while suffix < shorter - prefix, got[got.count - 1 - suffix] == wanted[wanted.count - 1 - suffix] { suffix += 1 }
+        let start = max(0, prefix - context)
+        func cut(_ text: [Character]) -> String {
+            let end = min(text.count, text.count - suffix + context)
+            return (start > 0 ? "…" : "") + String(text[start..<end]) + (end < text.count ? "…" : "")
+        }
+        return (cut(got), cut(wanted))
     }
 
     /// "timing: total 4.3 s · transcribe 1.2 s · cleanup 0.6 s · attempts 1", each clause only
@@ -72,10 +106,11 @@ enum DictationReport {
     /// endpoint, dropping the timing line first, then the raw text, then shortening the output.
     static func submission(for draft: DictationReportDraft, email: String = "") -> FeedbackSubmission {
         let details = "OpenSuperWhisper \(draft.appVersion) · macOS \(draft.osVersion)"
-        func make(outputLimit: Int, includeRaw: Bool, includeTiming: Bool = true) -> FeedbackSubmission {
+        func make(outputLimit: Int, includeRaw: Bool, includeTiming: Bool = true,
+                  excerpt: Bool = false) -> FeedbackSubmission {
             FeedbackSubmission(kind: .bug,
-                               message: message(for: draft, outputLimit: outputLimit,
-                                                includeRaw: includeRaw, includeTiming: includeTiming),
+                               message: message(for: draft, outputLimit: outputLimit, includeRaw: includeRaw,
+                                                includeTiming: includeTiming, excerpt: excerpt),
                                email: email,
                                details: details)
         }
@@ -92,12 +127,20 @@ enum DictationReport {
         let withoutRaw = make(outputLimit: maxTextLength, includeRaw: false, includeTiming: false)
         if FeedbackSender.fitsLimits(withoutRaw) { return withoutRaw }
 
+        // Shortening keeps the start of each text, and the correction may be further in: the
+        // part around it goes first.
+        let excerpt = draft.expected != nil
+        if excerpt {
+            let around = make(outputLimit: maxTextLength, includeRaw: false, includeTiming: false, excerpt: true)
+            if FeedbackSender.fitsLimits(around) { return around }
+        }
+
         var outputLimit = maxTextLength
         while outputLimit > 0 {
             outputLimit /= 2
-            let shorter = make(outputLimit: outputLimit, includeRaw: false, includeTiming: false)
+            let shorter = make(outputLimit: outputLimit, includeRaw: false, includeTiming: false, excerpt: excerpt)
             if FeedbackSender.fitsLimits(shorter) { return shorter }
         }
-        return make(outputLimit: 0, includeRaw: false, includeTiming: false)
+        return make(outputLimit: 0, includeRaw: false, includeTiming: false, excerpt: excerpt)
     }
 }

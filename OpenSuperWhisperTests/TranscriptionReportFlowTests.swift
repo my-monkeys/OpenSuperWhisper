@@ -23,6 +23,54 @@ final class ReportDraftTests: XCTestCase {
         XCTAssertEqual(draft.report(for: recording(), languageSetting: "en", appDetails: "x")?.problem, .other)
     }
 
+    func testAFreshDraftStartsFromWhatCameOut() {
+        let draft = ReportDraft(for: recording())
+
+        XCTAssertEqual(draft.output, "Send the mockups.")
+        XCTAssertEqual(draft.expected, "Send the mockups.")
+        XCTAssertEqual(draft.missing, .problem)
+    }
+
+    /// The same audio gives the same text on the maintainer's Mac: a text problem is only worth
+    /// saving with what should have come out, and an untouched copy of the output says nothing.
+    func testATextProblemNeedsTheCorrectedText() throws {
+        var draft = ReportDraft(for: recording())
+        draft.problem = .wrongWord
+        for untouched in ["Send the mockups.", "  Send the mockups.\n", "", " "] {
+            draft.expected = untouched
+            XCTAssertEqual(draft.missing, .expectedText, untouched)
+            XCTAssertFalse(draft.canSave, untouched)
+            XCTAssertNil(draft.correctedText, untouched)
+        }
+
+        draft.expected = " Send the mock-ups for Tuesday. "
+
+        XCTAssertTrue(draft.canSave)
+        XCTAssertEqual(draft.correctedText, "Send the mock-ups for Tuesday.")
+        let report = try XCTUnwrap(draft.report(for: recording(), languageSetting: "en", appDetails: "x"))
+        XCTAssertEqual(report.expectedText, "Send the mock-ups for Tuesday.")
+    }
+
+    func testEveryTextProblemAsksForIt() {
+        let asking = TranscriptionReport.Problem.offered.filter { ReportDraft(problem: $0).asksForExpectedText }
+        XCTAssertEqual(asking, [.wrongWord, .wrongName, .wrongLanguage, .cleanupChangedMeaning])
+        XCTAssertFalse(ReportDraft().asksForExpectedText)
+    }
+
+    /// "Something else" has no text to correct, so its comment is what it cannot do without, and
+    /// a correction typed before switching to it does not ride along.
+    func testSomethingElseNeedsAComment() throws {
+        var draft = ReportDraft(for: recording())
+        draft.problem = .other
+        draft.expected = "Send the mock-ups."
+        XCTAssertEqual(draft.missing, .comment)
+
+        draft.comment = "The bubble stayed on screen."
+
+        XCTAssertTrue(draft.canSave)
+        XCTAssertNil(try XCTUnwrap(draft.report(for: recording(), languageSetting: "en", appDetails: "x")).expectedText)
+    }
+
     func testWordFieldsOnlyForAWordOrAName() {
         XCTAssertEqual(TranscriptionReport.Problem.offered.filter { ReportDraft(problem: $0).showsWordFields },
                        [.wrongWord, .wrongName])
@@ -149,6 +197,16 @@ final class ReportIssueLinkTests: XCTestCase {
         XCTAssertTrue(body.contains("~~~text\nsend the mock ups and the plan plus notes\n~~~"))
         XCTAssertTrue(body.contains("~~~text\nSend the mockups & the plan + notes.\n~~~"))
         XCTAssertTrue(body.contains("The audio is not attached"))
+        XCTAssertFalse(body.contains("Should have written"), "this report was made without one")
+    }
+
+    func testBodyCarriesWhatItShouldHaveWritten() {
+        var report = report()
+        report.expectedText = "Send the mock-ups & the plan + notes."
+
+        let body = ReportIssueLink.body(for: report)
+
+        XCTAssertTrue(body.contains("**Should have written**\n~~~text\nSend the mock-ups & the plan + notes.\n~~~"))
     }
 
     /// Where it was dictated is private, and the report never kept it.
@@ -263,6 +321,20 @@ final class TranscriptionReportsModelTests: XCTestCase {
     private var root: URL!
     private var store: RecordingStore!
     private var model: TranscriptionReportsModel!
+
+    /// A card closed by ✕ and opened again finds the correction where it was left.
+    func testAReopenedCardFindsTheCorrection() {
+        let recording = Recording(id: UUID(), timestamp: Date(), fileName: "a.wav", transcription: "Meet on Thursday.",
+                                  duration: 2, status: .completed, progress: 1)
+        XCTAssertEqual(model.draft(for: recording), ReportDraft(for: recording))
+
+        var draft = ReportDraft(for: recording)
+        draft.problem = .wrongWord
+        draft.expected = "Meet on Tuesday."
+        model.keepDraft(draft, for: recording)
+
+        XCTAssertEqual(model.draft(for: recording), draft)
+    }
 
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory

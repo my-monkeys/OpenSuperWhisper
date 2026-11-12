@@ -18,6 +18,12 @@ extension UISnapshotProbe {
         },
         "report-card": { reportCard(stagedWord: false) },
         "report-card-word": { reportCard(stagedWord: true) },
+        "report-card-uncorrected": { reportCard(stagedWord: false, problem: .wrongWord) },
+        "report-card-uncorrected-large-text": {
+            AppPreferences.shared.textScale = TextScale.maximum
+            return reportCard(stagedWord: false, problem: .wrongWord)
+        },
+        "report-card-other": { reportCard(stagedWord: false, problem: .other) },
         "report-card-word-large-text": {
             AppPreferences.shared.textScale = TextScale.maximum
             return reportCard(stagedWord: true)
@@ -53,12 +59,20 @@ extension UISnapshotProbe {
         return recent?.first { $0.distinctOriginal != nil }
     }
 
-    private static func reportCard(stagedWord: Bool) -> AnyView {
-        if stagedWord {
-            ReportCard.snapshotDraft = ReportDraft(problem: .wrongWord, comment: "The engine keeps splitting this word in two.",
-                                                   writtenAs: "mock ups", shouldBe: "mockups")
+    /// `stagedWord` fills in a wrong word with its correction; `problem` only picks one, leaving
+    /// the rest as a fresh card has it.
+    private static func reportCard(stagedWord: Bool, problem: TranscriptionReport.Problem? = nil) -> AnyView {
+        let recording = reportedRecording
+        if let recording, stagedWord || problem != nil {
+            var draft = ReportDraft(for: recording)
+            draft.problem = problem ?? .wrongWord
+            if stagedWord {
+                draft.expected = recording.transcription.replacingOccurrences(of: "Thursday", with: "Tuesday")
+                draft.comment = "It hears Thursday every time I say Tuesday."
+            }
+            ReportCard.snapshotDraft = draft
         }
-        AppNavigation.shared.reporting = reportedRecording
+        AppNavigation.shared.reporting = recording
         return AnyView(AppShellView(page: .home))
     }
 
