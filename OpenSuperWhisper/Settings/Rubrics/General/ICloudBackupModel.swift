@@ -22,47 +22,48 @@ final class ICloudBackupModel: ObservableObject {
         self.backup = backup
     }
 
-    func refresh() {
-        isAvailable = backup.isAvailable
-        isEnabled = backup.isEnabled && isAvailable
-        isDownloading = isAvailable && backup.isDownloadPending
-        lastBackup = (try? backup.backup())?.origin
+    func refresh() async {
+        let status = await backup.status()
+        isAvailable = status.isAvailable
+        isEnabled = backup.isEnabled && status.isAvailable
+        isDownloading = status.isAvailable && status.isDownloadPending
+        lastBackup = status.lastBackup
     }
 
-    func setEnabled(_ on: Bool) {
+    func setEnabled(_ on: Bool) async {
         errorMessage = nil
-        guard on else { return turnOff() }
+        guard on else { return await turnOff() }
         // Its author is unknown until it lands, and writing now could replace a good backup.
-        guard !backup.isDownloadPending else {
+        guard !(await backup.isDownloadPending()) else {
             isDownloading = true
             errorMessage = String(localized: "Downloading the backup from iCloud…")
             return
         }
-        if let other = backup.backupFromAnotherMac() {
+        if let other = await backup.backupFromAnotherMac() {
             conflict = other
         } else {
-            turnOn()
+            await turnOn()
         }
     }
 
     /// "Replace it with this Mac's settings".
-    func replaceBackup() {
+    func replaceBackup() async {
         conflict = nil
-        turnOn()
+        await turnOn()
     }
 
     /// "Restore it": the choice was the confirmation, so the values are ready to apply.
-    func restoreFromConflict() -> SettingsTransferModel.PendingImport? {
+    func restoreFromConflict() async -> SettingsTransferModel.PendingImport? {
         conflict = nil
-        let pending = restoreRequest()
-        if pending != nil { turnOn() }
+        let pending = await restoreRequest()
+        if pending != nil { await turnOn() }
         return pending
     }
 
     /// The backup, ready for the same confirmation and import path as the manual file.
-    func restoreRequest() -> SettingsTransferModel.PendingImport? {
+    func restoreRequest() async -> SettingsTransferModel.PendingImport? {
         do {
-            guard let found = try backup.backup() else {
+            guard let found = try await backup.backup() else {
                 errorMessage = String(localized: "No backup in iCloud Drive yet.")
                 return nil
             }
@@ -74,18 +75,18 @@ final class ICloudBackupModel: ObservableObject {
         }
     }
 
-    private func turnOn() {
+    private func turnOn() async {
         AppPreferences.shared.iCloudSettingsBackupEnabled = true
         do {
-            try backup.writeIfChanged()
+            try await backup.writeIfChanged()
         } catch {
             errorMessage = error.localizedDescription
         }
-        refresh()
+        await refresh()
     }
 
-    private func turnOff() {
+    private func turnOff() async {
         AppPreferences.shared.iCloudSettingsBackupEnabled = false
-        refresh()
+        await refresh()
     }
 }

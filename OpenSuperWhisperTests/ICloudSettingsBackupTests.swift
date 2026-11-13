@@ -22,44 +22,53 @@ final class ICloudSettingsBackupTests: XCTestCase {
     }
 
     private func makeBackup(host: String = "Studio", debounce: Duration = .milliseconds(20),
-                            folder: URL? = nil) -> ICloudSettingsBackup {
+                            folder: URL? = nil,
+                            readFile: @escaping @Sendable (URL) throws -> Data = { try Data(contentsOf: $0) }) -> ICloudSettingsBackup {
         ICloudSettingsBackup(folder: folder ?? root.appendingPathComponent("OpenSuperWhisper"),
-                             defaults: defaults, hostName: host, appVersion: "1.2.3", debounce: debounce)
+                             defaults: defaults, hostName: host, appVersion: "1.2.3", debounce: debounce,
+                             readFile: readFile)
     }
 
-    func testWritesTheArchiveWithItsMetadata() throws {
+    func testWritesTheArchiveWithItsMetadata() async throws {
         defaults.set("fr", forKey: "whisperLanguage")
         let backup = makeBackup()
 
-        XCTAssertTrue(try backup.writeIfChanged())
+        let wrote = try await backup.writeIfChanged()
+        XCTAssertTrue(wrote)
 
-        let stored = try XCTUnwrap(try backup.backup())
+        let stored = try await XCTUnwrapAsync(try await backup.backup())
         XCTAssertEqual(stored.values["whisperLanguage"] as? String, "fr")
         XCTAssertEqual(stored.origin.host, "Studio")
         XCTAssertEqual(stored.origin.app, "1.2.3")
         XCTAssertNotNil(stored.origin.exportedAt)
     }
 
-    func testIdenticalSettingsDoNotRewriteTheFile() throws {
+    func testIdenticalSettingsDoNotRewriteTheFile() async throws {
         defaults.set(0.4, forKey: "temperature")
         let backup = makeBackup()
-        XCTAssertTrue(try backup.writeIfChanged())
+        var wrote = try await backup.writeIfChanged()
+        XCTAssertTrue(wrote)
         let before = try Data(contentsOf: backup.fileURL)
 
-        XCTAssertFalse(try backup.writeIfChanged())
+        wrote = try await backup.writeIfChanged()
+        XCTAssertFalse(wrote)
         XCTAssertEqual(try Data(contentsOf: backup.fileURL), before)
 
         defaults.set(0.5, forKey: "temperature")
-        XCTAssertTrue(try backup.writeIfChanged())
+        wrote = try await backup.writeIfChanged()
+        XCTAssertTrue(wrote)
     }
 
-    func testALocalPreferenceNeverReachesTheFile() throws {
+    func testALocalPreferenceNeverReachesTheFile() async throws {
         let backup = makeBackup()
-        XCTAssertTrue(try backup.writeIfChanged())
+        var wrote = try await backup.writeIfChanged()
+        XCTAssertTrue(wrote)
 
         defaults.set(true, forKey: "debugMode")
-        XCTAssertFalse(try backup.writeIfChanged())
-        XCTAssertNil(try backup.backup()?.values["debugMode"])
+        wrote = try await backup.writeIfChanged()
+        XCTAssertFalse(wrote)
+        let stored = try await backup.backup()
+        XCTAssertNil(stored?.values["debugMode"])
     }
 
     func testAChangeIsWrittenOnceThingsSettle() async throws {
@@ -70,7 +79,7 @@ final class ICloudSettingsBackupTests: XCTestCase {
 
         try await Task.sleep(for: .milliseconds(400))
 
-        let stored = try XCTUnwrap(try backup.backup())
+        let stored = try await XCTUnwrapAsync(try await backup.backup())
         XCTAssertEqual(stored.values["whisperLanguage"] as? String, "de")
         XCTAssertEqual(stored.values["autoCopyToClipboard"] as? Bool, true)
     }
@@ -86,26 +95,32 @@ final class ICloudSettingsBackupTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: backup.fileURL.path))
     }
 
-    func testAnotherMacsBackupIsRecognisedAndOwnIsNot() throws {
+    func testAnotherMacsBackupIsRecognisedAndOwnIsNot() async throws {
         defaults.set("fr", forKey: "whisperLanguage")
-        try makeBackup(host: "Laptop").writeIfChanged()
+        try await makeBackup(host: "Laptop").writeIfChanged()
 
-        XCTAssertEqual(makeBackup(host: "Studio").backupFromAnotherMac()?.host, "Laptop")
-        XCTAssertNil(makeBackup(host: "Laptop").backupFromAnotherMac())
+        let fromStudio = await makeBackup(host: "Studio").backupFromAnotherMac()
+        let fromLaptop = await makeBackup(host: "Laptop").backupFromAnotherMac()
+        XCTAssertEqual(fromStudio?.host, "Laptop")
+        XCTAssertNil(fromLaptop)
     }
 
-    func testNoBackupMeansNoConflictAndNothingToRestore() throws {
+    func testNoBackupMeansNoConflictAndNothingToRestore() async throws {
         let backup = makeBackup()
-        XCTAssertNil(backup.backupFromAnotherMac())
-        XCTAssertNil(try backup.backup())
+        let other = await backup.backupFromAnotherMac()
+        let stored = try await backup.backup()
+        XCTAssertNil(other)
+        XCTAssertNil(stored)
     }
 
-    func testMissingICloudDriveDisablesTheBackup() throws {
+    func testMissingICloudDriveDisablesTheBackup() async throws {
         let missing = root.appendingPathComponent("com~apple~CloudDocs").appendingPathComponent("OpenSuperWhisper")
         let backup = makeBackup(folder: missing)
 
-        XCTAssertFalse(backup.isAvailable)
-        XCTAssertFalse(try backup.writeIfChanged())
+        let available = await backup.isAvailable()
+        let wrote = try await backup.writeIfChanged()
+        XCTAssertFalse(available)
+        XCTAssertFalse(wrote)
         XCTAssertFalse(FileManager.default.fileExists(atPath: missing.path))
     }
 
@@ -114,12 +129,13 @@ final class ICloudSettingsBackupTests: XCTestCase {
         laptop.set("it", forKey: "whisperLanguage")
         let laptopBackup = ICloudSettingsBackup(folder: root.appendingPathComponent("OpenSuperWhisper"),
                                                 defaults: laptop, hostName: "Laptop", appVersion: "1.2.3")
-        try laptopBackup.writeIfChanged()
+        try await laptopBackup.writeIfChanged()
         let before = try Data(contentsOf: laptopBackup.fileURL)
 
         let studio = makeBackup(host: "Studio")
         studio.start()
-        studio.restore(try XCTUnwrap(try studio.backup()).values)
+        let found = try await XCTUnwrapAsync(try await studio.backup())
+        studio.restore(found.values)
         try await Task.sleep(for: .milliseconds(300))
 
         XCTAssertEqual(defaults.string(forKey: "whisperLanguage"), "it")
@@ -127,7 +143,7 @@ final class ICloudSettingsBackupTests: XCTestCase {
     }
 
     /// Optimize Mac Storage leaves a hidden `.<name>.icloud` stub where the file will land.
-    func testAPlaceholderIsABackupThatIsNotHereYetAndIsNeverOverwritten() throws {
+    func testAPlaceholderIsABackupThatIsNotHereYetAndIsNeverOverwritten() async throws {
         let backup = makeBackup()
         let folder = backup.folder
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -135,36 +151,70 @@ final class ICloudSettingsBackupTests: XCTestCase {
         try Data("stub".utf8).write(to: placeholder)
         defaults.set("fr", forKey: "whisperLanguage")
 
-        XCTAssertTrue(backup.isDownloadPending)
-        XCTAssertFalse(try backup.writeIfChanged())
+        var pending = await backup.isDownloadPending()
+        var wrote = try await backup.writeIfChanged()
+        let stored = try await backup.backup()
+        XCTAssertTrue(pending)
+        XCTAssertFalse(wrote)
         XCTAssertFalse(FileManager.default.fileExists(atPath: backup.fileURL.path))
-        XCTAssertNil(try backup.backup())
+        XCTAssertNil(stored)
 
         try FileManager.default.removeItem(at: placeholder)
-        XCTAssertFalse(backup.isDownloadPending)
-        XCTAssertTrue(try backup.writeIfChanged())
+        pending = await backup.isDownloadPending()
+        wrote = try await backup.writeIfChanged()
+        XCTAssertFalse(pending)
+        XCTAssertTrue(wrote)
     }
 
-    func testSwitchingOnWaitsForADownloadingBackup() throws {
+    func testSwitchingOnWaitsForADownloadingBackup() async throws {
         let backup = makeBackup()
         try FileManager.default.createDirectory(at: backup.folder, withIntermediateDirectories: true)
         try Data().write(to: backup.folder.appendingPathComponent(".\(SettingsArchive.fileName).icloud"))
         defaults.set(false, forKey: ICloudSettingsBackup.enabledKey)
 
         let model = ICloudBackupModel(backup: backup)
-        model.refresh()
-        model.setEnabled(true)
+        await model.refresh()
+        await model.setEnabled(true)
 
         XCTAssertTrue(model.isDownloading)
         XCTAssertFalse(backup.isEnabled)
     }
 
-    func testTheTestHostStaysOutOfTheRealICloudDrive() throws {
+    /// iCloud Drive can keep a read waiting inside `open()` for as long as it likes. Opening
+    /// Settings used to make that wait on the main thread, which froze the whole app.
+    func testASlowICloudDriveLeavesTheMainThreadFree() async throws {
+        defaults.set("fr", forKey: "whisperLanguage")
+        try await makeBackup(host: "Laptop").writeIfChanged()
+        let slow = makeBackup(readFile: { url in
+            Thread.sleep(forTimeInterval: 0.5)
+            return try Data(contentsOf: url)
+        })
+        let model = ICloudBackupModel(backup: slow)
+
+        let clock = ContinuousClock()
+        let started = clock.now
+        let refreshing = Task { await model.refresh() }
+        try await Task.sleep(for: .milliseconds(20))
+        let mainWaited = clock.now - started
+
+        XCTAssertLessThan(mainWaited, .milliseconds(300), "the main thread waited for iCloud Drive")
+        await refreshing.value
+        XCTAssertEqual(model.lastBackup?.host, "Laptop")
+    }
+
+    func testTheTestHostStaysOutOfTheRealICloudDrive() async throws {
         let folder = ICloudSettingsBackup.shared.folder.path
         let storage = try XCTUnwrap(AppIdentity.storageRoot()).path
+        let available = await ICloudSettingsBackup.shared.isAvailable()
 
         XCTAssertFalse(folder.contains("Mobile Documents"), folder)
         XCTAssertTrue(folder.hasPrefix(storage), folder)
-        XCTAssertFalse(ICloudSettingsBackup.shared.isAvailable)
+        XCTAssertFalse(available)
+    }
+
+    private func XCTUnwrapAsync<T>(_ value: @autoclosure () async throws -> T?,
+                                   file: StaticString = #filePath, line: UInt = #line) async throws -> T {
+        let resolved = try await value()
+        return try XCTUnwrap(resolved, file: file, line: line)
     }
 }
