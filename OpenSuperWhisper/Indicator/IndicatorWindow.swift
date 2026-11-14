@@ -150,16 +150,16 @@ class IndicatorViewModel: ObservableObject {
         }
     }
     
-    /// `pressedAt` is when the trigger key went down, passed on to the recorder's timing log.
-    func startRecording(pressedAt: DispatchTime? = nil) {
+    /// `recorderStarted` is the result of `AudioRecorder.startRecordingInBackground(pressedAt:)`
+    /// when the caller already ran it, so the microphone is not checked twice.
+    func startRecording(recorderStarted: Bool? = nil) {
         // No busy check: a previous dictation may still be transcribing in the background
         // (DictationPipeline). Recording is decoupled from transcription, so a new recording
         // can always start — that's the point of parallel recording. (parallel-recording)
 
         // No input device — surface it instead of optimistically showing "recording" and silently
-        // capturing nothing (#157). `getActiveMicrophone()` reads the cached device, so this stays
-        // off the blocking AVFoundation path that the hotkey tap must avoid (#freeze).
-        guard MicrophoneService.shared.getActiveMicrophone() != nil else {
+        // capturing nothing (#157).
+        guard recorderStarted ?? recorder.startRecordingInBackground() else {
             showError("No microphone available")
             return
         }
@@ -182,10 +182,6 @@ class IndicatorViewModel: ObservableObject {
         takeEnded = false
         recordingStartedAt = Date()
         startListeningForSound()
-
-        Task.detached { [recorder] in
-            recorder.startRecording(pressedAt: pressedAt)
-        }
 
         // Live transcription (Parakeet only): stream in parallel with the WAV recorder so the
         // indicator can show the text as the user speaks. Falls back to the file pass on stop.

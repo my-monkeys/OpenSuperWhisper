@@ -191,6 +191,18 @@ class AudioRecorder: NSObject, ObservableObject {
         Task { @MainActor in IndicatorWindowManager.shared.reportRecordingFailure(message) }
     }
 
+    /// Starts the recording in a detached task and returns at once; false when there is no input
+    /// device. The hotkey path calls it before the caret lookup, the indicator and the context
+    /// capture, which cost 25-60ms on the main thread (more for a browser URL), and every word
+    /// spoken in that time is lost.
+    func startRecordingInBackground(pressedAt: DispatchTime? = nil) -> Bool {
+        // `getActiveMicrophone()` reads the cached device, so this stays off the blocking
+        // AVFoundation path that the hotkey tap must avoid (#freeze).
+        guard MicrophoneService.shared.getActiveMicrophone() != nil else { return false }
+        Task.detached { [self] in startRecording(pressedAt: pressedAt) }
+        return true
+    }
+
     /// `pressedAt` is when the trigger key went down, for the log line that says how long the
     /// microphone took to open after it.
     func startRecording(pressedAt: DispatchTime? = nil) {
