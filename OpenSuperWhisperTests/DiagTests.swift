@@ -22,4 +22,17 @@ final class DiagTests: XCTestCase {
         XCTAssertThrowsError(try Diag.measure("test-throw") { throw Boom() })
         XCTAssertNil(Diag.currentInFlight())
     }
+
+    func testGapIsTheTimeSinceTheLastBeat() {
+        XCTAssertEqual(MainThreadWatchdog.gapNanoseconds(now: 5_000, lastBeat: 2_000), 3_000)
+    }
+
+    func testGapIsZeroRightAfterABeat() {
+        XCTAssertEqual(MainThreadWatchdog.gapNanoseconds(now: 5_000, lastBeat: 5_000), 0)
+    }
+
+    /// The bug: a beat stored after the check read its clock must not wrap into a huge stall.
+    func testABeatNewerThanTheClockReadingIsNoGap() {
+        XCTAssertEqual(MainThreadWatchdog.gapNanoseconds(now: 5_000, lastBeat: 5_001), 0)
+    }
 }

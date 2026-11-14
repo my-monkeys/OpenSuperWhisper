@@ -642,6 +642,24 @@ class AudioRecorder: NSObject, ObservableObject {
         growthObservations >= 2 || elapsed >= connectionGracePeriod
     }
 
+    /// Peak level below which the recorder's meter is reading digital silence.
+    ///
+    /// `AVAudioRecorder` metering bottoms out at -160 dBFS for samples that are exactly zero,
+    /// while a live microphone in a quiet room sits around -60 to -90. The floor is far under
+    /// any real input and far above the metering floor, so only true zeros fall below it.
+    static let silenceFloorDBFS: Float = -140
+
+    /// Whether the meter shows audio from a microphone rather than zeros.
+    ///
+    /// A Bluetooth headset switching into its call profile delivers digital silence for 1.5 to
+    /// 2.75 s while the file grows as fast as ever, so growth alone made the wait end at once and
+    /// the bubble claim "recording" over words that were being lost (#340). nil means the meter
+    /// could not be read, which is not evidence of signal.
+    static func heardSignal(peakDBFS: Float?) -> Bool {
+        guard let peakDBFS else { return false }
+        return peakDBFS > silenceFloorDBFS
+    }
+
     private func startConnectionMonitoring() {
         stopConnectionMonitoring()
 
@@ -663,7 +681,8 @@ class AudioRecorder: NSObject, ObservableObject {
             let currentFileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
             let totalGrowth = currentFileSize - initialFileSize
 
-            if totalGrowth > 8000 {
+            let peak = self.peakPowerDBFS()
+            if totalGrowth > 8000, Self.heardSignal(peakDBFS: peak) {
                 growthCount += 1
             }
 
@@ -672,7 +691,8 @@ class AudioRecorder: NSObject, ObservableObject {
 
             if growthCount < 2 {
                 Diag.mark("recorder.connectionWait timed out after \(Int(elapsed * 1000))ms "
-                    + "with \(totalGrowth) bytes written; going live anyway")
+                    + "with \(totalGrowth) bytes written, peak \(peak.map { "\(Int($0))dBFS" } ?? "n/a"); "
+                    + "going live anyway")
             }
             // Published from the main queue, after checking the take is still this one. This block
             // runs on a background queue: a stop landing just after the guard above would publish

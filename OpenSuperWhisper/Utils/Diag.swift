@@ -120,10 +120,17 @@ final class MainThreadWatchdog {
         }
     }
 
+    /// Time since the last heartbeat. `check()` reads its clock before taking the lock, so the
+    /// main thread can store a newer beat in between; the plain subtraction then wrapped to
+    /// about 2^64 ns and reported a stall of 18446744073 s every few seconds on an idle app.
+    static func gapNanoseconds(now: UInt64, lastBeat: UInt64) -> UInt64 {
+        lastBeat > now ? 0 : now - lastBeat
+    }
+
     private func check() {
         let now = DispatchTime.now().uptimeNanoseconds
         lock.lock()
-        let gapNs = now &- lastBeatNs
+        let gapNs = Self.gapNanoseconds(now: now, lastBeat: lastBeatNs)
         let shouldReport = gapNs >= stallThresholdNs && !reported
         if shouldReport { reported = true }
         lock.unlock()

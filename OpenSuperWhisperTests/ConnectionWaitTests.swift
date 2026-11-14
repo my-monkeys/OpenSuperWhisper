@@ -37,4 +37,17 @@ final class ConnectionWaitTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(AudioRecorder.connectionGracePeriod, 1)
         XCTAssertLessThanOrEqual(AudioRecorder.connectionGracePeriod, 5)
     }
+
+    /// #340: a Bluetooth headset switching profile writes digital silence, which grows the file
+    /// like speech does. Only a meter above the floor means the microphone is live.
+    func testDigitalSilenceIsNotASignal() {
+        XCTAssertFalse(AudioRecorder.heardSignal(peakDBFS: nil))
+        XCTAssertFalse(AudioRecorder.heardSignal(peakDBFS: -160))
+        XCTAssertFalse(AudioRecorder.heardSignal(peakDBFS: -141))
+    }
+
+    func testAQuietRoomIsASignal() {
+        XCTAssertTrue(AudioRecorder.heardSignal(peakDBFS: -60))
+        XCTAssertTrue(AudioRecorder.heardSignal(peakDBFS: -90))
+    }
 }
