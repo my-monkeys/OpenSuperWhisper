@@ -106,14 +106,23 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
     private static func draft(from crash: MXCrashDiagnostic) -> CrashReportDraft {
         let stack = parsedStack(of: crash.callStackTree)
         return CrashReportDraft(kind: .crash, cause: cause(of: crash), frames: stack.frames, images: stack.images,
-                                appVersion: crash.applicationVersion, osVersion: crash.metaData.osVersion)
+                                memoryRegion: crash.virtualMemoryRegionInfo,
+                                exceptionReason: crash.exceptionReason.map {
+                                    CrashReport.exceptionReason(name: $0.exceptionName, className: $0.className,
+                                                                message: $0.composedMessage)
+                                },
+                                diagnosticJSON: crash.jsonRepresentation(),
+                                appVersion: crash.applicationVersion, appBuild: crash.metaData.applicationBuildVersion,
+                                osVersion: crash.metaData.osVersion)
     }
 
     private static func draft(from hang: MXHangDiagnostic) -> CrashReportDraft {
         let stack = parsedStack(of: hang.callStackTree)
         return CrashReportDraft(kind: .hang, cause: "hang for \(hang.hangDuration.value) \(hang.hangDuration.unit.symbol)",
                                 frames: stack.frames, images: stack.images,
-                                appVersion: hang.applicationVersion, osVersion: hang.metaData.osVersion)
+                                diagnosticJSON: hang.jsonRepresentation(),
+                                appVersion: hang.applicationVersion, appBuild: hang.metaData.applicationBuildVersion,
+                                osVersion: hang.metaData.osVersion)
     }
 
     private static func cause(of crash: MXCrashDiagnostic) -> String {

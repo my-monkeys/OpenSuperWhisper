@@ -15,6 +15,8 @@ struct FeedbackSubmission: Equatable {
     var details: String?
     /// The dictation whose audio goes with the message, only when the user picked one.
     var audio: DictationAudioChoice?
+    /// A file already in memory, such as a crash's diagnostic. A picked `audio` replaces it.
+    var attachment: FeedbackAttachment?
 
     /// Sent as the API's free-text `context`, the one field it keeps besides the message and
     /// the email: where the message came from, what it is about, and the details if allowed.
@@ -76,7 +78,7 @@ struct FeedbackSender {
     private static let session = URLSession(configuration: sessionConfiguration)
 
     func send(_ submission: FeedbackSubmission) async throws {
-        var attachment: FeedbackAttachment?
+        var attachment = submission.attachment
         do {
             if let audio = submission.audio { attachment = try await loadAudio(audio) }
         } catch {
