@@ -150,7 +150,8 @@ class IndicatorViewModel: ObservableObject {
         }
     }
     
-    func startRecording() {
+    /// `pressedAt` is when the trigger key went down, passed on to the recorder's timing log.
+    func startRecording(pressedAt: DispatchTime? = nil) {
         // No busy check: a previous dictation may still be transcribing in the background
         // (DictationPipeline). Recording is decoupled from transcription, so a new recording
         // can always start — that's the point of parallel recording. (parallel-recording)
@@ -183,7 +184,7 @@ class IndicatorViewModel: ObservableObject {
         startListeningForSound()
 
         Task.detached { [recorder] in
-            recorder.startRecording()
+            recorder.startRecording(pressedAt: pressedAt)
         }
 
         // Live transcription (Parakeet only): stream in parallel with the WAV recorder so the

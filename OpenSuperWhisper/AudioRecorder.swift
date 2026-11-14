@@ -191,7 +191,9 @@ class AudioRecorder: NSObject, ObservableObject {
         Task { @MainActor in IndicatorWindowManager.shared.reportRecordingFailure(message) }
     }
 
-    func startRecording() {
+    /// `pressedAt` is when the trigger key went down, for the log line that says how long the
+    /// microphone took to open after it.
+    func startRecording(pressedAt: DispatchTime? = nil) {
         Diag.mark("recorder.startRecording (canRecord=\(canRecord))")
         if let blocker = Self.startBlocker(canRecord: canRecord,
                                            microphoneAccess: AVCaptureDevice.authorizationStatus(for: .audio)) {
@@ -208,31 +210,6 @@ class AudioRecorder: NSObject, ObservableObject {
         // Before any of the audio setup, so the connection wait and the state updates that follow
         // are already protected from being throttled. (#98)
         beginRecordingActivity()
-
-        if AppPreferences.shared.pauseMediaOnRecord {
-            MediaPlaybackController.shared.pauseMedia()
-        }
-        // Chime first, then lower the volume: ducked first, the start chime played at the
-        // ducked level, 10% by default, and could not be heard at all, while the end chime,
-        // played after the restore, could.
-        var chimeLength: TimeInterval = 0
-        if AppPreferences.shared.playSoundOnRecordStart {
-            playNotificationSound()
-            chimeLength = Self.chimeAudibleLength
-        }
-        if AppPreferences.shared.reduceVolumeOnRecord {
-            let level = Float32(AppPreferences.shared.reduceVolumeLevel)
-            // Checked when it fires: a take stopped meanwhile has already restored the volume.
-            let duck = DispatchWorkItem { [weak self] in
-                guard self?.currentRecordingURL != nil else { return }
-                SystemVolumeController.shared.duck(to: level)
-            }
-            DispatchQueue.main.async { [weak self] in
-                self?.pendingDuck?.cancel()
-                self?.pendingDuck = duck
-                DispatchQueue.main.asyncAfter(deadline: .now() + chimeLength, execute: duck)
-            }
-        }
 
         // A UUID suffix keeps each recording's temp file unique. Without it, two recordings
         // started in the same wall-clock second share a path — and starting the next recording
@@ -266,6 +243,39 @@ class AudioRecorder: NSObject, ObservableObject {
         updateRecordingState(isRecording: false, isConnecting: requiresConnection)
         startRecordingWithRecorder(fileURL: fileURL, channelCount: channels.recorded,
                                    monitorConnection: requiresConnection)
+
+        // After the mic is open: pausing media, the chime and the duck cost ~100ms that would
+        // otherwise sit between the key press and the first captured sample. A failed start has
+        // no stop to undo them, so it skips them.
+        guard currentRecordingURL != nil else { return }
+        if let pressedAt {
+            let ms = Double(DispatchTime.now().uptimeNanoseconds &- pressedAt.uptimeNanoseconds) / 1_000_000
+            Diag.mark("key press -> recording started after \(Int(ms.rounded())) ms")
+        }
+        if AppPreferences.shared.pauseMediaOnRecord {
+            Diag.measure("media.pause") { MediaPlaybackController.shared.pauseMedia() }
+        }
+        // Chime first, then lower the volume: ducked first, the start chime would play at the
+        // ducked level, 10% by default, and be inaudible, while the end chime plays after the
+        // restore.
+        var chimeLength: TimeInterval = 0
+        if AppPreferences.shared.playSoundOnRecordStart {
+            Diag.measure("chime.start") { playNotificationSound() }
+            chimeLength = Self.chimeAudibleLength
+        }
+        if AppPreferences.shared.reduceVolumeOnRecord {
+            let level = Float32(AppPreferences.shared.reduceVolumeLevel)
+            // Checked when it fires: a take stopped meanwhile has already restored the volume.
+            let duck = DispatchWorkItem { [weak self] in
+                guard self?.currentRecordingURL != nil else { return }
+                SystemVolumeController.shared.duck(to: level)
+            }
+            DispatchQueue.main.async { [weak self] in
+                self?.pendingDuck?.cancel()
+                self?.pendingDuck = duck
+                DispatchQueue.main.asyncAfter(deadline: .now() + chimeLength, execute: duck)
+            }
+        }
     }
 
     struct ChannelChoice {

@@ -459,6 +459,7 @@ class ShortcutManager {
         holdWorkItem?.cancel()
         holdMode = false
 
+        let pressedAt = DispatchTime.now()
         let now = ProcessInfo.processInfo.systemUptime
         let isDoubleTap = AppPreferences.shared.latchRecordingWithSpace
             && Self.isDoubleTap(now: now, previous: lastKeyDownTime, threshold: doubleTapThreshold)
@@ -487,7 +488,7 @@ class ShortcutManager {
                 let vm = Diag.measure("IndicatorWindowManager.show") {
                     IndicatorWindowManager.shared.show(nearPoint: indicatorPoint)
                 }
-                Diag.measure("vm.startRecording") { vm.startRecording() }
+                Diag.measure("vm.startRecording") { vm.startRecording(pressedAt: pressedAt) }
                 self.activeVm = vm
                 self.recordingStartedUptime = ProcessInfo.processInfo.systemUptime
                 self.startLatchTapIfEnabled()
