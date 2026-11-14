@@ -11,13 +11,19 @@ final class SystemVolumeController {
     /// The volume captured before ducking, restored on `restore()`. nil when not ducked.
     private var savedVolume: Float32?
 
-    /// Lowers the output volume to `level` (0...1), remembering the current volume.
-    /// No-op if already ducked or the device volume can't be read.
-    func duck(to level: Float32) {
+    /// Lowers the output volume to `fraction` (0...1) of the current volume, remembering the
+    /// current volume. No-op if already ducked or the device volume can't be read.
+    func duck(toFractionOf fraction: Float32) {
         guard savedVolume == nil, let device = Self.defaultOutputDevice(),
               let current = Self.volume(of: device) else { return }
         savedVolume = current
-        Self.setVolume(level, of: device)
+        Self.setVolume(Self.duckedVolume(current: current, fraction: fraction), of: device)
+    }
+
+    /// A share of the current volume, so ducking only ever lowers it. An absolute level
+    /// would raise a quiet output.
+    static func duckedVolume(current: Float32, fraction: Float32) -> Float32 {
+        current * max(0, min(1, fraction))
     }
 
     /// Restores the volume captured by the last `duck`.

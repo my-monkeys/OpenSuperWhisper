@@ -1236,7 +1236,8 @@ final class AppPreferences {
     @UserDefault(key: "reduceVolumeOnRecord", defaultValue: false)
     var reduceVolumeOnRecord: Bool
 
-    /// Target output volume (0...1) while recording when `reduceVolumeOnRecord` is on.
+    /// Output volume while recording, as a fraction (0...1) of the volume when the take starts,
+    /// when `reduceVolumeOnRecord` is on.
     @UserDefault(key: "reduceVolumeLevel", defaultValue: 0.1)
     var reduceVolumeLevel: Double
 

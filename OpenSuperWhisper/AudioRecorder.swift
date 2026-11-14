@@ -310,7 +310,7 @@ class AudioRecorder: NSObject, ObservableObject {
             // Checked when it fires: a take stopped meanwhile has already restored the volume.
             let duck = DispatchWorkItem { [weak self] in
                 guard self?.currentRecordingURL != nil else { return }
-                SystemVolumeController.shared.duck(to: level)
+                SystemVolumeController.shared.duck(toFractionOf: level)
             }
             DispatchQueue.main.async { [weak self] in
                 self?.pendingDuck?.cancel()
