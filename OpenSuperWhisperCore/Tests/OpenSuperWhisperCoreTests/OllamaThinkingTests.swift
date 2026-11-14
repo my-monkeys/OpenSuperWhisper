@@ -2,7 +2,7 @@ import XCTest
 @testable import OpenSuperWhisperCore
 
 /// Turning Ollama's thinking off for a cleanup (#339): what `/api/show` allows decides what is sent.
-final class OllamaThinkingTests: XCTestCase {
+final class OllamaThinkingTests: CoreTestCase {
     private func show(_ thinking: String?) -> Data {
         let field = thinking.map { ",\"thinking\":\($0)" } ?? ""
         return Data("{\"details\":{\"family\":\"gemma\"}\(field)}".utf8)
