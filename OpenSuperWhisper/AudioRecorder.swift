@@ -23,21 +23,6 @@ class AudioRecorder: NSObject, ObservableObject {
     var currentRecordingURL: URL? { take.withLockUnchecked { $0.url } }
     private var notificationObserver: Any?
     private var microphoneChangeObserver: Any?
-    // Keeps audio hardware warm so the first word is never cut off. Only touched on `warmQueue`.
-    private var primedRecorder: AVAudioRecorder?
-    /// Where the warm recorder is made and released. Takes start off the main thread and stops
-    /// land on it, so the recorder used to be assigned from both at once. Preparing one also
-    /// opens the input, which can be slow while a Bluetooth headset switches profile.
-    private let warmQueue = DispatchQueue(label: "fr.my-monkey.opensuperwhisper.warm-recorder",
-                                          qos: .userInitiated)
-    /// True from the start of a take to its end, on `warmQueue`. An input change meanwhile
-    /// leaves the warm recorder alone; the end of the take re-arms it.
-    private var takeHoldsInput = false
-    private var systemInputObserver: Any?
-    private lazy var warmRecorderRearm = Debouncer(delay: 0.5) { [weak self] in
-        self?.primeAudioHardware()
-    }
-
     /// The take in progress, behind its lock (see `RecorderTakeState`). Its `activity` holds App
     /// Nap off for as long as a recording is running, and is nil when nothing is recording.
     ///
@@ -78,14 +63,10 @@ class AudioRecorder: NSObject, ObservableObject {
         if let observer = microphoneChangeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
-        if let observer = systemInputObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
     
     private func setup() {
         updateCanRecordStatus()
-        primeAudioHardware()
 
         notificationObserver = NotificationCenter.default.addObserver(
             forName: .AVCaptureDeviceWasConnected,
@@ -110,78 +91,12 @@ class AudioRecorder: NSObject, ObservableObject {
         ) { [weak self] _ in
             self?.updateCanRecordStatus()
         }
-
-        // The warm recorder follows the system input. Left as it was, connecting earbuds moved
-        // it onto them and held them in their call profile from the moment they connected,
-        // the very thing the Bluetooth check below exists to avoid (#247).
-        systemInputObserver = NotificationCenter.default.addObserver(
-            forName: .systemInputDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.warmRecorderRearm.fire()
-        }
     }
 
     private func updateCanRecordStatus() {
         canRecord = MicrophoneService.shared.getActiveMicrophone() != nil
     }
 
-    /// Whether to keep a prepared recorder between takes. A warm recorder holds the system input
-    /// open, which pins a Bluetooth headset to its HFP "call" profile (mono, low quality) for as
-    /// long as we keep it, and music on that headset stays degraded until the app quits (#247).
-    /// The system input is what the warm recorder sits on, so it is checked as well as the chosen
-    /// mic: with the built-in mic chosen, connecting earbuds still makes them the system input.
-    static func keepsWarmRecorder(activeMicIsBluetooth: Bool, systemInputIsBluetooth: Bool) -> Bool {
-        !activeMicIsBluetooth && !systemInputIsBluetooth
-    }
-
-    /// Pre-warms the audio hardware by creating a prepared (but not recording) AVAudioRecorder,
-    /// which removes the cold-start delay of the first real recording. Called at launch, after
-    /// each take, and when the inputs change; the old recorder is released first so it never
-    /// stays on a device that is gone or that is no longer the input.
-    ///
-    /// Not kept for Bluetooth: the headset stays in A2DP while idle and returns to it right after
-    /// a take, at the cost of a slightly slower first word, which the connection wait absorbs.
-    private func primeAudioHardware(afterTake: Bool = false) {
-        // The hosted test runner launches the app under another code signature, so preparing a
-        // recorder there makes macOS ask for the microphone and the runner hangs on the prompt.
-        guard !DefaultsStore.isRunningTests else { return }
-        let service = MicrophoneService.shared
-        let keepWarm = Self.keepsWarmRecorder(activeMicIsBluetooth: service.isActiveMicrophoneBluetooth(),
-                                              systemInputIsBluetooth: service.isSystemInputBluetooth())
-        let primedURL = temporaryDirectory.appendingPathComponent("primed.wav")
-        warmQueue.async { [weak self] in
-            guard let self else { return }
-            if afterTake { takeHoldsInput = false }
-            guard !takeHoldsInput else { return }
-            primedRecorder = nil
-            guard keepWarm else {
-                Diag.mark("recorder.warm off: Bluetooth input")
-                return
-            }
-            let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatLinearPCM),
-                AVSampleRateKey: 16000.0,
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true
-            ]
-            primedRecorder = try? AVAudioRecorder(url: primedURL, settings: settings)
-            primedRecorder?.prepareToRecord()
-            Diag.mark("recorder.warm armed")
-        }
-    }
-
-    /// Hands the input to a take. Queued rather than done in place, so the start never waits on
-    /// a recorder that is still being prepared.
-    private func releaseWarmRecorderForTake() {
-        warmQueue.async { [weak self] in
-            self?.takeHoldsInput = true
-            self?.primedRecorder = nil
-        }
-    }
-    
     private func createTemporaryDirectoryIfNeeded() {
         do {
             try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
@@ -395,7 +310,6 @@ class AudioRecorder: NSObject, ObservableObject {
         ]
         
         do {
-            releaseWarmRecorderForTake()  // the hardware stays warm across the hand-over
             let recorder = try Diag.measure("AVAudioRecorder init+record") { () throws -> AVAudioRecorder in
                 let recorder = try AVAudioRecorder(url: fileURL, settings: settings)
                 recorder.delegate = self
@@ -420,7 +334,6 @@ class AudioRecorder: NSObject, ObservableObject {
             // No recording to protect, and nothing will call `stopRecording` for a start that
             // never happened — so release the assertion here or it is held for ever.
             endRecordingActivity()
-            primeAudioHardware(afterTake: true)
             reportStartFailure(String(localized: "Recording could not start"))
         }
     }
@@ -446,7 +359,6 @@ class AudioRecorder: NSObject, ObservableObject {
         recorder.stop()
         try? FileManager.default.removeItem(at: fileURL)
         orphan.activity.map(ProcessInfo.processInfo.endActivity)
-        if !orphan.newerTake { primeAudioHardware(afterTake: true) }
         Diag.mark("recorder.start abandoned: stopped during start")
         return true
     }
@@ -507,7 +419,6 @@ class AudioRecorder: NSObject, ObservableObject {
         updateRecordingState(isRecording: false, isConnecting: false)
         Task { @MainActor in SpectrumAnalyzer.shared.stop() }
         stopConnectionMonitoring()
-        primeAudioHardware(afterTake: true)  // so the next recording starts instantly too
 
         if AppPreferences.shared.pauseMediaOnRecord {
             MediaPlaybackController.shared.resumeMedia()
@@ -556,7 +467,6 @@ class AudioRecorder: NSObject, ObservableObject {
         updateRecordingState(isRecording: false, isConnecting: false)
         Task { @MainActor in SpectrumAnalyzer.shared.stop() }
         stopConnectionMonitoring()
-        primeAudioHardware(afterTake: true)
 
         if AppPreferences.shared.pauseMediaOnRecord {
             MediaPlaybackController.shared.resumeMedia()
@@ -733,7 +643,6 @@ extension AudioRecorder: AVAudioRecorderDelegate {
         stopConnectionMonitoring()
         endRecordingActivity()
         updateRecordingState(isRecording: false, isConnecting: false)
-        primeAudioHardware(afterTake: true)
 
         Task { @MainActor in
             SpectrumAnalyzer.shared.stop()

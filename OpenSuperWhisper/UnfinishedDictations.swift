@@ -58,7 +58,7 @@ final class UnfinishedDictations: ObservableObject {
     }
 
     /// Moves the takes an earlier version left in `legacy` into `directory`, so the scan treats
-    /// them like any other. Only `rec-*.wav` goes: `primed.wav` is the recorder's warm-up file.
+    /// them like any other. Only `rec-*.wav` goes; other files stay.
     /// Those the old folder has held for longer than the retention are deleted rather than
     /// moved, by modification date since a take's name says when it started, not when it stopped.
     /// Runs at launch, when the recorder owns none of them: it records into `directory` now.
