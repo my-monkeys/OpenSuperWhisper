@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import AppKit
 import CoreAudio
+import os
 import OpenSuperWhisperCore
 
 class AudioRecorder: NSObject, ObservableObject {
@@ -12,7 +13,6 @@ class AudioRecorder: NSObject, ObservableObject {
     @Published var canRecord = false
     @Published var isConnecting = false
     
-    private var audioRecorder: AVAudioRecorder?
     private var audioPlayer: AVAudioPlayer?
     private var notificationSound: NSSound?
     /// The volume duck waiting for the start chime to finish. Cancelled by a stop that lands
@@ -20,11 +20,9 @@ class AudioRecorder: NSObject, ObservableObject {
     private var pendingDuck: DispatchWorkItem?
     private let temporaryDirectory: URL
     /// The take being written, which nothing else may touch until it is stopped.
-    private(set) var currentRecordingURL: URL?
+    var currentRecordingURL: URL? { take.withLockUnchecked { $0.url } }
     private var notificationObserver: Any?
     private var microphoneChangeObserver: Any?
-    private var connectionCheckTimer: DispatchSourceTimer?
-    private var recordingDeviceID: AudioDeviceID?
     // Keeps audio hardware warm so the first word is never cut off. Only touched on `warmQueue`.
     private var primedRecorder: AVAudioRecorder?
     /// Where the warm recorder is made and released. Takes start off the main thread and stops
@@ -40,7 +38,8 @@ class AudioRecorder: NSObject, ObservableObject {
         self?.primeAudioHardware()
     }
 
-    /// Holds App Nap off for as long as a recording is running. Nil when nothing is recording.
+    /// The take in progress, behind its lock (see `RecorderTakeState`). Its `activity` holds App
+    /// Nap off for as long as a recording is running, and is nil when nothing is recording.
     ///
     /// App Nap throttles timers and defers dispatch work for an app that is not frontmost and has
     /// no visible window — which describes every dictation, since the point of the app is to record
@@ -57,7 +56,7 @@ class AudioRecorder: NSObject, ObservableObject {
     ///
     /// Idle *system* sleep is deliberately left enabled: a recording that somehow never ends should
     /// not also keep the Mac awake for ever.
-    private var recordingActivity: NSObjectProtocol?
+    private let take = RecorderTakeLock(initialState: RecorderTakeState())
 
     // MARK: - Singleton Instance
 
@@ -230,27 +229,33 @@ class AudioRecorder: NSObject, ObservableObject {
     }
     
     /// Tells the system this app is doing work the user asked for, so App Nap leaves it alone.
-    /// See `recordingActivity`. Ending any assertion already held keeps them from stacking: a
+    /// See `take.activity`. Ending any assertion already held keeps them from stacking: a
     /// start that never saw a matching stop would otherwise leak one and hold App Nap off for good.
     /// Internal rather than private so a test can check the pair stays balanced.
     func beginRecordingActivity() {
-        endRecordingActivity()
-        recordingActivity = ProcessInfo.processInfo.beginActivity(
+        let activity = ProcessInfo.processInfo.beginActivity(
             options: .userInitiatedAllowingIdleSystemSleep,
             reason: "Recording audio for dictation")
+        let previous = take.withLockUnchecked { state -> NSObjectProtocol? in
+            defer { state.activity = activity }
+            return state.activity
+        }
+        previous.map(ProcessInfo.processInfo.endActivity)
     }
 
     /// Releases the assertion. Safe to call when none is held, which is what makes it usable both
     /// on every exit path and as the guard against stacking in `beginRecordingActivity`.
     func endRecordingActivity() {
-        guard let activity = recordingActivity else { return }
-        ProcessInfo.processInfo.endActivity(activity)
-        recordingActivity = nil
+        let activity = take.withLockUnchecked { state -> NSObjectProtocol? in
+            defer { state.activity = nil }
+            return state.activity
+        }
+        activity.map(ProcessInfo.processInfo.endActivity)
     }
 
     /// Whether an assertion is currently held. Exists so a test can check that starting and
     /// stopping a recording leaves none behind.
-    var isHoldingRecordingActivity: Bool { recordingActivity != nil }
+    var isHoldingRecordingActivity: Bool { take.withLockUnchecked { $0.activity != nil } }
 
     /// Why a start cannot even be attempted, nil when it can. Said to the bubble, which has
     /// already shown "recording": without it the bubble stayed on that until the user stopped it.
@@ -321,7 +326,7 @@ class AudioRecorder: NSObject, ObservableObject {
         let timestamp = Int(Date().timeIntervalSince1970)
         let filename = "rec-\(timestamp)-\(UUID().uuidString.prefix(8)).wav"
         let fileURL = UnfinishedDictations.directory.appendingPathComponent(filename)
-        currentRecordingURL = fileURL
+        take.withLockUnchecked { $0.url = fileURL }
 
         print("start record file to \(fileURL)")
 
@@ -333,7 +338,7 @@ class AudioRecorder: NSObject, ObservableObject {
             print("Set system default input to: \(activeMic.displayName)")
 
             if let deviceID = MicrophoneService.shared.getCoreAudioDeviceID(for: activeMic) {
-                recordingDeviceID = deviceID
+                take.withLockUnchecked { $0.deviceID = deviceID }
             }
         }
         #endif
@@ -395,13 +400,17 @@ class AudioRecorder: NSObject, ObservableObject {
         
         do {
             releaseWarmRecorderForTake()  // the hardware stays warm across the hand-over
-            try Diag.measure("AVAudioRecorder init+record") {
-                audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
-                audioRecorder?.delegate = self
+            let recorder = try Diag.measure("AVAudioRecorder init+record") { () throws -> AVAudioRecorder in
+                let recorder = try AVAudioRecorder(url: fileURL, settings: settings)
+                recorder.delegate = self
                 // Always on: the bubble reads it to notice a microphone that hears nothing.
-                audioRecorder?.isMeteringEnabled = true
-                audioRecorder?.record()
+                recorder.isMeteringEnabled = true
+                // Published before `record()` so a stop landing meanwhile can reach it.
+                take.withLockUnchecked { $0.recorder = recorder }
+                recorder.record()
+                return recorder
             }
+            if abandonStartIfEnded(recorder, fileURL: fileURL) { return }
             Task { @MainActor in SpectrumAnalyzer.shared.start() }
             if monitorConnection {
                 startConnectionMonitoring()
@@ -411,7 +420,7 @@ class AudioRecorder: NSObject, ObservableObject {
             print("Recording started successfully")
         } catch {
             print("Failed to start recording: \(error)")
-            currentRecordingURL = nil
+            take.withLockUnchecked { $0.url = nil }
             // No recording to protect, and nothing will call `stopRecording` for a start that
             // never happened — so release the assertion here or it is held for ever.
             endRecordingActivity()
@@ -420,10 +429,36 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
+    /// Whether a start finds its take already ended: a stop, a cancel or the delegate cleared the
+    /// URL while the recorder was being made, or the next take has replaced it.
+    static func startWasAbandoned(startedURL: URL, currentURL: URL?) -> Bool {
+        currentURL != startedURL
+    }
+
+    /// Cleans up after a start that a stop beat to it. The recorder it just began is an orphan
+    /// that nobody will stop, so it would keep the microphone open and write a file for good.
+    private func abandonStartIfEnded(_ recorder: AVAudioRecorder, fileURL: URL) -> Bool {
+        // The activity is released only when no take owns it: a newer take holds its own.
+        let orphanedActivity = take.withLockUnchecked { state -> (abandoned: Bool, activity: NSObjectProtocol?) in
+            guard Self.startWasAbandoned(startedURL: fileURL, currentURL: state.url) else { return (false, nil) }
+            if state.recorder === recorder { state.recorder = nil }
+            guard state.url == nil else { return (true, nil) }
+            defer { state.activity = nil }
+            return (true, state.activity)
+        }
+        guard orphanedActivity.abandoned else { return false }
+        recorder.stop()
+        try? FileManager.default.removeItem(at: fileURL)
+        orphanedActivity.activity.map(ProcessInfo.processInfo.endActivity)
+        primeAudioHardware(afterTake: true)
+        Diag.mark("recorder.start abandoned: stopped during start")
+        return true
+    }
+
     /// The loudest sample since the last reading, in dBFS, across the recorded channels; nil
     /// while nothing records.
     func peakPowerDBFS() -> Float? {
-        guard let recorder = audioRecorder, recorder.isRecording else { return nil }
+        guard let recorder = take.withLockUnchecked({ $0.recorder }), recorder.isRecording else { return nil }
         recorder.updateMeters()
         let channels = Int(recorder.format.channelCount)
         return (0..<max(channels, 1)).map { recorder.peakPower(forChannel: $0) }.max()
@@ -466,7 +501,11 @@ class AudioRecorder: NSObject, ObservableObject {
         // Runs on the main thread (IndicatorViewModel is @MainActor). AudioQueueStop waits for the
         // queue to drain, so an input device pulled out from under it could stall the app here —
         // timed so a `▶` with no `◀` would name it rather than leaving a silent freeze.
-        Diag.measure("AVAudioRecorder.stop") { audioRecorder?.stop() }
+        let recorder = take.withLockUnchecked { state -> AVAudioRecorder? in
+            defer { state.recorder = nil }
+            return state.recorder
+        }
+        Diag.measure("AVAudioRecorder.stop") { recorder?.stop() }
         endRecordingActivity()
 
         updateRecordingState(isRecording: false, isConnecting: false)
@@ -482,8 +521,10 @@ class AudioRecorder: NSObject, ObservableObject {
             SystemVolumeController.shared.restore()
         }
 
-        let url = currentRecordingURL
-        currentRecordingURL = nil
+        let url = take.withLockUnchecked { state -> URL? in
+            defer { state.url = nil }
+            return state.url
+        }
 
         let duration = url.flatMap { try? AVAudioPlayer(contentsOf: $0).duration } ?? 0
         let outcome = StopOutcome.of(url: url, duration: duration)
@@ -510,7 +551,11 @@ class AudioRecorder: NSObject, ObservableObject {
 
     func cancelRecording() {
         // Same blocking AudioQueueStop as `stopRecording`, timed for the same reason.
-        Diag.measure("AVAudioRecorder.stop (cancel)") { audioRecorder?.stop() }
+        let recorder = take.withLockUnchecked { state -> AVAudioRecorder? in
+            defer { state.recorder = nil }
+            return state.recorder
+        }
+        Diag.measure("AVAudioRecorder.stop (cancel)") { recorder?.stop() }
         endRecordingActivity()
         updateRecordingState(isRecording: false, isConnecting: false)
         Task { @MainActor in SpectrumAnalyzer.shared.stop() }
@@ -525,10 +570,13 @@ class AudioRecorder: NSObject, ObservableObject {
             SystemVolumeController.shared.restore()
         }
         
-        if let url = currentRecordingURL {
+        let url = take.withLockUnchecked { state -> URL? in
+            defer { state.url = nil }
+            return state.url
+        }
+        if let url {
             try? FileManager.default.removeItem(at: url)
         }
-        currentRecordingURL = nil
     }
     
     
@@ -608,7 +656,13 @@ class AudioRecorder: NSObject, ObservableObject {
         var growthCount = 0
 
         timer.setEventHandler { [weak self] in
-            guard let self = self, let _ = self.audioRecorder, let url = self.currentRecordingURL else { return }
+            guard let self = self else { return }
+            let (recorder, url) = self.take.withLockUnchecked { ($0.recorder, $0.url) }
+            guard recorder != nil, let url else {
+                // The take ended before this timer was stored, so no stop will cancel it.
+                if url == nil { timer.cancel() }
+                return
+            }
 
             let currentFileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
             let totalGrowth = currentFileSize - initialFileSize
@@ -635,13 +689,16 @@ class AudioRecorder: NSObject, ObservableObject {
                 self.isConnecting = false
             }
         }
-        connectionCheckTimer = timer
+        take.withLockUnchecked { $0.connectionTimer = timer }
         timer.resume()
     }
 
     private func stopConnectionMonitoring() {
-        connectionCheckTimer?.cancel()
-        connectionCheckTimer = nil
+        let timer = take.withLockUnchecked { state -> DispatchSourceTimer? in
+            defer { state.connectionTimer = nil }
+            return state.connectionTimer
+        }
+        timer?.cancel()
     }
 }
 
@@ -656,7 +713,7 @@ extension AudioRecorder: AVAudioRecorderDelegate {
         // AirPods reconfigure the input route out from under the recorder, which is one reliable
         // way to get here; the built-in microphone never does it, which is why it only happened
         // with AirPods.
-        currentRecordingURL = nil
+        take.withLockUnchecked { $0.url = nil }
         stopConnectionMonitoring()
         endRecordingActivity()
         updateRecordingState(isRecording: false, isConnecting: false)
