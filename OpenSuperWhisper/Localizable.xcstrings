@@ -57353,6 +57353,52 @@
         }
       }
     },
+    "Asks the model not to think before it answers, which a cleanup does not need and which takes seconds. Only models that can switch thinking off are asked.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande au modèle de ne pas réfléchir avant de répondre : un nettoyage n'en a pas besoin et cela prend plusieurs secondes. Seuls les modèles capables de désactiver la réflexion sont concernés."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bittet das Modell, vor der Antwort nicht nachzudenken: Eine Bereinigung braucht das nicht und es kostet Sekunden. Nur Modelle, die das Nachdenken abschalten können, werden gefragt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pide al modelo que no piense antes de responder: una limpieza no lo necesita y tarda segundos. Solo se pide a los modelos que pueden desactivar el razonamiento."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiede al modello di non ragionare prima di rispondere: una pulizia non ne ha bisogno e richiede secondi. Viene chiesto solo ai modelli che possono disattivare il ragionamento."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pede ao modelo que não pense antes de responder: uma limpeza não precisa disso e leva segundos. Só é pedido aos modelos que conseguem desativar o raciocínio."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yêu cầu mô hình không suy nghĩ trước khi trả lời: việc dọn dẹp không cần điều này và mất vài giây. Chỉ áp dụng cho các mô hình có thể tắt suy nghĩ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要求模型在回答前不要思考：清理用不到，而且要多花几秒。只对能够关闭思考的模型生效。"
+          }
+        }
+      }
+    },
     "Chosen on the Style page.": {
       "localizations": {
         "de": {
