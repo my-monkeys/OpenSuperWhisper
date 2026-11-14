@@ -6,7 +6,7 @@ struct TextAICleanupGroup: View {
     @ObservedObject var viewModel: SettingsViewModel
 
     /// The stock pattern, as `AppPreferences` declares it. Kept here to tell a customised one apart.
-    static let defaultFillerPattern = "\\b(um|uh|uh huh|er|ah|hmm|mm)\\b,?\\s*"
+    static let defaultFillerPattern = AppPreferences.defaultFillerPattern
 
     /// One backend serves both this prose cleanup and the per-app formatting rules, so
     /// its fields stay visible while either is on: someone using formatting only would otherwise

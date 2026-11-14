@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 import KeyboardShortcuts
 import OpenSuperWhisperCore
 
@@ -620,15 +621,67 @@ final class AppPreferences {
     @UserDefault(key: "removeFillerWords", defaultValue: false)
     var removeFillerWords: Bool
 
-    /// User-editable, case-insensitive regex matching the filler words to remove.
-    @UserDefault(key: "fillerWordsPattern", defaultValue: "\\b(um|uh|uh huh|er|ah|hmm|mm)\\b,?\\s*")
+    /// User-editable, case-insensitive regex matching the filler words to remove. While it is
+    /// still the shipped default, the words removed come from the dictation's language
+    /// (`fillerPattern(forLanguage:customPattern:)`).
+    @UserDefault(key: "fillerWordsPattern", defaultValue: AppPreferences.defaultFillerPattern)
     var fillerWordsPattern: String
 
-    /// Removes the configured filler words (when enabled) and tidies leftover whitespace.
-    /// The matching itself is in `stripFillerWords`.
-    func cleanTranscription(_ text: String) -> String {
+    /// The shipped pattern: English hesitations.
+    static let defaultFillerPattern = fillerPattern(words: "um|uh|uh huh|er|ah|hmm|mm")
+
+    /// Hums that are no word in any language, the only fillers safe to remove from one we do
+    /// not know.
+    private static let universalFillerWords = "hmm|mm"
+
+    private static let fillerWordsByLanguage = [
+        "fr": "euh|heu|hum|hmm|mm",
+        // Never "um": it means "at" and "in order to".
+        "de": "äh|ähm|öhm|hmm|mm",
+    ]
+
+    /// Below this, the recognizer's guess about a short text is not trusted.
+    private static let minimumLanguageConfidence = 0.6
+
+    private static func fillerPattern(words: String) -> String {
+        "\\b(\(words))\\b,?\\s*"
+    }
+
+    /// The pattern to remove fillers with: the user's own when they changed it (it applies to
+    /// every language), otherwise the list for `language`. An unknown language gets only the
+    /// hums, since English "um" and "er" are real words elsewhere.
+    static func fillerPattern(forLanguage language: String?, customPattern: String) -> String {
+        guard customPattern == defaultFillerPattern else { return customPattern }
+        switch language?.split(separator: "-").first?.lowercased() {
+        case "en": return defaultFillerPattern
+        case let code?: return fillerPattern(words: fillerWordsByLanguage[code] ?? universalFillerWords)
+        case nil: return fillerPattern(words: universalFillerWords)
+        }
+    }
+
+    /// The language to pick the filler list by: the one the dictation was transcribed in when
+    /// it was fixed, else what the text itself looks like. Nil when neither is certain.
+    static func fillerLanguage(declared: String?, text: String) -> String? {
+        if let declared, declared != "auto", declared != KeyboardLanguage.selectionCode {
+            return declared
+        }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        guard let (language, confidence) = recognizer.languageHypotheses(withMaximum: 1).first,
+              confidence >= minimumLanguageConfidence
+        else { return nil }
+        return language.rawValue
+    }
+
+    /// Removes the filler words of `language` (when enabled) and tidies leftover whitespace.
+    /// `language` is what the dictation was transcribed in; nil or "auto" detects it from the
+    /// text. The matching itself is in `stripFillerWords`.
+    func cleanTranscription(_ text: String, language: String?) -> String {
         guard removeFillerWords, !fillerWordsPattern.isEmpty else { return text }
-        return Self.stripFillerWords(text, pattern: fillerWordsPattern)
+        let pattern = Self.fillerPattern(
+            forLanguage: Self.fillerLanguage(declared: language, text: text),
+            customPattern: fillerWordsPattern)
+        return Self.stripFillerWords(text, pattern: pattern)
     }
 
     /// Pure removal behind `cleanTranscription` (unit-tested directly). An invalid regex
