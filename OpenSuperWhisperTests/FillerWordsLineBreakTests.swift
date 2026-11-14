@@ -28,7 +28,7 @@ final class FillerWordsLineBreakTests: XCTestCase {
     /// The same text through `cleanTranscription`, with the stored default pattern.
     private func cleaned(_ text: String, fillers: Bool) -> String {
         AppPreferences.shared.removeFillerWords = fillers
-        return AppPreferences.shared.cleanTranscription(text)
+        return AppPreferences.shared.cleanTranscription(text, language: "en")
     }
 
     // MARK: - the report

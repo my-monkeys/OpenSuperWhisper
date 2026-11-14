@@ -307,7 +307,8 @@ class ContentViewModel: ObservableObject {
                     var settings = Settings()
                     settings.snippetTriggers = AppPreferences.shared.dictationSnippetTriggers
                     let rawText = try await transcriptionService.transcribeAudio(url: tempURL, settings: settings)
-                    let cleanedText = AppPreferences.shared.cleanTranscription(rawText)
+                    let spokenLanguage = settings.translateToEnglish ? "en" : settings.selectedLanguage
+                    let cleanedText = AppPreferences.shared.cleanTranscription(rawText, language: spokenLanguage)
                     // Optional LLM cleanup (no-op when disabled; returns the raw text on failure).
                     // App-aware formatting keys off the app captured at record-start, not the
                     // frontmost app: recording from the main window makes OSW itself frontmost, so
