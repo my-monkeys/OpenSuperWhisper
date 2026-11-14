@@ -1,5 +1,4 @@
 import AVFoundation
-import CoreAudio
 import os
 
 /// What the take in progress owns. A take starts off the main thread and is stopped on it, while
@@ -14,7 +13,6 @@ struct RecorderTakeState {
     var url: URL?
     var connectionTimer: DispatchSourceTimer?
     var activity: NSObjectProtocol?
-    var deviceID: AudioDeviceID?
 }
 
 typealias RecorderTakeLock = OSAllocatedUnfairLock<RecorderTakeState>

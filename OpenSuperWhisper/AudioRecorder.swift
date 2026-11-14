@@ -336,10 +336,6 @@ class AudioRecorder: NSObject, ObservableObject {
                 _ = MicrophoneService.shared.setAsSystemDefaultInput(activeMic)
             }
             print("Set system default input to: \(activeMic.displayName)")
-
-            if let deviceID = MicrophoneService.shared.getCoreAudioDeviceID(for: activeMic) {
-                take.withLockUnchecked { $0.deviceID = deviceID }
-            }
         }
         #endif
 
@@ -438,19 +434,19 @@ class AudioRecorder: NSObject, ObservableObject {
     /// Cleans up after a start that a stop beat to it. The recorder it just began is an orphan
     /// that nobody will stop, so it would keep the microphone open and write a file for good.
     private func abandonStartIfEnded(_ recorder: AVAudioRecorder, fileURL: URL) -> Bool {
-        // The activity is released only when no take owns it: a newer take holds its own.
-        let orphanedActivity = take.withLockUnchecked { state -> (abandoned: Bool, activity: NSObjectProtocol?) in
-            guard Self.startWasAbandoned(startedURL: fileURL, currentURL: state.url) else { return (false, nil) }
+        // A newer take keeps its own activity and the input, so neither is touched for it.
+        let orphan = take.withLockUnchecked { state -> (abandoned: Bool, newerTake: Bool, activity: NSObjectProtocol?) in
+            guard Self.startWasAbandoned(startedURL: fileURL, currentURL: state.url) else { return (false, false, nil) }
             if state.recorder === recorder { state.recorder = nil }
-            guard state.url == nil else { return (true, nil) }
+            guard state.url == nil else { return (true, true, nil) }
             defer { state.activity = nil }
-            return (true, state.activity)
+            return (true, false, state.activity)
         }
-        guard orphanedActivity.abandoned else { return false }
+        guard orphan.abandoned else { return false }
         recorder.stop()
         try? FileManager.default.removeItem(at: fileURL)
-        orphanedActivity.activity.map(ProcessInfo.processInfo.endActivity)
-        primeAudioHardware(afterTake: true)
+        orphan.activity.map(ProcessInfo.processInfo.endActivity)
+        if !orphan.newerTake { primeAudioHardware(afterTake: true) }
         Diag.mark("recorder.start abandoned: stopped during start")
         return true
     }
