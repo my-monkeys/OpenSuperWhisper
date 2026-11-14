@@ -62,4 +62,12 @@ final class SpectrumAnalyzerTapTests: XCTestCase {
         XCTAssertTrue(devices.contains(defaultInput),
                       "input on \(devices) (unit device \(unitDevice)), default \(defaultInput)")
     }
+
+    /// The engine is built off the main thread, so a stop can land before the build reports back:
+    /// only the build of the latest take may mark the analyzer as running.
+    func testOnlyTheLatestTakesBuildIsCurrent() {
+        XCTAssertTrue(SpectrumAnalyzer.isCurrent(build: 3, latest: 3))
+        XCTAssertFalse(SpectrumAnalyzer.isCurrent(build: 3, latest: 4), "stopped meanwhile")
+        XCTAssertFalse(SpectrumAnalyzer.isCurrent(build: 3, latest: 5), "stopped and restarted")
+    }
 }

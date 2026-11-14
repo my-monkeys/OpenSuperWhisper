@@ -3,6 +3,7 @@ import AVFoundation
 import Combine
 import CoreAudio
 import Foundation
+import os
 
 /// Live spectrum of the microphone, driving the indicator's visualiser.
 ///
@@ -21,7 +22,7 @@ final class SpectrumAnalyzer: ObservableObject {
     func stageBands(_ levels: [Float]) { bands = levels }
     #endif
 
-    /// The engine of the take in progress: a fresh one per take, nil between takes.
+    /// The engine of each take: a fresh one per take, held by `EngineHost`, nil between takes.
     ///
     /// On macOS the engine's input and output nodes share one HAL I/O unit, and that unit takes
     /// the default input when it is created, the first time `inputNode` is read: the device
@@ -42,10 +43,18 @@ final class SpectrumAnalyzer: ObservableObject {
     /// (`kAudioOutputUnitProperty_CurrentDevice` on its unit) also works on paper, but switching
     /// a unit's device has been reported to leave the input node on a 0 Hz / 0 channel format,
     /// the same kind of stale format #107 was about. Building and releasing the unit (and its
-    /// aggregate) on the main actor is timed as `spectrum.engine` and `spectrum.release`; if
-    /// either is slow, keep the engine across takes while it still sits on the default input.
-    private var engine: AVAudioEngine?
-    private var configurationObserver: NSObjectProtocol?
+    /// aggregate) is timed as `spectrum.engine` and `spectrum.release`. It runs on the engine
+    /// queue, not the main actor: with a Bluetooth headset the build alone took 288 to 583 ms
+    /// (#340), long enough that the indicator, shown by the same thread, could not draw. If it is
+    /// still too slow, keep the engine across takes while it still sits on the default input.
+    private let engineHost = EngineHost()
+    /// Which take the engine queue is working for. Bumped by `start()` and `stop()` on the main
+    /// actor, read by the engine queue to drop a build that nobody wants any more. A lock rather
+    /// than main-actor state because the queue cannot read that without waiting for main.
+    private nonisolated let latestGeneration = OSAllocatedUnfairLock(initialState: 0)
+    /// Between `start()` and `stop()`, including while the engine is still being built.
+    private var takeActive = false
+    /// True once the engine is up and its tap is feeding `consume`.
     private var isRunning = false
 
     private let fftSize = 1024
@@ -76,64 +85,40 @@ final class SpectrumAnalyzer: ObservableObject {
         layout.contains(.waveform)
     }
 
+    /// Whether the build that began at `build` is still the take the analyzer is on. Stale after
+    /// a `stop()`, and after the stop-and-start of the next take.
+    nonisolated static func isCurrent(build: Int, latest: Int) -> Bool {
+        build == latest
+    }
+
     func start() {
-        guard !isRunning, fftSetup != nil else { return }
+        guard !takeActive, fftSetup != nil else { return }
         guard Self.shouldRun(layout: IndicatorLayout.load(from: AppPreferences.shared.indicatorLayout))
         else { return }
 
-        // Reading `inputNode` is what creates the I/O unit, and with it any default-device
-        // aggregate, so it is inside the measurement: that is the part that can block.
-        let engine = Diag.measure("spectrum.engine") { () -> AVAudioEngine in
-            let engine = AVAudioEngine()
-            _ = engine.inputNode
-            return engine
+        takeActive = true
+        let take = latestGeneration.withLock { generation -> Int in
+            generation += 1
+            return generation
         }
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        Diag.mark("spectrum.input=\(Self.devicesBehindInput(of: engine)) "
-            + "default=\(MicrophoneService.shared.getCurrentSystemDefaultInputDevice().map(String.init) ?? "none") "
-            + "format=\(format.channelCount)ch/\(Int(format.sampleRate))Hz")
+        let host = engineHost
+        let latest = latestGeneration
+        host.queue.async { [weak self] in
+            guard Self.isCurrent(build: take, latest: latest.withLock { $0 }) else { return }
+            let started = host.build(
+                onBuffer: { samples, sampleRate in
+                    Task { @MainActor in self?.consume(samples, sampleRate: sampleRate) }
+                },
+                onConfigurationChange: { Task { @MainActor in self?.configurationChanged(during: take) } })
+            Task { @MainActor in self?.buildFinished(started, for: take) }
+        }
+    }
 
-        // `format: nil` rather than a format read a moment ago, and this is the fix rather than a
-        // tidy-up. This runs right after `AVAudioRecorder.record()` grabs the device, so the
-        // device is often mid-reconfiguration: a format snapshotted here is stale by the time the
-        // engine starts, and AVAudioEngine then refuses the tap with a format mismatch. Reported
-        // on 0.12.3 as "Failed to create tap due to format mismatch" for 1ch/48kHz/Float32,
-        // followed by CoreAudio failing to start the input at all, over and over. Passing nil
-        // makes the engine use the bus's own format at the moment the tap is created, so there is
-        // no snapshot left to go stale.
-        //
-        // `format: nil` narrows the window but does not close it: a device caught mid-change can
-        // still make `installTap` raise, and an NSException here is far worse than no visualiser
-        // (see `OSWCatchException`). So it is caught and the bubble simply stays flat.
-        do {
-            try ObjCExceptionError.catching {
-                input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
-                    guard let self, let channel = buffer.floatChannelData?[0] else { return }
-                    let incoming = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
-                    // The buffer knows its own sample rate; nothing read up front can be trusted to
-                    // still describe it. Sent along so the band edges are derived from the audio that
-                    // arrived.
-                    let sampleRate = Float(buffer.format.sampleRate)
-                    Task { @MainActor in self.consume(incoming, sampleRate: sampleRate) }
-                }
-            }
-        } catch {
-            Diag.mark("spectrum.installTap raised \(error.localizedDescription); visualiser off for this take")
-            return
-        }
-
-        do {
-            try ObjCExceptionError.catching { engine.prepare() }
-            try engine.start()
-        } catch {
-            input.removeTap(onBus: 0)
-            print("SpectrumAnalyzer: couldn't start the audio engine: \(error)")
-            return
-        }
-        self.engine = engine
+    /// A `stop()` that landed during the build has already queued the teardown behind it on the
+    /// engine queue, so a stale result needs nothing more than being ignored here.
+    private func buildFinished(_ started: Bool, for take: Int) {
+        guard started, Self.isCurrent(build: take, latest: latestGeneration.withLock { $0 }) else { return }
         isRunning = true
-        observeConfigurationChanges(of: engine)
     }
 
     /// A change to the input device's rate or channel count stops the engine on its own (see
@@ -144,18 +129,11 @@ final class SpectrumAnalyzer: ObservableObject {
     /// Not restarted in place: a change mid-take means the device is being reconfigured under the
     /// recorder, the moment #107 showed a second start failing over and over, and a flat bubble
     /// is the cheaper failure. The notification arrives on an internal queue where releasing the
-    /// engine can deadlock, so the stop hops to the main actor first.
-    private func observeConfigurationChanges(of engine: AVAudioEngine) {
-        let changed = ObjectIdentifier(engine)
-        configurationObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
-        ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, let current = self.engine, ObjectIdentifier(current) == changed else { return }
-                Diag.mark("spectrum.configurationChange; visualiser off for the rest of this take")
-                self.stop()
-            }
-        }
+    /// engine can deadlock, so the stop hops to the main actor, which hands it to the engine queue.
+    private func configurationChanged(during take: Int) {
+        guard Self.isCurrent(build: take, latest: latestGeneration.withLock { $0 }) else { return }
+        Diag.mark("spectrum.configurationChange; visualiser off for the rest of this take")
+        stop()
     }
 
     /// The devices the engine's input reads from. When the default input and output are
@@ -180,22 +158,15 @@ final class SpectrumAnalyzer: ObservableObject {
     }
 
     func stop() {
-        guard isRunning, engine != nil else { return }
-        if let configurationObserver {
-            NotificationCenter.default.removeObserver(configurationObserver)
-        }
-        configurationObserver = nil
-        // Through the property rather than a local binding, so the last reference goes inside the
-        // measurement and the unit's teardown is counted in it.
-        Diag.measure("spectrum.release") {
-            engine?.inputNode.removeTap(onBus: 0)
-            engine?.stop()
-            engine = nil
-        }
+        guard takeActive else { return }
+        takeActive = false
         isRunning = false
+        latestGeneration.withLock { $0 += 1 }
         sampleBuffer.removeAll(keepingCapacity: true)
         cachedRanges = nil
         bands = Array(repeating: 0, count: SpectrumBands.count)
+        let host = engineHost
+        host.queue.async { Diag.measure("spectrum.release") { host.teardown() } }
     }
 
     /// Band edges for one sample rate, kept so they are not recomputed for every buffer. Keyed by
@@ -261,5 +232,87 @@ final class SpectrumAnalyzer: ObservableObject {
         var scale = Float(1) / Float(fftSize)
         vDSP_vsmul(magnitudes, 1, &scale, &magnitudes, 1, vDSP_Length(half))
         return magnitudes
+    }
+}
+
+/// The engine of the take in progress and everything done to it, confined to `queue`.
+///
+/// Creating, starting and releasing an `AVAudioEngine` blocks on CoreAudio for as long as the
+/// device takes to answer, so none of it may run where the indicator is drawn.
+private final class EngineHost: @unchecked Sendable {
+    let queue = DispatchQueue(label: "fr.my-monkey.opensuperwhisper.spectrum.engine", qos: .userInitiated)
+    private var engine: AVAudioEngine?
+    private var configurationObserver: NSObjectProtocol?
+
+    /// Builds and starts the engine with a tap that reports each buffer; false when the visualiser
+    /// stays off for this take. Call on `queue`.
+    func build(onBuffer: @escaping @Sendable ([Float], Float) -> Void,
+               onConfigurationChange: @escaping @Sendable () -> Void) -> Bool {
+        // Reading `inputNode` is what creates the I/O unit, and with it any default-device
+        // aggregate, so it is inside the measurement: that is the part that can block.
+        let engine = Diag.measure("spectrum.engine") { () -> AVAudioEngine in
+            let engine = AVAudioEngine()
+            _ = engine.inputNode
+            return engine
+        }
+        let input = engine.inputNode
+        let format = input.outputFormat(forBus: 0)
+        Diag.mark("spectrum.input=\(SpectrumAnalyzer.devicesBehindInput(of: engine)) "
+            + "default=\(MicrophoneService.shared.getCurrentSystemDefaultInputDevice().map(String.init) ?? "none") "
+            + "format=\(format.channelCount)ch/\(Int(format.sampleRate))Hz")
+
+        // `format: nil` rather than a format read a moment ago, and this is the fix rather than a
+        // tidy-up. This runs right after `AVAudioRecorder.record()` grabs the device, so the
+        // device is often mid-reconfiguration: a format snapshotted here is stale by the time the
+        // engine starts, and AVAudioEngine then refuses the tap with a format mismatch. Reported
+        // on 0.12.3 as "Failed to create tap due to format mismatch" for 1ch/48kHz/Float32,
+        // followed by CoreAudio failing to start the input at all, over and over. Passing nil
+        // makes the engine use the bus's own format at the moment the tap is created, so there is
+        // no snapshot left to go stale.
+        //
+        // `format: nil` narrows the window but does not close it: a device caught mid-change can
+        // still make `installTap` raise, and an NSException here is far worse than no visualiser
+        // (see `OSWCatchException`). So it is caught and the bubble simply stays flat.
+        do {
+            try ObjCExceptionError.catching {
+                input.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
+                    guard let channel = buffer.floatChannelData?[0] else { return }
+                    let incoming = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+                    // The buffer knows its own sample rate; nothing read up front can be trusted to
+                    // still describe it. Sent along so the band edges are derived from the audio that
+                    // arrived.
+                    onBuffer(incoming, Float(buffer.format.sampleRate))
+                }
+            }
+        } catch {
+            Diag.mark("spectrum.installTap raised \(error.localizedDescription); visualiser off for this take")
+            return false
+        }
+
+        do {
+            try ObjCExceptionError.catching { engine.prepare() }
+            try engine.start()
+        } catch {
+            input.removeTap(onBus: 0)
+            print("SpectrumAnalyzer: couldn't start the audio engine: \(error)")
+            return false
+        }
+        self.engine = engine
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
+        ) { _ in onConfigurationChange() }
+        return true
+    }
+
+    /// Call on `queue`. Through the property rather than a local binding, so the last reference
+    /// goes inside the caller's measurement and the unit's teardown is counted in it.
+    func teardown() {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+        }
+        configurationObserver = nil
+        engine?.inputNode.removeTap(onBus: 0)
+        engine?.stop()
+        engine = nil
     }
 }
