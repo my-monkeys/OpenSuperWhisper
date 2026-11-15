@@ -369,13 +369,13 @@ class AudioRecorder: NSObject, ObservableObject {
     /// Cleans up after a start that a stop beat to it. The recorder it just began is an orphan
     /// that nobody will stop, so it would keep the microphone open and write a file for good.
     private func abandonStartIfEnded(_ recorder: AVAudioRecorder, fileURL: URL) -> Bool {
-        // A newer take keeps its own activity and the input, so neither is touched for it.
-        let orphan = take.withLockUnchecked { state -> (abandoned: Bool, newerTake: Bool, activity: NSObjectProtocol?) in
-            guard Self.startWasAbandoned(startedURL: fileURL, currentURL: state.url) else { return (false, false, nil) }
+        // A newer take keeps its own activity, so it is not touched for it.
+        let orphan = take.withLockUnchecked { state -> (abandoned: Bool, activity: NSObjectProtocol?) in
+            guard Self.startWasAbandoned(startedURL: fileURL, currentURL: state.url) else { return (false, nil) }
             if state.recorder === recorder { state.recorder = nil }
-            guard state.url == nil else { return (true, true, nil) }
+            guard state.url == nil else { return (true, nil) }
             defer { state.activity = nil }
-            return (true, false, state.activity)
+            return (true, state.activity)
         }
         guard orphan.abandoned else { return false }
         recorder.stop()
