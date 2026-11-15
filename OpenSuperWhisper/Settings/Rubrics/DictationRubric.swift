@@ -322,7 +322,7 @@ struct DictationRubric: View {
                 SSwitch(isOn: $viewModel.reduceVolumeOnRecord)
             }
             if viewModel.reduceVolumeOnRecord {
-                SettingRow("Volume while dictating", indented: true) {
+                SettingRow("Volume while dictating (of current)", indented: true) {
                     SSlider(value: $viewModel.reduceVolumeLevel, range: 0...0.5,
                             valueLabel: "\(Int(viewModel.reduceVolumeLevel * 100)) %")
                 }

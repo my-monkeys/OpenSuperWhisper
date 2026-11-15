@@ -41217,48 +41217,48 @@
         }
       }
     },
-    "Volume while dictating": {
+    "Volume while dictating (of current)": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lautstärke beim Diktieren"
+            "value": "Lautstärke beim Diktieren (vom aktuellen Wert)"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Volumen al dictar"
+            "value": "Volumen al dictar (del volumen actual)"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Volume pendant la dictée"
+            "value": "Volume pendant la dictée (du volume actuel)"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Volume durante la dettatura"
+            "value": "Volume durante la dettatura (del volume attuale)"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Volume durante o ditado"
+            "value": "Volume durante o ditado (do volume atual)"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Âm lượng khi đọc chính tả"
+            "value": "Âm lượng khi đọc chính tả (so với hiện tại)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "听写时的音量"
+            "value": "听写时的音量（占当前音量）"
           }
         }
       }
