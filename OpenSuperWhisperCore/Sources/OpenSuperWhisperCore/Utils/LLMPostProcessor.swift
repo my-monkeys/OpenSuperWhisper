@@ -76,7 +76,8 @@ public enum LLMPostProcessor {
                                  disableReasoning: RemoteService.disablesReasoning(
                                      stored: prefs.aiRemoteDisableReasoning, service: service))
         default:
-            return OllamaBackend(endpoint: prefs.aiOllamaEndpoint, model: model ?? prefs.aiOllamaModel)
+            return OllamaBackend(endpoint: prefs.aiOllamaEndpoint, model: model ?? prefs.aiOllamaModel,
+                                 disableThinking: prefs.aiOllamaDisableThinking ?? OllamaThinking.disabledByDefault)
         }
     }
 

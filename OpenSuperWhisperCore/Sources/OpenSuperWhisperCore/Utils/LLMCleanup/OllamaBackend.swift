@@ -6,6 +6,8 @@ import Foundation
 struct OllamaBackend: LLMCleanupBackend {
     let endpoint: String
     let model: String
+    /// Asks the model not to think (`think`, see `OllamaThinking`); off leaves it on its default.
+    var disableThinking = false
 
     /// Ollama is a separate process we can't cheaply probe synchronously here; treat it as
     /// "ready" and let `generate` fail gracefully (the caller falls back to the raw text).
@@ -21,16 +23,8 @@ struct OllamaBackend: LLMCleanupBackend {
         var request = URLRequest(url: base.appendingPathComponent("api/chat"), timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = [
-            "model": model,
-            "stream": false,
-            "options": ["temperature": 0],
-            "messages": [
-                ["role": "system", "content": system],
-                ["role": "user", "content": user],
-            ],
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let think = disableThinking ? await OllamaThinking.value(endpoint: base, model: model) : nil
+        request.httpBody = try OllamaThinking.chatBody(model: model, system: system, user: user, think: think)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {

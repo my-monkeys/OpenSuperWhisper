@@ -44,6 +44,8 @@ public protocol CorePreferences: AnyObject, Sendable {
     var aiRemoteDisableReasoning: Bool? { get }
     var aiOllamaEndpoint: String { get }
     var aiOllamaModel: String { get }
+    /// nil until the user chooses: then on (`OllamaThinking.disabledByDefault`).
+    var aiOllamaDisableThinking: Bool? { get }
     var aiPostProcessingEnabled: Bool { get }
     var appContextFormattingEnabled: Bool { get }
     var appContextProfiles: [AppContextProfile] { get }

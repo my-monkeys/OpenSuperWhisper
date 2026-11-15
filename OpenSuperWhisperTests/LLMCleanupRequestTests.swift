@@ -115,6 +115,8 @@ final class LLMCleanupRequestTests: XCTestCase {
         prefs.aiSpokenFormattingEnabled = false
         prefs.aiOllamaEndpoint = Self.endpoint
         prefs.aiOllamaModel = "llama3.2:3b"
+        // The wire-format tests below see the chat request alone; the thinking lookup has its own.
+        prefs.aiOllamaDisableThinking = false
         prefs.aiRemoteEndpoint = "\(LLMStubProtocol.host)/v1/"
         prefs.aiRemoteModel = "llama-3.1-8b-instant"
     }
@@ -191,6 +193,7 @@ final class LLMCleanupRequestTests: XCTestCase {
         prefs.aiPostProcessingEnabled = true
         prefs.aiOllamaEndpoint = Self.endpoint
         prefs.aiOllamaModel = "llama3.2:3b"
+        prefs.aiOllamaDisableThinking = false
         LLMStubProtocol.reset(replying: ollamaReply("Cleaned."))
 
         _ = await LLMPostProcessor.process(Self.input, bundleID: nil)
@@ -223,6 +226,48 @@ final class LLMCleanupRequestTests: XCTestCase {
         messages = try XCTUnwrap(try onlyRequest().json["messages"] as? [[String: String]])
         XCTAssertEqual(messages.first?["content"],
                        "OPEN\n\nKeep these words spelled exactly as written here: dictation.\n\nCLOSE")
+    }
+
+    /// One body that answers both `/api/show` (a model that can turn thinking off) and `/api/chat`.
+    private func ollamaReplyWithThinking() -> LLMStubProtocol.Reply {
+        .http(status: 200, body: String(data: try! JSONSerialization.data(withJSONObject: [
+            "message": ["role": "assistant", "content": "Cleaned."],
+            "thinking": ["values": [true, false]],
+        ]), encoding: .utf8)!)
+    }
+
+    /// Thinking is turned off until the user chooses otherwise (#339): the model is asked once what
+    /// it accepts, and the answer is kept for the next dictation. A model name no other test uses
+    /// keeps the process-wide answer cache out of the way.
+    func testOllamaThinkingIsTurnedOffAfterAskingTheModelOnce() async throws {
+        prefs.aiOllamaDisableThinking = nil
+        prefs.aiOllamaModel = "think-default:1b"
+        LLMStubProtocol.reset(replying: ollamaReplyWithThinking())
+
+        _ = await LLMPostProcessor.process(Self.input, bundleID: nil)
+        _ = await LLMPostProcessor.process(Self.input, bundleID: nil)
+
+        let sent = LLMStubProtocol.requests
+        XCTAssertEqual(sent.map { $0.request.url?.path }, ["/api/show", "/api/chat", "/api/chat"])
+        let show = try XCTUnwrap(JSONSerialization.jsonObject(with: sent[0].body) as? NSDictionary)
+        XCTAssertEqual(show, ["model": "think-default:1b"])
+        XCTAssertEqual(sent[0].request.timeoutInterval, 5)
+        for chat in sent.dropFirst() {
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: chat.body) as? NSDictionary)
+            XCTAssertEqual(json["think"] as? Bool, false)
+        }
+    }
+
+    func testOllamaThinkingLeftOnSendsNothingAndAsksNothing() async throws {
+        prefs.aiOllamaDisableThinking = false
+        prefs.aiOllamaModel = "think-left-on:1b"
+        LLMStubProtocol.reset(replying: ollamaReplyWithThinking())
+
+        _ = await LLMPostProcessor.process(Self.input, bundleID: nil)
+
+        let (request, json) = try onlyRequest()
+        XCTAssertEqual(request.url?.path, "/api/chat")
+        XCTAssertNil(json["think"])
     }
 
     /// The path is appended to whatever the user typed, a trailing slash included.

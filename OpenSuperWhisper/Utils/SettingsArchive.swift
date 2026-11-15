@@ -55,7 +55,7 @@ enum SettingsArchive {
 
     static let portableKeys: [String] = [
         "addSpaceAfterSentence", "agentAskOnPermission", "agentAskOnQuestion", "agentAskOnStop",
-        "agentEnabledKinds", "agentWaitSeconds", "aiBackend", "aiOllamaEndpoint", "aiOllamaModel",
+        "agentEnabledKinds", "agentWaitSeconds", "aiBackend", "aiOllamaDisableThinking", "aiOllamaEndpoint", "aiOllamaModel",
         "aiPostProcessingClosing", "aiPostProcessingEnabled", "aiPostProcessingPrompt",
         "aiPostProcessingTranslation", "aiRemoteDisableReasoning", "aiRemoteEndpoint", "aiRemoteModel",
         "aiSpokenFormattingEnabled", "appAppearance",

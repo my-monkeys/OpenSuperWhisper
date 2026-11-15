@@ -784,6 +784,11 @@ final class AppPreferences {
     @OptionalUserDefault(key: "aiRemoteDisableReasoning")
     var aiRemoteDisableReasoning: Bool?
 
+    /// Asks Ollama not to think before it answers, for the models that can (`OllamaThinking`).
+    /// Nil until the user chooses, which counts as on.
+    @OptionalUserDefault(key: "aiOllamaDisableThinking")
+    var aiOllamaDisableThinking: Bool?
+
     /// Remote-LLM cleanup API key — Keychain-backed (a secret), not UserDefaults.
     /// nil/empty means send no Authorization header (no-auth/local servers).
     var aiRemoteAPIKey: String? {
