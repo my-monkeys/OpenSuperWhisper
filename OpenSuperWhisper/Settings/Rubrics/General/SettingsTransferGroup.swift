@@ -24,13 +24,13 @@ struct SettingsTransferGroup: View {
         }
         .onAppear {
             model.refreshGitHub()
-            icloud.refresh()
+            Task { await icloud.refresh() }
         }
         .confirmationDialog("A backup from another Mac is in iCloud Drive", isPresented: Binding(
             get: { icloud.conflict != nil },
             set: { if !$0 { icloud.conflict = nil } })) {
-            Button("Restore it") { restoreFromConflict() }
-            Button("Replace it with this Mac's settings") { icloud.replaceBackup() }
+            Button("Restore it") { Task { await restoreFromConflict() } }
+            Button("Replace it with this Mac's settings") { Task { await icloud.replaceBackup() } }
             Button("Cancel", role: .cancel) { icloud.conflict = nil }
         } message: {
             Text(conflictMessage)
@@ -50,13 +50,15 @@ struct SettingsTransferGroup: View {
         SettingRow("Back up to iCloud Drive", hint: iCloudHint) {
             SSwitch(isOn: Binding(
                 get: { icloud.isEnabled },
-                set: { icloud.setEnabled($0) }))
+                set: { on in Task { await icloud.setEnabled(on) } }))
                 .disabled(!icloud.isAvailable)
         }
         if icloud.isAvailable {
             SettingRow("Restore from iCloud Drive", hint: lastBackupHint) {
                 Button("Restore…") {
-                    if let pending = icloud.restoreRequest() { model.pendingImport = pending }
+                    Task {
+                        if let pending = await icloud.restoreRequest() { model.pendingImport = pending }
+                    }
                 }
                 .buttonStyle(.sSecondary)
                 .disabled(model.isBusy || icloud.lastBackup == nil)
@@ -84,8 +86,8 @@ struct SettingsTransferGroup: View {
         return "\(host) already saved its settings there. Restore them here, or replace them with this Mac's."
     }
 
-    private func restoreFromConflict() {
-        guard let pending = icloud.restoreFromConflict() else { return }
+    private func restoreFromConflict() async {
+        guard let pending = await icloud.restoreFromConflict() else { return }
         model.pendingImport = pending
         model.confirmImport()
     }

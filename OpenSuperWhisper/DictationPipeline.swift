@@ -301,7 +301,10 @@ final class DictationPipeline: ObservableObject {
             let wasFallback = transcriptionService.lastUsedFallback
             // The stop phrase goes first, before the dictionary rules can reshape it. (#145)
             let spokenText = AppPreferences.shared.stripStopPhrase(rawText, cutAtLast: item.endedByStopPhrase)
-            var text = AppPreferences.shared.cleanTranscription(spokenText)
+            // The language the take was transcribed with, already resolved from the keyboard
+            // layout at record time: reading the layout again here would run TIS off the main thread.
+            let spokenLanguage = settings.translateToEnglish ? "en" : settings.selectedLanguage
+            var text = AppPreferences.shared.cleanTranscription(spokenText, language: spokenLanguage)
             // The engine's own output (its dictionary rules already applied inside the engine),
             // before filler-word removal and any LLM cleanup, kept for the post-record hook and
             // the history's original text (#168). Tracked alongside `text` rather than read from
@@ -318,7 +321,7 @@ final class DictationPipeline: ObservableObject {
                 let streamed = AppPreferences.shared.stripStopPhrase(item.streamedFallback,
                                                                      cutAtLast: item.endedByStopPhrase)
                 let fallback = AppPreferences.shared
-                    .cleanTranscription(streamed)
+                    .cleanTranscription(streamed, language: spokenLanguage)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !fallback.isEmpty else {
                     discardAudio(item.tempURL)

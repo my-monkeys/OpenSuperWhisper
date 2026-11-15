@@ -52,6 +52,9 @@ enum ReportIssueLink {
             let note = report.rawText == nil ? "the text before cleanup was not kept" : "same as before cleanup"
             lines += ["**Final text** (\(note))"] + fenced(shortened(report.finalText, to: textLimit))
         }
+        if let expected = report.expectedText {
+            lines += ["", "**Should have written**"] + fenced(shortened(expected, to: textLimit))
+        }
         lines += ["", "_The audio is not attached. It is in the zip exported from Reports in the app, if you want to add it._"]
         return lines.joined(separator: "\n")
     }

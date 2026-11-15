@@ -105,6 +105,16 @@ final class FeedbackRequestTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(transport.requests[0].value(forHTTPHeaderField: "Content-Type")).hasPrefix("multipart/"))
     }
 
+    func testAnInMemoryAttachmentGoesAsMultipartWithoutLoadingAudio() async throws {
+        let transport = RecordingTransport()
+        var withFile = submission
+        withFile.attachment = attachment
+        try await transport.sender(loadAudio: { _ in XCTFail("no audio was picked"); return self.attachment }).send(withFile)
+
+        let body = String(decoding: try XCTUnwrap(transport.requests.first?.httpBody), as: UTF8.self)
+        XCTAssertTrue(body.contains("filename=\"dictation-7.wav\""))
+    }
+
     func testAnUnreadableRecordingSendsNothing() async {
         let transport = RecordingTransport()
         var withAudio = submission

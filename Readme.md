@@ -248,12 +248,14 @@ rebuilt before Xcode resolves the packages.
 
 ## Also from My-Monkey
 
-Two other free, open-source apps from the same collective:
+Other things from the same collective:
 
 | | |
 |---|---|
-| 🐒 **[Desktop Monkey](https://desktop-monkey.my-monkey.fr)** | A pixel-art monkey that lives on your desktop: he follows your cursor, hunts it, throws bananas at it and naps when you're away. Windows and macOS, one 6 MB file. ([source](https://github.com/my-monkeys/desktop-monkey)) |
-| 📊 **[Claude Monitor](https://github.com/my-monkeys/claude-monitor)** | A macOS menu-bar app that counts your Claude Code instances and MCP servers, watches the per-user process limit and RAM, and kills a runaway swarm before it takes the Mac down. |
+| ⏱️ **[Monkey Claude Usage](https://github.com/my-monkeys/monkey-claude-usage)** | Every Claude account you own, metered in the macOS menu bar: session, weekly and per-model limits, with a countdown once one is spent. |
+| 🔋 **[Monkey Battery](https://github.com/my-monkeys/monkey-battery)** | How long your Mac really has left, next to the battery icon once you drop below 10 %. Two minutes before it sleeps, a red panel and an alarm you can't miss. |
+| 🌍 **[GeoDaily](https://geodaily.eu)** | A daily geography quiz in the browser, with practice modes for every continent and leaderboards to play with friends. |
+| 📊 **[Glance](https://glance-analytics.com)** | Your Umami and Plausible analytics in one app: every site on one screen, live visitors, charts that read at a glance. iOS, Android, macOS and Windows. ([source](https://github.com/my-monkeys/glance)) |
 
 ## License
 

@@ -7,6 +7,8 @@ import OpenSuperWhisperCore
 struct TextAIBackendFields: View {
     @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject private var session = CleanupSessionStatus.shared
+    /// The user's own choice for the thinking switch, nil until they make one.
+    @State private var storedDisableThinking: Bool?
 
     var body: some View {
         switch viewModel.aiBackend {
@@ -135,6 +137,14 @@ struct TextAIBackendFields: View {
         SettingRow("Ollama model", advanced: true, indented: true) {
             STextField("llama3.2", text: $viewModel.aiOllamaModel, monospaced: true, width: 200)
         }
+        SettingRow("Disable reasoning",
+                   hint: "Asks the model not to think before it answers, which a cleanup does not need and which takes seconds. Only models that can switch thinking off are asked.",
+                   advanced: true, indented: true) {
+            SSwitch(isOn: Binding(
+                get: { storedDisableThinking ?? OllamaThinking.disabledByDefault },
+                set: { storedDisableThinking = $0; AppPreferences.shared.aiOllamaDisableThinking = $0 }))
+        }
+        .onAppear { storedDisableThinking = AppPreferences.shared.aiOllamaDisableThinking }
         SettingRow("Endpoint", advanced: true, indented: true) {
             HStack(spacing: 8) {
                 Button("Test") { viewModel.testLLMConnection() }

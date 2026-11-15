@@ -232,6 +232,17 @@ gh release create "$TAG" --repo my-monkeys/OpenSuperWhisper \
 ```
 (`--latest` is implied for a normal release. Write `notes.md` first — see §11 for tone.)
 
+Then attach the same two files under names without a version. The website's download buttons
+(`opensuperwhisper-site`, `src/data/download.ts`) point at
+`releases/latest/download/OpenSuperWhisper-<arch>.dmg`, which 404s until these are attached. 0.15.2
+shipped without them and the site's buttons were dead until 0.15.3.
+```sh
+for a in arm64 x86_64; do cp -c "OpenSuperWhisper-$a-$VERSION.dmg" "/tmp/OpenSuperWhisper-$a.dmg"; done
+DEVELOPER_DIR=/Library/Developer/CommandLineTools \
+gh release upload "$TAG" --repo my-monkeys/OpenSuperWhisper \
+  /tmp/OpenSuperWhisper-arm64.dmg /tmp/OpenSuperWhisper-x86_64.dmg
+```
+
 ### 6.6 Append an `<item>` to BOTH appcasts
 arm64 DMG → `appcast.xml`; x86_64 DMG → `appcast-x86_64.xml`. Insert as the **first** `<item>` in
 each `<channel>`. Template (fill the 4 per-arch values: url, edSignature, length, pubDate):
@@ -347,7 +358,8 @@ hdiutil detach "/Volumes/OpenSuperWhisper"
 ```
 End to end:
 - `gh release view "$TAG" --repo my-monkeys/OpenSuperWhisper` — both DMGs attached (stable) / arm64 only (beta).
-- Stable: `curl -sI <enclosure url>` returns 302→200 (asset reachable for Sparkle).
+- Stable: `curl -sI <enclosure url>` returns 302→200 (asset reachable for Sparkle), and so do
+  `releases/latest/download/OpenSuperWhisper-arm64.dmg` and `-x86_64.dmg` (the website's buttons).
 - Stable: `brew update && brew upgrade my-monkeys/tap/opensuperwhisper` installs the new version.
 - Sparkle: from the previous stable, menu-bar **Check for Updates…** offers the new version and
   installs it (the real auto-update path — worth doing once per stable).

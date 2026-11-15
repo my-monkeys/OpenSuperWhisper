@@ -33,7 +33,7 @@ final class CrashReportTests: XCTestCase {
 
     private func draft(frames: [String], cause: String = "EXC_BAD_ACCESS (SIGSEGV)") -> CrashReportDraft {
         CrashReportDraft(kind: .crash, cause: cause, frames: frames,
-                         appVersion: "0.14.0 (63)", osVersion: "26.2")
+                         appVersion: "0.14.0", appBuild: "63", osVersion: "26.2")
     }
 
     // MARK: - Message
@@ -84,6 +84,145 @@ final class CrashReportTests: XCTestCase {
 
         XCTAssertTrue(message.hasPrefix("crash: "))
         XCTAssertLessThanOrEqual(message.count, "crash: ".count + 200)
+    }
+
+    // MARK: - Context
+
+    func testTheContextNamesVersionAndBuild() {
+        XCTAssertEqual(CrashReport.details(for: draft(frames: [])), "OpenSuperWhisper 0.14.0 (63) · macOS 26.2")
+    }
+
+    /// MetricKit's `osVersion` already reads "macOS 27.2.1 (26B131)": no second prefix.
+    func testAnOSVersionThatStartsWithMacOSIsNotPrefixedAgain() {
+        var metricKit = draft(frames: [])
+        metricKit.osVersion = "macOS 27.2.1 (26B131)"
+
+        XCTAssertEqual(CrashReport.details(for: metricKit), "OpenSuperWhisper 0.14.0 (63) · macOS 27.2.1 (26B131)")
+    }
+
+    // MARK: - Cause details
+
+    func testTheRegionAndTheExceptionGetOneCompactLineEachBelowTheCause() {
+        var crash = draft(frames: ["A 0x01"])
+        crash.memoryRegion = "    Freed heap region:\n  0x1000-0x2000\t[ 16K]\n\n  rw-/rwx  "
+        crash.exceptionReason = CrashReport.exceptionReason(name: "NSInvalidArgumentException", className: "NSArray",
+                                                            message: "index 3\nbeyond bounds")
+
+        XCTAssertEqual(CrashReport.message(for: crash, frameLimit: 1), """
+        crash: EXC_BAD_ACCESS (SIGSEGV)
+        region: Freed heap region: 0x1000-0x2000 [ 16K] rw-/rwx
+        exception: NSInvalidArgumentException (NSArray): index 3 beyond bounds
+        #0 A 0x01
+        """)
+    }
+
+    func testTheRegionAndTheExceptionAreCapped() {
+        var crash = draft(frames: [])
+        crash.memoryRegion = String(repeating: "r ", count: 500)
+        crash.exceptionReason = String(repeating: "e", count: 500)
+        let lines = CrashReport.message(for: crash, frameLimit: 0).split(separator: "\n")
+
+        XCTAssertEqual(lines.count, 3)
+        XCTAssertEqual(lines[1].count, "region: ".count + 300)
+        XCTAssertEqual(lines[2].count, "exception: ".count + 300)
+    }
+
+    func testAbsentDetailsLeaveNoEmptyLine() {
+        XCTAssertEqual(CrashReport.message(for: draft(frames: []), frameLimit: 0), "crash: EXC_BAD_ACCESS (SIGSEGV)")
+    }
+
+    func testTheBudgetStillHoldsWithBothDetailLines() {
+        var crash = draft(frames: (0..<400).map { "VeryLongBinaryNameThatPadsEachFrameNicely_\($0) 0x000000010abcdef0" })
+        crash.memoryRegion = String(repeating: "r", count: 1000)
+        crash.exceptionReason = String(repeating: "e", count: 1000)
+        let submission = CrashReport.submission(for: crash)
+
+        XCTAssertTrue(FeedbackSender.fitsLimits(submission))
+        XCTAssertTrue(submission.message.contains("#0 "))
+        XCTAssertTrue(submission.message.contains("region: "))
+    }
+
+    // MARK: - Diagnostic file
+
+    func testTheDiagnosticIsAttachedAsJSONNamedAfterTheBuild() throws {
+        var crash = draft(frames: [])
+        crash.diagnosticJSON = Data(#"{"callStackTree": {}}"#.utf8)
+        let attachment = try XCTUnwrap(CrashReport.submission(for: crash).attachment)
+
+        XCTAssertEqual(attachment.filename, "crash-0.14.0-63.json")
+        XCTAssertEqual(attachment.contentType, "application/json")
+        XCTAssertNotNil(try? JSONSerialization.jsonObject(with: attachment.data))
+    }
+
+    func testAHangIsNamedHang() throws {
+        var hang = draft(frames: [])
+        hang.kind = .hang
+        hang.diagnosticJSON = Data("{}".utf8)
+
+        XCTAssertEqual(CrashReport.attachment(for: hang)?.filename, "hang-0.14.0-63.json")
+    }
+
+    func testUnreadableJSONAttachesNothing() {
+        var crash = draft(frames: [])
+        crash.diagnosticJSON = Data("not json".utf8)
+
+        XCTAssertNil(CrashReport.submission(for: crash).attachment)
+        XCTAssertNil(CrashReport.submission(for: draft(frames: [])).attachment)
+    }
+
+    func testTheLocaleLeavesBeforeTheFileDoes() throws {
+        var crash = draft(frames: [])
+        crash.diagnosticJSON = Data(#"{"diagnosticMetaData": {"regionFormat": "fr_FR", "osVersion": "macOS 27"}}"#.utf8)
+        let data = try XCTUnwrap(CrashReport.submission(for: crash).attachment).data
+
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("fr_FR"))
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("macOS 27"))
+    }
+
+    func testTheMultipartFormCarriesTheJSONFile() throws {
+        var crash = draft(frames: [])
+        crash.diagnosticJSON = Data(#"{"a":1}"#.utf8)
+        let submission = CrashReport.submission(for: crash)
+        let body = try XCTUnwrap(FeedbackSender.request(for: submission, attachment: submission.attachment).httpBody)
+
+        XCTAssertTrue(String(decoding: body, as: UTF8.self)
+            .contains("name=\"files\"; filename=\"crash-0.14.0-63.json\"\r\nContent-Type: application/json\r\n\r\n{\"a\":1}\r\n"))
+    }
+}
+
+final class DiagnosticJSONTests: XCTestCase {
+
+    private func object(_ data: Data?) throws -> [String: Any] {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(data)) as? [String: Any])
+    }
+
+    func testRegionFormatIsRemovedAtEveryDepth() throws {
+        let json = Data("""
+        {"regionFormat": "fr_FR", "diagnosticMetaData": {"regionFormat": "fr_FR", "appBuildVersion": "73"},
+         "list": [{"deep": {"regionFormat": "en_US", "kept": true}}]}
+        """.utf8)
+        let stripped = try object(DiagnosticJSON.withoutLocale(json))
+
+        XCTAssertNil(stripped["regionFormat"])
+        XCTAssertEqual(stripped["diagnosticMetaData"] as? [String: String], ["appBuildVersion": "73"])
+        let deep = ((stripped["list"] as? [[String: Any]])?.first?["deep"]) as? [String: Any]
+        XCTAssertEqual(deep?["kept"] as? Bool, true)
+        XCTAssertNil(deep?["regionFormat"])
+    }
+
+    func testEverythingElseSurvives() throws {
+        let json = Data(#"{"callStackTree": {"callStacks": [{"threadAttributed": true}]}, "n": 1.5, "s": "a/b"}"#.utf8)
+        let stripped = try object(DiagnosticJSON.withoutLocale(json))
+
+        XCTAssertEqual(stripped["n"] as? Double, 1.5)
+        XCTAssertEqual(stripped["s"] as? String, "a/b")
+        XCTAssertNotNil(stripped["callStackTree"])
+    }
+
+    func testInvalidJSONYieldsNothing() {
+        for json in ["", "not json", "{\"a\":"] {
+            XCTAssertNil(DiagnosticJSON.withoutLocale(Data(json.utf8)), json)
+        }
     }
 }
 
@@ -198,7 +337,7 @@ final class CallStackTreeTests: XCTestCase {
 
     func testTheImageLinesFollowTheFrames() {
         let draft = CrashReportDraft(kind: .crash, cause: "c", frames: ["A 0x1 +0x1"],
-                                     images: ["image A \(appUUID)"], appVersion: "1", osVersion: "26")
+                                     images: ["image A \(appUUID)"], appVersion: "1", appBuild: "2", osVersion: "26")
 
         XCTAssertEqual(CrashReport.message(for: draft, frameLimit: 1),
                        "crash: c\n#0 A 0x1 +0x1\nimage A \(appUUID)")
@@ -209,7 +348,7 @@ final class CallStackTreeTests: XCTestCase {
         let frames = (0..<400).map { "VeryLongBinaryNameThatPadsEachFrameNicely_\($0) 0x000000010abcdef0 +0x39a54c" }
         let images = (0..<5).map { "image Binary\($0) \(appUUID)" }
         let draft = CrashReportDraft(kind: .crash, cause: "c", frames: frames, images: images,
-                                     appVersion: "1", osVersion: "26")
+                                     appVersion: "1", appBuild: "2", osVersion: "26")
         let submission = CrashReport.submission(for: draft)
 
         XCTAssertTrue(FeedbackSender.fitsLimits(submission))
@@ -222,7 +361,7 @@ final class CallStackTreeTests: XCTestCase {
     func testTheSizeTrimDropsTheOutermostFramesAndNeverTheCrashSite() {
         let frames = (0..<400).map { "VeryLongBinaryNameThatPadsEachFrameNicely_\($0) 0x000000010abcdef0" }
         let submission = CrashReport.submission(for: CrashReportDraft(kind: .crash, cause: "c", frames: frames,
-                                                                      appVersion: "1", osVersion: "26"))
+                                                                      appVersion: "1", appBuild: "2", osVersion: "26"))
         let kept = submission.message.split(separator: "\n").filter { $0.hasPrefix("#") }
 
         XCTAssertLessThan(kept.count, frames.count)

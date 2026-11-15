@@ -38,20 +38,26 @@ class MicrophoneService: ObservableObject {
         // changes no device list, so without it the app keeps recording from the previous mic
         // while claiming to follow the system default.
         deviceMonitor = MicrophoneDeviceMonitor(
-            onDevicesChanged: { [weak self] in self?.devicesDidChange() },
-            onDefaultInputChanged: { [weak self] in
-                guard let self, self.followsSystemDefault else { return }
-                self.updateCurrentMicrophone()
-            })
+            onDevicesChanged: { [weak self] in self?.inputsDidChange(refreshingList: true) },
+            onDefaultInputChanged: { [weak self] in self?.inputsDidChange(refreshingList: false) })
     }
-    
-    private func devicesDidChange() {
+
+    /// The device list settling or the system input moving. A system input change used to update
+    /// the microphone without posting `microphoneDidChange`, so nothing listening heard that the
+    /// app had moved to another device. It also matters with a pinned mic: while that one is
+    /// unplugged, the app records from the system input.
+    ///
+    /// `systemInputDidChange` goes out every time, changed microphone or not: the recorder's warm
+    /// recorder sits on the system input, not on the chosen mic, so it has to move even when the
+    /// chosen mic stays put.
+    private func inputsDidChange(refreshingList: Bool) {
         let before = currentMicrophone
-        refreshAvailableMicrophones()
+        if refreshingList { refreshAvailableMicrophones() }
         updateCurrentMicrophone()
         if currentMicrophone != before {
             NotificationCenter.default.post(name: .microphoneDidChange, object: nil)
         }
+        NotificationCenter.default.post(name: .systemInputDidChange, object: nil)
     }
     
     func refreshAvailableMicrophones() {
@@ -126,6 +132,17 @@ class MicrophoneService: ObservableObject {
         return isBluetoothMicrophone(device)
     }
     
+    /// Whether the system input is a Bluetooth device, whichever mic the app has chosen.
+    func isSystemInputBluetooth() -> Bool {
+        #if os(macOS)
+        guard let deviceID = getCurrentSystemDefaultInputDevice(), deviceID != kAudioObjectUnknown
+        else { return false }
+        return MicrophoneDiscovery.isBluetooth(transportType: MicrophoneDiscovery.transportType(of: deviceID))
+        #else
+        return false
+        #endif
+    }
+
     func isActiveMicrophoneRequiresConnection() -> Bool {
         guard let device = getActiveMicrophone() else { return false }
         return isBluetoothMicrophone(device) || isContinuityMicrophone(device)
@@ -423,5 +440,7 @@ class MicrophoneService: ObservableObject {
 
 extension Notification.Name {
     static let microphoneDidChange = Notification.Name("microphoneDidChange")
+    /// An input device came or went, or the system input moved. Posted on the main queue.
+    static let systemInputDidChange = Notification.Name("systemInputDidChange")
 }
 

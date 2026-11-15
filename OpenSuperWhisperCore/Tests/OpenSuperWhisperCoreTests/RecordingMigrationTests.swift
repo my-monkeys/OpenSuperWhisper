@@ -66,7 +66,8 @@ final class RecordingMigrationTests: CoreTestCase {
                        ["v1", "v2_add_status", "v3_add_source_context", "v4_add_model_used", "v5_add_was_fallback",
                         "v6_add_raw_transcription", "v7_add_transcription_reports", "v8_add_style_used",
                         "v9_clear_own_recording_source", "v10_add_cleanup_outcome",
-                        "v11_add_dictation_timing", "v12_add_report_ending"])
+                        "v11_add_dictation_timing", "v12_add_report_ending",
+                        "v13_add_report_expected_text"])
     }
 
     // MARK: - Schema

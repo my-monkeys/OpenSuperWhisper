@@ -24,6 +24,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "agentRecentProjects",
         "agentWaitSeconds",
         "aiBackend",
+        "aiOllamaDisableThinking",
         "aiOllamaEndpoint",
         "aiOllamaModel",
         "aiPostProcessingClosing",
@@ -270,6 +271,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("fillerWordsPattern") { prefs.fillerWordsPattern = "um" }
         assertWrites("aiPostProcessingEnabled") { prefs.aiPostProcessingEnabled = true }
         assertWrites("aiBackend") { prefs.aiBackend = "remote" }
+        assertWrites("aiOllamaDisableThinking") { prefs.aiOllamaDisableThinking = false }
         assertWrites("aiOllamaEndpoint") { prefs.aiOllamaEndpoint = "http://ollama" }
         assertWrites("aiOllamaModel") { prefs.aiOllamaModel = "ollama-model" }
         assertWrites("aiRemoteDisableReasoning") { prefs.aiRemoteDisableReasoning = false }
@@ -455,6 +457,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.aiRemoteEndpoint, "https://api.groq.com/openai/v1")
         XCTAssertEqual(prefs.aiRemoteModel, "llama-3.1-8b-instant")
         XCTAssertNil(prefs.aiRemoteDisableReasoning)
+        XCTAssertNil(prefs.aiOllamaDisableThinking)
         // A file name on disk: a different default would point existing installs at a model
         // they never downloaded.
         XCTAssertEqual(prefs.builtInModelFileName, "qwen2.5-1.5b-instruct-q4_k_m.gguf")

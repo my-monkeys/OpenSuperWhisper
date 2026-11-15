@@ -11,19 +11,21 @@ enum DictationReportSender {
     /// message; the network await below does not hold the actor.
     @MainActor
     static func send(recording: Recording, problem: TranscriptionReport.Problem?, comment: String,
-                     includeAudio: Bool = false) async throws {
+                     expected: String? = nil, includeAudio: Bool = false) async throws {
         // Same re-read as the saved report: the card's copy predates the post-delivery timing
         // update, so sending it would omit `total` from the timing line. A read error reaches
         // the card's "Couldn't send — retry" state instead of sending stale numbers.
         let current = try await RecordingStore.shared.recordingForReport(recording)
-        var submission = DictationReport.submission(for: draft(recording: current, problem: problem, comment: comment))
+        var submission = DictationReport.submission(for: draft(recording: current, problem: problem,
+                                                               comment: comment, expected: expected))
         if includeAudio { submission.audio = DictationAudioChoice.forRecording(current) }
         try await FeedbackSender().send(submission)
     }
 
     static func draft(recording: Recording,
                       problem: TranscriptionReport.Problem?,
-                      comment: String) -> DictationReportDraft {
+                      comment: String,
+                      expected: String? = nil) -> DictationReportDraft {
         let note = [problem?.issueLabel, comment.trimmingCharacters(in: .whitespacesAndNewlines)]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
@@ -42,6 +44,7 @@ enum DictationReportSender {
             translateToEnglish: AppPreferences.shared.translateToEnglish,
             durationSeconds: Int(recording.duration.rounded()),
             output: recording.transcription,
+            expected: expected,
             rawOutput: recording.distinctOriginal,
             appVersion: version,
             osVersion: osString,

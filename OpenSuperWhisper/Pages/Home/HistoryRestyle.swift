@@ -38,7 +38,7 @@ enum HistoryRestyle {
         let engineText = recording.rawTranscription ?? recording.transcription
         let backend = request.backend.map { LLMPostProcessor.backend($0, model: request.model) }
         let cleanup = await LLMPostProcessor.processWithOutcome(
-            prefs.cleanTranscription(engineText), bundleID: nil, style: request.style.instructions,
+            prefs.cleanTranscription(engineText, language: nil), bundleID: nil, style: request.style.instructions,
             extraInstruction: request.extraInstruction.trimmingCharacters(in: .whitespacesAndNewlines),
             generalCleanup: true, backend: backend)
         let text = prefs.expandSnippets(cleanup.text)

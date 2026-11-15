@@ -43,10 +43,7 @@ struct RemoteBackend: LLMCleanupBackend {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw CleanupHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
         }
-        guard let content = LLMPostProcessor.extractChatContent(from: data) else {
-            throw URLError(.cannotParseResponse)
-        }
-        return content
+        return try LLMPostProcessor.chatReply(from: data)
     }
 
     /// A real, tiny chat request, because `GET /models` proves nothing about the key or the model:

@@ -43,6 +43,7 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var aiRemoteDisableReasoning: Bool?
         var aiOllamaEndpoint = ""
         var aiOllamaModel = ""
+        var aiOllamaDisableThinking: Bool?
         var aiPostProcessingEnabled = false
         var appContextFormattingEnabled = false
         var appContextProfiles: [AppContextProfile] = []
@@ -184,6 +185,10 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
     var aiOllamaModel: String {
         get { self[\.aiOllamaModel] }
         set { self[\.aiOllamaModel] = newValue }
+    }
+    var aiOllamaDisableThinking: Bool? {
+        get { self[\.aiOllamaDisableThinking] }
+        set { self[\.aiOllamaDisableThinking] = newValue }
     }
     var aiPostProcessingEnabled: Bool {
         get { self[\.aiPostProcessingEnabled] }

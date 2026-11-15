@@ -57,12 +57,12 @@ final class TranscriptionReportsModel: ObservableObject {
         await refresh()
     }
 
-    func draft(for recordingID: UUID) -> ReportDraft {
-        drafts[recordingID] ?? ReportDraft()
+    func draft(for recording: Recording) -> ReportDraft {
+        drafts[recording.id] ?? ReportDraft(for: recording)
     }
 
-    func keepDraft(_ draft: ReportDraft, for recordingID: UUID) {
-        drafts[recordingID] = draft == ReportDraft() ? nil : draft
+    func keepDraft(_ draft: ReportDraft, for recording: Recording) {
+        drafts[recording.id] = draft == ReportDraft(for: recording) ? nil : draft
     }
 
     func discardDraft(for recordingID: UUID) {

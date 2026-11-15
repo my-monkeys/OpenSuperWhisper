@@ -143,6 +143,15 @@ extension RecordingStore {
             }
         }
 
+        migrator.registerMigration("v13_add_report_expected_text") { db in
+            let reportColumns = try db.columns(in: TranscriptionReport.databaseTableName).map { $0.name }
+            if !reportColumns.contains("expectedText") {
+                try db.alter(table: TranscriptionReport.databaseTableName) { t in
+                    t.add(column: "expectedText", .text)
+                }
+            }
+        }
+
         return migrator
     }
 }

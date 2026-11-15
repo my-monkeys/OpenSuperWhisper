@@ -1,7 +1,8 @@
 import Foundation
 import OpenSuperWhisperCore
 
-/// A recording's audio as the feedback endpoint would receive it: the stored file, byte for byte.
+/// A file as the feedback endpoint would receive it: a recording's stored audio byte for byte, or
+/// a crash's diagnostic JSON.
 struct FeedbackAttachment: Equatable {
     let filename: String
     let contentType: String
