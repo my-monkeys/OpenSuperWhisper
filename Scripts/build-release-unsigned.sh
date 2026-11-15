@@ -10,8 +10,7 @@
 #
 # Copied from notarize_app.sh, and to be kept in step with it: the beta Xcode refusal, the forced
 # native build, the autocorrect and onnxruntime staging, the xcodebuild flags and the x86_64
-# post-build edits. Swift packages are cloned inside the derived data, so FluidAudio is not
-# patched, as in a release.
+# post-build edits. Swift packages are cloned inside the derived data, as in a release.
 #
 # build/ is left holding the universal autocorrect the project links from there, as
 # notarize_app.sh leaves it; run.sh copies its own back. The core's xcframeworks in

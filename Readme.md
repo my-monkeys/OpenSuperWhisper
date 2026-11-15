@@ -241,8 +241,8 @@ Tests, after `./run.sh build`:
   -only-testing:OpenSuperWhisperTests` (the same derived data and packages as `run.sh`);
 - the core's: `Scripts/test-core.sh macos` and `Scripts/test-core.sh ios` (iOS Simulator).
 
-Never run `swift test` in `OpenSuperWhisperCore/`: it resolves the packages on its own, without the
-FluidAudio patch `run.sh` applies, and writes a `Package.resolved` nobody should commit. After a
+Never run `swift test` in `OpenSuperWhisperCore/`: it resolves the packages on its own, outside the
+workspace pins, and writes a `Package.resolved` nobody should commit. After a
 submodule bump (`git submodule update`), run `./run.sh build` again so the native libraries are
 rebuilt before Xcode resolves the packages.
 

@@ -36,9 +36,9 @@ creates `NSApplication` only to set the `.prohibited` activation policy, and nev
 still read is "Unload model when idle" (`unloadWhisperModelWhenIdle`): with it on the CLI exits
 with no context loaded, so `smoke-release.sh` refuses to run and leaves the setting to the user.
 
-Two known divergences are kept as they are and listed as follow-ups, not fixed here: releases
-ship FluidAudio without `patches/fluidaudio-vocabulary-rescorer.patch`, and the release ggml
-CPU backend is built in generic mode.
+Two known divergences were kept as they were and listed as follow-ups, not fixed here: releases
+shipped FluidAudio without `patches/fluidaudio-vocabulary-rescorer.patch` (the patch was dropped
+on 2026-11-09), and the release ggml CPU backend is built in generic mode.
 
 ## Packaging
 
@@ -403,8 +403,8 @@ timing of 4.5 to 4.7); G5 to G7 ran once per slice.
    FluidAudio. Run it after `./run.sh build` with `Scripts/test-core.sh macos|ios [xcodebuild args]`
    (derived data in `build-core/`; the iOS slices are built when missing, `OSW_SIM_DESTINATION`
    picks the simulator, otherwise the first iPhone of the newest runtime the selected Xcode's
-   simulator SDK can target). Never `swift test`: it resolves on its own into `.build/` with an
-   unpatched FluidAudio and writes `OpenSuperWhisperCore/Package.resolved`. Every XCTest class
+   simulator SDK can target). Never `swift test`: it resolves on its own into `.build/`, outside
+   the workspace pins, and writes `OpenSuperWhisperCore/Package.resolved`. Every XCTest class
    derives from `CoreTestCase`, which installs one test configuration (`CoreTestEnvironment`,
    through `replaceForTesting`) with in-memory preferences that touch no UserDefaults or Keychain, a
    per-process storage root in the temporary directory, the app's Silero file by path and `.cpuOnly`

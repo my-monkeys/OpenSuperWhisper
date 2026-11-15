@@ -5,37 +5,6 @@ if [[ "$1" == "build" ]]; then
     JUST_BUILD=true
 fi
 
-# Patch FluidAudio's vocabulary rescorer to prefer longer matching spans
-# (keyword boosting quality, e.g. "My-Monkey" matched as one term). Idempotent;
-# fails loudly if the target moved (so a FluidAudio bump can't silently skip it).
-apply_fluidaudio_patches() {
-    local checkout="SourcePackages/checkouts/FluidAudio"
-    local patch_file="patches/fluidaudio-vocabulary-rescorer.patch"
-    local target="$checkout/Sources/FluidAudio/ASR/Parakeet/SlidingWindow/CustomVocabulary/Rescorer/VocabularyRescorer+TokenRescoring.swift"
-
-    if [[ ! -f "$patch_file" ]]; then
-        echo "Missing FluidAudio patch: $patch_file"
-        exit 1
-    fi
-
-    if [[ ! -f "$target" ]]; then
-        echo "Missing FluidAudio source checkout: $target"
-        exit 1
-    fi
-
-    if grep -q "Prefer longer spans" "$target"; then
-        echo "FluidAudio vocabulary rescorer patch already applied."
-        return
-    fi
-
-    echo "Applying FluidAudio vocabulary rescorer patch..."
-    patch --silent --forward -d "$checkout" -p1 < "$patch_file"
-    if [[ $? -ne 0 ]] && ! grep -q "Prefer longer spans" "$target"; then
-        echo "Failed to apply FluidAudio vocabulary rescorer patch."
-        exit 1
-    fi
-}
-
 ./Scripts/fetch-sherpa.sh
 
 # The core package's binary targets must exist before Swift packages are resolved.
@@ -61,7 +30,7 @@ cp vendor/onnxruntime/libonnxruntime.1.24.4.dylib ./build/libonnxruntime.1.24.4.
 ln -sf libonnxruntime.1.24.4.dylib ./build/libonnxruntime.dylib
 codesign --force --sign - ./build/libonnxruntime.1.24.4.dylib
 
-# Resolve Swift packages so the FluidAudio checkout exists, then patch it.
+# Resolve Swift packages on their own, so a resolution failure shows its own output.
 echo "Resolving Swift packages..."
 RESOLVE_OUTPUT=$(xcodebuild -resolvePackageDependencies -scheme OpenSuperWhisper -derivedDataPath build -clonedSourcePackagesDirPath SourcePackages -skipPackagePluginValidation -skipMacroValidation 2>&1)
 if [[ $? -ne 0 ]]; then
@@ -70,7 +39,6 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-apply_fluidaudio_patches
 
 # Build the app
 echo "Building OpenSuperWhisper..."

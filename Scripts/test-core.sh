@@ -2,7 +2,7 @@
 #
 # Runs the core package's tests (docs/core-extraction.md, slice 5) through the project's
 # OpenSuperWhisperCoreTests scheme, so they build against the workspace pins and run.sh's
-# patched FluidAudio checkout in SourcePackages/.
+# package checkouts in SourcePackages/.
 #
 # Usage: Scripts/test-core.sh macos|ios [extra xcodebuild args]
 #   macos  this Mac, arm64
@@ -11,12 +11,12 @@
 #          Xcode's simulator SDK can target
 #
 # Run ./run.sh build first: it fetches sherpa and onnxruntime, builds the macOS native slices,
-# resolves SourcePackages and patches FluidAudio. The iOS slices are built here when missing.
+# and resolves SourcePackages. The iOS slices are built here when missing.
 # Pass -resultBundlePath to keep an .xcresult; an existing one at that path is deleted first,
 # because xcodebuild refuses to overwrite it. TEST_RUNNER_* variables reach the tests on both
 # destinations (TEST_RUNNER_OSW_TEST_GGUF, TEST_RUNNER_OSW_GOLDEN_MACHINE).
 #
-# Never `swift test`: it resolves on its own into .build/ with an unpatched FluidAudio and
+# Never `swift test`: it resolves on its own into .build/, outside the workspace pins, and
 # writes OpenSuperWhisperCore/Package.resolved.
 set -euo pipefail
 
@@ -31,8 +31,6 @@ shift
 
 FLUIDAUDIO=SourcePackages/checkouts/FluidAudio
 [[ -d $FLUIDAUDIO ]] || fail "no $FLUIDAUDIO checkout, run ./run.sh build first"
-grep -rqF "Prefer longer spans" $FLUIDAUDIO/Sources \
-  || fail "the FluidAudio vocabulary rescorer patch is not applied, run ./run.sh build first"
 
 args=("$@")
 for (( i = 1; i <= ${#args}; i++ )); do
