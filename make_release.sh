@@ -236,9 +236,9 @@ if [[ -n "$GITHUB_TOKEN" ]]; then
 
 ### Homebrew (Recommended)
 \`\`\`bash
-brew install --cask my-monkeys/tap/opensuperwhisper
+brew install --cask my-monkeys/tap/openmonkeywhisper
 \`\`\`
-Use the full \`my-monkeys/tap/\` path: the bare name resolves to the homebrew-cask entry for the original project, not this fork.
+Installed with \`my-monkeys/tap/opensuperwhisper\` before November 2026? That cask still works but is deprecated: uninstall it, then install \`openmonkeywhisper\`.
 
 ### Manual Installation
 1. Download the \`${APP_NAME}-${ARCH}-${NEW_VERSION}.dmg\` file below
