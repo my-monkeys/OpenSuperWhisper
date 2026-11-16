@@ -68,17 +68,18 @@ say `accepted` / `source=Notarized Developer ID`.
 
 ## Update the Homebrew cask
 
-The cask lives in the **`my-monkeys/homebrew-tap`** repo at `Casks/opensuperwhisper.rb`. It uses
+The cask lives in the **`my-monkeys/homebrew-tap`** repo at `Casks/openmonkeywhisper.rb`, next to
+the deprecated `Casks/opensuperwhisper.rb` that still gets every bump (`./update_homebrew_tap.sh`
+writes both). It uses
 an `arch arm: "arm64", intel: "x86_64"` stanza with per-arch `on_arm`/`on_intel` `sha256` blocks and
 a `#{arch}` URL, so `brew` fetches the matching DMG. After a release, bump `version` and **both**
 `sha256` values (from step 3) and push.
 
 ```sh
-brew install --cask my-monkeys/tap/opensuperwhisper
+brew install --cask my-monkeys/tap/openmonkeywhisper
 ```
 
-> Use the full `my-monkeys/tap/` path. The bare `opensuperwhisper` is the homebrew-cask entry
-> for the original project, not this fork.
+> The bare `opensuperwhisper` is the homebrew-cask entry for the original project, not this fork.
 
 ## Auto-update (Sparkle)
 

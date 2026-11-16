@@ -26,11 +26,13 @@ Five transcription engines, four of them fully on-device. No subscription, no ac
 ## Install
 
 ```sh
-brew install --cask my-monkeys/tap/opensuperwhisper
+brew install --cask my-monkeys/tap/openmonkeywhisper
 ```
 
-> ⚠️ Use the full `my-monkeys/tap/` path. The bare name `opensuperwhisper` is the homebrew-cask
-> entry for the original project, which still serves its 0.1.0, not this fork.
+> The cask was called `opensuperwhisper` until November 2026, a name it shared with the original
+> project's cask in homebrew/cask. `my-monkeys/tap/opensuperwhisper` still works and still gets every
+> release, but it is deprecated: to move over, `brew uninstall --cask my-monkeys/tap/opensuperwhisper`,
+> then install `openmonkeywhisper`. Settings and history stay.
 
 You can also download the latest **notarized** `.dmg` from
 [Releases](https://github.com/my-monkeys/OpenSuperWhisper/releases), or

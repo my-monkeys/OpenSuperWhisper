@@ -87,7 +87,7 @@ Everything below already exists on Maxim's Mac. Listed so a release can be repro
 | Sparkle CLI tools | `SourcePackages/artifacts/sparkle/Sparkle/bin/` (`sign_update`, `generate_keys`, `generate_appcast`) — present after Swift packages resolve |
 | arm64 feed | `https://raw.githubusercontent.com/my-monkeys/OpenSuperWhisper/master/appcast.xml` |
 | x86_64 feed | `https://raw.githubusercontent.com/my-monkeys/OpenSuperWhisper/master/appcast-x86_64.xml` |
-| Homebrew tap | repo `my-monkeys/homebrew-tap`, cask `Casks/opensuperwhisper.rb`; cloned locally at `/opt/homebrew/Library/Taps/my-monkeys/homebrew-tap` |
+| Homebrew tap | repo `my-monkeys/homebrew-tap`, casks `Casks/openmonkeywhisper.rb` and the deprecated `Casks/opensuperwhisper.rb` (both bumped every release); cloned locally at `/opt/homebrew/Library/Taps/my-monkeys/homebrew-tap` |
 
 If notarization ever says the profile is missing, recreate it with:
 ```sh
@@ -113,8 +113,10 @@ xcrun notarytool store-credentials osw-notary \
   just those commands with `DEVELOPER_DIR=/Library/Developer/CommandLineTools` (CLT has no license
   gate). Do **not** run `xcodebuild` under CLT. (Or accept once: `sudo xcodebuild -license accept`.)
 - **Homebrew name collision.** A cask named `opensuperwhisper` also exists in `homebrew/cask`, for
-  the original project. **Always** use the fully-qualified `my-monkeys/tap/opensuperwhisper` for
-  install/upgrade, or you'll pull the wrong app.
+  the original project, which is why ours is `openmonkeywhisper` since November 2026 (#323). The old
+  `my-monkeys/tap/opensuperwhisper` is kept, deprecated, for the people installed under it: Homebrew
+  trusts tap casks one name at a time and the trust does not follow a rename, so it can't simply be
+  renamed. Always use a fully-qualified `my-monkeys/tap/…` name for install/upgrade.
 - **macOS 26/27 beta toolchain bug.** The beta `ld` links the Rust autocorrect dylib with a
   mis-aligned LINKEDIT string pool that it then rejects for the arm64 slice. Workaround: a known-good
   prebuilt `vendor/libautocorrect_swift.dylib` is vendored; `notarize_app.sh` uses it automatically
@@ -270,12 +272,14 @@ DEVELOPER_DIR=/Library/Developer/CommandLineTools git commit -am "chore: appcast
 DEVELOPER_DIR=/Library/Developer/CommandLineTools git push origin master
 ```
 
-### 6.7 Update the Homebrew cask
-Edit `/opt/homebrew/Library/Taps/my-monkeys/homebrew-tap/Casks/opensuperwhisper.rb` (or the repo on
-GitHub). Bump `version` and **both** `sha256` (arm64 → `on_arm`, x86_64 → `on_intel`), from §6.3.
-Current shape:
+### 6.7 Update the Homebrew casks
+`./update_homebrew_tap.sh <version>` does it: it hashes the DMGs GitHub serves and rewrites both
+`Casks/openmonkeywhisper.rb` and the deprecated `Casks/opensuperwhisper.rb` (same version and
+checksums; the old one adds `deprecate!` and they declare `conflicts_with` on each other). By hand:
+bump `version` and **both** `sha256` (arm64 → `on_arm`, x86_64 → `on_intel`) in both files.
+Current shape of the new one:
 ```ruby
-cask "opensuperwhisper" do
+cask "openmonkeywhisper" do
   arch arm: "arm64", intel: "x86_64"
   version "0.9.3"
   on_arm   { sha256 "<arm64 sha256>" }
@@ -285,6 +289,7 @@ cask "opensuperwhisper" do
   name "OpenSuperWhisper"
   desc "macOS dictation with local Whisper/Parakeet transcription"
   homepage "https://github.com/my-monkeys/OpenSuperWhisper"
+  conflicts_with cask: "opensuperwhisper"
   depends_on macos: :sonoma
   app "OpenSuperWhisper.app"
   binary "#{appdir}/OpenSuperWhisper.app/Contents/MacOS/OpenSuperWhisper", target: "opensuperwhisper"
@@ -296,7 +301,8 @@ cask "opensuperwhisper" do
   ]
 end
 ```
-Commit + push the tap repo. Then `brew update && brew upgrade my-monkeys/tap/opensuperwhisper`.
+Commit + push the tap repo. Then `brew update && brew upgrade my-monkeys/tap/openmonkeywhisper`
+(or `my-monkeys/tap/opensuperwhisper` on a Mac still installed under the old name).
 
 ### 6.8 Verify (see §10) and announce (see §11).
 
@@ -360,7 +366,8 @@ End to end:
 - `gh release view "$TAG" --repo my-monkeys/OpenSuperWhisper` — both DMGs attached (stable) / arm64 only (beta).
 - Stable: `curl -sI <enclosure url>` returns 302→200 (asset reachable for Sparkle), and so do
   `releases/latest/download/OpenSuperWhisper-arm64.dmg` and `-x86_64.dmg` (the website's buttons).
-- Stable: `brew update && brew upgrade my-monkeys/tap/opensuperwhisper` installs the new version.
+- Stable: `brew update && brew info --cask my-monkeys/tap/openmonkeywhisper my-monkeys/tap/opensuperwhisper`
+  shows the new version for both casks.
 - Sparkle: from the previous stable, menu-bar **Check for Updates…** offers the new version and
   installs it (the real auto-update path — worth doing once per stable).
 
@@ -392,7 +399,7 @@ marketing. A 🍌 at the end is on-brand but optional.
 |---|---|
 | `xcodebuild` works but `git`/`gh`/`brew` say "Xcode license not agreed" | beta Xcode is active → prefix those with `DEVELOPER_DIR=/Library/Developer/CommandLineTools`, or `sudo xcodebuild -license accept` once |
 | Build fails: "mis-aligned LINKEDIT string pool" (arm64) | beta-toolchain ld bug → ensure `vendor/libautocorrect_swift.dylib` is present (script uses it); remove it after the toolchain is fixed |
-| `brew upgrade opensuperwhisper` pulls the wrong/old app | name collision with homebrew/cask → use `my-monkeys/tap/opensuperwhisper` |
+| `brew upgrade opensuperwhisper` pulls the wrong/old app | name collision with homebrew/cask → use `my-monkeys/tap/openmonkeywhisper` |
 | Notarization: "no profile named osw-notary" | recreate with `notarytool store-credentials` (§3) |
 | `sign_update: command not found` | Swift packages not resolved → run `./run.sh build` once (resolves `SourcePackages/`), or `xcodebuild -resolvePackageDependencies` |
 | Sparkle doesn't offer the update | top `<sparkle:version>` ≤ installed `CFBundleVersion`, or feeds not pushed to `master`, or you edited the wrong feed for the arch |

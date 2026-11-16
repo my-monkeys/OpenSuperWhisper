@@ -23,7 +23,14 @@ set -e -o pipefail
 VERSION="${1}"
 REPO="${REPO:-my-monkeys/OpenSuperWhisper}"
 TAP="${TAP:-my-monkeys/homebrew-tap}"
-CASK_PATH="Casks/opensuperwhisper.rb"
+TOKEN="openmonkeywhisper"
+
+# The cask was called opensuperwhisper until 0.15.4. That is also the token of the original app in
+# homebrew/cask, so the bare name installed the wrong app (#323). The old cask stays, deprecated,
+# and gets every bump like the new one. Turning it into a rename would have broken everyone
+# installed under it: Homebrew trusts tap casks one name at a time, and that trust does not follow
+# a rename, so their next `brew upgrade` would have refused to load the new name.
+LEGACY_TOKEN="opensuperwhisper"
 
 if [[ -z "$VERSION" ]]; then
     echo "Usage: $0 <version>            e.g. $0 0.12.2"
@@ -62,8 +69,10 @@ WORKTREE=$(mktemp -d)
 trap 'rm -rf "$WORKTREE"' EXIT
 gh repo clone "$TAP" "$WORKTREE" -- --quiet --depth 1
 
-cat > "${WORKTREE}/${CASK_PATH}" <<CASK
-cask "opensuperwhisper" do
+# $1 is the token, $2 the stanzas that sit between homepage and depends_on.
+write_cask() {
+    cat > "${WORKTREE}/Casks/${1}.rb" <<CASK
+cask "${1}" do
   arch arm: "arm64", intel: "x86_64"
 
   version "${VERSION}"
@@ -80,6 +89,7 @@ cask "opensuperwhisper" do
   desc "macOS dictation with local Whisper/Parakeet transcription"
   homepage "https://github.com/${REPO}"
 
+${2}
   depends_on macos: :sonoma
 
   app "OpenSuperWhisper.app"
@@ -93,6 +103,12 @@ cask "opensuperwhisper" do
   ]
 end
 CASK
+}
+
+write_cask "$TOKEN" "  conflicts_with cask: \"${LEGACY_TOKEN}\""
+write_cask "$LEGACY_TOKEN" "  deprecate! date: \"2026-11-16\", because: \"was renamed\", replacement_cask: \"my-monkeys/tap/${TOKEN}\"
+
+  conflicts_with cask: \"${TOKEN}\""
 
 cd "$WORKTREE"
 if git diff --quiet; then
@@ -101,7 +117,7 @@ if git diff --quiet; then
 fi
 
 git diff --stat
-git add "$CASK_PATH"
-git commit -q -m "opensuperwhisper ${VERSION}"
+git add "Casks/${TOKEN}.rb" "Casks/${LEGACY_TOKEN}.rb"
+git commit -q -m "${TOKEN} ${VERSION}"
 git push -q origin HEAD
-echo "Tap updated: https://github.com/${TAP}/blob/main/${CASK_PATH}"
+echo "Tap updated: https://github.com/${TAP}/blob/main/Casks/${TOKEN}.rb"
