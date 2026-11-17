@@ -67,17 +67,7 @@ struct PrivacyRubric: View {
                 SSwitch(isOn: $viewModel.saveTranscriptionHistory)
             }
             SettingRow("Transcriptions folder", hint: LocalizedStringKey(Recording.recordingsDirectory.path)) {
-                // Under the button rather than beside it: the label and its long path take the
-                // row's width first, and beside the button the weight was squeezed into a
-                // column a few letters wide.
-                VStack(alignment: .trailing, spacing: 6) {
-                    Button("Show in Finder") { NSWorkspace.shared.open(Recording.recordingsDirectory) }
-                        .buttonStyle(.sSecondary)
-                    RecordingsSizeText(style: .sizeAndCount)
-                        .scaledFont(size: 12)
-                        .foregroundColor(STheme.hint)
-                        .fixedSize()
-                }
+                TranscriptionsFolderControls()
             }
         }
     }
@@ -192,5 +182,39 @@ private struct RetentionNumberField: View {
             Stepper("", value: $value, in: 1...100000)
                 .labelsHidden()
         }
+    }
+}
+
+/// "Show in Finder", and its weight underneath. The folder only exists once a recording was
+/// saved: with history off from the start there is none, and the button used to open nothing
+/// without a word. It is disabled then, and says why.
+private struct TranscriptionsFolderControls: View {
+    /// Observed for its changes alone: a saved recording is what creates the folder, so the
+    /// check below runs again the moment one lands. That needs the count loaded, which the
+    /// size line would do but is not shown while the folder is missing, hence the `.task`.
+    @ObservedObject private var usage = RecordingsDiskUsage.shared
+
+    var body: some View {
+        let folder = Recording.recordingsDirectory
+        let exists = FileManager.default.fileExists(atPath: folder.path)
+        // Under the button rather than beside it: the label and its long path take the row's
+        // width first, and beside the button the weight was squeezed into a column a few
+        // letters wide.
+        VStack(alignment: .trailing, spacing: 6) {
+            Button("Show in Finder") { NSWorkspace.shared.open(folder) }
+                .buttonStyle(.sSecondary)
+                .disabled(!exists)
+            Group {
+                if exists {
+                    RecordingsSizeText(style: .sizeAndCount)
+                } else {
+                    Text("Nothing has been saved here yet.")
+                }
+            }
+            .scaledFont(size: 12)
+            .foregroundColor(STheme.hint)
+            .fixedSize()
+        }
+        .task { await usage.loadIfNeeded() }
     }
 }
