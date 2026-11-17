@@ -507,6 +507,52 @@
         }
       }
     },
+    "At login, open without the main window. Opening the app yourself shows it.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei der Anmeldung ohne Hauptfenster starten. Öffnest du die App selbst, erscheint es."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al iniciar sesión, abrir sin la ventana principal. Si abres la app tú mismo, se muestra."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À l'ouverture de session, démarrer sans la fenêtre principale. Si vous ouvrez l'app vous-même, elle s'affiche."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All'accesso, avvia senza la finestra principale. Se apri l'app tu stesso, viene mostrata."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ao iniciar a sessão, abrir sem a janela principal. Se você abrir o app, ela aparece."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi đăng nhập, khởi động không có cửa sổ chính. Nếu bạn tự mở ứng dụng, cửa sổ sẽ hiện ra."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时启动不显示主窗口。手动打开应用时会显示。"
+          }
+        }
+      }
+    },
     "Auto-paste Transcription": {
       "localizations": {
         "fr": {
@@ -25619,52 +25665,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "保留最近 %lld 条"
-          }
-        }
-      }
-    },
-    "Launch without the main window. Open it from the menu bar icon.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ohne Hauptfenster starten. Öffne es über das Symbol in der Menüleiste."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abrir sin la ventana principal. Ábrela desde el icono de la barra de menús."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Démarrer sans la fenêtre principale. Ouvrez-la depuis l'icône de la barre de menus."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avvia senza la finestra principale. Aprila dall'icona nella barra dei menu."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abrir sem a janela principal. Abra-a pelo ícone da barra de menus."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Khởi động không có cửa sổ chính. Mở từ biểu tượng trên thanh menu."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "启动时不显示主窗口。可从菜单栏图标打开。"
           }
         }
       }
