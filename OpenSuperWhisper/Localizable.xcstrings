@@ -1,6 +1,52 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "1-9 insert · ↑↓ ⏎ · esc close": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1-9 einfügen · ↑↓ ⏎ · Esc schließen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1-9 insertar · ↑↓ ⏎ · esc cerrar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1-9 insérer · ↑↓ ⏎ · échap fermer"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1-9 inserisci · ↑↓ ⏎ · esc chiudi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1-9 inserir · ↑↓ ⏎ · esc fechar"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1-9 chèn · ↑↓ ⏎ · esc đóng"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1-9 插入 · ↑↓ ⏎ · esc 关闭"
+          }
+        }
+      }
+    },
     "A site rule picks the transcription model, the writing style and AI cleanup, in Safari, Arc and other supported browsers. Insertion and formatting follow the app.": {
       "localizations": {
         "fr": {
@@ -6579,6 +6625,52 @@
         }
       }
     },
+    "Pick a recent dictation": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Letztes Diktat auswählen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir un dictado reciente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir une dictée récente"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una dettatura recente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher um ditado recente"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn một lần đọc chính tả gần đây"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择最近的听写"
+          }
+        }
+      }
+    },
     "Play a notification sound when recording begins": {
       "localizations": {
         "fr": {
@@ -8737,6 +8829,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "录音时实时显示转写（仅 Parakeet）"
+          }
+        }
+      }
+    },
+    "Shows your last nine dictations next to the cursor. Press 1 to 9 to insert one.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeigt deine letzten neun Diktate neben dem Cursor. Mit 1 bis 9 fügst du eines ein."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muestra tus últimos nueve dictados junto al cursor. Pulsa 1 a 9 para insertar uno."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affiche vos neuf dernières dictées près du curseur. Appuyez sur 1 à 9 pour en insérer une."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra le ultime nove dettature accanto al cursore. Premi da 1 a 9 per inserirne una."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra seus últimos nove ditados ao lado do cursor. Pressione 1 a 9 para inserir um."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiện chín lần đọc chính tả gần nhất cạnh con trỏ. Nhấn 1 đến 9 để chèn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在光标旁显示最近九条听写。按 1 到 9 即可插入。"
           }
         }
       }

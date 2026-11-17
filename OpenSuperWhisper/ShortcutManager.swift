@@ -15,6 +15,10 @@ extension KeyboardShortcuts.Name {
     /// claiming a global combination for every user isn't ours to do. ⌃⌘V is a natural pick: it
     /// sits next to ⌘V without colliding with it or with paste-and-match-style (⌥⇧⌘V).
     static let pasteLastTranscription = Self("pasteLastTranscription")
+    /// Opens a small panel next to the cursor with the last nine dictations, one digit key each.
+    /// Unbound by default, like the other optional shortcuts: claiming a global combination for
+    /// everyone isn't ours to do.
+    static let pickRecentTranscription = Self("pickRecentTranscription")
     /// Dictates, then presses Return once the text lands — the keyboard twin of the submit
     /// mouse button. Unbound by default: claiming a global combination for everyone isn't
     /// ours to do. (#50)
@@ -248,6 +252,13 @@ class ShortcutManager {
             }
         }
 
+        // On key-UP for the same reason: the insertion that follows waits for modifiers to lift.
+        KeyboardShortcuts.onKeyUp(for: .pickRecentTranscription) {
+            Task { @MainActor in
+                await RecentPickerController.shared.toggle()
+            }
+        }
+
         KeyboardShortcuts.onKeyUp(for: .nextWritingStyle) {
             Task { @MainActor in
                 let prefs = AppPreferences.shared
@@ -383,7 +394,7 @@ class ShortcutManager {
     /// The key combinations that should be listening now: the bound trigger slots and the
     /// optional shortcuts the user set. Esc is left out: it only listens while the bubble shows.
     private func liveKeyCombos() -> [KeyboardShortcuts.Name] {
-        let optional: [KeyboardShortcuts.Name] = [.toggleRecordAndSubmit, .pasteLastTranscription, .nextWritingStyle]
+        let optional: [KeyboardShortcuts.Name] = [.toggleRecordAndSubmit, .pasteLastTranscription, .pickRecentTranscription, .nextWritingStyle]
         return boundComboSlots + optional.filter { KeyboardShortcuts.getShortcut(for: $0) != nil }
     }
 
