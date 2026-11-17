@@ -195,14 +195,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
     private var microphoneObserver: AnyCancellable?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Before the move offer below, whose modal alert handles events of its own and would
+        // replace the launch's Apple event this is read from.
+        let launchedAtLogin = LaunchAtLoginManager.wasLaunchedAtLogin
         // First, so nothing else appears or starts while the app is about to be replaced by its copy.
         if MainActor.assumeIsolated({ MoveToApplications.offerIfNeeded() }) { return }
 
         setupStatusBarItem()
         AppearanceController.shared.apply()
 
-        // Start in the menu bar only when requested. Never during onboarding: the user needs the
-        // window to finish setup.
+        // Start in the menu bar only when requested, and only when macOS opened the app at login.
+        // Someone who opens it by hand gets the window: hidden, that launch looked like it did
+        // nothing, and the second try only brought up a window that was already there (#323).
+        // Never during onboarding either: the user needs the window to finish setup.
         //
         // The orderOut looks redundant next to the policy change and is not. Whether the window
         // exists yet depends on the macOS version, which is the same disagreement that produced
@@ -211,7 +216,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, ObservableOb
         // created yet the lookup is nil and this does nothing, which is what the old code did
         // there anyway, so it cannot be a regression on either.
         let onboarded = AppPreferences.shared.hasCompletedOnboarding
-        let startsHidden = AppPreferences.shared.startHidden && onboarded
+        let startsHidden = AppPreferences.shared.startHidden && onboarded && launchedAtLogin
         if startsHidden {
             NSApplication.shared.setActivationPolicy(.accessory)
             mainWindow?.orderOut(nil)

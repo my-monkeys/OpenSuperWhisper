@@ -73,7 +73,7 @@ struct GeneralRubric: View {
                     set: { launchAtLogin.setEnabled($0) }))
             }
             SettingRow("Start in the menu bar",
-                       hint: "Launch without the main window. Open it from the menu bar icon.") {
+                       hint: "At login, open without the main window. Opening the app yourself shows it.") {
                 SSwitch(isOn: $viewModel.startHidden)
             }
         }

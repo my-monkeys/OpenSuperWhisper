@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import ServiceManagement
 
 /// Manages whether the app launches automatically when the user logs in.
@@ -14,6 +14,15 @@ final class LaunchAtLoginManager: ObservableObject {
 
     private init() {
         self.isEnabled = SMAppService.mainApp.status == .enabled
+    }
+
+    /// Whether macOS opened the app at login, rather than someone opening it. Read from the
+    /// launch's Apple event, which is only current early in `applicationDidFinishLaunching`.
+    /// Also true for a login item added by hand in System Settings, not only through our toggle.
+    nonisolated static var wasLaunchedAtLogin: Bool {
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        return event?.eventID == kAEOpenApplication
+            && event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
     }
 
     /// Re-reads the current state from the system. Call this when the settings
