@@ -13,6 +13,7 @@ import OpenSuperWhisperCore
 enum UISnapshotProbe {
     static let screens: [String: () -> AnyView] = [
         "home": { AnyView(AppShellView(page: .home)) },
+        "recent-picker": { recentPicker() },
         "home-unfinished": { seedUnfinished(); return AnyView(AppShellView(page: .home)) },
         "home-unfinished-recovered": { seedUnfinished(recovered: true); return AnyView(AppShellView(page: .home)) },
         "home-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return AnyView(AppShellView(page: .home)) },
@@ -353,7 +354,8 @@ enum UISnapshotProbe {
         func size(_ name: String) -> CGSize {
             // The settings are their own window, with their own default size.
             let fallback = name.hasPrefix("settings-") ? SettingsWindowController.defaultSize
-                                                       : CGSize(width: 1080, height: 760)
+                : name == "recent-picker" ? CGSize(width: RecentPickerView.width + 2 * RecentPickerView.shadowRoom, height: 330)
+                : CGSize(width: 1080, height: 760)
             return CGSize(width: Double(environment["OSW_SNAPSHOT_WIDTH"] ?? "") ?? fallback.width,
                           height: Double(environment["OSW_SNAPSHOT_HEIGHT"] ?? "") ?? fallback.height)
         }
@@ -410,6 +412,16 @@ enum UISnapshotProbe {
         host.cacheDisplay(in: host.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
         window.close()
+    }
+
+    /// The "Pick a recent dictation" panel over the seeded recordings, the second row highlighted.
+    private static func recentPicker() -> AnyView {
+        var recordings: [Recording]?
+        Task { recordings = (try? await RecordingStore.shared.fetchRecordings(limit: RecentPicker.scanDepth, offset: 0)) ?? [] }
+        while recordings == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        let model = RecentPickerModel(rows: RecentPicker.rows(from: recordings ?? []))
+        model.highlighted = 1
+        return AnyView(RecentPickerView(model: model, onPick: { _ in }))
     }
 
     /// A few made-up dictations so Home has something to show.
