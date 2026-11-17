@@ -197,6 +197,7 @@ final class PersistedContractTests: XCTestCase {
         XCTAssertEqual(KeyboardShortcuts.Name.toggleRecord.rawValue, "toggleRecord")
         XCTAssertEqual(KeyboardShortcuts.Name.escape.rawValue, "escape")
         XCTAssertEqual(KeyboardShortcuts.Name.pasteLastTranscription.rawValue, "pasteLastTranscription")
+        XCTAssertEqual(KeyboardShortcuts.Name.pickRecentTranscription.rawValue, "pickRecentTranscription")
         XCTAssertEqual(KeyboardShortcuts.Name.toggleRecordAndSubmit.rawValue, "toggleRecordAndSubmit")
         XCTAssertEqual(KeyboardShortcuts.Name.recordTriggerSlot(3).rawValue, "recordTriggerSlot3")
         XCTAssertEqual(KeyboardShortcuts.Name.holdTriggerSlot(0).rawValue, "holdTriggerSlot0")

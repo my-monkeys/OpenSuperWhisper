@@ -30,6 +30,8 @@ struct DictationRubric: View {
               keywords: "style shortcut cycle switch pro personal raccourci style suivant"),
         .init(title: "Paste the last dictation", rubric: .dictation, advanced: true,
               keywords: "paste last transcription again coller dernière dictée"),
+        .init(title: "Pick a recent dictation", rubric: .dictation, advanced: true,
+              keywords: "recent history last nine list choose insert choisir récente historique dictées liste"),
         .init(title: "Confirm before cancelling", rubric: .dictation, advanced: true,
               keywords: "confirmation escape twice confirmer annuler"),
         .init(title: "Microphone", rubric: .dictation,
@@ -139,6 +141,16 @@ struct DictationRubric: View {
                        hint: "Inserts your latest dictation again wherever the cursor is.",
                        advanced: true) {
                 TriggerRecorderField(name: .pasteLastTranscription,
+                                     mouseButton: $viewModel.pasteMouseButtonUnused,
+                                     modifierKey: $viewModel.pasteModifierUnused,
+                                     allowsMouse: false,
+                                     allowsModifier: false,
+                                     style: .chips)
+            }
+            SettingRow("Pick a recent dictation",
+                       hint: "Shows your last nine dictations next to the cursor. Press 1 to 9 to insert one.",
+                       advanced: true) {
+                TriggerRecorderField(name: .pickRecentTranscription,
                                      mouseButton: $viewModel.pasteMouseButtonUnused,
                                      modifierKey: $viewModel.pasteModifierUnused,
                                      allowsMouse: false,
