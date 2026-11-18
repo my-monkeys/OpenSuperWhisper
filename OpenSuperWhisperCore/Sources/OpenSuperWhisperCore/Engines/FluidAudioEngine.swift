@@ -176,20 +176,25 @@ class FluidAudioEngine: TranscriptionEngine {
     }
 
     /// Samples to hand FluidAudio in place of the file, or nil to let it read the file itself.
-    /// The recorder writes every input channel of an external device. FluidAudio downmixes such
-    /// a file with AVAudioConverter, which turns speech carried by one of several unlabeled
-    /// channels into silence, so a multi-channel file goes through the active-channel mix
-    /// instead. A mono file goes through it too when it is quiet enough to be lifted
-    /// (`QuietClipGain`); any other keeps FluidAudio's reader, which streams long files from disk.
+    /// A dictation always comes as samples, padded with silence (`ClipEdgePadding`). The recorder
+    /// writes every input channel of an external device. FluidAudio downmixes such a file with
+    /// AVAudioConverter, which turns speech carried by one of several unlabeled channels into
+    /// silence, so a multi-channel file goes through the active-channel mix instead. A long mono
+    /// file goes through it too when it is quiet enough to be lifted (`QuietClipGain`); any other
+    /// keeps FluidAudio's reader, which streams long files from disk.
     ///
     /// Boosting always needs the samples: the rescorer reads the audio behind the transcript.
     private static func samplesIfNeeded(url: URL, forBoosting: Bool) async throws -> [Float]? {
-        let isMultiChannel = try AVAudioFile(forReading: url).processingFormat.channelCount > 1
-        guard try forBoosting || isMultiChannel || AudioPCMConverter.staysBelowNormalLevel(url) else { return nil }
+        let file = try AVAudioFile(forReading: url)
+        let isMultiChannel = file.processingFormat.channelCount > 1
+        let isDictation = ClipEdgePadding.fits(
+            durationSeconds: Double(file.length) / file.processingFormat.sampleRate)
+        guard try forBoosting || isMultiChannel || isDictation
+                || AudioPCMConverter.staysBelowNormalLevel(url) else { return nil }
         guard let samples = try await AudioPCMConverter.convertAudioToPCM(fileURL: url) else {
             throw TranscriptionError.audioConversionFailed
         }
-        return samples
+        return isDictation ? ClipEdgePadding.padded(samples) : samples
     }
 }
 
