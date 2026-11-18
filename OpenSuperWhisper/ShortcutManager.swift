@@ -55,6 +55,11 @@ class ShortcutManager {
     private var boundComboSlots: [KeyboardShortcuts.Name] = []
     /// The take the trigger keys control. Internal so tests can stand one up.
     var activeVm: IndicatorViewModel?
+    /// How long the microphone stays open after a take is ended. People let go on the last
+    /// syllable, and closing the recorder on that instant cut the word short. Zero stops at once.
+    var stopTail: TimeInterval = 0.25
+    /// The stop of a take that has ended but is still recording its tail.
+    private var pendingStop: Task<Void, Never>?
     private var holdWorkItem: DispatchWorkItem?
     private let holdThreshold: TimeInterval = 0.3
     private var holdMode = false
@@ -288,6 +293,12 @@ class ShortcutManager {
             if IndicatorWindowManager.shared.requestCancel() {
                 activeVm = nil
             }
+        } else if let stop = pendingStop {
+            // Inside the tail the take is still recording, so there is no transcription yet to
+            // discard: the recording itself is dropped, as Esc just after the stop always did.
+            stop.cancel()
+            pendingStop = nil
+            IndicatorWindowManager.shared.stopForce()
         } else {
             IndicatorWindowManager.shared.discardDecoding()
         }
@@ -459,9 +470,36 @@ class ShortcutManager {
         holdWorkItem = nil
         holdMode = false
         latched = false
-        IndicatorWindowManager.shared.stopRecording()
         activeVm = nil
         LatchKeyMonitor.shared.stop()
+        stopAfterTail()
+    }
+
+    /// Stops the recorder once the tail has gone by. The take already counts as ended: a press
+    /// inside the tail starts a new one, which stops this one first (`flushPendingStop`).
+    @MainActor private func stopAfterTail() {
+        guard stopTail > 0 else {
+            IndicatorWindowManager.shared.stopRecording()
+            return
+        }
+        let tail = UInt64(stopTail * 1_000_000_000)
+        pendingStop = Task { @MainActor [self] in
+            try? await Task.sleep(nanoseconds: tail)
+            // Checked with no suspension before the stop, so a flush or an Esc on the main actor
+            // either cancelled this already or finds it gone.
+            guard !Task.isCancelled else { return }
+            pendingStop = nil
+            IndicatorWindowManager.shared.stopRecording()
+        }
+    }
+
+    /// Ends a tail now. The recorder and the bubble are shared, so a new take must not start
+    /// while the last one still holds them.
+    @MainActor func flushPendingStop() {
+        guard let stop = pendingStop else { return }
+        stop.cancel()
+        pendingStop = nil
+        IndicatorWindowManager.shared.stopRecording()
     }
 
     /// `holdOnly` is for the hold-only triggers: the recording lasts exactly as long as the key
@@ -481,6 +519,7 @@ class ShortcutManager {
 
         Task { @MainActor in
             if self.activeVm == nil {
+                self.flushPendingStop()
                 Diag.mark("keyDown → start recording")
                 let recorderStarted = AudioRecorder.shared.startRecordingInBackground(pressedAt: pressedAt)
                 // Pressed while the agent panel has focus: the take answers the agent there,
