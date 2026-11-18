@@ -27,6 +27,8 @@ final class StaleStopTests: XCTestCase {
 
     func testBubbleStopClearsTheActiveTake() {
         let manager = ShortcutManager()
+        // The stop counted here is the immediate one; the tail has tests of its own.
+        manager.stopTail = 0
         let vm = IndicatorViewModel()
         var stops = 0
         vm.stopRecordingOverride = { stops += 1; return .tooShort }
