@@ -555,15 +555,16 @@ public class TranscriptionService: ObservableObject {
     }
 
     /// Whether a failed remote transcription should retry on the local fallback: only
-    /// "can't use the server" errors (unreachable / 5xx after retries) — never auth or a
-    /// real client 4xx that a local model wouldn't fix. Pure → `nonisolated` + testable.
+    /// "can't use the server" errors (unreachable / 5xx after retries, or 413 "file too large",
+    /// which a local model has no limit on) — never auth or a real client 4xx that a local
+    /// model wouldn't fix. Pure → `nonisolated` + testable.
     nonisolated static func shouldUseFallback(for error: Error) -> Bool {
         guard let remote = error as? RemoteError else { return false }
         switch remote {
         case .network:
             return true
         case .api(let status, _):
-            return (500...599).contains(status)
+            return status == 413 || (500...599).contains(status)
         case .missingAPIKey, .invalidAPIKey:
             return false
         }

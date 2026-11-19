@@ -15,6 +15,11 @@ final class TranscriptionServiceFallbackTests: CoreTestCase {
         XCTAssertTrue(TranscriptionService.shouldUseFallback(for: RemoteError.api(503, nil)))
     }
 
+    /// "File too large" is the one client error a local model fixes.
+    func testFallsBackOnPayloadTooLarge() {
+        XCTAssertTrue(TranscriptionService.shouldUseFallback(for: RemoteError.api(413, "too large")))
+    }
+
     func testDoesNotFallBackOnAuth4xxOrNonRemote() {
         XCTAssertFalse(TranscriptionService.shouldUseFallback(for: RemoteError.missingAPIKey))
         XCTAssertFalse(TranscriptionService.shouldUseFallback(for: RemoteError.invalidAPIKey))
