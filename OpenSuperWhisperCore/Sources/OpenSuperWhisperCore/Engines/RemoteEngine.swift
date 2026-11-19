@@ -31,8 +31,14 @@ final class RemoteEngine: TranscriptionEngine {
     /// one carrying a stub URLProtocol, which a session built here would otherwise never see.
     private let sessionConfiguration: () -> URLSessionConfiguration
 
-    init(sessionConfiguration: @escaping () -> URLSessionConfiguration = { .default }) {
+    /// Largest file sent in one request; bigger ones go up in parts. Injectable so a test needs
+    /// no 24 MB file.
+    private let maxUploadBytes: Int
+
+    init(sessionConfiguration: @escaping () -> URLSessionConfiguration = { .default },
+         maxUploadBytes: Int = RemoteUploadChunks.maxFileBytes) {
         self.sessionConfiguration = sessionConfiguration
+        self.maxUploadBytes = maxUploadBytes
     }
 
     /// Loaded once a server URL is configured. The remote model itself is not
@@ -77,66 +83,15 @@ final class RemoteEngine: TranscriptionEngine {
             self.onProgressUpdate?(0.05)
             try Task.checkCancellation()
 
-            let audioData = try Data(contentsOf: url)
-            let boundary = "Boundary-\(UUID().uuidString)"
-            let request = self.makeRequest(
-                endpoint: endpoint,
-                boundary: boundary,
-                filename: url.lastPathComponent,
-                audioData: audioData,
-                language: clip.language,
-                temperature: clip.temperature,
-                prompt: clip.prompt
-            )
-
-            self.onProgressUpdate?(0.2)
-
-            // Send with bounded retries for TRANSIENT failures only: network blips,
-            // 5xx, 408/429, and the "405 + nginx HTML" signature a reverse proxy
-            // returns mid-redeploy/restart. Re-sending the same audio has no side
-            // effects, so this just rides out a momentary server hiccup. Auth errors
-            // (401/403) and real JSON-API 4xx are never retried.
-            var attempt = 0
-            while true {
-                attempt += 1
-                try Task.checkCancellation()
-                let session = self.makeSession()
-                var retry = false
-                do {
-                    defer { session.finishTasksAndInvalidate() }
-                    let (data, response) = try await session.data(for: request)
-                    try Task.checkCancellation()
-
-                    guard let http = response as? HTTPURLResponse else {
-                        throw RemoteError.network(nil)
-                    }
-                    if (200..<300).contains(http.statusCode) {
-                        self.onProgressUpdate?(1.0)
-                        return Self.extractText(from: data)
-                    }
-                    if http.statusCode == 401 || http.statusCode == 403 {
-                        throw self.apiKey.isEmpty ? RemoteError.missingAPIKey : RemoteError.invalidAPIKey
-                    }
-                    let body = String(data: data, encoding: .utf8) ?? ""
-                    print("RemoteEngine HTTP \(http.statusCode) (attempt \(attempt)/\(Self.maxAttempts)): \(body)")
-                    if attempt < Self.maxAttempts, Self.isRetryable(status: http.statusCode, body: body) {
-                        retry = true
-                    } else {
-                        throw RemoteError.api(http.statusCode, Self.serverMessage(from: data))
-                    }
-                } catch let urlError as URLError {
-                    print("RemoteEngine network error (attempt \(attempt)/\(Self.maxAttempts)): \(urlError.code.rawValue)")
-                    guard attempt < Self.maxAttempts, Self.isRetryable(urlError) else {
-                        throw RemoteError.network(urlError)
-                    }
-                    retry = true
-                }
-                // Reached only when an attempt was deemed retryable.
-                if retry {
-                    try await Task.sleep(nanoseconds: Self.backoffNanos(afterAttempt: attempt))
-                    self.onProgressUpdate?(0.2)
-                }
+            let fileSize = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int ?? 0
+            if fileSize <= self.maxUploadBytes {
+                let text = try await self.send(
+                    audio: try Data(contentsOf: url), filename: url.lastPathComponent,
+                    endpoint: endpoint, clip: clip, retryProgress: 0.2)
+                self.onProgressUpdate?(1.0)
+                return text
             }
+            return try await self.transcribeInParts(url: url, endpoint: endpoint, clip: clip)
         }
 
         currentTask = task
@@ -156,13 +111,100 @@ final class RemoteEngine: TranscriptionEngine {
         }
     }
 
+    // MARK: - Sending
+
+    /// A file over the server's upload cap is decoded and sent as consecutive WAV parts cut at
+    /// pauses, then the texts are joined: one request would be refused (413) however it is sent.
+    private func transcribeInParts(url: URL, endpoint: URL, clip: ClipParameters) async throws -> String {
+        guard let samples = try await AudioPCMConverter.convertAudioToPCM(fileURL: url) else {
+            throw TranscriptionError.audioConversionFailed
+        }
+        let ranges = RemoteUploadChunks.plan(samples: samples,
+                                             maxSamples: RemoteUploadChunks.maxSamples(forBytes: maxUploadBytes))
+        var texts: [String] = []
+        for (index, range) in ranges.enumerated() {
+            try Task.checkCancellation()
+            onProgressUpdate?(0.2 + 0.75 * Float(index) / Float(ranges.count))
+            let text = try await send(
+                audio: RemoteUploadChunks.wavData(samples: samples[range]),
+                filename: RemoteUploadChunks.partFilename(original: url.lastPathComponent, index: index),
+                endpoint: endpoint, clip: clip,
+                retryProgress: 0.2 + 0.75 * Float(index) / Float(ranges.count))
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { texts.append(trimmed) }
+        }
+        onProgressUpdate?(0.95)
+        return texts.joined(separator: " ")
+    }
+
+    /// Sends one audio file and returns the server's text, with bounded retries for TRANSIENT
+    /// failures only: network blips, 5xx, 408/429, and the "405 + nginx HTML" signature a reverse
+    /// proxy returns mid-redeploy/restart. Re-sending the same audio has no side effects, so this
+    /// just rides out a momentary server hiccup. Auth errors (401/403) and real JSON-API 4xx are
+    /// never retried.
+    private func send(audio: Data, filename: String, endpoint: URL, clip: ClipParameters,
+                      retryProgress: Float) async throws -> String {
+        let request = makeRequest(
+            endpoint: endpoint,
+            boundary: "Boundary-\(UUID().uuidString)",
+            filename: filename,
+            audioData: audio,
+            language: clip.language,
+            temperature: clip.temperature,
+            prompt: clip.prompt
+        )
+        onProgressUpdate?(retryProgress)
+
+        var attempt = 0
+        while true {
+            attempt += 1
+            try Task.checkCancellation()
+            let session = makeSession()
+            var retry = false
+            do {
+                defer { session.finishTasksAndInvalidate() }
+                let (data, response) = try await session.data(for: request)
+                try Task.checkCancellation()
+
+                guard let http = response as? HTTPURLResponse else {
+                    throw RemoteError.network(nil)
+                }
+                if (200..<300).contains(http.statusCode) {
+                    return Self.extractText(from: data)
+                }
+                if http.statusCode == 401 || http.statusCode == 403 {
+                    throw apiKey.isEmpty ? RemoteError.missingAPIKey : RemoteError.invalidAPIKey
+                }
+                let body = String(data: data, encoding: .utf8) ?? ""
+                print("RemoteEngine HTTP \(http.statusCode) (attempt \(attempt)/\(Self.maxAttempts)): \(body)")
+                if attempt < Self.maxAttempts, Self.isRetryable(status: http.statusCode, body: body) {
+                    retry = true
+                } else {
+                    throw RemoteError.api(http.statusCode, Self.serverMessage(from: data))
+                }
+            } catch let urlError as URLError {
+                print("RemoteEngine network error (attempt \(attempt)/\(Self.maxAttempts)): \(urlError.code.rawValue)")
+                guard attempt < Self.maxAttempts, Self.isRetryable(urlError) else {
+                    throw RemoteError.network(urlError)
+                }
+                retry = true
+            }
+            // Reached only when an attempt was deemed retryable.
+            if retry {
+                try await Task.sleep(nanoseconds: Self.backoffNanos(afterAttempt: attempt))
+                onProgressUpdate?(retryProgress)
+            }
+        }
+    }
+
     // MARK: - Helpers
+
+    typealias ClipParameters = (action: String, language: String, temperature: Double, prompt: String)
 
     /// What `transcribeAudio` takes from the settings for one request. Pure, so the mapping can
     /// be pinned without a server: the remote engine sends the user's prompt only, never the
     /// dictionary boost or the field's text that Whisper combines into its own (#89).
-    static func clipParameters(for settings: TranscriptionSettings)
-        -> (action: String, language: String, temperature: Double, prompt: String) {
+    static func clipParameters(for settings: TranscriptionSettings) -> ClipParameters {
         // OpenAI splits transcribe vs translate into two endpoints; the translations
         // endpoint always outputs English and ignores `language`.
         let translate = settings.translateToEnglish
