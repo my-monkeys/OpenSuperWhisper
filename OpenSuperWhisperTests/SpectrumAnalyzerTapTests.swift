@@ -46,8 +46,9 @@ final class SpectrumAnalyzerTapTests: XCTestCase {
         XCTAssertTrue(SpectrumAnalyzer.shouldRun(layout: .default))
     }
 
-    /// What building one engine per take relies on: a new engine reads from the device that is
-    /// the default input at that moment, which `AudioRecorder` has just made the take's mic. The
+    /// What building a new engine after a change of mic relies on: a new engine reads from the
+    /// device that is the default input at that moment, which `AudioRecorder` has just made the
+    /// take's mic. The
     /// engine is never started, so no microphone is opened; reading `inputNode` only creates the
     /// I/O unit.
     func testAFreshEngineReadsTheCurrentDefaultInput() throws {
