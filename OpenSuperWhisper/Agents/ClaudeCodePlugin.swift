@@ -20,7 +20,7 @@ enum ClaudeCodePlugin {
     static func status() async -> Status {
         await Task.detached {
             if isEnabledInSettings() { return Status.installed }
-            return claudeExecutable() == nil ? .noClaudeCode : .notInstalled
+            return AgentCLI.executable(named: "claude") == nil ? .noClaudeCode : .notInstalled
         }.value
     }
 
@@ -51,67 +51,65 @@ enum ClaudeCodePlugin {
         return await run(["plugin", "uninstall", pluginID]).map { _ in }
     }
 
-    struct PluginError: Error, Equatable {
-        let message: String
-    }
-
-    /// A GUI app gets launchd's bare PATH, without ~/.local/bin where Claude Code installs
-    /// itself, so the command is looked up through a login shell, which reads the user's own.
-    static func claudeExecutable() -> String? {
-        let output = shell("command -v claude")
-        let path = output?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return path.hasPrefix("/") ? path : nil
-    }
-
     private static func run(_ arguments: [String]) async -> Result<String, PluginError> {
-        await Task.detached {
-            guard let claude = claudeExecutable() else {
-                return .failure(PluginError(message: "Claude Code was not found on this Mac."))
-            }
-            let command = ([claude] + arguments).map(quoted).joined(separator: " ")
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-            process.arguments = ["-lc", command + " 2>&1"]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            do { try process.run() } catch {
-                return .failure(PluginError(message: error.localizedDescription))
-            }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            let output = String(decoding: data, as: UTF8.self)
-            return process.terminationStatus == 0
-                ? .success(output)
-                : .failure(PluginError(message: output.trimmingCharacters(in: .whitespacesAndNewlines)))
-        }.value
-    }
-
-    private static func shell(_ command: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", command]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return process.terminationStatus == 0 ? String(decoding: data, as: UTF8.self) : nil
-    }
-
-    private static func quoted(_ argument: String) -> String {
-        "'" + argument.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        await AgentCLI.run("claude", arguments, notFound: "Claude Code was not found on this Mac.")
     }
 }
 
-
-/// Codex has no install step of ours: it imports Claude Code's plugin marketplaces and enables
-/// the plugins it finds, ours included. This only reads whether it has done so, from its config.
+/// Codex does not import Claude Code's plugin marketplaces (0.163 stopped), so the plugin is
+/// added to it the same way as to Claude Code: through its own `codex plugin` commands.
 enum CodexPlugin {
+    enum Status: Equatable {
+        case installed
+        case notInstalled
+        /// No `codex` command on this Mac.
+        case noCodex
+    }
+
+    static let marketplaceCommand = ["plugin", "marketplace", "add", ClaudeCodePlugin.marketplace]
+    static let installCommand = ["plugin", "add", ClaudeCodePlugin.pluginID]
+    static let uninstallCommand = ["plugin", "remove", ClaudeCodePlugin.pluginID]
+
+    /// Read from Codex's config, where `codex plugin add` records the plugin as enabled, the
+    /// way Claude Code's is read: no process for the common case. Off the main thread for the
+    /// same reason as Claude Code's.
+    static func status() async -> Status {
+        await Task.detached {
+            if isEnabled() { return Status.installed }
+            return AgentCLI.executable(named: "codex") == nil ? .noCodex : .notInstalled
+        }.value
+    }
+
+    static func install(step: @escaping @MainActor (String) -> Void) async -> Result<Void, PluginError> {
+        await step("Adding the OpenSuperWhisper marketplace from GitHub…")
+        // Adding a marketplace that is already there is not a reason to stop.
+        if case .failure(let error) = await run(marketplaceCommand),
+           !error.message.localizedCaseInsensitiveContains("already") {
+            return .failure(error)
+        }
+        await step("Installing the plugin into Codex…")
+        return await run(installCommand).map { _ in }
+    }
+
+    static func uninstall(step: @escaping @MainActor (String) -> Void) async -> Result<Void, PluginError> {
+        await step("Removing the plugin from Codex…")
+        return await run(uninstallCommand).map { _ in }
+    }
+
+    private static func run(_ arguments: [String]) async -> Result<String, PluginError> {
+        await AgentCLI.run("codex", arguments, notFound: "Codex was not found on this Mac.")
+    }
+
     static func isEnabled() -> Bool {
-        let config = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
-        guard let text = try? String(contentsOf: config, encoding: .utf8) else { return false }
+        guard let text = try? String(contentsOf: configURL(), encoding: .utf8) else { return false }
         return isEnabled(inConfig: text)
+    }
+
+    /// Codex keeps its state in `$CODEX_HOME`, `~/.codex` by default.
+    static func configURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        let home = environment["CODEX_HOME"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex")
+        return home.appendingPathComponent("config.toml")
     }
 
     /// True when the plugin's table is there and says `enabled = true` before the next table.

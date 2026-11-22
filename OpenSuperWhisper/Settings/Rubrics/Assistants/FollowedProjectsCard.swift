@@ -84,7 +84,7 @@ private struct ProjectRow: View {
                 SSwitch(isOn: Binding(
                     get: { model.isProjectOn(path) },
                     set: { model.setProject(path, on: $0) }))
-                .disabled(!model.enabled || parent != nil)
+                .disabled(parent != nil)
             }
             if let parent {
                 caption("Off because it is inside \(AgentSettings.abbreviated(parent)), which is off. Turn that folder back on to use the panel here.",

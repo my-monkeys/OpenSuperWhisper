@@ -22,6 +22,7 @@ enum UISnapshotProbe {
         "dictionary": { seedDictionary(); return AnyView(AppShellView(page: .dictionary)) },
         "dictionary-editor": { seedDictionary(openEditor: true); return AnyView(AppShellView(page: .dictionary)) },
         "snippets": { seedSnippets(); return AnyView(AppShellView(page: .snippets)) },
+        "snippets-off": { seedSnippets(); AppPreferences.shared.snippetsEnabled = false; return AnyView(AppShellView(page: .snippets)) },
         "snippets-empty": { seedSnippets(empty: true); return AnyView(AppShellView(page: .snippets)) },
         "snippets-editor": { seedSnippets(openEditor: true); return AnyView(AppShellView(page: .snippets)) },
         "snippets-editor-new": {
@@ -118,6 +119,10 @@ enum UISnapshotProbe {
         "onboarding-3": { AnyView(OnboardingView(initialStep: .words).environmentObject(AppState())) },
         "onboarding-4": { AnyView(OnboardingView(initialStep: .permissions).environmentObject(AppState())) },
         "onboarding-5": { AnyView(OnboardingView(initialStep: .firstTry).environmentObject(AppState())) },
+        "settings-assistants-codex-missing": { assistantsSettings(codex: .noCodex) },
+        "settings-assistants-codex-not-installed": { assistantsSettings(codex: .notInstalled) },
+        "settings-assistants-codex-installed": { assistantsSettings(codex: .installed) },
+        "settings-assistants-claude-on": { assistantsSettings(codex: .installed, claudeOn: true) },
         "settings-textAndAI-ai": {
             AppPreferences.shared.aiPostProcessingEnabled = true
             return scrolled(.textAndAI, to: "Format with AI")
@@ -254,6 +259,13 @@ enum UISnapshotProbe {
     }
 
     /// The Settings window's content on `rubric`, rendered directly: no window is opened.
+    /// Settings › Assistants with the Codex plugin state staged and no agent answered, unless asked.
+    private static func assistantsSettings(codex: CodexPlugin.Status, claudeOn: Bool = false) -> AnyView {
+        AssistantsSettingsModel.snapshotCodexStatus = codex
+        AppPreferences.shared.setAgentKind(.claudeCode, enabled: claudeOn)
+        return settingsWindow(.assistants)
+    }
+
     private static func settingsWindow(_ rubric: SettingsRubric) -> AnyView {
         AppNavigation.shared.settingsRubric = rubric
         return AnyView(SettingsWindowView(viewModel: SettingsViewModel()))

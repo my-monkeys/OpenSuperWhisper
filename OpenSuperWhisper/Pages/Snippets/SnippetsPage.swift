@@ -99,14 +99,12 @@ private struct SnippetsOptionsGroup: View {
                        hint: "Whole words, any case, said alone or mid-sentence. Expanded after AI formatting, so your text is never rewritten.") {
                 SSwitch(isOn: $viewModel.snippetsEnabled)
             }
-            SettingRow("Help recognition of triggers",
-                       hint: "Also bias the model toward your triggers while listening. Helps unusual phrases, but can over-correct short, common ones.",
-                       indented: true) {
-                SSwitch(isOn: $viewModel.snippetsBoostEnabled)
-                    .disabled(!viewModel.snippetsEnabled)
-            }
-            if !viewModel.snippetsEnabled {
-                SettingNotice("Snippets are off. They are kept but nothing is expanded.")
+            if viewModel.snippetsEnabled {
+                SettingRow("Help recognition of triggers",
+                           hint: "Also bias the model toward your triggers while listening. Helps unusual phrases, but can over-correct short, common ones.",
+                           indented: true) {
+                    SSwitch(isOn: $viewModel.snippetsBoostEnabled)
+                }
             }
         }
     }

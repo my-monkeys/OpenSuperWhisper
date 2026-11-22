@@ -60,7 +60,7 @@ struct AssistantsRubric: View {
             SettingRow("Claude Code", hint: claudeHint) {
                 claudeControl
             }
-            if let error = model.error {
+            if let error = model.errors[.claudeCode] {
                 AssistantsErrorRow(message: error)
             }
             SettingRow("Answer Claude Code",
@@ -68,12 +68,11 @@ struct AssistantsRubric: View {
                        indented: true) {
                 SSwitch(isOn: $model.claudeOn)
             }
-            SettingRow("Codex", hint: model.codexHasPlugin
-                       ? "Plugin found. Codex copies Claude Code's plugins on its own."
-                       : "Codex picks up the plugin by itself once it is installed for Claude Code.") {
-                if model.codexHasPlugin {
-                    StatusPill(text: "✓ Plugin found")
-                }
+            SettingRow("Codex", hint: codexHint) {
+                codexControl
+            }
+            if let error = model.errors[.codex] {
+                AssistantsErrorRow(message: error)
             }
             if model.codexHasPlugin {
                 SettingRow("Answer Codex",
@@ -96,7 +95,7 @@ struct AssistantsRubric: View {
     }
 
     private var claudeHint: LocalizedStringKey {
-        if model.working { return LocalizedStringKey(model.step ?? "Working…") }
+        if model.working == .claudeCode { return LocalizedStringKey(model.step ?? "Working…") }
         switch model.status {
         case nil: return "Checking for the plugin…"
         case .installed: return "Plugin installed. New sessions use it; restart the ones already open."
@@ -105,8 +104,18 @@ struct AssistantsRubric: View {
         }
     }
 
+    private var codexHint: LocalizedStringKey {
+        if model.working == .codex { return LocalizedStringKey(model.step ?? "Working…") }
+        switch model.codexStatus {
+        case nil: return "Checking for the plugin…"
+        case .installed: return "Plugin installed. New sessions use it; restart the ones already open."
+        case .notInstalled: return "Adds the OpenSuperWhisper plugin to Codex, through its own plugin command."
+        case .noCodex: return "Codex not found. Install it, then come back here to add the plugin."
+        }
+    }
+
     @ViewBuilder private var claudeControl: some View {
-        if model.working || model.status == nil {
+        if model.working == .claudeCode || model.status == nil {
             ProgressView().controlSize(.small)
         } else {
             switch model.status {
@@ -115,11 +124,35 @@ struct AssistantsRubric: View {
                     StatusPill(text: "✓ Connected")
                     Button("Remove", action: model.uninstall)
                         .buttonStyle(.sDanger)
+                        .disabled(model.working != nil)
                 }
             case .notInstalled:
                 Button("Install the plugin", action: model.install)
                     .buttonStyle(.sPrimary)
+                    .disabled(model.working != nil)
             case .noClaudeCode, nil:
+                EmptyView()
+            }
+        }
+    }
+
+    @ViewBuilder private var codexControl: some View {
+        if model.working == .codex || model.codexStatus == nil {
+            ProgressView().controlSize(.small)
+        } else {
+            switch model.codexStatus {
+            case .installed:
+                HStack(spacing: 8) {
+                    StatusPill(text: "✓ Connected")
+                    Button("Remove", action: model.uninstallCodex)
+                        .buttonStyle(.sDanger)
+                        .disabled(model.working != nil)
+                }
+            case .notInstalled:
+                Button("Install the plugin", action: model.installCodex)
+                    .buttonStyle(.sPrimary)
+                    .disabled(model.working != nil)
+            case .noCodex, nil:
                 EmptyView()
             }
         }
@@ -127,49 +160,48 @@ struct AssistantsRubric: View {
 
     // MARK: Notify me when
 
-    private var notifyGroup: some View {
-        SettingsGroup("Notify me when") {
-            if !model.enabled {
-                SettingNotice("Turn on Claude Code, Codex or pi above to choose when the panel shows.")
-            }
-            Group {
+    /// Nothing here does anything until an agent is answered, so the group isn't shown before.
+    @ViewBuilder private var notifyGroup: some View {
+        if model.enabled {
+            SettingsGroup("Notify me when") {
                 SettingRow("Finishes a task") { SSwitch(isOn: $model.askOnStop) }
                 SettingRow("Needs a permission") { SSwitch(isOn: $model.askOnPermission) }
                 SettingRow("Asks a question", hint: "You can answer by voice from the panel.") {
                     SSwitch(isOn: $model.askOnQuestion)
                 }
-            }
-            .disabled(!model.enabled)
-            SettingRow("Notification sound", advanced: true, soon: true) {
-                SMenu(Text("Glass")) { EmptyView() }
-            }
-            SettingRow("Followed projects", hint: LocalizedStringKey(model.projectsSummary), advanced: true) {
-                Button("Manage…") {
-                    model.refreshProjects()
-                    managingProjects = true
+                SettingRow("Notification sound", advanced: true, soon: true) {
+                    SMenu(Text("Glass")) { EmptyView() }
                 }
-                .buttonStyle(.sSecondary)
+                SettingRow("Followed projects", hint: LocalizedStringKey(model.projectsSummary), advanced: true) {
+                    Button("Manage…") {
+                        model.refreshProjects()
+                        managingProjects = true
+                    }
+                    .buttonStyle(.sSecondary)
+                }
             }
         }
     }
 
     // MARK: Answer panel
 
-    private var panelGroup: some View {
-        SettingsGroup("Answer panel") {
-            SettingRow("Answer by voice", hint: "Your dictation shortcut, while the panel is open.", advanced: true) {
-                SKeyCap(dictationTrigger)
-            }
-            SettingRow("Panel position", advanced: true, soon: true) {
-                SMenu(Text("Top right")) { EmptyView() }
-            }
-            SettingRow("Wait for an answer",
-                       hint: "Then the agent goes back to its terminal, where you can still answer.") {
-                SPicker(selection: $model.waitSeconds,
-                        options: AppPreferences.agentWaitChoices.map {
-                            ($0, LocalizedStringKey(AgentSettings.label(forWait: $0)))
-                        })
-                .disabled(!model.enabled)
+    /// The panel never shows while no agent is answered, so neither do its settings.
+    @ViewBuilder private var panelGroup: some View {
+        if model.enabled {
+            SettingsGroup("Answer panel") {
+                SettingRow("Answer by voice", hint: "Your dictation shortcut, while the panel is open.", advanced: true) {
+                    SKeyCap(dictationTrigger)
+                }
+                SettingRow("Panel position", advanced: true, soon: true) {
+                    SMenu(Text("Top right")) { EmptyView() }
+                }
+                SettingRow("Wait for an answer",
+                           hint: "Then the agent goes back to its terminal, where you can still answer.") {
+                    SPicker(selection: $model.waitSeconds,
+                            options: AppPreferences.agentWaitChoices.map {
+                                ($0, LocalizedStringKey(AgentSettings.label(forWait: $0)))
+                            })
+                }
             }
         }
     }
