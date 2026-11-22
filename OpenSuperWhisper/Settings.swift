@@ -267,12 +267,6 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
-    @Published var customDictionaryBoostEnabled: Bool {
-        didSet {
-            AppPreferences.shared.customDictionaryBoostEnabled = customDictionaryBoostEnabled
-        }
-    }
-
     @Published var customDictionaryEntries: [CustomDictionaryEntry] {
         didSet {
             AppPreferences.shared.customDictionaryEntries = customDictionaryEntries
@@ -1078,7 +1072,6 @@ class SettingsViewModel: ObservableObject {
         self.initialPrompt = prefs.initialPrompt
         self.useSurroundingTextAsContext = prefs.useSurroundingTextAsContext
         self.customDictionaryEnabled = prefs.customDictionaryEnabled
-        self.customDictionaryBoostEnabled = prefs.customDictionaryBoostEnabled
         // Folded when the window opens rather than as the user types: merging live would yank a
         // row away mid-keystroke the moment its replacement matched another.
         self.customDictionaryEntries = CustomDictionary.merged(prefs.customDictionaryEntries)
@@ -1555,7 +1548,6 @@ extension TranscriptionSettings {
             beamSize: prefs.beamSize,
             useAsianAutocorrect: prefs.useAsianAutocorrect,
             customDictionaryEnabled: prefs.customDictionaryEnabled,
-            customDictionaryBoostEnabled: prefs.customDictionaryBoostEnabled,
             customDictionaryEntries: prefs.customDictionaryEntries,
             useSurroundingTextAsContext: prefs.useSurroundingTextAsContext)
     }

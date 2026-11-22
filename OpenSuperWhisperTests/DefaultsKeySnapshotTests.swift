@@ -50,13 +50,13 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         "clipboardRestoreDelayMs",
         "contextAwareModelMode",
         "crashReportMode",
-        "customDictionaryBoostEnabled",
         "customDictionaryData",
         "customDictionaryEnabled",
         "customWritingStylesData",
         "debugMode",
         "dictionaryRefusedWords",
         "dictionarySuggestionsData",
+        "didMigrateDictionaryBoostSwitch",
         "didSeedAppContextPresets",
         "didSeedTerminalInsertionRules",
         "escCancelWithoutConfirmation",
@@ -217,7 +217,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         assertWrites("noSpeechThreshold") { prefs.noSpeechThreshold = 0.3 }
         assertWrites("initialPrompt") { prefs.initialPrompt = "prompt" }
         assertWrites("customDictionaryEnabled") { prefs.customDictionaryEnabled = true }
-        assertWrites("customDictionaryBoostEnabled") { prefs.customDictionaryBoostEnabled = true }
+        assertWrites("didMigrateDictionaryBoostSwitch") { prefs.didMigrateDictionaryBoostSwitch = true }
         assertWrites("useSurroundingTextAsContext") { prefs.useSurroundingTextAsContext = true }
         assertWrites("suggestDictionaryWords") { prefs.suggestDictionaryWords = true }
         assertWrites("dictionarySuggestionsData") { prefs.dictionarySuggestionsData = Data([1]) }
@@ -400,7 +400,7 @@ final class DefaultsKeySnapshotTests: XCTestCase {
         XCTAssertEqual(prefs.noSpeechThreshold, 0.6)
         XCTAssertEqual(prefs.initialPrompt, "")
         XCTAssertEqual(prefs.customDictionaryEnabled, false)
-        XCTAssertEqual(prefs.customDictionaryBoostEnabled, false)
+        XCTAssertEqual(prefs.didMigrateDictionaryBoostSwitch, false)
         XCTAssertEqual(prefs.useSurroundingTextAsContext, false)
         XCTAssertEqual(prefs.suggestDictionaryWords, false)
         XCTAssertNil(prefs.dictionarySuggestionsData)

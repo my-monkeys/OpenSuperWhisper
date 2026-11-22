@@ -18,6 +18,8 @@ struct DictionaryEntryEditor: View {
     @State private var type: EntryType
     @State private var newVariant = ""
     @State private var sample: String
+    /// Once the user flips the recognition switch, the entry's kind stops choosing it.
+    @State private var boostTouched = false
     @FocusState private var variantFieldFocused: Bool
 
     init(initial: CustomDictionaryEntry, isNew: Bool,
@@ -33,8 +35,16 @@ struct DictionaryEntryEditor: View {
         let triggers = initial.triggers
         normalized.original = triggers.first ?? ""
         normalized.alternates = Array(triggers.dropFirst())
+        var startsAsWord = !isNew && initial.kind == .word
+        #if DEBUG
+        if isNew, let asWord = DictionaryPage.snapshotNewEntry?.asWord { startsAsWord = asWord }
+        #endif
+        // A new entry opens on Correction, so it starts with the recognition switch off.
+        if isNew {
+            normalized.boostsRecognition = Self.startsBoosted(normalized, asWord: startsAsWord)
+        }
         _draft = State(initialValue: normalized)
-        _type = State(initialValue: !isNew && initial.kind == .word ? .word : .correction)
+        _type = State(initialValue: startsAsWord ? .word : .correction)
         _sample = State(initialValue: Self.sampleSentence(for: initial))
     }
 
@@ -72,6 +82,9 @@ struct DictionaryEntryEditor: View {
             }
             options
             DictionaryTestBox(sample: $sample, entry: result)
+        }
+        .onChange(of: startsBoosted) { _, boosted in
+            if isNew && !boostTouched { draft.boostsRecognition = boosted }
         }
         .padding(.horizontal, 26).padding(.vertical, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,8 +247,9 @@ struct DictionaryEntryEditor: View {
             }
             EditorOptionRow("Also help recognition of this word",
                             hint: boostHint) {
-                SSwitch(isOn: $draft.boostsRecognition)
-                    .disabled(!AppPreferences.shared.customDictionaryBoostEnabled || draft.isRegex)
+                SSwitch(isOn: Binding(get: { draft.boostsRecognition },
+                                      set: { draft.boostsRecognition = $0; boostTouched = true }))
+                    .disabled(draft.isRegex)
             }
             EditorOptionRow("Applies", soon: true) {
                 SMenu(Text("Everywhere")) { EmptyView() }
@@ -248,10 +262,7 @@ struct DictionaryEntryEditor: View {
 
     private var boostHint: LocalizedStringKey {
         if draft.isRegex { return "A pattern writes a template, which teaches the model nothing." }
-        if !AppPreferences.shared.customDictionaryBoostEnabled {
-            return "Turn on “Help recognition of these words” on the Dictionary page first."
-        }
-        return "Turn off for a short or common word the model starts hearing everywhere, like “Maxim” written for “Mais”. The replacement still applies, and AI cleanup still keeps the word as written."
+        return "Helps the model recognise a rare, distinctive word. It can over-correct a short, common one the model then hears everywhere, like “Maxim” written for “Mais”: turn it off for those. The replacement still applies, and AI cleanup still keeps the word as written."
     }
 
     private func fieldLabel(_ text: LocalizedStringKey) -> some View {
@@ -281,6 +292,16 @@ struct DictionaryEntryEditor: View {
             entry.alternates = Array(triggers.dropFirst())
         }
         return entry
+    }
+
+    /// Whether the entry as it stands would start with its recognition switch on. A Correction
+    /// with no phrasing yet is not a word, though an empty rule reads as one.
+    private var startsBoosted: Bool {
+        Self.startsBoosted(result, asWord: type == .word)
+    }
+
+    static func startsBoosted(_ entry: CustomDictionaryEntry, asWord: Bool) -> Bool {
+        entry.kind.boostsByDefault && (asWord || !entry.triggers.isEmpty)
     }
 
     private var isValid: Bool {

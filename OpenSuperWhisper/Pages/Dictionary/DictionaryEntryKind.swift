@@ -14,6 +14,11 @@ enum DictionaryEntryKind {
     /// A regular expression.
     case pattern
 
+    /// Whether a new entry of this kind starts with "Also help recognition of this word" on. A
+    /// correction's rule already writes its replacement, and boosting that replacement is what
+    /// made Parakeet hear "Maxim" for "Mais"; only a word has nothing else to make it heard.
+    var boostsByDefault: Bool { self == .word }
+
     var label: LocalizedStringKey {
         switch self {
         case .word: return "New word"
@@ -49,6 +54,13 @@ extension CustomDictionaryEntry {
     /// and an older rule could hold a real line break.
     var writesLineBreak: Bool {
         replacement.contains("\n") || replacement.contains("\\n")
+    }
+
+    /// An entry as a new one is created: its recognition switch set the way its kind starts.
+    func withDefaultBoost() -> CustomDictionaryEntry {
+        var entry = self
+        entry.boostsRecognition = kind.boostsByDefault
+        return entry
     }
 
     var kind: DictionaryEntryKind {

@@ -20,6 +20,19 @@ enum UISnapshotProbe {
         "home-cleanup-alert": { cleanupAlert() },
         "home-cleanup-alert-large-text": { AppPreferences.shared.textScale = TextScale.maximum; return cleanupAlert() },
         "dictionary": { seedDictionary(); return AnyView(AppShellView(page: .dictionary)) },
+        "dictionary-off": {
+            seedDictionary()
+            AppPreferences.shared.customDictionaryEnabled = false
+            return AnyView(AppShellView(page: .dictionary))
+        },
+        "dictionary-editor-new-word": {
+            seedDictionary(newEntry: (true, "Rsets", "Rsets"))
+            return AnyView(AppShellView(page: .dictionary))
+        },
+        "dictionary-editor-new-correction": {
+            seedDictionary(newEntry: (false, "Maxime", "Maxim"))
+            return AnyView(AppShellView(page: .dictionary))
+        },
         "dictionary-editor": { seedDictionary(openEditor: true); return AnyView(AppShellView(page: .dictionary)) },
         "snippets": { seedSnippets(); return AnyView(AppShellView(page: .snippets)) },
         "snippets-off": { seedSnippets(); AppPreferences.shared.snippetsEnabled = false; return AnyView(AppShellView(page: .snippets)) },

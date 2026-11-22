@@ -23,6 +23,7 @@ struct DictionarySuggestion: Codable, Equatable, Identifiable, Sendable {
     var entry: CustomDictionaryEntry {
         CustomDictionaryEntry(original: correctsHeard ? heard.trimmingCharacters(in: .whitespacesAndNewlines) : term,
                               replacement: term)
+            .withDefaultBoost()
     }
 }
 

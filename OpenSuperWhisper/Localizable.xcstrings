@@ -23737,52 +23737,6 @@
         }
       }
     },
-    "Help recognition of these words": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Erkennung dieser Wörter verbessern"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ayudar a reconocer estas palabras"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aider la reconnaissance de ces mots"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aiuta il riconoscimento di queste parole"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ajudar a reconhecer estas palavras"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hỗ trợ nhận dạng các từ này"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "帮助识别这些词"
-          }
-        }
-      }
-    },
     "Hide details": {
       "localizations": {
         "de": {
@@ -27597,52 +27551,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "新词"
-          }
-        }
-      }
-    },
-    "New words only help recognition when “Help recognition of these words” is on.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Neue Wörter helfen der Erkennung nur, wenn „Erkennung dieser Wörter verbessern“ an ist."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las palabras nuevas solo ayudan al reconocimiento si “Ayudar a reconocer estas palabras” está activado."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les nouveaux mots n'aident la reconnaissance que si « Aider la reconnaissance de ces mots » est activé."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le nuove parole aiutano il riconoscimento solo se “Aiuta il riconoscimento di queste parole” è attivo."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Palavras novas só ajudam o reconhecimento quando “Ajudar a reconhecer estas palavras” está ativado."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Từ mới chỉ hỗ trợ nhận dạng khi bật “Hỗ trợ nhận dạng các từ này”."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "只有开启“帮助识别这些词”，新词才会帮助识别。"
           }
         }
       }
@@ -38729,52 +38637,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "更大的模型遵循指令更可靠；更小的模型更快速、更轻量。"
-          }
-        }
-      }
-    },
-    "The dictionary is off. Your entries are kept but nothing is replaced or recognised better.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Wörterbuch ist aus. Deine Einträge bleiben erhalten, aber nichts wird ersetzt oder besser erkannt."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El diccionario está desactivado. Tus entradas se conservan, pero no se sustituye ni se reconoce mejor nada."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le dictionnaire est désactivé. Vos entrées sont conservées, mais rien n'est remplacé ni mieux reconnu."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il dizionario è disattivato. Le tue voci vengono conservate, ma nulla viene sostituito o riconosciuto meglio."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O dicionário está desativado. Suas entradas são mantidas, mas nada é substituído nem reconhecido melhor."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Từ điển đang tắt. Các mục của bạn được giữ lại nhưng không có gì được thay thế hay nhận dạng tốt hơn."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "词典已关闭。你的词条会被保留，但不会再替换词语或提升识别效果。"
           }
         }
       }
@@ -59699,52 +59561,6 @@
         }
       }
     },
-    "On: the model is biased toward your words while listening, so it can recognise one it would otherwise mishear. Off: a New word only fixes the capitalisation of a word already spelt right. Helps rare, distinctive words, but can over-correct short, common ones: each entry can opt out in its editor.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activé : le modèle penche vers vos mots pendant l'écoute et reconnaît ceux qu'il entendrait mal. Désactivé : un Nouveau mot ne corrige que la majuscule d'un mot déjà bien écrit. Aide pour les mots rares et distinctifs, mais peut surcorriger les mots courts et courants : chaque entrée peut s'en retirer dans son éditeur."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "An: Das Modell wird beim Zuhören zu Ihren Wörtern gelenkt und erkennt so eines, das es sonst falsch hören würde. Aus: Ein neues Wort korrigiert nur die Großschreibung eines schon richtig geschriebenen Worts. Hilft bei seltenen, markanten Wörtern, kann aber kurze, häufige überkorrigieren: Jeder Eintrag kann sich in seinem Editor davon ausnehmen."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activado: el modelo se inclina hacia tus palabras mientras escucha y reconoce las que oiría mal. Desactivado: una Palabra nueva solo corrige las mayúsculas de una palabra ya bien escrita. Ayuda con palabras raras y distintivas, pero puede corregir de más las cortas y comunes: cada entrada puede excluirse en su editor."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attivo: il modello viene orientato verso le tue parole durante l'ascolto e riconosce quelle che sentirebbe male. Disattivo: una Nuova parola corregge solo le maiuscole di una parola già scritta bene. Aiuta con parole rare e distintive, ma può correggere troppo quelle brevi e comuni: ogni voce può escludersi nel suo editor."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ligado: o modelo é direcionado para suas palavras durante a escuta e reconhece as que ouviria errado. Desligado: uma Nova palavra só corrige as maiúsculas de uma palavra já bem escrita. Ajuda com palavras raras e distintas, mas pode corrigir demais as curtas e comuns: cada entrada pode ficar de fora no seu editor."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bật: mô hình nghiêng về các từ của bạn khi nghe, nên nhận ra từ mà nó vốn nghe sai. Tắt: một Từ mới chỉ sửa chữ hoa của từ đã viết đúng. Hữu ích với từ hiếm, đặc trưng, nhưng có thể sửa quá tay với từ ngắn, phổ biến: mỗi mục có thể tắt riêng trong trình chỉnh sửa."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开启：收音时模型会偏向你的词，能认出原本会听错的词。关闭：新词只会修正已拼对的词的大小写。对生僻、有辨识度的词有帮助，但可能过度纠正简短常用的词：每个词条都可在其编辑器中单独关闭。"
-          }
-        }
-      }
-    },
     "A pattern writes a template, which teaches the model nothing.": {
       "localizations": {
         "fr": {
@@ -59787,98 +59603,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "模式写出的是模板，对模型没有帮助。"
-          }
-        }
-      }
-    },
-    "Turn on “Help recognition of these words” on the Dictionary page first.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activez d'abord « Aider la reconnaissance de ces mots » sur la page Dictionnaire."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Schalten Sie zuerst „Erkennung dieser Wörter verbessern“ auf der Seite Wörterbuch ein."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activa primero “Ayudar a reconocer estas palabras” en la página Diccionario."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attiva prima “Aiuta il riconoscimento di queste parole” nella pagina Dizionario."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ative primeiro “Ajudar a reconhecer estas palavras” na página Dicionário."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hãy bật “Hỗ trợ nhận dạng các từ này” trên trang Từ điển trước."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先在词典页面开启“帮助识别这些词”。"
-          }
-        }
-      }
-    },
-    "Turn off for a short or common word the model starts hearing everywhere, like “Maxim” written for “Mais”. The replacement still applies, and AI cleanup still keeps the word as written.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Désactivez-le pour un mot court ou courant que le modèle se met à entendre partout, comme « Maxim » écrit à la place de « Mais ». Le remplacement s'applique toujours, et le nettoyage IA garde toujours le mot tel qu'il est écrit."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausschalten bei einem kurzen oder häufigen Wort, das das Modell plötzlich überall hört, etwa „Maxim“ statt „Mais“. Die Ersetzung gilt weiterhin, und die KI-Bereinigung behält das Wort so, wie es geschrieben ist."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Desactívalo para una palabra corta o común que el modelo empieza a oír por todas partes, como “Maxim” escrito en lugar de “Mais”. El reemplazo sigue aplicándose y la limpieza con IA mantiene la palabra tal como está escrita."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disattivalo per una parola breve o comune che il modello inizia a sentire ovunque, come “Maxim” scritto al posto di “Mais”. La sostituzione resta attiva e la pulizia con IA mantiene la parola così com'è scritta."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Desligue para uma palavra curta ou comum que o modelo passa a ouvir em todo lugar, como “Maxim” escrito no lugar de “Mais”. A substituição continua valendo, e a limpeza com IA mantém a palavra como está escrita."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tắt cho từ ngắn hoặc phổ biến mà mô hình bắt đầu nghe thấy ở khắp nơi, như “Maxim” được viết thay cho “Mais”. Phép thay thế vẫn áp dụng và bước dọn dẹp bằng AI vẫn giữ nguyên cách viết của từ."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "如果模型开始到处“听到”某个简短或常用的词（例如把“Mais”写成“Maxim”），就关闭它。替换规则仍然生效，AI 清理也会保留该词的写法。"
           }
         }
       }
@@ -63467,6 +63191,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "请添加备注以保存报告。"
+          }
+        }
+      }
+    },
+    "Helps the model recognise a rare, distinctive word. It can over-correct a short, common one the model then hears everywhere, like “Maxim” written for “Mais”: turn it off for those. The replacement still applies, and AI cleanup still keeps the word as written.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hilft dem Modell, ein seltenes, markantes Wort zu erkennen. Bei einem kurzen, häufigen Wort kann es zu viel korrigieren, sodass das Modell es plötzlich überall hört, etwa „Maxim“ statt „Mais“: Schalte es dort aus. Die Ersetzung gilt weiterhin, und die KI-Bereinigung behält das Wort so, wie es geschrieben ist."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayuda al modelo a reconocer una palabra rara y distintiva. Puede corregir de más una palabra corta y común que el modelo empieza entonces a oír por todas partes, como “Maxim” escrito en lugar de “Mais”: desactívalo para esas. El reemplazo sigue aplicándose y la limpieza con IA mantiene la palabra tal como está escrita."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aide le modèle à reconnaître un mot rare et distinctif. Peut corriger à tort un mot court et courant que le modèle se met alors à entendre partout, comme « Maxim » écrit à la place de « Mais » : désactivez-le pour ceux-là. Le remplacement s'applique toujours, et le nettoyage IA garde toujours le mot tel qu'il est écrit."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aiuta il modello a riconoscere una parola rara e distintiva. Può correggere troppo una parola breve e comune che il modello inizia poi a sentire ovunque, come “Maxim” scritto al posto di “Mais”: disattivalo per quelle. La sostituzione resta attiva e la pulizia con IA mantiene la parola così com'è scritta."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajuda o modelo a reconhecer uma palavra rara e distintiva. Pode corrigir demais uma palavra curta e comum que o modelo passa então a ouvir em todo lugar, como “Maxim” escrito no lugar de “Mais”: desligue para essas. A substituição continua valendo, e a limpeza com IA mantém a palavra como está escrita."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giúp mô hình nhận ra một từ hiếm và đặc trưng. Với từ ngắn, phổ biến, nó có thể sửa quá tay khiến mô hình nghe thấy từ đó ở khắp nơi, như “Maxim” được viết thay cho “Mais”: hãy tắt cho những từ ấy. Phép thay thế vẫn áp dụng và bước dọn dẹp bằng AI vẫn giữ nguyên cách viết của từ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帮助模型识别罕见、独特的词。对简短、常用的词，它可能矫枉过正，让模型开始到处“听到”这个词，例如把“Mais”写成“Maxim”：这类词请关闭它。替换规则仍然生效，AI 清理也会保留该词的写法。"
           }
         }
       }

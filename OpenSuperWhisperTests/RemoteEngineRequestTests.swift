@@ -166,7 +166,6 @@ final class RemoteEngineRequestTests: XCTestCase {
     func testClipParametersSendOnlyTheUserPrompt() {
         var settings = settings(language: "de", temperature: 0.3, prompt: "Mein Prompt")
         settings.customDictionaryEnabled = true
-        settings.customDictionaryBoostEnabled = true
         settings.customDictionaryEntries = [CustomDictionaryEntry(original: "osw", replacement: "OpenSuperWhisper")]
         settings.useSurroundingTextAsContext = true
         settings.focusedText = "Text already in the field"
@@ -227,7 +226,6 @@ final class RemoteEngineRequestTests: XCTestCase {
                                       apiKey: "sk-test", stubbed: true)
         var settings = settings(language: "fr", temperature: 0.2, prompt: "Mein Prompt")
         settings.customDictionaryEnabled = true
-        settings.customDictionaryBoostEnabled = true
         settings.customDictionaryEntries = [CustomDictionaryEntry(original: "osw", replacement: "OpenSuperWhisper")]
         settings.useSurroundingTextAsContext = true
         settings.focusedText = "Text already in the field"

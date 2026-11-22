@@ -79,7 +79,6 @@ extension Fixtures {
                               beamSize: 5,
                               useAsianAutocorrect: true,
                               customDictionaryEnabled: false,
-                              customDictionaryBoostEnabled: false,
                               customDictionaryEntries: [],
                               useSurroundingTextAsContext: false,
                               focusedText: nil)

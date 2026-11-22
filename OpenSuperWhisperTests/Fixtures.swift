@@ -70,7 +70,6 @@ extension Fixtures {
         settings.beamSize = 5
         settings.useAsianAutocorrect = true
         settings.customDictionaryEnabled = false
-        settings.customDictionaryBoostEnabled = false
         settings.customDictionaryEntries = []
         settings.useSurroundingTextAsContext = false
         settings.focusedText = nil

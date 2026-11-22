@@ -16,6 +16,7 @@ final class AppPreferences {
     /// "onboardingTriggerHealed" flag and can rewrite `recordingTriggers`.
     func runMigrations() {
         migrateOldPreferences()
+        migrateDictionaryBoostSwitch()
         seedAppContextPresetsIfNeeded()
         seedTerminalInsertionRulesIfNeeded()
         migrateGroqToRemote()
@@ -316,14 +317,32 @@ final class AppPreferences {
     @UserDefault(key: "customDictionaryEnabled", defaultValue: false)
     var customDictionaryEnabled: Bool
 
-    /// Whether the dictionary's terms also bias *recognition* (Whisper prompt boost / Parakeet
-    /// vocabulary boosting), on top of the always-on text replacement. Opt-in and default OFF:
-    /// boosting is fuzzy and helps rare, distinctive jargon ("Kubernetes") but over-corrects
-    /// short, common terms (it rewrites vaguely-similar spans). Replacement alone is exact and
-    /// safe, so the common case (fixing the spelling/casing of correctly-heard words) needs no
-    /// boosting. See `CustomDictionary.boostTerms`.
-    @UserDefault(key: "customDictionaryBoostEnabled", defaultValue: false)
-    var customDictionaryBoostEnabled: Bool
+    /// Flips true once `migrateDictionaryBoostSwitch` has run, so it never runs twice.
+    @UserDefault(key: "didMigrateDictionaryBoostSwitch", defaultValue: false)
+    var didMigrateDictionaryBoostSwitch: Bool
+
+    /// The dictionary used to have one switch, "Help recognition of these words", off by default,
+    /// that decided whether any entry steered recognition; each entry's own switch now decides.
+    /// Someone who never turned the global one on had no entry steering anything, so their
+    /// entries other than New words, which are the point of the change, are switched off to keep
+    /// it that way. Whoever had it on keeps every entry as it was. The old key is dropped either
+    /// way, and the step runs once, so an entry the user turns back on stays on.
+    private func migrateDictionaryBoostSwitch() {
+        guard !didMigrateDictionaryBoostSwitch else { return }
+        let defaults = DefaultsStore.current
+        let oldKey = "customDictionaryBoostEnabled"
+        if !defaults.bool(forKey: oldKey) {
+            var entries = customDictionaryEntries
+            var changed = false
+            for index in entries.indices where entries[index].kind != .word && entries[index].boostsRecognition {
+                entries[index].boostsRecognition = false
+                changed = true
+            }
+            if changed { customDictionaryEntries = entries }
+        }
+        defaults.removeObject(forKey: oldKey)
+        didMigrateDictionaryBoostSwitch = true
+    }
 
     /// Read what is already written in the field being dictated into, and let the transcriber
     /// expect those words.

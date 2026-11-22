@@ -14,7 +14,6 @@ public protocol CorePreferences: AnyObject, Sendable {
 
     // Custom dictionary
     var customDictionaryEnabled: Bool { get }
-    var customDictionaryBoostEnabled: Bool { get }
     var customDictionaryEntries: [CustomDictionaryEntry] { get }
 
     // Remote server

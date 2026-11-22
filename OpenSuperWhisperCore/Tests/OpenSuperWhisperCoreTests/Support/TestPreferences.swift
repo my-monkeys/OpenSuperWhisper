@@ -17,7 +17,6 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
         var unloadWhisperModelWhenIdle = false
 
         var customDictionaryEnabled = false
-        var customDictionaryBoostEnabled = false
         var customDictionaryEntries: [CustomDictionaryEntry] = []
 
         var remoteServerURL = ""
@@ -90,10 +89,6 @@ final class TestPreferences: CorePreferences, @unchecked Sendable {
     var customDictionaryEnabled: Bool {
         get { self[\.customDictionaryEnabled] }
         set { self[\.customDictionaryEnabled] = newValue }
-    }
-    var customDictionaryBoostEnabled: Bool {
-        get { self[\.customDictionaryBoostEnabled] }
-        set { self[\.customDictionaryBoostEnabled] = newValue }
     }
     var customDictionaryEntries: [CustomDictionaryEntry] {
         get { self[\.customDictionaryEntries] }

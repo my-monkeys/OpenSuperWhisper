@@ -43,9 +43,9 @@ public struct CustomDictionaryEntry: Codable, Identifiable, Equatable, Hashable,
     /// apply, since the pattern already says what it wants to consume.
     public var isRegex: Bool
 
-    /// Whether the replacement also steers what the engine hears while "Help recognition of
-    /// these words" is on: the Whisper prompt, Parakeet's vocabulary boost, the cleanup model's
-    /// spellings. Off, the entry only rewrites what it matches.
+    /// Whether the replacement also steers what the engine hears: the Whisper prompt, Parakeet's
+    /// vocabulary boost, the cleanup model's spellings. Off, the entry only rewrites what it
+    /// matches. A new entry starts on for a New word and off for the other kinds.
     ///
     /// Boosting is fuzzy, and a short word pulls in whatever sounds a little like it: an entry
     /// meant to turn "Maxime" into "Maxim" had Parakeet write "Maxim" for every "Mais". One switch

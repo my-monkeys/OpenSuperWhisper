@@ -132,7 +132,6 @@ final class SettingsResolutionTests: XCTestCase {
         prefs.beamSize = 3
         prefs.useAsianAutocorrect = false
         prefs.customDictionaryEnabled = true
-        prefs.customDictionaryBoostEnabled = true
         prefs.customDictionaryEntries = [entry]
         prefs.useSurroundingTextAsContext = true
 
@@ -149,7 +148,6 @@ final class SettingsResolutionTests: XCTestCase {
         XCTAssertEqual(settings.beamSize, 3)
         XCTAssertEqual(settings.useAsianAutocorrect, false)
         XCTAssertEqual(settings.customDictionaryEnabled, true)
-        XCTAssertEqual(settings.customDictionaryBoostEnabled, true)
         XCTAssertEqual(settings.customDictionaryEntries, [entry])
         XCTAssertEqual(settings.useSurroundingTextAsContext, true)
         XCTAssertNil(settings.focusedText, "set per clip by the pipeline, never from preferences")
@@ -157,7 +155,6 @@ final class SettingsResolutionTests: XCTestCase {
         XCTAssertTrue(settings.isAsianLanguage)
         XCTAssertFalse(settings.shouldApplyAsianAutocorrect)
         XCTAssertTrue(settings.shouldApplyCustomDictionary)
-        XCTAssertTrue(settings.shouldBoostCustomDictionary)
     }
 
     /// The values a fresh install transcribes with.
@@ -175,21 +172,19 @@ final class SettingsResolutionTests: XCTestCase {
         XCTAssertEqual(settings.beamSize, 5)
         XCTAssertEqual(settings.useAsianAutocorrect, true)
         XCTAssertEqual(settings.customDictionaryEnabled, false)
-        XCTAssertEqual(settings.customDictionaryBoostEnabled, false)
         XCTAssertEqual(settings.customDictionaryEntries, [])
         XCTAssertEqual(settings.useSurroundingTextAsContext, false)
         XCTAssertNil(settings.focusedText)
         XCTAssertFalse(settings.shouldApplyCustomDictionary)
     }
 
-    /// Boosting needs the dictionary itself on and non-empty, whatever its own switch says.
+    /// Boosting needs the dictionary itself on and non-empty.
     func testBoostNeedsAnEnabledNonEmptyDictionary() {
-        prefs.customDictionaryBoostEnabled = true
         prefs.customDictionaryEnabled = true
-        XCTAssertFalse(Settings().shouldBoostCustomDictionary, "empty dictionary")
+        XCTAssertEqual(Settings().recognitionBoostTerms, [], "empty dictionary")
 
         prefs.customDictionaryEntries = [CustomDictionaryEntry(original: "a", replacement: "b")]
         prefs.customDictionaryEnabled = false
-        XCTAssertFalse(Settings().shouldBoostCustomDictionary, "dictionary off")
+        XCTAssertEqual(Settings().recognitionBoostTerms, [], "dictionary off")
     }
 }

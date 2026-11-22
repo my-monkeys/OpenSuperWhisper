@@ -17,7 +17,6 @@ public struct TranscriptionSettings: Sendable {
     public var beamSize: Int
     public var useAsianAutocorrect: Bool
     public var customDictionaryEnabled: Bool
-    public var customDictionaryBoostEnabled: Bool
     public var customDictionaryEntries: [CustomDictionaryEntry]
     public var useSurroundingTextAsContext: Bool
     /// The snippet triggers to bias recognition toward, already gated by the host's snippet
@@ -31,7 +30,7 @@ public struct TranscriptionSettings: Sendable {
     public init(selectedLanguage: String, translateToEnglish: Bool, suppressBlankAudio: Bool,
                 showTimestamps: Bool, temperature: Double, noSpeechThreshold: Double,
                 initialPrompt: String, useBeamSearch: Bool, beamSize: Int, useAsianAutocorrect: Bool,
-                customDictionaryEnabled: Bool, customDictionaryBoostEnabled: Bool,
+                customDictionaryEnabled: Bool,
                 customDictionaryEntries: [CustomDictionaryEntry], useSurroundingTextAsContext: Bool,
                 snippetTriggers: [String] = [], focusedText: String? = nil) {
         self.selectedLanguage = selectedLanguage
@@ -45,7 +44,6 @@ public struct TranscriptionSettings: Sendable {
         self.beamSize = beamSize
         self.useAsianAutocorrect = useAsianAutocorrect
         self.customDictionaryEnabled = customDictionaryEnabled
-        self.customDictionaryBoostEnabled = customDictionaryBoostEnabled
         self.customDictionaryEntries = customDictionaryEntries
         self.useSurroundingTextAsContext = useSurroundingTextAsContext
         self.snippetTriggers = snippetTriggers
@@ -64,17 +62,11 @@ public struct TranscriptionSettings: Sendable {
         customDictionaryEnabled && !customDictionaryEntries.isEmpty
     }
 
-    /// Whether to also bias recognition toward the dictionary terms (opt-in, on top of the
-    /// always-on text replacement). Gated by the separate `customDictionaryBoostEnabled` flag.
-    public var shouldBoostCustomDictionary: Bool {
-        customDictionaryBoostEnabled && shouldApplyCustomDictionary
-    }
-
-    /// Everything this clip's recognition leans toward: the dictionary's terms when their boost
-    /// is on, then the snippet triggers.
+    /// Everything this clip's recognition leans toward: the terms of the dictionary entries that
+    /// steer recognition, then the snippet triggers.
     public var recognitionBoostTerms: [String] {
         RecognitionBoost.terms(
-            dictionary: shouldBoostCustomDictionary
+            dictionary: shouldApplyCustomDictionary
                 ? CustomDictionary.boostTerms(entries: customDictionaryEntries) : [],
             snippets: snippetTriggers)
     }

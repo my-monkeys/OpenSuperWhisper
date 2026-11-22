@@ -19,6 +19,8 @@ struct DictionaryPage: View {
     static var snapshotOpensFirstEntry = false
     /// Lets the snapshot renderer show one filter, the Suggested list among them.
     static var snapshotFilter: DictionaryFilter?
+    /// Lets the snapshot renderer show the editor open on a blank new entry, as a New word or not.
+    static var snapshotNewEntry: (asWord: Bool, original: String, replacement: String)?
     #endif
 
     private var entries: [CustomDictionaryEntry] { viewModel.customDictionaryEntries }
@@ -36,7 +38,6 @@ struct DictionaryPage: View {
                     .buttonStyle(.sPrimary)
                 }
                 DictionaryOptionsGroup(viewModel: viewModel,
-                                       hasWords: entries.contains { $0.kind == .word },
                                        onTeachPunctuation: { showPunctuationCalibration = true })
                 filterChips
                 if filter == .suggested {
@@ -130,6 +131,9 @@ struct DictionaryPage: View {
         if Self.snapshotOpensFirstEntry {
             editing = entries.first { $0.kind == .correction } ?? entries.first
         }
+        if let new = Self.snapshotNewEntry {
+            editing = CustomDictionaryEntry(original: new.original, replacement: new.replacement)
+        }
         if let snapshotFilter = Self.snapshotFilter {
             filter = snapshotFilter
         }
@@ -140,7 +144,6 @@ struct DictionaryPage: View {
 /// The global switches that shape every entry, above the list.
 struct DictionaryOptionsGroup: View {
     @ObservedObject var viewModel: SettingsViewModel
-    let hasWords: Bool
     let onTeachPunctuation: () -> Void
     /// Suggestions read the field through Accessibility, and do nothing without it, silently.
     @State private var canReadFields = Self.accessibilityAllowed()
@@ -190,28 +193,20 @@ struct DictionaryOptionsGroup: View {
                        hint: "Whole-word replacement, case-insensitive. Write \\n in a replacement for a line break.") {
                 SSwitch(isOn: $viewModel.customDictionaryEnabled)
             }
-            SettingRow("Help recognition of these words",
-                       hint: "On: the model is biased toward your words while listening, so it can recognise one it would otherwise mishear. Off: a New word only fixes the capitalisation of a word already spelt right. Helps rare, distinctive words, but can over-correct short, common ones: each entry can opt out in its editor.",
-                       indented: true) {
-                SSwitch(isOn: $viewModel.customDictionaryBoostEnabled)
-                    .disabled(!viewModel.customDictionaryEnabled)
-            }
-            SettingRow("Suggest words from your corrections",
-                       hint: "After a dictation, the field it went into is read again for up to a minute. A name or term you fix by hand is offered for the dictionary. It stays on your Mac, and the text read is never saved.",
-                       indented: true) {
-                SSwitch(isOn: $viewModel.suggestDictionaryWords)
-                    .disabled(!viewModel.customDictionaryEnabled)
-            }
-            if viewModel.customDictionaryEnabled && viewModel.suggestDictionaryWords && !canReadFields {
-                SettingNotice("Suggestions need Accessibility to read the field your dictation went into, and OpenSuperWhisper isn't allowed yet.") {
-                    Button("Allow") { askForAccessibility() }
-                        .buttonStyle(.sPrimary)
+            // Hidden rather than greyed out, like the controls of a plugin that is not installed:
+            // with the dictionary off, they would only be switches that cannot be moved.
+            if viewModel.customDictionaryEnabled {
+                SettingRow("Suggest words from your corrections",
+                           hint: "After a dictation, the field it went into is read again for up to a minute. A name or term you fix by hand is offered for the dictionary. It stays on your Mac, and the text read is never saved.",
+                           indented: true) {
+                    SSwitch(isOn: $viewModel.suggestDictionaryWords)
                 }
-            }
-            if !viewModel.customDictionaryEnabled {
-                SettingNotice("The dictionary is off. Your entries are kept but nothing is replaced or recognised better.")
-            } else if hasWords && !viewModel.customDictionaryBoostEnabled {
-                SettingNotice("“Help recognition of these words” is off, so a New word only fixes capitalisation, not a word the model mishears. Turn it on to have the model recognise it.")
+                if viewModel.suggestDictionaryWords && !canReadFields {
+                    SettingNotice("Suggestions need Accessibility to read the field your dictation went into, and OpenSuperWhisper isn't allowed yet.") {
+                        Button("Allow") { askForAccessibility() }
+                            .buttonStyle(.sPrimary)
+                    }
+                }
             }
         }
     }

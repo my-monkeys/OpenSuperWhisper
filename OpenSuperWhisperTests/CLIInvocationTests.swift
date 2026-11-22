@@ -91,7 +91,6 @@ final class CLISettingsTests: XCTestCase {
         prefs.beamSize = 2
         prefs.useAsianAutocorrect = false
         prefs.customDictionaryEnabled = true
-        prefs.customDictionaryBoostEnabled = true
         prefs.customDictionaryEntries = [CustomDictionaryEntry(original: "git hub", replacement: "GitHub")]
         prefs.useSurroundingTextAsContext = true
         try FileManager.default.createDirectory(at: promptFile.deletingLastPathComponent(),
@@ -117,7 +116,7 @@ final class CLISettingsTests: XCTestCase {
         XCTAssertEqual(settings.selectedLanguage, "de")
         XCTAssertEqual(settings.initialPrompt, "From the prompt file.")
         XCTAssertTrue(settings.useBeamSearch)
-        XCTAssertTrue(settings.shouldBoostCustomDictionary)
+        XCTAssertTrue(settings.shouldApplyCustomDictionary)
     }
 
     /// `--raw` gives exactly what the Whisper goldens are recorded with, so the release smoke
@@ -144,8 +143,6 @@ final class CLISettingsTests: XCTestCase {
         XCTAssertEqual(settings.beamSize, pinned.beamSize, file: file, line: line)
         XCTAssertEqual(settings.useAsianAutocorrect, pinned.useAsianAutocorrect, file: file, line: line)
         XCTAssertEqual(settings.customDictionaryEnabled, pinned.customDictionaryEnabled, file: file, line: line)
-        XCTAssertEqual(settings.customDictionaryBoostEnabled, pinned.customDictionaryBoostEnabled,
-                       file: file, line: line)
         XCTAssertEqual(settings.customDictionaryEntries, pinned.customDictionaryEntries, file: file, line: line)
         XCTAssertEqual(settings.useSurroundingTextAsContext, pinned.useSurroundingTextAsContext,
                        file: file, line: line)
