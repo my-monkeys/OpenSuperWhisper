@@ -185,6 +185,52 @@
         }
       }
     },
+    "Adds the OpenSuperWhisper plugin to Codex, through its own plugin command.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fügt Codex das OpenSuperWhisper-Plug-in über dessen eigenen Plug-in-Befehl hinzu."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añade el plugin de OpenSuperWhisper a Codex, con su propio comando de plugins."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute le plugin OpenSuperWhisper à Codex, via sa propre commande de plugins."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiunge il plugin OpenSuperWhisper a Codex, tramite il suo comando per i plugin."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adiciona o plugin OpenSuperWhisper ao Codex, pelo próprio comando de plugins dele."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thêm plugin OpenSuperWhisper vào Codex, qua lệnh plugin riêng của nó."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过 Codex 自带的插件命令，为其添加 OpenSuperWhisper 插件。"
+          }
+        }
+      }
+    },
     "AI Cleanup": {
       "localizations": {
         "fr": {
@@ -1607,6 +1653,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "剪贴板与粘贴"
+          }
+        }
+      }
+    },
+    "Codex not found. Install it, then come back here to add the plugin.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex nicht gefunden. Installiere es und komm dann hierher zurück, um das Plug-in hinzuzufügen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encuentra Codex. Instálalo y vuelve aquí para añadir el plugin."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex est introuvable. Installez-le, puis revenez ici pour ajouter le plugin."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex non trovato. Installalo, poi torna qui per aggiungere il plugin."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex não encontrado. Instale-o e volte aqui para adicionar o plugin."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tìm thấy Codex. Hãy cài đặt, rồi quay lại đây để thêm plugin."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 Codex。请先安装，然后回到此处添加插件。"
           }
         }
       }
@@ -4091,6 +4183,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "初始提示词"
+          }
+        }
+      }
+    },
+    "Installing the plugin into Codex…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plug-in wird in Codex installiert…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instalando el plugin en Codex…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installation du plugin dans Codex…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installazione del plugin in Codex…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instalando o plugin no Codex…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang cài plugin vào Codex…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在将插件安装到 Codex…"
           }
         }
       }
@@ -7817,6 +7955,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "从转写中移除下方正则匹配项（不区分大小写），并整理空格。默认关闭；关闭时插入文本保持不变。"
+          }
+        }
+      }
+    },
+    "Removing the plugin from Codex…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plug-in wird aus Codex entfernt…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitando el plugin de Codex…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suppression du plugin de Codex…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimozione del plugin da Codex…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removendo o plugin do Codex…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang gỡ plugin khỏi Codex…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在从 Codex 移除插件…"
           }
         }
       }
@@ -19455,52 +19639,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Codex 会询问一次是否信任插件的 hooks：请在 Codex 中运行 /hooks。"
-          }
-        }
-      }
-    },
-    "Codex picks up the plugin by itself once it is installed for Claude Code.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Codex übernimmt das Plug-in von selbst, sobald es für Claude Code installiert ist."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Codex detecta el plugin solo en cuanto está instalado para Claude Code."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Codex récupère le plugin tout seul une fois qu'il est installé pour Claude Code."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Codex rileva il plugin da solo una volta installato per Claude Code."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Codex detecta o plugin sozinho depois que ele é instalado para o Claude Code."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Codex tự nhận plugin sau khi plugin được cài cho Claude Code."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "为 Claude Code 安装插件后，Codex 会自动识别并使用它。"
           }
         }
       }
@@ -31879,52 +32017,6 @@
         }
       }
     },
-    "Plugin found. Codex copies Claude Code's plugins on its own.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plug-in gefunden. Codex übernimmt die Plug-ins von Claude Code von selbst."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plugin encontrado. Codex copia solo los plugins de Claude Code."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plugin trouvé. Codex copie tout seul les plugins de Claude Code."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plugin trovato. Codex copia da solo i plugin di Claude Code."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plugin encontrado. O Codex copia os plugins do Claude Code sozinho."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Đã tìm thấy plugin. Codex tự sao chép plugin của Claude Code."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已找到插件。Codex 会自行复制 Claude Code 的插件。"
-          }
-        }
-      }
-    },
     "Plugin installed. New sessions use it; restart the ones already open.": {
       "localizations": {
         "de": {
@@ -40435,52 +40527,6 @@
         }
       }
     },
-    "Turn on Claude Code, Codex or pi above to choose when the panel shows.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Schalte oben Claude Code, Codex oder pi ein, um festzulegen, wann das Feld erscheint."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activa Claude Code, Codex o pi arriba para elegir cuándo aparece el panel."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Activez Claude Code, Codex ou pi ci-dessus pour choisir quand le panneau s'affiche."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attiva Claude Code, Codex o pi qui sopra per scegliere quando mostrare il pannello."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ative o Claude Code, o Codex ou o pi acima para escolher quando o painel aparece."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bật Claude Code, Codex hoặc pi ở trên để chọn khi nào bảng hiển thị."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先在上方开启 Claude Code、Codex 或 pi，才能选择面板何时显示。"
-          }
-        }
-      }
-    },
     "Turn on Live text (Parakeet) to use it.": {
       "localizations": {
         "de": {
@@ -44479,52 +44525,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "✓ 就绪，在本机运行"
-          }
-        }
-      }
-    },
-    "✓ Plugin found": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "✓ Plug-in gefunden"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "✓ Plugin encontrado"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "✓ Plugin trouvé"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "✓ Plugin trovato"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "✓ Plugin encontrado"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "✓ Đã tìm thấy plugin"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "✓ 已找到插件"
           }
         }
       }
@@ -52197,52 +52197,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "念一句短语，得到一段长文本。你的邮箱、链接或签名，与你当初输入的一字不差。"
-          }
-        }
-      }
-    },
-    "Snippets are off. They are kept but nothing is expanded.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Textbausteine sind aus. Sie bleiben erhalten, aber nichts wird eingesetzt."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Los fragmentos están desactivados. Se conservan, pero no se expande nada."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Les snippets sont désactivés. Ils sont conservés, mais rien n'est inséré."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I frammenti sono disattivati. Vengono conservati, ma non viene espanso nulla."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Os trechos estão desativados. Eles são mantidos, mas nada é expandido."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Đoạn văn mẫu đang tắt. Chúng vẫn được giữ nhưng không có gì được mở rộng."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "片段功能已关闭。已有片段会保留，但不会展开任何内容。"
           }
         }
       }
