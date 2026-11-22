@@ -70,7 +70,6 @@ final class SnippetPreferencesTests: XCTestCase {
         prefs.snippets = [email]
         prefs.snippetsBoostEnabled = true
         prefs.customDictionaryEnabled = true
-        prefs.customDictionaryBoostEnabled = true
         prefs.customDictionaryEntries = [CustomDictionaryEntry(original: "git hub", replacement: "GitHub")]
         var clip = Settings()
         clip.snippetTriggers = prefs.dictationSnippetTriggers

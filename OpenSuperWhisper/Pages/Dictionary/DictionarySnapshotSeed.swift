@@ -6,7 +6,8 @@ import OpenSuperWhisperCore
 extension UISnapshotProbe {
     /// Made-up entries for the Dictionary screens, written to the isolated preferences before
     /// the page's view model reads them.
-    static func seedDictionary(openEditor: Bool = false) {
+    static func seedDictionary(openEditor: Bool = false,
+                               newEntry: (asWord: Bool, original: String, replacement: String)? = nil) {
         AppPreferences.shared.customDictionaryEnabled = true
         AppPreferences.shared.customDictionaryEntries = [
             CustomDictionaryEntry(original: "open super whisper", replacement: "OpenSuperWhisper",
@@ -21,6 +22,7 @@ extension UISnapshotProbe {
                                   isRegex: true),
         ]
         DictionaryPage.snapshotOpensFirstEntry = openEditor
+        DictionaryPage.snapshotNewEntry = newEntry
         DictionaryPage.snapshotFilter = nil
         AppPreferences.shared.suggestDictionaryWords = false
         AppPreferences.shared.dictionarySuggestionsData = nil

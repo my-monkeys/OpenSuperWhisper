@@ -73,7 +73,7 @@ struct ReportDraft: Equatable {
         if wrong.isEmpty || wrong.caseInsensitiveCompare(correct) == .orderedSame {
             return CustomDictionaryEntry(original: correct, replacement: correct)
         }
-        return CustomDictionaryEntry(original: wrong, replacement: correct)
+        return CustomDictionaryEntry(original: wrong, replacement: correct).withDefaultBoost()
     }
 
     func report(for recording: Recording, languageSetting: String?, appDetails: String) -> TranscriptionReport? {

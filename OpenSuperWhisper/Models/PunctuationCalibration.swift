@@ -171,6 +171,7 @@ enum PunctuationCalibration {
                                          replacement: key.mark,
                                          alternates: Array(spoken.dropFirst()),
                                          spacing: key.spacing)
+                .withDefaultBoost()
         }
     }
 

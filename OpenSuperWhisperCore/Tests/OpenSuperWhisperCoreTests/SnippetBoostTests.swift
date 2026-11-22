@@ -38,40 +38,44 @@ final class SnippetBoostTests: CoreTestCase {
 
     // MARK: - One clip's settings
 
-    private func settings(dictionaryBoost: Bool, snippetTriggers: [String]) -> TranscriptionSettings {
+    private func settings(dictionary: [CustomDictionaryEntry], snippetTriggers: [String]) -> TranscriptionSettings {
         TranscriptionSettings(
             selectedLanguage: "en", translateToEnglish: false, suppressBlankAudio: true,
             showTimestamps: false, temperature: 0, noSpeechThreshold: 0.6, initialPrompt: "",
             useBeamSearch: false, beamSize: 5, useAsianAutocorrect: false,
-            customDictionaryEnabled: true, customDictionaryBoostEnabled: dictionaryBoost,
-            customDictionaryEntries: [CustomDictionaryEntry(original: "git hub", replacement: "GitHub")],
+            customDictionaryEnabled: true, customDictionaryEntries: dictionary,
             useSurroundingTextAsContext: false, snippetTriggers: snippetTriggers)
     }
 
-    func testTheClipBoostsSnippetTriggersEvenWithTheDictionaryBoostOff() {
-        XCTAssertEqual(settings(dictionaryBoost: false, snippetTriggers: ["my email"]).recognitionBoostTerms,
+    private let gitHub = CustomDictionaryEntry(original: "git hub", replacement: "GitHub")
+    private let gitHubSpellingOnly = CustomDictionaryEntry(original: "git hub", replacement: "GitHub",
+                                                           boostsRecognition: false)
+
+    func testTheClipBoostsSnippetTriggersEvenWhenNoEntrySteersRecognition() {
+        XCTAssertEqual(settings(dictionary: [gitHubSpellingOnly], snippetTriggers: ["my email"]).recognitionBoostTerms,
                        ["my email"])
     }
 
-    func testTheClipBoostsBothWhenBothAreOn() {
-        XCTAssertEqual(settings(dictionaryBoost: true, snippetTriggers: ["my email"]).recognitionBoostTerms,
+    func testTheClipBoostsBothTheDictionaryAndTheTriggers() {
+        XCTAssertEqual(settings(dictionary: [gitHub], snippetTriggers: ["my email"]).recognitionBoostTerms,
                        ["GitHub", "my email"])
     }
 
-    func testAClipWithoutSnippetTriggersBoostsWhatItDidBefore() {
-        XCTAssertEqual(settings(dictionaryBoost: true, snippetTriggers: []).recognitionBoostTerms, ["GitHub"])
-        XCTAssertEqual(settings(dictionaryBoost: false, snippetTriggers: []).recognitionBoostTerms, [])
+    func testAClipWithoutSnippetTriggersBoostsTheDictionaryAlone() {
+        XCTAssertEqual(settings(dictionary: [gitHub], snippetTriggers: []).recognitionBoostTerms, ["GitHub"])
+        XCTAssertEqual(settings(dictionary: [gitHubSpellingOnly], snippetTriggers: []).recognitionBoostTerms, [])
     }
 
     // MARK: - Preferences
 
-    /// The dictionary half the engines reading preferences add to a clip's snippet triggers.
-    func testPreferencesBoostTheDictionaryOnlyWithBothSwitchesOn() {
+    /// The dictionary half the engines reading preferences add to a clip's snippet triggers: it
+    /// follows the dictionary's own switch and each entry's, and nothing else.
+    func testPreferencesBoostTheEntriesThatSteerRecognitionWhileTheDictionaryIsOn() {
         let prefs = CoreTestEnvironment.preferences
-        prefs.customDictionaryEntries = [CustomDictionaryEntry(original: "git hub", replacement: "GitHub")]
+        prefs.customDictionaryEntries = [gitHub,
+                                         CustomDictionaryEntry(original: "Maxime", replacement: "Maxim",
+                                                               boostsRecognition: false)]
         prefs.customDictionaryEnabled = true
-        XCTAssertEqual(prefs.dictionaryBoostTerms, [])
-        prefs.customDictionaryBoostEnabled = true
         XCTAssertEqual(prefs.dictionaryBoostTerms, ["GitHub"])
         prefs.customDictionaryEnabled = false
         XCTAssertEqual(prefs.dictionaryBoostTerms, [])

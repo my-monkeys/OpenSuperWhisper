@@ -65,7 +65,8 @@ final class DictionarySuggestionsTests: XCTestCase {
         XCTAssertEqual(entry.kind, .correction)
         XCTAssertEqual(CustomDictionary.apply("Merci Maxime !", entries: prefs.customDictionaryEntries),
                        "Merci Maxim !")
-        XCTAssertEqual(CustomDictionary.boostTerms(entries: prefs.customDictionaryEntries), ["Maxim"])
+        XCTAssertEqual(CustomDictionary.boostTerms(entries: prefs.customDictionaryEntries), [],
+                       "a correction starts outside recognition: its rule already writes the term")
     }
 
     /// Only the case was wrong: the term alone, which fixes its case wherever it is written.

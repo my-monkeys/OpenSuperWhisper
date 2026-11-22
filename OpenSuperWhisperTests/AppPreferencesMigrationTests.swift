@@ -47,8 +47,8 @@ final class AppPreferencesMigrationTests: XCTestCase {
         prefs.runMigrations()
 
         XCTAssertEqual(scratch.writtenKeys,
-                       ["appContextProfilesData", "appInsertionRulesData", "didSeedAppContextPresets",
-                        "didSeedTerminalInsertionRules", "indicatorLayout", "offeredAppContextPresets",
+                       ["appContextProfilesData", "appInsertionRulesData", "didMigrateDictionaryBoostSwitch",
+                        "didSeedAppContextPresets", "didSeedTerminalInsertionRules", "indicatorLayout", "offeredAppContextPresets",
                         "perAppDisabledBundleIDs", "recordingTriggers"])
         XCTAssertEqual(prefs.selectedEngine, "whisper")
         XCTAssertNil(defaults.object(forKey: "aiBackend"))
@@ -499,5 +499,65 @@ final class AppPreferencesMigrationTests: XCTestCase {
         XCTAssertEqual(prefs.appInsertionRules.filter {
             $0.bundleIdentifier.lowercased() == "com.apple.terminal"
         }.count, 1)
+    }
+
+    // MARK: - Dictionary boost switch (#234)
+
+    private let dictionaryWord = CustomDictionaryEntry(original: "Rsets", replacement: "Rsets")
+    private let dictionaryCorrection = CustomDictionaryEntry(original: "Maxime", replacement: "Maxim")
+    private let dictionaryCommand = CustomDictionaryEntry(original: "new paragraph", replacement: "\\n\\n")
+    private let dictionaryPattern = CustomDictionaryEntry(original: "(a), said (b)", replacement: "“$1” said $2",
+                                                          isRegex: true)
+
+    private var storedDictionary: [CustomDictionaryEntry] {
+        [dictionaryWord, dictionaryCorrection, dictionaryCommand, dictionaryPattern]
+    }
+
+    func testBoostSwitchLeftOffSwitchesOffEveryEntryButNewWords() {
+        defaults.set(false, forKey: "customDictionaryBoostEnabled")
+        prefs.customDictionaryEntries = storedDictionary
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.customDictionaryEntries.map(\.boostsRecognition), [true, false, false, false])
+        XCTAssertNil(defaults.object(forKey: "customDictionaryBoostEnabled"))
+        XCTAssertTrue(prefs.didMigrateDictionaryBoostSwitch)
+    }
+
+    func testBoostSwitchNeverWrittenCountsAsOff() {
+        prefs.customDictionaryEntries = storedDictionary
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.customDictionaryEntries.map(\.boostsRecognition), [true, false, false, false])
+    }
+
+    func testBoostSwitchOnChangesNoEntryAndIsRemoved() {
+        defaults.set(true, forKey: "customDictionaryBoostEnabled")
+        prefs.customDictionaryEntries = storedDictionary
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.customDictionaryEntries.map(\.boostsRecognition), [true, true, true, true])
+        XCTAssertNil(defaults.object(forKey: "customDictionaryBoostEnabled"))
+    }
+
+    func testBoostSwitchMigrationRunsOnce() {
+        prefs.customDictionaryEntries = storedDictionary
+        prefs.runMigrations()
+        var entries = prefs.customDictionaryEntries
+        entries[1].boostsRecognition = true
+        prefs.customDictionaryEntries = entries
+
+        prefs.runMigrations()
+
+        XCTAssertEqual(prefs.customDictionaryEntries.map(\.boostsRecognition), [true, true, false, false],
+                       "a correction the user switched back on stays on")
+    }
+
+    func testBoostSwitchMigrationLeavesAnEmptyDictionaryUnwritten() {
+        prefs.runMigrations()
+
+        XCTAssertNil(defaults.object(forKey: "customDictionaryData"))
     }
 }
