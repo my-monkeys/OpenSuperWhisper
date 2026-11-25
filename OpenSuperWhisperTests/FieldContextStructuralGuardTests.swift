@@ -302,9 +302,11 @@ final class FieldContextStructuralGuardTests: XCTestCase {
     /// `applyForCurrentContext` but never `captureFocusedText`, because our own window is
     /// frontmost there and `captureFrontmost` skips it — there is no ordering to pin.
     ///
-    /// What this does NOT prove: that the read is skipped when the post-rule engine is remote.
-    /// That needs `captureFocusedText`'s Accessibility read to be injectable, and it is a direct
-    /// `SourceCapture` call today. The pure gate underneath is asserted in `FieldContextGateTests`.
+    /// What this does NOT prove: the order between the model rule and the read at runtime. The
+    /// gate underneath and its reader seam are asserted behaviourally in `FieldContextGateTests`
+    /// (`RecordingContext.focusedTextReader` reports whether the read happened, and the engine
+    /// that refused it); no seam exposes the call order in this view model, which is why that
+    /// half stays a source assertion.
     func testTheFieldIsReadAfterTheModelRule() throws {
         let path = "OpenSuperWhisper/Indicator/IndicatorWindow.swift"
         let text = try XCTUnwrap(try sources()[path])
