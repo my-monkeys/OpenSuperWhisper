@@ -24,12 +24,11 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     /// global prefs. Readable so a test can check what the fallback factory passed.
     let versionOverride: String?
 
-    /// FluidAudio's debug lines print the transcript and the replacement pair, and Release still
-    /// sends the pair to the unified log. Dictation text is the user's, so the dependency is held
-    /// at warnings for the life of the process; that also drops the count-only "applied N
-    /// replacement(s)" info line, an accepted loss.
+    /// A belt for hosts that build an engine without the app's startup entry. `AppCore.install`
+    /// calls `FluidAudioLogging.keepDictationTextOutOfTheLog()` at launch, before the live preview
+    /// can log; this covers a host that installs a configuration and builds an engine directly.
     private static let logLevelConfigured: Void = {
-        AppLogger.minimumLevel = .warning
+        FluidAudioLogging.keepDictationTextOutOfTheLog()
     }()
 
     init(versionOverride: String? = nil) {
@@ -159,8 +158,13 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     }
 
     /// The terms to boost toward and where they came from: the dictionary and the clip's snippet
-    /// triggers, then as much of the field as the cap allows. Same list as Whisper's prompt boost
-    /// and the live streaming preview (`RecognitionBoost`).
+    /// triggers, then as much of the field as the cap allows.
+    ///
+    /// The dictionary and snippet parts are the same `RecognitionBoost` merge Whisper's prompt
+    /// boost (`TranscriptionSettings.recognitionBoostTerms`) and the live streaming preview
+    /// (`IndicatorWindow`) build. Field terms are Parakeet's alone: Whisper gets the field as
+    /// surrounding prose, and the preview does not receive field terms at all. Keeping the live
+    /// preview out of this change is deliberate.
     ///
     /// Boosting is opt-in for all three (separate from the always-on replacement): only bias the
     /// decoder when the user explicitly enabled it (#over-boost).
@@ -303,18 +307,30 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
         // file, where a term containing ":", a leading "#", a newline or "{" would have been
         // read as the loader's own syntax. Terms reduced from a field of prose are the first
         // that can contain any of those.
-        let models = try await vocabularyModels()
-        let tokenizer = try await vocabularyTokenizer(for: models)
-        let terms = Self.vocabularyTerms(for: plan, encode: tokenizer.encode).map {
-            CustomVocabularyTerm(text: $0.text, ctcTokenIds: $0.ctcTokenIds,
-                                 minSimilarity: $0.minSimilarity)
-        }
-        let vocabulary = CustomVocabularyContext(terms: terms)
+        let vocabulary = CustomVocabularyContext(terms: try await vocabulary(for: plan))
         let session = try await VocabularyBoostingSession(vocabulary: vocabulary,
-                                                          ctcModels: models,
+                                                          ctcModels: try await vocabularyModels(),
                                                           config: Self.rescorerConfig)
         boostSessions.store(session, for: plan)
         return session
+    }
+
+    /// The terms the session receives for `plan`: the tokenized list with its floors.
+    private func vocabulary(for plan: RecognitionBoost.Plan) async throws -> [CustomVocabularyTerm] {
+        let models = try await vocabularyModels()
+        let tokenizer = try await vocabularyTokenizer(for: models)
+        return Self.vocabularyTerms(for: plan, encode: tokenizer.encode).map {
+            CustomVocabularyTerm(text: $0.text, ctcTokenIds: $0.ctcTokenIds,
+                                 minSimilarity: $0.minSimilarity)
+        }
+    }
+
+    /// How many terms a session would actually receive for `plan`. Internal for the benchmark: a
+    /// term the CTC tokenizer cannot encode is dropped, so an arm's input list cannot prove its
+    /// boost was real — the inert arm exists to make that visible.
+    func boostedTermCount(for plan: RecognitionBoost.Plan) async throws -> Int {
+        guard !plan.terms.isEmpty else { return 0 }
+        return try await vocabulary(for: plan).count
     }
 
     /// The CTC tokenizer, loaded once and reused: pre-tokenising every term is what lets the
@@ -382,5 +398,21 @@ extension AsrModelVersion {
         case "ultra": self = .ultra
         default: self = .v3
         }
+    }
+}
+
+/// Keeps dictation text out of FluidAudio's own logs.
+///
+/// The dependency's debug lines carry the transcript and the applied replacement pair, and in
+/// Release the pair still reaches the unified log. The live preview builds a FluidAudio manager at
+/// record start, before any `FluidAudioEngine` exists, so the app calls this from its startup
+/// entry (`AppCore.install`, which `AppMain.main` runs before the GUI or the CLI); the engine's
+/// initializer calls it too, for a host that skips that entry.
+public enum FluidAudioLogging {
+
+    /// Holds FluidAudio at warnings for the life of the process. The count-only "applied N
+    /// replacement(s)" info line is dropped with the debug lines; nothing reads it.
+    public static func keepDictationTextOutOfTheLog() {
+        AppLogger.minimumLevel = .warning
     }
 }

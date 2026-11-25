@@ -110,6 +110,18 @@ final class ParakeetBoostBenchmark: CoreTestCase {
                                 "totalMs": Int(totalMs), "firstMs": rows.first?["ms"] ?? 0,
                                 "clips": rows]
         }
+
+        // After the timed arms: how many terms each arm's boost actually kept. A term the CTC
+        // tokenizer cannot encode is dropped, so the input list alone cannot tell whether an arm's
+        // boost was real; the workflow's inert-arm guard needs the surviving count, not `terms`.
+        for arm in arms {
+            guard var entry = report[arm.name] as? [String: Any] else { continue }
+            var settings = Fixtures.pinnedSettings()
+            if !arm.viaField { settings.snippetTriggers = arm.terms }
+            let plan = engine.boostPlan(settings, fieldTerms: arm.viaField ? arm.terms : [])
+            entry["tokenizedTerms"] = try await engine.boostedTermCount(for: plan)
+            report[arm.name] = entry
+        }
         let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
         if let out = environment["OSW_PARAKEET_BENCH_OUT"] {
             try data.write(to: URL(fileURLWithPath: out))
