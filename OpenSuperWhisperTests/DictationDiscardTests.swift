@@ -60,7 +60,7 @@ final class DictationDiscardTests: XCTestCase {
     func testACancelledRunIsNeitherSavedAsFailedNorAnnounced() async throws {
         var notices: [RecordingState] = []
         pipeline.noticeOverride = { notices.append($0) }
-        pipeline.transcribeOverride = { [pipeline] _, _ in
+        pipeline.transcribeOverride = { [pipeline] _, _, _ in
             pipeline.discardEverything()
             throw CancellationError()
         }
@@ -74,7 +74,7 @@ final class DictationDiscardTests: XCTestCase {
 
     func testADiscardDuringCleanupSavesAndInsertsNothing() async throws {
         var inserted: [String] = []
-        pipeline.transcribeOverride = { _, _ in "words nobody kept" }
+        pipeline.transcribeOverride = { _, _, _ in "words nobody kept" }
         pipeline.cleanupOverride = { [pipeline] text in
             pipeline.discardEverything()
             return CleanupOutcome(text: text, status: .notRun)

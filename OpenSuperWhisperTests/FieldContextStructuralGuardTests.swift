@@ -45,6 +45,7 @@ final class FieldContextStructuralGuardTests: XCTestCase {
         "OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/Engines/SenseVoiceModelManager.swift",
         "OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/LLMModelManager.swift",
         "OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/Utils/LLMCleanup/OllamaBackend.swift",
+        "OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/Utils/LLMCleanup/OllamaThinking.swift",
         "OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/Utils/LLMCleanup/RemoteBackend.swift",
         "OpenSuperWhisperCore/Sources/OpenSuperWhisperCore/WhisperModelManager.swift",
     ]
