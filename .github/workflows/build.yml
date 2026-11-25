@@ -306,7 +306,7 @@ jobs:
       # The setup below mirrors `core-tests`: the benchmark builds against the same native
       # slices, the same patched FluidAudio checkout, and the same workspace pins.
       - name: Checkout repository (with submodules)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Install dependencies
