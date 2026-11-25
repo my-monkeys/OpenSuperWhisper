@@ -44,9 +44,9 @@ struct TextAIRecognitionGroup: View {
     private var fieldContextHint: LocalizedStringKey {
         switch EngineCapabilities.fieldContextMode(for: viewModel.selectedEngine) {
         case .prose:
-            return "Reads the focused field to recognise names better. Never sent to a server."
+            return "Reads the focused field to recognise names better. The field text is never sent as context, but a recognised word can end up in your transcript, which goes to your AI engine when cleanup runs."
         case .terms:
-            return "Reads the focused field and gives Parakeet a term list from it, not a sentence. A word that sounds close to a listed term can be rewritten. Never sent to a server."
+            return "Reads the focused field and gives Parakeet a term list from it, not a sentence. The field text is never sent as context, but a word that sounds close to a listed term can be rewritten into your transcript, which goes to your AI engine when cleanup runs."
         case .none:
             return "This engine takes no hint about what is coming, so the field is not read."
         case .remoteExcluded:

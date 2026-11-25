@@ -156,7 +156,7 @@ struct PrivacyRubric: View {
             guard viewModel.canUseFieldContext else {
                 return "On, but this engine does not use it: the field is not read."
             }
-            return "On: the text before your cursor is read to help the model recognise names. It stays on your Mac and is used only for this transcription."
+            return "On: the text before your cursor is read to help the model recognise names. It is never sent as context, but a recognised word can end up in your transcript, which goes to your AI engine when cleanup runs."
         }
         return viewModel.matchTextAroundCaret || watchesCorrections
             ? "Off: the model is given nothing from the screen."
