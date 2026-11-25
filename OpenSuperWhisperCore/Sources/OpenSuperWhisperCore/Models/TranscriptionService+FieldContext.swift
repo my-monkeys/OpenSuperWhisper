@@ -1,5 +1,31 @@
 import Foundation
 
+/// The outcome of asking the field for its context. `FieldContext?` cannot carry it: nil is both
+/// "not worked out yet" and "worked out, and this engine gets nothing". Without the distinction a
+/// nil resolved before the engine gate reads as unresolved after it, so a field that yields no
+/// terms runs the reducer and the spelling checker a second time on the same main thread.
+///
+/// A nil is reusable only on the engine instance it was decided on: "nothing for Parakeet" is not
+/// "nothing for Whisper", which would be handed the prose. A non-nil value survives a reload
+/// through `matches`, which asks the same conformance question the dispatch cast asks.
+enum FieldContextResolution {
+    case notResolved
+    case resolved(FieldContext?, on: TranscriptionEngine)
+
+    /// Whether this already answers for `engine`, so the spelling pass can be skipped.
+    func reusable(on engine: TranscriptionEngine) -> Bool {
+        guard case .resolved(let value, let resolvedOn) = self else { return false }
+        if let value { return value.matches(engine) }
+        return resolvedOn === engine
+    }
+
+    /// The resolved value; meaningful only when `reusable(on:)` is true.
+    var value: FieldContext? {
+        if case .resolved(let value, _) = self { return value }
+        return nil
+    }
+}
+
 /// Field-context resolution for `TranscriptionService` (#89): which engines may see the focused
 /// field, and in what shape. Split out of `TranscriptionService.swift` so that file stays the
 /// dispatch path — selection, loading, the engine gate — while this one decides what the field is

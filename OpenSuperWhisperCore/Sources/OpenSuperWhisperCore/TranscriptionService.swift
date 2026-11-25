@@ -303,17 +303,21 @@ public class TranscriptionService: ObservableObject {
         // the dictation path normally passes — and an engine of the selected kind is already
         // loaded. Those are the conditions under which `ensureEngineLoaded` below returns this
         // same instance. A real model swap reloads inside the gate, so it still resolves after
-        // selection; a value that goes stale anyway is discarded by `FieldContext.matches`.
+        // selection; a value that goes stale anyway is discarded by its `reusable(on:)` check.
         let overrideKeepsEngine = modelOverride.map { option in
             let active = ModelCatalog.activeOption()
             return active?.engine == option.engine && active?.identifier == option.identifier
         } ?? true
-        let readyContext: FieldContext? = overrideKeepsEngine
-            && loadedEngineKind == CoreAccess.preferences.selectedEngine
-            ? currentEngine.flatMap {
-                resolveFieldContext(capturedFieldText, for: $0, settings: settings)
-            }
-            : nil
+        let readyContext: FieldContextResolution
+        if overrideKeepsEngine,
+           loadedEngineKind == CoreAccess.preferences.selectedEngine,
+           let engine = currentEngine {
+            readyContext = .resolved(
+                resolveFieldContext(capturedFieldText, for: engine, settings: settings),
+                on: engine)
+        } else {
+            readyContext = .notResolved
+        }
 
         // Serialize every transcription across the app (dictation pipeline, file-drop queue,
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
@@ -393,7 +397,7 @@ public class TranscriptionService: ObservableObject {
     private func transcribe(url: URL, settings: TranscriptionSettings,
                             fallbackModel: DictationModelOption?,
                             capturedFieldText: String?,
-                            preResolvedContext: FieldContext?) async throws -> String {
+                            preResolvedContext: FieldContextResolution) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
             // The fallback engine is built AND initialized here, so a user on remote-with-
@@ -422,11 +426,13 @@ public class TranscriptionService: ObservableObject {
         // declared a context protocol, and the preference gate is evaluated at dispatch time so
         // a setting switched off between recording and transcription behaves as it did before.
         //
-        // A value resolved before the gate is reused only if it fits the engine that actually
-        // ran. If a reload or an engine switch replaced that engine in the meantime, the value
-        // is discarded here and resolved again — never passed to an engine it does not match.
-        let context = preResolvedContext.flatMap { $0.matches(engine) ? $0 : nil }
-            ?? resolveFieldContext(capturedFieldText, for: engine, settings: settings)
+        // A resolution taken before the gate is reused only if it answers for this engine. If a
+        // reload or an engine switch replaced it in the meantime, it is resolved again here —
+        // never passed to an engine it does not match. A resolution that came back empty is
+        // reused too: re-running it would repeat the spelling pass for the same nil.
+        let context: FieldContext? = preResolvedContext.reusable(on: engine)
+            ? preResolvedContext.value
+            : resolveFieldContext(capturedFieldText, for: engine, settings: settings)
         do {
             return try await runOnEngine(engine, url: url, settings: settings, context: context)
         } catch let error where fallbackModel == nil && Self.shouldUseFallback(for: error) {
@@ -436,14 +442,15 @@ public class TranscriptionService: ObservableObject {
                 throw error
             }
             print("Remote transcription failed (\(error)); falling back to local model \(fallback.displayName)")
-            // The fallback re-resolves against its own engine. It is safe to pass the text on:
-            // the record-time gate refused to capture it under the remote engine, so a
-            // remote-then-local clip has nothing to pass.
-            // No pre-resolved value: the fallback engine is a different one, and resolves its
-            // own context from the same clip text.
+            // The fallback engine is a different one, so no pre-resolved value is passed; it
+            // re-resolves from the same clip text. The text can genuinely be there — it is
+            // whatever the field held when the clip was recorded, under whichever engine was
+            // selected then — so the refuser is the dispatch-time mode gate in
+            // `resolveFieldContext`, not an absence at record time: the selected id is still
+            // `remote`, and a remote-selected run is handed no field context, fallback or not.
             return try await transcribe(url: url, settings: settings, fallbackModel: fallback,
                                         capturedFieldText: capturedFieldText,
-                                        preResolvedContext: nil)
+                                        preResolvedContext: .notResolved)
         }
     }
 
