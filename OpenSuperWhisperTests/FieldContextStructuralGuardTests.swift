@@ -159,23 +159,26 @@ final class FieldContextStructuralGuardTests: XCTestCase {
 
     /// The secure-field predicate is tested on its own; nothing checked that the readers ask it.
     /// `SecureTextFields` states that every reader that touches a field asks — `SourceCapture`
-    /// (what the transcriber is told), `TextAroundCaret` (how the dictation is fitted) and
-    /// `WatchedField` (what the user corrected) — so a reader that stopped calling it, or called
+    /// (what the transcriber is told), `TextAroundCaret` (how the dictation is fitted),
+    /// `WatchedField` (what the user corrected) and `FocusUtils.focusedTextMetrics` (the length
+    /// and caret written to the diagnostic log) — so a reader that stopped calling it, or called
     /// it without negating the answer, would leave every predicate test green while reading a
     /// password box.
     ///
-    /// Only the first of the three feeds a model; they share the guard because a password box is
-    /// not ours to read for any purpose.
+    /// Only the first feeds a model; they share the guard because a password box is not ours to
+    /// read for any purpose, and the metrics reader is why: it writes a fact about the field to a
+    /// log that outlives the dictation.
     ///
-    /// Blind spot, stated: this covers the three files that are the readers today. A NEW reader
+    /// Blind spot, stated: this covers the four files that are the readers today. A NEW reader
     /// that never calls the guard is not caught, because finding it would mean enumerating
     /// "Accessibility readers", a curated list with the same weakness as the network one above.
-    func testTheThreeReadersAskTheSecureFieldGuard() throws {
+    func testEveryReaderAsksTheSecureFieldGuard() throws {
         let sources = try sources()
         let readers = [
             "OpenSuperWhisper/Utils/SourceCapture.swift",
             "OpenSuperWhisper/Utils/TextAroundCaret.swift",
             "OpenSuperWhisper/Utils/WatchedField.swift",
+            "OpenSuperWhisper/Utils/FocusUtils.swift",
         ]
 
         for path in readers {

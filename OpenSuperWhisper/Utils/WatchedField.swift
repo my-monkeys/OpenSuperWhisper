@@ -39,7 +39,12 @@ struct WatchedField: @unchecked Sendable {
         AXUIElementSetMessagingTimeout(element, timeout)
         let field = WatchedField(element: element, pid: pid)
         // A secure field reports bullets or nothing, but it is not ours to ask in the first place.
-        guard !SecureTextFields.isSecure(field.string(kAXSubroleAttribute)) else { return nil }
+        // The error comes with the answer: a subrole read that failed is not an absent subrole.
+        var subroleRef: CFTypeRef?
+        let subroleError = AXUIElementCopyAttributeValue(
+            element, kAXSubroleAttribute as CFString, &subroleRef
+        )
+        guard !SecureTextFields.isSecure(subroleRef as? String, error: subroleError) else { return nil }
         return field
     }
 

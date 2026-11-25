@@ -61,8 +61,10 @@ enum SourceCapture {
     /// The same, from a focused element already in hand.
     static func focusedText(in element: AXUIElement) -> String? {
         AXUIElementSetMessagingTimeout(element, FocusUtils.axMessagingTimeout)
-        // A password box is not read and then thrown away: it is not read at all.
-        guard !SecureTextFields.isSecure(subrole(of: element)) else { return nil }
+        // A password box is not read and then thrown away: it is not read at all. The error
+        // travels with the answer, because a subrole that could not be read is not an absence.
+        let answer = subrole(of: element)
+        guard !SecureTextFields.isSecure(answer.subrole, error: answer.error) else { return nil }
 
         var valueRef: AnyObject?
         guard AXUIElementCopyAttributeValue(
@@ -72,13 +74,15 @@ enum SourceCapture {
         return tail(of: text, upTo: caretOffset(in: element) ?? text.count)
     }
 
-    /// The element's subrole, or nil when the app does not answer.
-    private static func subrole(of element: AXUIElement) -> String? {
+    /// The element's subrole and the error it came with. The two travel together: only the
+    /// error separates "no subrole, which is every ordinary text field" from "the question
+    /// failed", and the guard must not read the second as the first.
+    private static func subrole(of element: AXUIElement) -> (subrole: String?, error: AXError) {
         var subroleRef: AnyObject?
-        guard AXUIElementCopyAttributeValue(
+        let error = AXUIElementCopyAttributeValue(
             element, kAXSubroleAttribute as CFString, &subroleRef
-        ) == .success else { return nil }
-        return subroleRef as? String
+        )
+        return (subroleRef as? String, error)
     }
 
     /// Where the caret sits in the focused element, as a character offset.

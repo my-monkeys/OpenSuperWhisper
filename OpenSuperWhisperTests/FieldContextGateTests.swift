@@ -20,10 +20,17 @@ final class FieldContextGateTests: XCTestCase {
     }
 
     override func tearDown() {
+        // The context is a singleton and `focusedText` has no setter — `update` deliberately
+        // leaves it alone (#F4) — so the text a test left is cleared the only way it is ever
+        // written: `captureFocusedText` with the gate closed, which assigns nil without an
+        // Accessibility read. Before the restore, so the closed gate is the scratch state and
+        // not whatever this machine happens to have.
+        RecordingContext.shared.focusedTextReader = nil
+        AppPreferences.shared.useSurroundingTextAsContext = false
+        RecordingContext.shared.captureFocusedText()
+
         scratch.restore()
         scratch = nil
-        // The context is a singleton: clear the injected reader and the text a test left on it.
-        RecordingContext.shared.focusedTextReader = nil
         RecordingContext.shared.update(appName: nil, bundleID: nil)
         super.tearDown()
     }
