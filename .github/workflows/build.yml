@@ -296,8 +296,8 @@ jobs:
   # reproduce #235's numbers, and a low count here is not evidence that a dictation in a noisy
   # room is safe.
   #
-  # Manual only: it downloads the ASR and CTC models and takes the better part of an hour, and no
-  # pull request depends on it.
+  # Manual only: it downloads the ASR and CTC models and runs four arms over the clips, which can
+  # take over an hour, and no pull request depends on it.
   parakeet-overboost:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: macos-26
@@ -305,7 +305,8 @@ jobs:
     # report. Declared so the checkout token is not left with the default write scopes.
     permissions:
       contents: read
-    timeout-minutes: 120
+    # The three capped steps can take 45 + 30 + 90 = 165 minutes, so the job must outlast them.
+    timeout-minutes: 180
     steps:
       # The setup below mirrors `core-tests`: the benchmark builds against the same native
       # slices, the same patched FluidAudio checkout, and the same workspace pins.
@@ -313,6 +314,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           submodules: recursive
+          # Nothing after the checkout needs the token, so it is not left in .git/config.
+          persist-credentials: false
       - name: Install dependencies
         run: brew install cmake rust
       - name: Compute the native build cache key
@@ -374,7 +377,7 @@ jobs:
       # and `Scripts/test-core.sh` documents it. Without the prefix the benchmark skips itself and
       # the step would pass having measured nothing — which is what the report check below is for.
       - name: Run the benchmark
-        timeout-minutes: 40
+        timeout-minutes: 90
         run: |
           TEST_RUNNER_OSW_PARAKEET_BENCH="$PWD/clips" \
           TEST_RUNNER_OSW_PARAKEET_BENCH_OUT="$PWD/bench.json" \
@@ -411,15 +414,28 @@ jobs:
           if absent:
               sys.exit(f"arm(s) {absent} carry no transcriptDiffs: written by an older benchmark, "
                        "so the decode-path indicator would be vacuous")
+          absent = [key for key, _ in ARMS if "tokenizedTerms" not in report[key]]
+          if absent:
+              sys.exit(f"arm(s) {absent} carry no tokenizedTerms: written by an older benchmark, "
+                       "so the surviving-term check would be vacuous")
+          # A non-empty input list does not make a control: the CTC tokenizer drops a term it
+          # cannot encode, and the arm then measures an unboosted decode. `tokenizedTerms` is the
+          # count the boost session actually received, so that is what this guard checks.
+          for key in ("field", "inert"):
+              if report[key]["tokenizedTerms"] == 0:
+                  sys.exit(f"the {key} arm kept no boost term: it measures an unboosted decode "
+                           f"(input: {report[key]['terms']})")
 
           baits = {key: report[key]["baits"] for key, _ in ARMS}
           lines = [
               "### Parakeet over-boost benchmark (synthetic clips)",
               "",
-              "| arm | false replacements (shared list) | WER |",
-              "|---|---|---|",
+              "| arm | false replacements (shared list) | WER | boost terms kept |",
+              "|---|---|---|---|",
           ]
-          lines += [f"| {label} | {baits[key]} | {report[key]['wer']:.3f} |" for key, label in ARMS]
+          lines += [f"| {label} | {baits[key]} | {report[key]['wer']:.3f} | "
+                    f"{report[key]['tokenizedTerms']}/{len(report[key]['terms'])} |"
+                    for key, label in ARMS]
 
           # The inert arm isolates the decode path a non-empty term list selects: it boosts a term
           # no clip can contain, so a change from `none` is the decoder, not a replacement. The
