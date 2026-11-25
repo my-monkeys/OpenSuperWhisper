@@ -39,7 +39,8 @@ struct FocusTarget {
     /// been written there since (see `FocusReturn.selectionToSet`).
     let field: FieldSnapshot?
 
-    /// The focused element of `app` right now, with its caret.
+    /// The focused element of `app` right now, with its caret — nil for a secure field, whose
+    /// length and selection are not measured.
     static func capture(_ app: NSRunningApplication) -> FocusTarget {
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(appElement, FocusUtils.axMessagingTimeout)
@@ -52,6 +53,18 @@ struct FocusTarget {
         }
         let element = focused as! AXUIElement
         AXUIElementSetMessagingTimeout(element, FocusUtils.axMessagingTimeout)
+
+        // A secure field's length and selection are facts about a password, so they are not
+        // measured. The element itself is still kept: putting the focus back on it is not
+        // reading it, and the dictation still goes where the person was typing.
+        var subroleRef: CFTypeRef?
+        let subroleError = AXUIElementCopyAttributeValue(
+            element, kAXSubroleAttribute as CFString, &subroleRef
+        )
+        guard !SecureTextFields.isSecure(subroleRef as? String, error: subroleError) else {
+            return FocusTarget(pid: app.processIdentifier, bundleID: app.bundleIdentifier,
+                               element: element, field: nil)
+        }
 
         var count: CFTypeRef?
         var range: CFTypeRef?
@@ -241,6 +254,12 @@ final class LiveFocusControl: FocusControlling {
 
     func field(_ target: FocusTarget) -> FieldSnapshot? {
         guard let element = target.element else { return nil }
+        // Asked here as well as at capture, because a target can be built by another caller and
+        // a field can become secure between the two: its length and selection are not ours now.
+        var subroleRef: CFTypeRef?
+        let subroleError = copy(kAXSubroleAttribute, of: element, into: &subroleRef)
+        guard !SecureTextFields.isSecure(subroleRef as? String, error: subroleError) else { return nil }
+
         var count: CFTypeRef?
         var range: CFTypeRef?
         guard copy(kAXNumberOfCharactersAttribute, of: element, into: &count) == .success else { return nil }

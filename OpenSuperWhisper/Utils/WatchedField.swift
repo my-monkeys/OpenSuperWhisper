@@ -17,6 +17,14 @@ struct WatchedField: @unchecked Sendable {
     let element: AXUIElement
     let pid: pid_t
 
+    /// Only `focused(in:)` may build one: it is the path that asks the secure-field predicate,
+    /// and a memberwise init would let any caller hold a password box the guard never saw. The
+    /// initializer is private so that bypass does not compile.
+    private init(element: AXUIElement, pid: pid_t) {
+        self.element = element
+        self.pid = pid
+    }
+
     /// Shorter than `FocusUtils.axMessagingTimeout`: nothing waits on these, and a field that
     /// cannot answer in a quarter of a second is one to give up on rather than wait for.
     static let timeout: Float = 0.25

@@ -3,11 +3,19 @@ import ApplicationServices
 /// Whether an Accessibility element is a secure text field — one whose contents are not the
 /// app's to read, whatever it would do with them.
 ///
-/// The comparison lives here and nowhere else. Every reader that touches a field asks it —
-/// `SourceCapture.focusedText` (what the transcriber is told), `TextAroundCaret.focused` (how the
-/// dictation is fitted), `WatchedField.focused` (what the user corrected) and
-/// `FocusUtils.focusedTextMetrics` (how long the field was and where the caret sat, for the
-/// diagnostic log) — so a fifth reader either calls it or is conspicuous in review for not doing so.
+/// The comparison lives here and nowhere else. The readers that take the field's text, its
+/// length or its selection and hand it on ask it — `SourceCapture.focusedText` (what the
+/// transcriber is told), `TextAroundCaret.focused` (how the dictation is fitted),
+/// `WatchedField.focused` (what the user corrected), `FocusUtils.focusedTextMetrics` (the length
+/// and caret written to the diagnostic log), and `FocusReturn`'s two measurement sites,
+/// `FocusTarget.capture` and `LiveFocusControl.field` (the length and selection kept so the
+/// caret can be put back) — so a new reader of that kind either calls it or is conspicuous in
+/// review for not doing so.
+///
+/// The field reads outside this guard are the ones whose answer is used on the spot and handed
+/// nowhere: `FocusUtils.getCaretRect` with `CaretAnchor` (the selection becomes a screen
+/// rectangle, for the indicator bubble) and `FocusUtils.focusedElementIsEditable` (whether the
+/// value is settable, and the role). Neither hands on text, a length or a selection.
 ///
 /// They share it because a password box is not ours to read for *any* purpose, not because all
 /// of them feed a model: only the first does. It guards the read itself, not what is done with
