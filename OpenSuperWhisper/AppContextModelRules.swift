@@ -121,6 +121,15 @@ final class RecordingContext {
         enabled && EngineCapabilities.supportsFieldContext(engine: engine)
     }
 
+    /// Test seam: where `captureFocusedText` gets the text. nil in production, which uses the
+    /// Accessibility reader below.
+    ///
+    /// It exists because the behavioural assertion cannot otherwise be made. A headless test gets
+    /// nil from the real reader whether or not it was called, so "the field was not read" would
+    /// pass for the wrong reason — proving the read is skipped for an engine that cannot use it
+    /// needs a reader that can report being called.
+    var focusedTextReader: (() -> String?)?
+
     /// Read the field this dictation is going into, once the engine that will transcribe is known.
     ///
     /// Called after `ContextModelSwitcher.applyForCurrentContext`, because a per-app rule can
@@ -131,15 +140,6 @@ final class RecordingContext {
     /// Always assigns, including nil. A field left over from an earlier dictation is never where
     /// this one started, and a setting turned off between two recordings must not keep the old
     /// text alive.
-    /// Test seam: where `captureFocusedText` gets the text. nil in production, which uses the
-    /// Accessibility reader below.
-    ///
-    /// It exists because the behavioural assertion cannot otherwise be made. A headless test gets
-    /// nil from the real reader whether or not it was called, so "the field was not read" would
-    /// pass for the wrong reason — proving the read is skipped for an engine that cannot use it
-    /// needs a reader that can report being called.
-    var focusedTextReader: (() -> String?)?
-
     func captureFocusedText() {
         let prefs = AppPreferences.shared
         guard Self.wantsFieldText(enabled: prefs.useSurroundingTextAsContext,
@@ -157,6 +157,21 @@ final class RecordingContext {
         // frontmost app is asked instead.
         focusedText = focusTarget?.element.map { SourceCapture.focusedText(in: $0) }
             ?? SourceCapture.focusedText()
+    }
+
+    /// Hand the field's text to the one clip it belongs to and forget it here.
+    ///
+    /// The snapshot is the text's only owner once recording stops; leaving a copy in the shared
+    /// context keeps the contents of someone's document in memory for the life of the process,
+    /// past every discard and cancel.
+    func consumeFocusedText() -> String? {
+        defer { focusedText = nil }
+        return focusedText
+    }
+
+    /// Drop the field's text when no clip will take it — the cancel path.
+    func clearFocusedText() {
+        focusedText = nil
     }
 
     /// Whether to remember the field a recording starts in (#164). Only when the text will be

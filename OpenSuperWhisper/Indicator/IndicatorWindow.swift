@@ -296,6 +296,10 @@ class IndicatorViewModel: ObservableObject {
         // would find the recorder empty and report the dictation as lost.
         guard state != .decoding else { return }
         takeEnded = true
+        // This take owns the field's text, captured at its start. Take it out of the shared
+        // context before any exit below — the dropped-take returns included — so nothing keeps
+        // someone's document in memory once this dictation is over.
+        let capturedFieldText = RecordingContext.shared.consumeFocusedText()
         // The stop press is the origin of the whole measurement (#262), so it is taken on the
         // first line: everything below it — cancel-confirmation reset, the live-preview hand-off,
         // the agent-reply disarm — is time the user waits after letting go.
@@ -360,7 +364,7 @@ class IndicatorViewModel: ObservableObject {
             appName: ctx.appName, bundleID: ctx.bundleID,
             windowTitle: ctx.windowTitle, fullURL: ctx.fullURL,
             keyboardLanguage: ctx.keyboardLanguage,
-            focusedText: ctx.focusedText,
+            focusedText: capturedFieldText,
             focusTarget: ctx.focusTarget,
             agentReplyID: agentReplyID)
         let modelOption = ModelCatalog.activeOption()
@@ -452,6 +456,8 @@ class IndicatorViewModel: ObservableObject {
 
     func cancelRecording() {
         takeEnded = true
+        // No clip will carry this take's field text, so drop it with the take.
+        RecordingContext.shared.clearFocusedText()
         stopListeningForSound()
         hideTimer?.invalidate()
         hideTimer = nil
