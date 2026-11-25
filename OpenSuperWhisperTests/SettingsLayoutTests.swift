@@ -116,8 +116,8 @@ final class SettingsLayoutTests: XCTestCase {
         AppleIntelligence.replaceModelForTesting(nil)
         for key in ["aiPostProcessingEnabled", "appContextFormattingEnabled", "retentionMaxCountEnabled",
                     "retentionMaxCount", "textScale", "remoteServerURL", "remoteServerModel", "aiBackend",
-                    "selectedEngine", "customDictionaryEnabled", "customDictionaryData", "snippetsData",
-                    "cachedRemoteModels"] {
+                    "selectedEngine", "useSurroundingTextAsContext", "customDictionaryEnabled",
+                    "customDictionaryData", "snippetsData", "cachedRemoteModels"] {
             DefaultsStore.current.removeObject(forKey: key)
         }
     }
@@ -143,6 +143,9 @@ final class SettingsLayoutTests: XCTestCase {
         /// Text & AI changes with the cleanup backend, Models with the engine.
         var backend = "builtin"
         var engine = "whisper"
+        /// Text & AI's recognition hint changes with the engine's field-context mode; the Privacy
+        /// hint changes with the switch too.
+        var fieldContext = false
         /// Pinned so the Apple Intelligence fields render the same on every Mac: its ready line,
         /// or the longer notice explaining why it can't run.
         var appleIntelligence: AppleIntelligenceAvailability = .unsupportedMac
@@ -151,7 +154,10 @@ final class SettingsLayoutTests: XCTestCase {
             switch rubric {
             case .models: return "\(rubric.rawValue)-\(engine)"
             case .textAndAI where backend == "apple": return "\(rubric.rawValue)-apple-\(appleIntelligence)"
-            case .textAndAI: return "\(rubric.rawValue)-\(backend)"
+            case .textAndAI:
+                return "\(rubric.rawValue)-\(backend)-\(engine)-\(fieldContext ? "fieldOn" : "fieldOff")"
+            case .privacy:
+                return "\(rubric.rawValue)-\(engine)-\(fieldContext ? "fieldOn" : "fieldOff")"
             default: return rubric.rawValue
             }
         }
@@ -162,11 +168,22 @@ final class SettingsLayoutTests: XCTestCase {
         let rubrics = SettingsRubric.allCases.flatMap { rubric -> [Case] in
             switch rubric {
             case .textAndAI:
-                return ["builtin", "ollama", "remote"].map { Case(rubric: rubric, backend: $0) }
+                var textAndAI = ["builtin", "ollama", "remote"].map { Case(rubric: rubric, backend: $0) }
                     + [AppleIntelligenceAvailability.available, .turnedOff].map {
                         Case(rubric: rubric, backend: "apple", appleIntelligence: $0)
                     }
+                // One case per field-context mode: the recognition hint's `.terms`, `.none` and
+                // `.remoteExcluded` arms. Whisper's `.prose` arm is the builtin case above.
+                textAndAI += ["fluidaudio", "sensevoice", "remote"].map {
+                    Case(rubric: rubric, engine: $0)
+                }
+                return textAndAI
             case .models: return ["whisper", "remote"].map { Case(rubric: rubric, engine: $0) }
+            case .privacy:
+                // Off, on, and on-but-the-engine-cannot-use-it: the three hint states.
+                return [Case(rubric: rubric),
+                        Case(rubric: rubric, fieldContext: true),
+                        Case(rubric: rubric, engine: "remote", fieldContext: true)]
             default: return [Case(rubric: rubric)]
             }
         }
@@ -184,6 +201,7 @@ final class SettingsLayoutTests: XCTestCase {
                 AppPreferences.shared.aiBackend = testCase.backend
                 AppleIntelligence.replaceModelForTesting(FixedOnDeviceModel(availability: testCase.appleIntelligence))
                 AppPreferences.shared.selectedEngine = testCase.engine
+                AppPreferences.shared.useSurroundingTextAsContext = testCase.fieldContext
                 let size = testCase.rubric == nil ? size : settingsSize
                 let name = "\(testCase.name)-\(language)-\(Int(size.width))-\(Int(scale * 100))"
                 SPaneStack.overflows.removeAll()

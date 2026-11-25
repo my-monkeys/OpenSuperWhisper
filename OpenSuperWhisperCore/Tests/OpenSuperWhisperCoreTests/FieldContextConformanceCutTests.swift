@@ -64,14 +64,29 @@ final class FieldContextConformanceCutTests: CoreTestCase {
 
     // MARK: - Helpers
 
-    private func settings(fieldContext: Bool) -> TranscriptionSettings {
+    private func settings(fieldContext: Bool, language: String = "en") -> TranscriptionSettings {
         var settings = Fixtures.pinnedSettings()
         settings.useSurroundingTextAsContext = fieldContext
+        settings.selectedLanguage = language
         return settings
     }
 
     private func service(_ engine: TranscriptionEngine) -> TranscriptionService {
         TranscriptionService(engineBuilder: { _ in engine })
+    }
+
+    /// Installs a configuration whose spelling provider is `spelling`, for the body only. The
+    /// test environment's configuration is restored even when an assertion fails, so a later
+    /// class cannot inherit a provider from this one.
+    private func withSpelling(
+        _ spelling: @escaping @MainActor @Sendable (String?) -> DictionaryCandidates.Spelling,
+        _ body: () async throws -> Void
+    ) async rethrows {
+        var configuration = CoreTestEnvironment.configuration
+        configuration.fieldTermSpelling = spelling
+        CoreConfiguration.replaceForTesting(configuration)
+        defer { CoreConfiguration.replaceForTesting(CoreTestEnvironment.configuration) }
+        try await body()
     }
 
     // MARK: - The engine that declares a context protocol gets it
@@ -184,5 +199,163 @@ final class FieldContextConformanceCutTests: CoreTestCase {
 
         XCTAssertNil(engine.recorder.proseContext)
         XCTAssertEqual(engine.recorder.plainCalls, 1)
+    }
+
+    // MARK: - The spelling provider is the one the service resolves with
+
+    /// The provider's answers decide which words reach the term engine. Mutation: replace the
+    /// `CoreAccess.fieldTermSpelling` call in `resolveFieldContext` with a fixed knows-nothing
+    /// dictionary and "Cherith" is delivered — this row reddens. A test that only reads the
+    /// provider back through `CoreAccess` stays green under that change.
+    func testTheSpellingProviderDecidesWhichWordsAreTerms() async throws {
+        try await withSpelling({ _ in
+            DictionaryCandidates.Spelling(knows: { $0.lowercased() == "cherith" },
+                                          correctsTypo: { _ in false })
+        }) {
+            CoreTestEnvironment.preferences.selectedEngine = "fluidaudio"
+            let engine = TermStub()
+
+            _ = try await service(engine).transcribeAudio(
+                url: Fixtures.jfkWav, settings: settings(fieldContext: true),
+                capturedFieldText: "Cherith met Nyiragongo")
+
+            XCTAssertEqual(engine.recorder.terms, ["Nyiragongo"],
+                           "the provider's answer did not reach the reducer")
+            XCTAssertEqual(engine.recorder.plainCalls, 0)
+        }
+    }
+
+    /// The clip's language reaches the provider: the same text is judged against a German
+    /// dictionary and an English one. Mutation: pass nil (or a guessed language) to
+    /// `CoreAccess.fieldTermSpelling` and the German row receives "Cherith" — this reddens.
+    func testTheClipsLanguageReachesTheSpellingProvider() async throws {
+        try await withSpelling({ language in
+            language == "de"
+                ? DictionaryCandidates.Spelling(knows: { $0.lowercased() == "cherith" },
+                                                correctsTypo: { _ in false })
+                : DictionaryCandidates.Spelling(knows: { _ in false }, correctsTypo: { _ in false })
+        }) {
+            CoreTestEnvironment.preferences.selectedEngine = "fluidaudio"
+
+            let german = TermStub()
+            _ = try await service(german).transcribeAudio(
+                url: Fixtures.jfkWav, settings: settings(fieldContext: true, language: "de"),
+                capturedFieldText: "Cherith met Nyiragongo")
+            XCTAssertEqual(german.recorder.terms, ["Nyiragongo"],
+                           "the clip's language did not cross: the German dictionary was not used")
+
+            let english = TermStub()
+            _ = try await service(english).transcribeAudio(
+                url: Fixtures.jfkWav, settings: settings(fieldContext: true, language: "en"),
+                capturedFieldText: "Cherith met Nyiragongo")
+            XCTAssertEqual(english.recorder.terms, ["Cherith", "Nyiragongo"])
+        }
+    }
+
+    /// The clip's language also decides the capital rule, through the run a capitalised known
+    /// word witnesses. Mutation: hardcode `capitalMarksNames` true and the German row delivers
+    /// "Thier"; hardcode it false and the English row delivers nothing — one of them reddens.
+    func testTheClipsLanguageDecidesTheCapitalRule() async throws {
+        try await withSpelling({ _ in
+            DictionaryCandidates.Spelling(knows: { $0.lowercased() == "parakeet" },
+                                          correctsTypo: { $0.lowercased() == "thier" })
+        }) {
+            CoreTestEnvironment.preferences.selectedEngine = "fluidaudio"
+
+            let english = TermStub()
+            _ = try await service(english).transcribeAudio(
+                url: Fixtures.jfkWav, settings: settings(fieldContext: true, language: "en"),
+                capturedFieldText: "Thier Parakeet")
+            XCTAssertEqual(english.recorder.terms, ["Thier"])
+
+            let german = TermStub()
+            _ = try await service(german).transcribeAudio(
+                url: Fixtures.jfkWav, settings: settings(fieldContext: true, language: "de"),
+                capturedFieldText: "Thier Parakeet")
+            XCTAssertNil(german.recorder.terms,
+                         "the German capital rule did not refuse the sentence-start typo")
+            XCTAssertEqual(german.recorder.plainCalls, 1)
+        }
+    }
+
+    // MARK: - The resolution taken before the engine gate
+
+    /// A resolution answers only for the engine it was decided on: a non-nil value survives a
+    /// reload by conformance, and a nil survives only on the same instance — "nothing for
+    /// Parakeet" is not "nothing for Whisper", which would be handed the prose.
+    /// Mutation: return true unconditionally and the cross-engine rows redden; return false
+    /// unconditionally and the same-instance and non-nil rows redden.
+    func testAResolutionIsReusedOnlyOnTheEngineItAnswersFor() {
+        let prose = ProseStub()
+        let otherProse = ProseStub()
+        let terms = TermStub()
+        let plain = StubEngine()
+
+        XCTAssertFalse(FieldContextResolution.notResolved.reusable(on: prose))
+        XCTAssertNil(FieldContextResolution.notResolved.value)
+
+        let proseValue = FieldContextResolution.resolved(.prose("text"), on: plain)
+        XCTAssertTrue(proseValue.reusable(on: prose), "a non-nil value survives by conformance")
+        XCTAssertTrue(proseValue.reusable(on: otherProse))
+        XCTAssertFalse(proseValue.reusable(on: terms))
+        XCTAssertFalse(proseValue.reusable(on: plain))
+
+        let termValue = FieldContextResolution.resolved(.terms(["Cherith"]), on: prose)
+        XCTAssertTrue(termValue.reusable(on: terms))
+        XCTAssertFalse(termValue.reusable(on: prose))
+
+        let emptyOnProse = FieldContextResolution.resolved(nil, on: prose)
+        XCTAssertTrue(emptyOnProse.reusable(on: prose), "the same engine may reuse its own nil")
+        XCTAssertFalse(emptyOnProse.reusable(on: otherProse),
+                       "a nil decided for one engine is not a nil for another")
+        XCTAssertNil(emptyOnProse.value)
+    }
+
+    /// The pre-gate path, through the service: the second transcription of an already-loaded
+    /// engine resolves before the engine gate and reuses that resolution, so two clips ask the
+    /// provider twice, not three times. Mutation: make `reusable(on:)` always false and the
+    /// second count is three — red. The first call cannot take the path (nothing is loaded yet).
+    func testThePreGateResolutionIsReusedAcrossTwoTranscriptions() async throws {
+        let calls = ProviderCalls()
+        try await withSpelling({ _ in
+            calls.record()
+            return DictionaryCandidates.Spelling(knows: { $0.lowercased() == "cherith" },
+                                                 correctsTypo: { _ in false })
+        }) {
+            CoreTestEnvironment.preferences.selectedEngine = "fluidaudio"
+            let engine = TermStub()
+            let service = self.service(engine)
+
+            _ = try await service.transcribeAudio(
+                url: Fixtures.jfkWav, settings: settings(fieldContext: true),
+                capturedFieldText: "Cherith met Nyiragongo")
+            XCTAssertEqual(calls.total, 1, "the first clip resolves once, after the engine loads")
+
+            _ = try await service.transcribeAudio(
+                url: Fixtures.jfkWav, settings: settings(fieldContext: true),
+                capturedFieldText: "Cherith met Nyiragongo")
+            XCTAssertEqual(calls.total, 2,
+                           "the second clip resolved before the gate and was not resolved again")
+            XCTAssertEqual(engine.recorder.terms, ["Nyiragongo"])
+        }
+    }
+}
+
+/// Counts provider asks from the `@Sendable` closure. A reference type with a lock, so the
+/// closure can capture it without a shared-mutable-state warning.
+private final class ProviderCalls: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var total: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func record() {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
     }
 }

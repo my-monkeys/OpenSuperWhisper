@@ -52,17 +52,19 @@ final class SecureFieldGuardTests: XCTestCase {
         XCTAssertTrue(SecureTextFields.isSecure(kAXSearchFieldSubrole as String, error: .cannotComplete))
     }
 
-    /// Every remaining error is an unanswered question too — a dead element, a disabled API, a
-    /// call the app did not implement. A sweep rather than one row, so a new error code cannot
-    /// slip into a default that reads as "not secure".
+    /// Every remaining non-success error is an unanswered question too — a dead element, a
+    /// disabled API, a call the app did not implement, a notification question, or an answer too
+    /// imprecise to use. A sweep rather than one row, so a new error code cannot slip into a
+    /// default that reads as "not secure".
     ///
-    /// Mutation: return false where the predicate refuses, and every row here reddens while the
-    /// rows above stay green.
+    /// Mutation: return false where the predicate refuses, and every row here reddens — as do
+    /// the `cannotComplete` rows above, which refuse for the same reason.
     func testEveryOtherErrorRefuses() {
         let unanswered: [AXError] = [
             .failure, .illegalArgument, .invalidUIElement, .invalidUIElementObserver,
-            .actionUnsupported, .notImplemented, .apiDisabled,
-            .parameterizedAttributeUnsupported,
+            .actionUnsupported, .notificationUnsupported, .notImplemented,
+            .notificationAlreadyRegistered, .notificationNotRegistered, .apiDisabled,
+            .parameterizedAttributeUnsupported, .notEnoughPrecision,
         ]
         for error in unanswered {
             XCTAssertTrue(SecureTextFields.isSecure(nil, error: error), "\(error)")

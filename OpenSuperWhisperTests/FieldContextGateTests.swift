@@ -52,30 +52,33 @@ final class FieldContextGateTests: XCTestCase {
         XCTAssertTrue(RecordingContext.wantsFieldText(enabled: true, engine: "fluidaudio"))
     }
 
-    /// The gate and the capability table can never disagree, for any engine id the build knows.
-    /// A new engine that joins `allEngineIds` is covered without touching this file.
-    func testTheGateAgreesWithTheCapabilityForEveryEngine() {
-        for id in EngineCapabilities.allEngineIds {
-            XCTAssertEqual(RecordingContext.wantsFieldText(enabled: true, engine: id),
-                           EngineCapabilities.supportsFieldContext(engine: id), id)
+    /// The gate's answer per engine, as literals rather than as a re-derivation of its own
+    /// implementation. Mutation: `||` instead of `&&`, a special case for remote, or a dropped
+    /// conjunct changes one of these answers and reddens here. (An engine id the table does not
+    /// know is refused, which is what keeps a new id from opening the gate by accident.)
+    func testTheGateAnswersFromItsOwnRuleForEveryKnownEngine() {
+        let expected: [String: Bool] = ["whisper": true, "fluidaudio": true,
+                                        "remote": false, "apple": false, "sensevoice": false,
+                                        "groq": false, "": false]
+        for (engine, answer) in expected {
+            XCTAssertEqual(RecordingContext.wantsFieldText(enabled: true, engine: engine),
+                           answer, engine)
+            XCTAssertFalse(RecordingContext.wantsFieldText(enabled: false, engine: engine), engine)
         }
     }
 
     // MARK: - The Settings switch
 
-    /// The switch is offered exactly where the selected engine can use the text. Mutation:
-    /// return true unconditionally and the three incapable engines redden.
+    /// The switch is offered exactly where the selected engine can use the text, as literals.
+    /// Mutation: return true unconditionally and the three incapable engines redden; mark remote
+    /// capable and the remote row reddens.
     ///
     /// This is the layer the review found uncovered: `supportsFieldContext` was tested, the
-    /// property the UI actually disables the row with was not.
+    /// property the UI actually disables the row with was not. The expectations are hardcoded on
+    /// purpose — a loop comparing the property to the capability table would be the same
+    /// expression twice and could never fail.
     func testTheSettingsSwitchIsOfferedOnlyForCapableEngines() {
         let viewModel = SettingsViewModel()
-
-        for id in EngineCapabilities.allEngineIds {
-            viewModel.selectedEngine = id
-            XCTAssertEqual(viewModel.canUseFieldContext,
-                           EngineCapabilities.supportsFieldContext(engine: id), id)
-        }
 
         viewModel.selectedEngine = "whisper"
         XCTAssertTrue(viewModel.canUseFieldContext)
@@ -121,7 +124,10 @@ final class FieldContextGateTests: XCTestCase {
     }
 
     /// The switch's conjunct, behaviourally. Mutation: drop `enabled` from `wantsFieldText` and
-    /// the field is read with the setting off.
+    /// the first assertion reddens.
+    ///
+    /// The positive control is inside the row: the same seam must read once the switch is on, or
+    /// the negative half would pass equally with a reader that was never wired up.
     func testTheFieldIsNotReadWithTheSwitchOff() {
         let prefs = AppPreferences.shared
         let context = RecordingContext.shared
@@ -135,5 +141,32 @@ final class FieldContextGateTests: XCTestCase {
 
         XCTAssertEqual(reads, 0)
         XCTAssertNil(context.focusedText)
+
+        prefs.useSurroundingTextAsContext = true
+        context.captureFocusedText()
+        XCTAssertEqual(reads, 1, "the reader was never called: the negative case above is vacuous")
+    }
+
+    /// F4: opening the status-bar menu mid-recording refreshes the app fields and must leave the
+    /// text the recording captured alone. `captureFrontmost(forRecording: false)` is the only
+    /// caller that needs the app without the field, and `update` deliberately has no parameter
+    /// for the text.
+    ///
+    /// Mutation: assign `focusedText = nil` in `captureFrontmost` (or in its
+    /// `forRecording: false` branch) and the second assertion reddens — the clip would then be
+    /// transcribed with no field context, which is F4 with a new mechanism.
+    func testTheMenuPathLeavesTheRecordedFieldTextAlone() {
+        let prefs = AppPreferences.shared
+        let context = RecordingContext.shared
+        prefs.useSurroundingTextAsContext = true
+        prefs.selectedEngine = "whisper"
+        context.focusedTextReader = { "a private sentence" }
+        context.captureFocusedText()
+        XCTAssertEqual(context.focusedText, "a private sentence", "the record-start read failed")
+
+        context.captureFrontmost(forRecording: false)
+
+        XCTAssertEqual(context.focusedText, "a private sentence",
+                       "the menu path erased the field text the recording captured")
     }
 }

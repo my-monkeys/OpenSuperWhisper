@@ -26,6 +26,11 @@ final class FieldContextCapabilityTests: CoreTestCase {
             case .remoteExcluded:
                 XCTAssertEqual(id, "remote")
             case .none:
+                // Apple is `.none` because `AnalysisContext.contextualStrings` is documented for
+                // `DictationTranscriber`, not the `SpeechTranscriber` module this app runs: using
+                // it would be a module swap with different models, presets and locale coverage,
+                // with no instrument to detect a quality change. Revisit only if the app adopts
+                // `DictationTranscriber`, and change this row with it.
                 XCTAssertTrue(["apple", "sensevoice"].contains(id), id)
             }
         }
@@ -55,6 +60,8 @@ final class FieldContextCapabilityTests: CoreTestCase {
     }
 
     /// The gate the app actually calls, checked against the mode it is derived from, per engine.
+    /// Mutation: derive it as `fieldContextMode(for:) != .none` and the remote row reddens —
+    /// `.remoteExcluded` is not `.none`, which is the whole reason the case exists.
     func testSupportsFieldContextAgreesWithTheMode() {
         for id in EngineCapabilities.allEngineIds {
             XCTAssertEqual(EngineCapabilities.supportsFieldContext(engine: id),
