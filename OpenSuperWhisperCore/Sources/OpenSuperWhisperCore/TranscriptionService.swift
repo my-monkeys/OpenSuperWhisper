@@ -298,10 +298,17 @@ public class TranscriptionService: ObservableObject {
         // already loaded. The spelling pass is synchronous main-thread work, and holding the
         // process-wide permit through it delays whatever dictation is queued behind this one.
         //
-        // Only when no per-call model swap can change the engine, and an engine of the selected
-        // kind is already loaded — the two conditions under which `ensureEngineLoaded` below
-        // returns this same instance. Every other path resolves after selection, as it did.
-        let readyContext: FieldContext? = modelOverride == nil
+        // Two conditions, both needed: the per-call override leaves the loaded engine in place —
+        // nil, or the engine+identifier pair `applyOneOffModel` treats as a no-op, which is what
+        // the dictation path normally passes — and an engine of the selected kind is already
+        // loaded. Those are the conditions under which `ensureEngineLoaded` below returns this
+        // same instance. A real model swap reloads inside the gate, so it still resolves after
+        // selection; a value that goes stale anyway is discarded by `FieldContext.matches`.
+        let overrideKeepsEngine = modelOverride.map { option in
+            let active = ModelCatalog.activeOption()
+            return active?.engine == option.engine && active?.identifier == option.identifier
+        } ?? true
+        let readyContext: FieldContext? = overrideKeepsEngine
             && loadedEngineKind == CoreAccess.preferences.selectedEngine
             ? currentEngine.flatMap {
                 resolveFieldContext(capturedFieldText, for: $0, settings: settings)
@@ -438,55 +445,6 @@ public class TranscriptionService: ObservableObject {
                                         capturedFieldText: capturedFieldText,
                                         preResolvedContext: nil)
         }
-    }
-
-    /// The language the spelling dictionary should judge the field's words in, or nil for "the
-    /// user's own languages".
-    ///
-    /// The clip's language, not the app's preference: a dictation transcribed in French must not
-    /// have its field checked against whichever language happened to be selected earlier.
-    ///
-    /// "auto" maps to nil, because it is not a language a dictionary can look a word up in — the
-    /// engine detects it from audio that had not been spoken when this text was written. Nil asks
-    /// the dictionary for the user's preferred languages, which is what the old preference-read
-    /// path did whenever the preference was "auto", and is the only honest answer available.
-    ///
-    /// The keyboard-layout selection code never reaches here: `DictationPipeline.process`
-    /// resolves it into a concrete language before these settings are built.
-    nonisolated static func spellingLanguage(for selectedLanguage: String) -> String? {
-        selectedLanguage == "auto" ? nil : selectedLanguage
-    }
-
-    /// What this engine is allowed to see of the field, or nil when it is allowed nothing.
-    ///
-    /// The two gates are deliberate: the preference (the user asked) and the conformance (this
-    /// engine has somewhere to put it). Neither alone is a reason to hand over someone's
-    /// document. A non-conforming engine reaches the `nil` return and is then called with the
-    /// plain `transcribeAudio(url:settings:)` — the argument is never passed, which is the
-    /// defensive strip in its only honest form.
-    private func resolveFieldContext(_ text: String?, for engine: TranscriptionEngine,
-                                     settings: TranscriptionSettings) -> FieldContext? {
-        guard let text = TranscriptionPrompt.surroundingText(
-            enabled: settings.useSurroundingTextAsContext, captured: text) else { return nil }
-
-        // The mode, not only the conformance. The capture gate already refused to read the field
-        // for an engine that cannot use it, but that is one layer, and the layer that is easy to
-        // bypass — a test stub, a future engine, a fallback path. Checking the selected id here
-        // means a conforming engine selected as `remote` still receives nothing, so the refusal
-        // holds even when the gate did not run.
-        guard EngineCapabilities.supportsFieldContext(engine: CoreAccess.preferences.selectedEngine)
-        else { return nil }
-
-        if engine is ProseContextEngine { return .prose(text) }
-        // The spelling pass runs only here: a prose engine returned above, and an engine with
-        // nowhere to put a term list returns below without one.
-        guard engine is TermContextEngine else { return nil }
-        let terms = FieldContextTerms.terms(
-            from: text,
-            spelling: CoreAccess.fieldTermSpelling(
-                Self.spellingLanguage(for: settings.selectedLanguage)),
-            capitalMarksNames: LanguageUtil.marksNamesWithCapitals(settings.selectedLanguage))
-        return terms.isEmpty ? nil : .terms(terms)
     }
 
     /// Dispatch one transcription, passing the field context only to an engine that declared it
