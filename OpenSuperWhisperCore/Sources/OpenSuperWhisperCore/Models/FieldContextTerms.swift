@@ -23,41 +23,56 @@ public enum FieldContextTerms {
                              limit: Int = 10) -> [String] {
         guard !text.isEmpty, limit > 0 else { return [] }
 
-        let words = words(in: text)
+        let memoisedSpelling = memoised(spelling)
+        let tokens = words(in: text)
         var seen = Set<String>()
         var result: [String] = []
 
         var index = 0
-        while index < words.count {
+        while index < tokens.count {
             var consumed = 1
             // Longest run first: "Claude Code" is one name, not two words.
-            for length in stride(from: min(3, words.count - index), through: 1, by: -1) {
-                let run = Array(words[index..<(index + length)])
-                // The flag decides two different things, and only one of them is the word we
-                // emit. `term(from:)` also asks `isVocabulary` whether *any* word in the run is
-                // evidence, and the flag changes that answer for a capitalised word whose
-                // as-written form the dictionary knows. The guard below drops most such words
-                // from the output — but a run they admitted still emits the words that survive,
-                // so the flag reaches the answer through candidacy even when the word that
-                // admitted it is dropped.
+            for length in stride(from: min(3, tokens.count - index), through: 1, by: -1) {
+                let slice = tokens[index..<(index + length)]
+
+                // A run cannot continue past punctuation the tokeniser trimmed from a word's
+                // end: "Cherith, Nyiragongo" is two names, not one. Only a trailing trim counts,
+                // so "(Nyiragongo Cherith" keeps its leading bracket and is still one name.
+                guard !slice.dropLast().contains(where: { $0.endsRun }) else { continue }
                 // A run cannot cross a sentence end. "Cherith. Nyiragongo" is two names in two
                 // sentences, not one name of two words — joining them would put a term in the
                 // vocabulary that the user never wrote, and consume the second name doing it.
-                guard !run.dropFirst().contains(where: { $0.startsSentence }),
-                      run.allSatisfy({ admitsToRun($0.text) }),
+                // The flag is computed from the previous raw word plus the gap, so a line break
+                // counts.
+                guard !slice.dropFirst().contains(where: { $0.startsSentence }) else { continue }
+
+                let run = slice.map {
+                    CorrectionDiff.Word($0.text, startsSentence: $0.startsSentence)
+                }
+                // The flag decides what `isVocabulary` answers for the words inside a run, but
+                // not what this reducer emits: a word admitted only because the flag lets a
+                // dictionary-known capital count is exactly the word `survivesFieldGuard` drops,
+                // and every word that survives is vocabulary on its own. Fusion is the only shape
+                // the flag's reach can still take; the strong-shape recall it now costs is stated
+                // in `survivesFieldGuard`.
+                guard run.allSatisfy({ admitsToRun($0.text) }),
                       let candidate = DictionaryCandidates.term(
-                          from: run, spelling: spelling, capitalMarksNames: capitalMarksNames)
+                          from: run, spelling: memoisedSpelling,
+                          capitalMarksNames: capitalMarksNames)
                 else { continue }
 
-                // The guard is per word, so "Code" falls out of "Claude Code" and "Claude"
-                // stays. A run with no survivors falls through to a shorter one rather than
-                // consuming words that might each stand on their own.
-                let survivors = candidate.split(separator: " ")
-                    .map(String.init)
-                    .filter { survivesFieldGuard($0, spelling: spelling) }
-                guard !survivors.isEmpty else { continue }
+                // A run emits only a contiguous slice of its survivors. "Code" falls out of
+                // "Claude Code" and "Claude" stays, but a word dropped from the middle separates
+                // two names instead of letting the reducer invent the pair: "Cherith Bay
+                // Nyiragongo" is "Cherith" and "Nyiragongo", never "Cherith Nyiragongo".
+                let candidateWords = candidate.split(separator: " ").map(String.init)
+                let kept = candidateWords.map { survivesFieldGuard($0, spelling: memoisedSpelling) }
+                guard let first = kept.firstIndex(of: true),
+                      let last = kept.lastIndex(of: true),
+                      kept[first...last].allSatisfy({ $0 })
+                else { continue }
 
-                let term = survivors.joined(separator: " ")
+                let term = candidateWords[first...last].joined(separator: " ")
                 if seen.insert(term.lowercased()).inserted {
                     result.append(term)
                     if result.count == limit { return result }
@@ -77,9 +92,14 @@ public enum FieldContextTerms {
     /// prose is much weaker evidence, and a wrong term is not a suggestion — it changes what the
     /// engine hears, including words the user never said.
     ///
-    /// - A word that does not start with a capital or a digit is dropped, unless its shape is
-    ///   evidence on its own ("iOS", "eBay"): in someone's own prose a lowercase unknown is as
-    ///   likely a typo as jargon, but a lowercase-initial name with an inner capital is a name.
+    /// - A strong shape is evidence only while the spelling dictionary does not already know the
+    ///   word as written ("iOS", "eBay", "GPT4"). This is what stops "PDF" and "USA" being
+    ///   boosted next to a real name. It costs recall for acronyms and brands the OS dictionary
+    ///   spells — those stop being boosted — but the engine already writes those words, and the
+    ///   user's dictionary is the escape hatch for the rest.
+    /// - A word that does not start with a capital or a digit is dropped unless its shape is
+    ///   evidence on its own: in someone's own prose a lowercase unknown is as likely a typo as
+    ///   jargon, but a lowercase-initial name with an inner capital is a name.
     /// - A capitalised word with no strong shape survives only when its lowercase form is
     ///   unknown. "Cherith" stays; "Parakeet" — and "Maxim" — do not. `isVocabulary` deliberately
     ///   keeps the latter, and that stays right for a dictionary suggestion. This is also what
@@ -87,12 +107,10 @@ public enum FieldContextTerms {
     ///   known word in lowercase, so its capital buys it nothing here.
     private static func survivesFieldGuard(_ word: String,
                                            spelling: DictionaryCandidates.Spelling) -> Bool {
-        // Shape is evidence on its own, whatever the first character is: "iOS", "macOS" and
-        // "eBay" carry an inner capital and are exactly the product names this exists for. This
-        // is the only door open to a lowercase-initial word. The other one stays shut — a
-        // lowercase word with no shape is still dropped, because in someone's prose it is as
-        // likely a typo as jargon.
-        if DictionaryCandidates.hasStrongShape(word) { return true }
+        // Shape is evidence only while the dictionary does not already know the word: "PDF" and
+        // "USA" are spelled right already, so boosting them only makes a near neighbour likelier
+        // to be rewritten. Asked as written, the way `isVocabulary` asks about a strong shape.
+        if DictionaryCandidates.hasStrongShape(word) { return !spelling.knows(word) }
         guard startsName(word) else { return false }
         return !spelling.knows(word.lowercased())
     }
@@ -110,29 +128,98 @@ public enum FieldContextTerms {
 
     // MARK: - Tokenising
 
+    /// One word of the field, with the two boundary facts a run needs.
+    private struct Token {
+        let text: String
+        /// First word of a sentence, where a capital is grammar rather than spelling.
+        let startsSentence: Bool
+        /// Punctuation was trimmed from this word's end, so nothing after it belongs to the same
+        /// run. A trim at the front does not count: "(Nyiragongo Cherith" is one name.
+        var endsRun: Bool
+    }
+
     /// The words of the field's text, each with whether a sentence starts at it.
     ///
-    /// Connecting punctuation is trimmed from both ends — a name followed by a comma is the same
-    /// name — but `@`, `#`, `_`, `-` and `/` are left alone, because they are what tells
-    /// `DictionaryCandidates` a token is a handle, a flag or a path rather than a word.
+    /// The trimming is `CorrectionDiff.core(of:)` — the rule the correction watch already uses,
+    /// so the two cannot disagree about where a word ends. `@`, `#`, `&` and `_` survive it,
+    /// which is what tells `DictionaryCandidates` a token is a handle, a flag or a path rather
+    /// than a word.
     ///
-    /// The flag matters because a capital at a sentence start is grammar, not spelling, and the
-    /// heuristic treats it that way. Over-marking a sentence start makes the reducer more
-    /// conservative, never less.
-    private static func words(in text: String) -> [CorrectionDiff.Word] {
-        var result: [CorrectionDiff.Word] = []
-        var startsSentence = true
-        for raw in text.split(whereSeparator: \.isWhitespace) {
-            let trimmed = String(raw).trimmingCharacters(in: edgePunctuation)
-            guard !trimmed.isEmpty else { continue }
-            result.append(CorrectionDiff.Word(trimmed, startsSentence: startsSentence))
-            // A closing quote after the full stop does not stop it ending the sentence.
-            let terminator = raw.reversed().first { !"\"')]}”’".contains($0) }
-            startsSentence = terminator.map { ".!?".contains($0) } ?? false
+    /// The sentence flag is `CorrectionDiff.endsSentence(previousRaw + gap)`, gap included. The
+    /// whitespace split loses a line break, and a line break ends a run; passing only the
+    /// previous word would make one-name-per-line lists fuse.
+    private static func words(in text: String) -> [Token] {
+        var result: [Token] = []
+        var raw = ""
+        /// The whitespace between the previous word and `raw`.
+        var gap = ""
+        var previousRaw: String?
+
+        func flush() {
+            guard !raw.isEmpty else { return }
+            let core = CorrectionDiff.core(of: raw)
+            if core.isEmpty {
+                // A token that is nothing but punctuation ("—", "…", ",,") separates the words
+                // on either side, and a sentence mark among it still ends a sentence for the
+                // word after it.
+                if !result.isEmpty { result[result.count - 1].endsRun = true }
+                previousRaw = raw
+            } else {
+                // The first word starts a sentence; after it the previous raw word plus the gap
+                // decide, so a line break the whitespace split discards still counts.
+                let startsSentence: Bool
+                if result.isEmpty {
+                    startsSentence = true
+                } else {
+                    startsSentence = CorrectionDiff.endsSentence((previousRaw ?? "") + gap)
+                }
+                result.append(Token(text: core, startsSentence: startsSentence,
+                                    endsRun: !raw.hasSuffix(core)))
+                previousRaw = raw
+            }
+            raw = ""
         }
+
+        for character in text {
+            if character.isWhitespace {
+                if raw.isEmpty {
+                    gap.append(character)
+                } else {
+                    flush()
+                    gap = String(character)
+                }
+            } else {
+                raw.append(character)
+            }
+        }
+        flush()
         return result
     }
 
-    private static let edgePunctuation =
-        CharacterSet(charactersIn: ".,;:!?\"'`()[]{}<>«»„“”‘’…—–")
+    // MARK: - Spelling lookups
+
+    /// One spelling dictionary for one reduction, asking the injected `knows` at most once per
+    /// distinct form.
+    ///
+    /// The reducer offers a word as the start of up to three runs and `isVocabulary` asks about
+    /// it again inside each; a 48-word title-case field made 562 lookups. The cache lives for one
+    /// call and is never shared, so `Spelling`'s single-caller contract still holds.
+    private static func memoised(_ spelling: DictionaryCandidates.Spelling)
+        -> DictionaryCandidates.Spelling {
+        let cache = KnownWords()
+        return DictionaryCandidates.Spelling(
+            knows: { cache.answer(for: $0, spelling: spelling) },
+            correctsTypo: spelling.correctsTypo)
+    }
+
+    private final class KnownWords {
+        private var answers: [String: Bool] = [:]
+
+        func answer(for word: String, spelling: DictionaryCandidates.Spelling) -> Bool {
+            if let known = answers[word] { return known }
+            let answer = spelling.knows(word)
+            answers[word] = answer
+            return answer
+        }
+    }
 }

@@ -10,7 +10,7 @@ final class FieldContextTermsTests: CoreTestCase {
     private static let known: Set<String> = [
         "the", "and", "is", "here", "met", "at", "about", "it", "run", "now", "call", "then",
         "again", "went", "sang", "repos", "code", "maxim", "parakeet", "charity", "bunny",
-        "monday", "paris", "github",
+        "monday", "paris", "github", "bay", "pdf", "usa",
         "der", "mann", "ging", "zu", "hello", "there",
     ]
 
@@ -20,10 +20,11 @@ final class FieldContextTermsTests: CoreTestCase {
 
     /// The same dictionary, with "github" unknown.
     ///
-    /// `isVocabulary` answers `!known` for an inner-capital word, so a dictionary that knows
-    /// "github" makes "GitHub" invisible on its own. The candidacy row needs exactly that, and
-    /// `testStrongShapesSurvive` needs the opposite — one word, two rows, two stub answers. Each
-    /// row keeps its own assertion rather than either being weakened to fit a shared stub.
+    /// The shared stub knows "github", so "GitHub" is dropped by the strong-shape rule; only a
+    /// dictionary that does not know it lets the shape argument be tested at all. One word, two
+    /// rows, two stub answers: `testStrongShapesSurvive` needs this one, and
+    /// `testStrongShapesTheDictionaryKnowsAreDropped` pins the other. Each row keeps its own
+    /// assertion rather than either being weakened to fit a shared stub.
     private let spellingWithoutGitHub = DictionaryCandidates.Spelling(
         knows: { $0.lowercased() != "github" && FieldContextTermsTests.known.contains($0.lowercased()) },
         correctsTypo: { _ in false })
@@ -87,6 +88,18 @@ final class FieldContextTermsTests: CoreTestCase {
                        ["GitHub", "OSW", "GPT4"])
     }
 
+    /// The dictionary's own words are not boosted, even with a strong shape and even beside a
+    /// real name — the reported "PDF"/"USA" over-boost.
+    ///
+    /// The cost, stated: an acronym or brand the OS dictionary knows as written loses its boost
+    /// ("GitHub" here; "iOS" on a machine whose dictionary knows it). The model already spells
+    /// those words, and the user's dictionary is the escape hatch for the rest.
+    func testStrongShapesTheDictionaryKnowsAreDropped() {
+        XCTAssertEqual(terms("the PDF Cherith wrote"), ["Cherith"])
+        XCTAssertEqual(terms("the USA Nyiragongo wrote"), ["Nyiragongo"])
+        XCTAssertEqual(terms("the GitHub Cherith wrote"), ["Cherith"])
+    }
+
     /// Lowercase unknown words are as likely a typo as jargon, so the field path does not boost
     /// them — unlike the dictionary-suggestion path, which follows a correction the user made.
     func testLowercaseUnknownIsNotATerm() {
@@ -108,6 +121,50 @@ final class FieldContextTermsTests: CoreTestCase {
                        ["Cherith", "Nyiragongo"])
     }
 
+    // MARK: - What ends a run
+    //
+    // Mutations these rows pin, each measured against a model of the reducer: drop the `endsRun`
+    // barrier and the comma row fuses to "Cherith Nyiragongo Sintra" and the semicolon row to
+    // "Cherith Nyiragongo"; drop the `startsSentence` check (or the gap from the flag) and the
+    // one-per-line row fuses; revert to the old private tokenizer — no barrier and `. ! ?` as
+    // the only sentence marks — and the ellipsis/CJK row fuses; replace the contiguous survivor
+    // slice with "join every survivor" and the dropped-middle-word row emits "Cherith
+    // Nyiragongo"; return `true` for a strong shape before asking the dictionary and the PDF/USA
+    // row emits "PDF Cherith"; drop the memo and the lookup-count row goes from 3 to 36.
+
+    /// A comma separates list items. The old tokenizer trimmed the comma and fused them.
+    func testCommasSeparateNames() {
+        XCTAssertEqual(terms("Cherith, Nyiragongo, Sintra"),
+                       ["Cherith", "Nyiragongo", "Sintra"])
+    }
+
+    /// A semicolon or a colon separates just as a comma does.
+    func testSemicolonsAndColonsSeparateNames() {
+        XCTAssertEqual(terms("Cherith; Nyiragongo: Sintra"),
+                       ["Cherith", "Nyiragongo", "Sintra"])
+    }
+
+    /// One name per line. The line break lives in the gap between tokens, which the whitespace
+    /// split discards; the sentence flag has to see it or the lines fuse.
+    func testLineBreaksSeparateNames() {
+        XCTAssertEqual(terms("Cherith\nNyiragongo\nSintra"),
+                       ["Cherith", "Nyiragongo", "Sintra"])
+    }
+
+    /// Sentence marks the private tokenizer did not know. Both are punctuation the shared
+    /// `CorrectionDiff` already understands.
+    func testEllipsisAndCJKFullStopEndRuns() {
+        XCTAssertEqual(terms("Cherith… Nyiragongo。 Sintra"),
+                       ["Cherith", "Nyiragongo", "Sintra"])
+    }
+
+    /// Only punctuation trimmed from a word's END is a barrier. A bracket or a quote in front of
+    /// a name is punctuation of the sentence, not a separator inside it.
+    func testLeadingPunctuationDoesNotBreakARun() {
+        XCTAssertEqual(terms("(Nyiragongo Cherith) wrote"), ["Nyiragongo Cherith"])
+        XCTAssertEqual(terms("\"Nyiragongo Cherith\" wrote"), ["Nyiragongo Cherith"])
+    }
+
     func testCyrillicKeepsItsShape() {
         XCTAssertEqual(terms("Привет мир"), ["Привет"])
     }
@@ -124,6 +181,15 @@ final class FieldContextTermsTests: CoreTestCase {
     /// per-word extraction: per-word extraction would give two terms instead of one.
     func testAMultiWordNameKeepsWordsThatSurvive() {
         XCTAssertEqual(terms("Nyiragongo Cherith wrote"), ["Nyiragongo Cherith"])
+    }
+
+    /// A word dropped from the middle ends the run. Joining across it would invent "Cherith
+    /// Nyiragongo", a term the user never wrote, and swallow the second name doing it.
+    ///
+    /// "Bay" is dictionary-known, which is the evidence that drops it.
+    func testADroppedMiddleWordEndsTheRun() {
+        XCTAssertEqual(terms("Cherith Bay Nyiragongo wrote"),
+                       ["Cherith", "Nyiragongo"])
     }
 
     // MARK: - Order, dedupe and the cap
@@ -174,16 +240,40 @@ final class FieldContextTermsTests: CoreTestCase {
         XCTAssertEqual(terms("Der Mann ging zu Cherith", capitalMarksNames: false), ["Cherith"])
     }
 
-    /// The flag is load-bearing through run candidacy, not through the word it emits.
+    /// The flag no longer changes what the reducer emits.
     ///
-    /// "Mann" is a known word, so the guard drops it whichever way the flag is set. But with the
-    /// flag on it also satisfies `isVocabulary` for the run "Der Mann GitHub", and the run's
-    /// survivor is "GitHub" — known as written, so `isVocabulary` never counts it alone, but a
-    /// strong shape, so the guard keeps it. With the flag off nothing witnesses the run and
-    /// "GitHub" is never reached: a single word is only ever emitted if it is vocabulary by
-    /// itself.
-    func testCapitalMarksNamesDecidesWhetherARunIsWitnessed() {
-        XCTAssertEqual(terms("Der Mann GitHub ging", capitalMarksNames: true), ["GitHub"])
-        XCTAssertEqual(terms("Der Mann GitHub ging", capitalMarksNames: false), [])
+    /// Its old row relied on "GitHub" being known as written: the run "Der Mann GitHub" was
+    /// witnessed only by the flag's known-capital branch. Strong shapes are now held to the
+    /// dictionary as well, so that witness is dropped by the guard, and every word that survives
+    /// is vocabulary on its own. Fusion is what remains: two adjacent survivors become one term
+    /// under either flag setting. (The witness path is unreachable with the `correctsTypo: false`
+    /// stub, so no row can pin it; the recall the strong-shape rule costs is stated in
+    /// `testStrongShapesTheDictionaryKnowsAreDropped`.)
+    func testCapitalMarksNamesNoLongerChangesWhatSurvives() {
+        XCTAssertEqual(terms("Sintra Dunlap wrote"), ["Sintra Dunlap"])
+        XCTAssertEqual(terms("Sintra Dunlap wrote", capitalMarksNames: false), ["Sintra Dunlap"])
+    }
+
+    // MARK: - Lookup cost
+
+    /// One lookup per distinct form, not one per run a word could start.
+    ///
+    /// This text offers each name as the start of up to three runs, and `isVocabulary` asks
+    /// again inside each: the memo answers 3 lookups where the same text without it asks 36.
+    /// The bound leaves room for a form asked in both cases without letting the memo disappear.
+    func testSpellingIsAskedOncePerDistinctForm() {
+        var asked: [String] = []
+        let counting = DictionaryCandidates.Spelling(
+            knows: { word in
+                asked.append(word)
+                return FieldContextTermsTests.known.contains(word.lowercased())
+            },
+            correctsTypo: { _ in false })
+        let text = Array(repeating: "Nyiragongo Cherith", count: 12).joined(separator: " and ")
+
+        XCTAssertEqual(FieldContextTerms.terms(from: text, spelling: counting,
+                                               capitalMarksNames: true),
+                       ["Nyiragongo Cherith"])
+        XCTAssertLessThanOrEqual(asked.count, 8, "spelling asked \(asked.count) times: \(asked)")
     }
 }
