@@ -301,6 +301,10 @@ jobs:
   parakeet-overboost:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: macos-26
+    # Nothing here writes to the repository: it checks out, caches build output and uploads a
+    # report. Declared so the checkout token is not left with the default write scopes.
+    permissions:
+      contents: read
     timeout-minutes: 120
     steps:
       # The setup below mirrors `core-tests`: the benchmark builds against the same native
@@ -391,15 +395,59 @@ jobs:
           with open("bench.json", encoding="utf-8") as handle:
               report = json.load(handle)
 
-          none = report["none"]["baits"]
-          terms = report["terms"]["baits"]
+          ARMS = [
+              ("none", "no terms"),
+              ("terms", "terms (snippet triggers)"),
+              ("inert", "inert (decode-path control)"),
+              ("field", "field (reducer output)"),
+          ]
+          missing = [key for key, _ in ARMS if key not in report]
+          if missing:
+              sys.exit(f"bench.json is missing arm(s) {missing}: it was written by an older "
+                       "benchmark, so the arm comparison would be vacuous")
+          if not all(report[key].get("clips") for key, _ in ARMS):
+              sys.exit("an arm carries no clip rows: the transcript comparison would be vacuous")
+          absent = [key for key, _ in ARMS if "transcriptDiffs" not in report[key]]
+          if absent:
+              sys.exit(f"arm(s) {absent} carry no transcriptDiffs: written by an older benchmark, "
+                       "so the decode-path indicator would be vacuous")
+
+          baits = {key: report[key]["baits"] for key, _ in ARMS}
           lines = [
               "### Parakeet over-boost benchmark (synthetic clips)",
               "",
-              "| arm | bait replacements | WER |",
+              "| arm | false replacements (shared list) | WER |",
               "|---|---|---|",
-              f"| no terms | {none} | {report['none']['wer']:.3f} |",
-              f"| terms | {terms} | {report['terms']['wer']:.3f} |",
+          ]
+          lines += [f"| {label} | {baits[key]} | {report[key]['wer']:.3f} |" for key, label in ARMS]
+
+          # The inert arm isolates the decode path a non-empty term list selects: it boosts a term
+          # no clip can contain, so a change from `none` is the decoder, not a replacement. The
+          # benchmark reports that per arm; the per-clip flags are cross-checked against the count
+          # so a self-contradicting report cannot be presented as a measurement.
+          flags = [clip.get("differsFromNone") for clip in report["inert"]["clips"]]
+          if any(flag is None for flag in flags):
+              sys.exit("the inert arm's clips carry no differsFromNone: the decode-path count "
+                       "cannot be checked")
+          counted = sum(1 for flag in flags if flag)
+          if counted != report["inert"]["transcriptDiffs"]:
+              sys.exit(f"the inert arm contradicts itself: transcriptDiffs="
+                       f"{report['inert']['transcriptDiffs']} but {counted} clip(s) are flagged "
+                       "differsFromNone")
+          differing = report["inert"]["transcriptDiffs"]
+          lines += [
+              "",
+              f"Decode path (inert - none): {baits['inert'] - baits['none']} replacement(s); "
+              f"transcripts differ in {differing}/{len(report['inert']['clips'])} clip(s).",
+              f"Field term effect (field - inert): {baits['field'] - baits['inert']} replacement(s).",
+          ]
+          if baits["inert"] > baits["none"]:
+              lines.append("The inert control itself added replacements, so the boost arms' counts "
+                           "cannot be attributed to their terms alone.")
+          lines += [
+              "",
+              "The shared bait list changed in this round, so these counts are not comparable",
+              "with earlier runs of this benchmark.",
               "",
               "Synthetic speech is cleaner than human speech, so this bounds the risk; it does not",
               "reproduce #235's numbers.",
@@ -409,8 +457,19 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
               handle.write(summary + "\n")
 
-          if terms > none:
-              sys.exit(f"the boost added {terms - none} bait replacement(s): {none} -> {terms}")
+          failures = []
+          if baits["terms"] > baits["none"]:
+              failures.append(f"the snippet-term arm added {baits['terms'] - baits['none']} "
+                              f"replacement(s) over no terms: {baits['none']} -> {baits['terms']}")
+          if baits["field"] > baits["none"]:
+              detail = f"{baits['none']} -> {baits['field']}"
+              if baits["inert"] > baits["none"]:
+                  detail += (f"; the inert control also rose ({baits['none']} -> {baits['inert']}), "
+                             "so the decode path may be the cause")
+              failures.append(f"the field arm added {baits['field'] - baits['none']} "
+                              f"replacement(s) over no terms: {detail}")
+          if failures:
+              sys.exit("; ".join(failures))
           PY
       - name: Upload the report
         if: ${{ !cancelled() }}
