@@ -60,8 +60,8 @@ final class FieldContextHintCopyTests: XCTestCase {
         let hint = try body(of: "private var fieldContextHint: LocalizedStringKey", in: text)
 
         let expected: [(mode: String, literal: String)] = [
-            (".prose", "Reads the focused field to recognise names better. The field text is never sent as context, but a recognised word can end up in your transcript, which goes to your AI engine when cleanup runs."),
-            (".terms", "Reads the focused field and gives Parakeet a term list from it, not a sentence. The field text is never sent as context, but a word that sounds close to a listed term can be rewritten into your transcript, which goes to your AI engine when cleanup runs."),
+            (".prose", "Reads the focused field to recognise names better. The field text is never sent to a server, but a recognised word can end up in your transcript, which goes to your AI engine when cleanup runs."),
+            (".terms", "Reads the focused field and gives Parakeet a term list from it, not a sentence. The field text is never sent to a server, but a word that sounds close to a listed term can be rewritten into your transcript, which goes to your AI engine when cleanup runs."),
             (".none", "This engine takes no hint about what is coming, so the field is not read."),
             (".remoteExcluded", "Never: this text would be sent to your server, so the field is not read."),
         ]
@@ -83,7 +83,7 @@ final class FieldContextHintCopyTests: XCTestCase {
 
         let capability = try XCTUnwrap(hint.range(of: "guard viewModel.canUseFieldContext"))
         let unused = try XCTUnwrap(hint.range(of: "On, but this engine does not use it: the field is not read."))
-        let on = try XCTUnwrap(hint.range(of: "On: the text before your cursor is read to help the model recognise names. It is never sent as context, but a recognised word can end up in your transcript, which goes to your AI engine when cleanup runs."))
+        let on = try XCTUnwrap(hint.range(of: "On: the text before your cursor is read to help the model recognise names. It is never sent to a server, but a recognised word can end up in your transcript, which goes to your AI engine when cleanup runs."))
         XCTAssertLessThan(capability.lowerBound, unused.lowerBound,
                           "the on-but-unused state is not behind the capability check")
         XCTAssertLessThan(unused.lowerBound, on.lowerBound,
