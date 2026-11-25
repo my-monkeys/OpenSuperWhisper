@@ -93,16 +93,12 @@ public enum DictionaryCandidates {
     static func isVocabulary(_ word: String, startsSentence: Bool, spelling: Spelling,
                              capitalMarksNames: Bool) -> Bool {
         if isEmail(word) { return true }
-        guard !isExcludedShape(word) else { return false }
-        let letters = word.filter(\.isLetter)
-        let known = spelling.knows(word)
-
         // Digits among letters ("GPT4", "M2"), a capital inside the word ("GitHub", "iOS"), an
         // acronym ("OSW"): the shape says it all, unless the spelling dictionary already has it.
-        if word.contains(where: \.isNumber) || hasInnerCapital(word)
-            || (letters.count >= 2 && letters.allSatisfy(\.isUppercase)) {
-            return !known
-        }
+        // One predicate, shared with the field-term reducer.
+        if hasStrongShape(word) { return !spelling.knows(word) }
+        guard !isExcludedShape(word) else { return false }
+        let known = spelling.knows(word)
         guard let first = word.first else { return false }
         if first.isUppercase {
             // At a sentence start the capital is the sentence's, and an unknown word there is

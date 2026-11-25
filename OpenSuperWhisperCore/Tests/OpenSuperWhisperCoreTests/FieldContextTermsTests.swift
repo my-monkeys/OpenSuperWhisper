@@ -34,6 +34,20 @@ final class FieldContextTermsTests: CoreTestCase {
                                 capitalMarksNames: capitalMarksNames, limit: limit)
     }
 
+    /// A dictionary that knows the shared words and would fix "thier", for the rows where a
+    /// sentence-start capital is what decides a word.
+    private static let spellingThatFixesThier = DictionaryCandidates.Spelling(
+        knows: { FieldContextTermsTests.known.contains($0.lowercased()) },
+        correctsTypo: { $0.lowercased() == "thier" })
+
+    /// The reducer with that dictionary, flag on: "Thier" is admitted by a mid-sentence capital
+    /// and refused at a sentence start.
+    private func termsFixingThier(_ text: String) -> [String] {
+        FieldContextTerms.terms(from: text,
+                                spelling: FieldContextTermsTests.spellingThatFixesThier,
+                                capitalMarksNames: true)
+    }
+
     // MARK: - Nothing to reduce
 
     func testEmptyWhitespaceAndPunctuationYieldNothing() {
@@ -207,16 +221,24 @@ final class FieldContextTermsTests: CoreTestCase {
     /// keeps its sentence-start capital and the dictionary's typo fix rejects it. The control is
     /// the same sentence with no dash — the flag must not depend on the dash being there.
     func testAPunctuationOnlyTokenDoesNotBecomeTheSentenceBase() {
-        let fixingThier = DictionaryCandidates.Spelling(
-            knows: { FieldContextTermsTests.known.contains($0.lowercased()) },
-            correctsTypo: { $0.lowercased() == "thier" })
+        XCTAssertEqual(termsFixingThier("Cherith. Thier"), ["Cherith"])
+        XCTAssertEqual(termsFixingThier("Cherith. — Thier"), ["Cherith"])
+    }
 
-        XCTAssertEqual(FieldContextTerms.terms(from: "Cherith. Thier", spelling: fixingThier,
-                                               capitalMarksNames: true),
-                       ["Cherith"])
-        XCTAssertEqual(FieldContextTerms.terms(from: "Cherith. — Thier", spelling: fixingThier,
-                                               capitalMarksNames: true),
-                       ["Cherith"])
+    /// A punctuation-only token must not swallow the gap before it. A line break that is the
+    /// only sentence evidence still starts the sentence for the word after the dash.
+    ///
+    /// The first line is a dictionary-known word on purpose: an emitted first word would make
+    /// the row pass in both arms. The positive control "Here — Thier idea" (no line break) shows
+    /// "Thier" is admitted mid-sentence with the same stub, so the empty results come from the
+    /// flag and not from the word never being admissible.
+    func testALineBreakBeforeAPunctuationOnlyTokenStartsTheSentence() {
+        XCTAssertEqual(termsFixingThier("Here — Thier idea"), ["Thier"], "mid-sentence control")
+        XCTAssertEqual(termsFixingThier("Here\nThier idea"), [], "control with no marker")
+        XCTAssertEqual(termsFixingThier("Here\n— Thier idea"), [], "the dash must not swallow the line break")
+        XCTAssertEqual(termsFixingThier("Here\n- Thier idea"), [], "hyphen-minus marker")
+        XCTAssertEqual(termsFixingThier("Here\n— — Thier idea"), [],
+                       "the flag must survive consecutive markers")
     }
 
     func testCyrillicKeepsItsShape() {
@@ -357,9 +379,12 @@ final class FieldContextTermsTests: CoreTestCase {
 
     /// One lookup per distinct form, not one per run a word could start.
     ///
-    /// This text offers each name as the start of up to three runs, and `isVocabulary` asks
-    /// again inside each: the memo answers 3 lookups where the same text without it asks 36.
-    /// The bound leaves room for a form asked in both cases without letting the memo disappear.
+    /// "Form" here is the exact string the reducer asks about, and for two words there are three
+    /// of them: the name as written in `isVocabulary` ("Nyiragongo"), its lowercase in the field
+    /// guard ("nyiragongo"), and "cherith". The memo answers those three; the same text without
+    /// it asks 36 times (twelve two-word runs, three asks each). The "and" between the pairs never
+    /// reaches a term call — `admitsToRun` rejects it first — so it is in neither count, and the
+    /// bound leaves room for a form asked in both cases without letting the memo disappear.
     func testSpellingIsAskedOncePerDistinctForm() {
         var asked: [String] = []
         let counting = DictionaryCandidates.Spelling(

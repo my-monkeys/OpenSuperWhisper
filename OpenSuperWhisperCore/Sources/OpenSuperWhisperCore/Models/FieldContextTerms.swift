@@ -49,12 +49,13 @@ enum FieldContextTerms {
                 let run = slice.map {
                     CorrectionDiff.Word($0.text, startsSentence: $0.startsSentence)
                 }
-                // The flag decides what `isVocabulary` answers for the words inside a run, but
-                // not what this reducer emits: a word admitted only because the flag lets a
-                // dictionary-known capital count is exactly the word `survivesFieldGuard` drops,
-                // and every word that survives is vocabulary on its own. Fusion is the only shape
-                // the flag's reach can still take; the strong-shape recall it now costs is stated
-                // in `survivesFieldGuard`.
+                // The flag decides whether a run has a witness. A capitalised word the dictionary
+                // knows as written is vocabulary only when the language marks names with capitals
+                // (`isVocabulary`'s known-capital branch), so a run whose only witness is that
+                // word does not form with the flag off, and a survivor that is not vocabulary on
+                // its own is not emitted through that run. Both answers are pinned in
+                // `testCapitalMarksNamesDecidesWhetherARunIsWitnessed`; the strong-shape recall
+                // the guard costs is stated in `survivesFieldGuard`.
                 guard run.allSatisfy({ admitsToRun($0.text) }),
                       let candidate = DictionaryCandidates.term(
                           from: run, spelling: memoisedSpelling,
@@ -166,6 +167,10 @@ enum FieldContextTerms {
         /// The whitespace between the previous word and `raw`.
         var gap = ""
         var previousRaw: String?
+        /// A sentence start seen before a punctuation-only token, held for the next real word.
+        /// "Here\n— Thier" must keep the line break's sentence start even though the dash is the
+        /// token immediately before "Thier".
+        var pendingSentenceStart = false
 
         func flush() {
             guard !raw.isEmpty else { return }
@@ -173,8 +178,11 @@ enum FieldContextTerms {
             if core.isEmpty {
                 // A token that is nothing but punctuation ("—", "…", ",,") separates the words
                 // on either side. It must not become the sentence-flag base: "Cherith. — Thier"
-                // would then read the dash and lose the full stop the last word carries.
+                // would then read the dash and lose the full stop the last word carries. Its own
+                // gap is still evidence, so hold the answer for the next real word.
                 if !result.isEmpty { result[result.count - 1].endsRun = true }
+                pendingSentenceStart = pendingSentenceStart
+                    || CorrectionDiff.endsSentence((previousRaw ?? "") + gap)
             } else {
                 // The first word starts a sentence; after it the previous raw word plus the gap
                 // decide, so a line break the whitespace split discards still counts.
@@ -182,10 +190,12 @@ enum FieldContextTerms {
                 if result.isEmpty {
                     startsSentence = true
                 } else {
-                    startsSentence = CorrectionDiff.endsSentence((previousRaw ?? "") + gap)
+                    startsSentence = pendingSentenceStart
+                        || CorrectionDiff.endsSentence((previousRaw ?? "") + gap)
                 }
                 append(partsOf: core, raw: raw, startsSentence: startsSentence, to: &result)
                 previousRaw = raw
+                pendingSentenceStart = false
             }
             raw = ""
         }
