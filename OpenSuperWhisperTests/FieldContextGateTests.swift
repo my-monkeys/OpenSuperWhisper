@@ -20,14 +20,13 @@ final class FieldContextGateTests: XCTestCase {
     }
 
     override func tearDown() {
-        // The context is a singleton and `focusedText` has no setter — `update` deliberately
-        // leaves it alone (#F4) — so the text a test left is cleared the only way it is ever
-        // written: `captureFocusedText` with the gate closed, which assigns nil without an
-        // Accessibility read. Before the restore, so the closed gate is the scratch state and
-        // not whatever this machine happens to have.
+        // The context is a singleton and `focusedText` has no setter. `clearFocusedText()` is the
+        // production cancel-path writer; using it here clears the text independently of the gate
+        // and does no Accessibility read. The switch is turned off before the restore so the next
+        // scratch session does not inherit it.
         RecordingContext.shared.focusedTextReader = nil
         AppPreferences.shared.useSurroundingTextAsContext = false
-        RecordingContext.shared.captureFocusedText()
+        RecordingContext.shared.clearFocusedText()
 
         scratch.restore()
         scratch = nil
@@ -168,5 +167,50 @@ final class FieldContextGateTests: XCTestCase {
 
         XCTAssertEqual(context.focusedText, "a private sentence",
                        "the menu path erased the field text the recording captured")
+    }
+
+    /// The take owns the field text once recording stops, and the singleton must not keep a copy
+    /// for the life of the process. `consumeFocusedText()` hands the text to that one clip and
+    /// nils the singleton.
+    ///
+    /// The text is put in place through the same seam the read uses (`focusedTextReader`), so the
+    /// row drives the real capture/writer path rather than reaching into storage.
+    ///
+    /// Mutation: drop the `defer { focusedText = nil }` from `consumeFocusedText` and the second
+    /// assertion reddens (the singleton keeps the document); return nil instead of the stored
+    /// text and the first reddens.
+    func testConsumeTakesTheFieldTextOutOfTheSingleton() {
+        let prefs = AppPreferences.shared
+        let context = RecordingContext.shared
+        prefs.useSurroundingTextAsContext = true
+        prefs.selectedEngine = "whisper"
+        context.focusedTextReader = { "a private sentence" }
+        context.captureFocusedText()
+        XCTAssertEqual(context.focusedText, "a private sentence", "the capture did not store the text")
+
+        let consumed = context.consumeFocusedText()
+
+        XCTAssertEqual(consumed, "a private sentence",
+                       "the clip was handed something other than the captured text")
+        XCTAssertNil(context.focusedText, "the singleton kept the document after the take consumed it")
+    }
+
+    /// The cancel path: no clip will carry the text, so it is dropped rather than left behind.
+    ///
+    /// Mutation: drop the assignment from `clearFocusedText` and both assertions redden — the
+    /// context keeps the document and then hands it on to a clip that was never coming.
+    func testClearDropsTheFieldTextWhenNoClipTakesIt() {
+        let prefs = AppPreferences.shared
+        let context = RecordingContext.shared
+        prefs.useSurroundingTextAsContext = true
+        prefs.selectedEngine = "whisper"
+        context.focusedTextReader = { "a private sentence" }
+        context.captureFocusedText()
+        XCTAssertEqual(context.focusedText, "a private sentence", "the capture did not store the text")
+
+        context.clearFocusedText()
+
+        XCTAssertNil(context.focusedText, "the cancel path left the document in the singleton")
+        XCTAssertNil(context.consumeFocusedText(), "a cleared context still handed text to a clip")
     }
 }

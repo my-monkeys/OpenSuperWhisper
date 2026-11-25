@@ -412,6 +412,11 @@ class IndicatorWindowManager: IndicatorViewDelegate {
     /// live recording is precisely what failed, and stepping aside would leave the bubble waiting
     /// for audio that is never coming.
     func reportRecordingFailure(_ message: String) {
+        // The take died before it could be stopped, so no clip will ever carry the field text
+        // captured for it. Cleared here rather than in `cleanup()`: that runs from `hide()`,
+        // which can belong to a previous take while a new one is already capturing its own.
+        // Before the guard: with the bubble already gone there is still a held text to release.
+        RecordingContext.shared.clearFocusedText()
         guard let viewModel else { return }
         viewModel.cleanup()
         viewModel.showError(message)
