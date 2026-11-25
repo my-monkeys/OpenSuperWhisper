@@ -14,21 +14,65 @@ import os
 ///
 /// So the keeper restores any shortcut the library dropped, and once secure input ends, or the
 /// Mac wakes or unlocks, it registers them all afresh.
+///
+/// The library's own bookkeeping has two blind spots, so the keeper also asks Carbon what it
+/// really holds:
+/// - A shortcut field left armed keeps the library's global switch off; the keeper turns it back
+///   on once no capture is armed.
+/// - The library can stay stuck in its "a menu is open" mode when an end-of-tracking is lost.
+///   It then keeps every hot key unregistered while `isEnabled(for:)` still says true.
 @MainActor
 final class HotkeyKeeper {
     enum Action: Equatable {
         case none
+        case resumeLibrary
         case restoreDropped
         case reregisterAll
+        case recoverLost
     }
 
-    /// What one check should do. A fresh registration waits for the running take to end: the
-    /// trigger may be held down for push-to-talk, and taking its hot key down would lose the
-    /// release that stops the recording. A dropped shortcut has no registration left to lose.
-    nonisolated static func action(reregisterPending: Bool, anyDropped: Bool, takeRunning: Bool) -> Action {
+    /// What one check should do. While a shortcut field captures a combination the library is
+    /// paused on purpose, so nothing is touched. A fresh registration waits for the running take
+    /// to end: the trigger may be held down for push-to-talk, and taking its hot key down would
+    /// lose the release that stops the recording. A dropped or lost shortcut has no registration
+    /// left to lose.
+    nonisolated static func action(
+        reregisterPending: Bool, anyDropped: Bool, takeRunning: Bool,
+        libraryPaused: Bool = false, captureArmed: Bool = false, anyLost: Bool = false
+    ) -> Action {
+        if captureArmed { return .none }
+        if libraryPaused { return .resumeLibrary }
         if reregisterPending && !takeRunning { return .reregisterAll }
-        return anyDropped ? .restoreDropped : .none
+        if anyDropped { return .restoreDropped }
+        return anyLost ? .recoverLost : .none
     }
+
+    enum CombinationState: Equatable {
+        case held
+        case free
+        case unknown
+    }
+
+    /// Whether some registration in this process holds the combination. It only ever registers a
+    /// combination that nobody holds (and releases it at once), so it can never swallow a press
+    /// of a working shortcut: a held one makes the registration fail instead.
+    nonisolated static func probe(keyCode: UInt32, modifiers: UInt32) -> CombinationState {
+        var ref: EventHotKeyRef?
+        let id = EventHotKeyID(signature: probeSignature, id: 1)
+        let status = RegisterEventHotKey(keyCode, modifiers, id, GetEventDispatcherTarget(), 0, &ref)
+        switch status {
+        case noErr:
+            if let ref { UnregisterEventHotKey(ref) }
+            return .free
+        case OSStatus(eventHotKeyExistsErr):
+            return .held
+        default:
+            return .unknown
+        }
+    }
+
+    /// 'OSHK', distinct from the library's own signature.
+    private nonisolated static let probeSignature: OSType = 0x4F53_484B
 
     nonisolated static func secureInputEnded(was: Bool, isNow: Bool) -> Bool {
         was && !isNow
@@ -45,6 +89,7 @@ final class HotkeyKeeper {
     private var timer: Timer?
     private var secureInputWasOn = IsSecureEventInputEnabled()
     private var reregisterPending = false
+    private var reportedLost: [String] = []
 
     /// `liveNames` are the shortcuts that should be listening right now: the bound trigger slots
     /// and the optional shortcuts the user set.
@@ -84,9 +129,21 @@ final class HotkeyKeeper {
 
         let names = liveNames()
         let dropped = names.filter { !KeyboardShortcuts.isEnabled(for: $0) }
-        switch Self.action(reregisterPending: reregisterPending, anyDropped: !dropped.isEmpty, takeRunning: takeRunning()) {
+        // A field only captures through local event monitors, which hear nothing while another
+        // app is frontmost. Counting an armed field only while the app is active keeps a count
+        // that a torn-down field never released from silencing the keeper for good.
+        let captureArmed = ShortcutCapture.isArmed && NSApp.isActive
+        let libraryPaused = !KeyboardShortcuts.isEnabled
+        let lost = captureArmed || libraryPaused ? [] : lostNames(names.filter { !dropped.contains($0) })
+        switch Self.action(
+            reregisterPending: reregisterPending, anyDropped: !dropped.isEmpty, takeRunning: takeRunning(),
+            libraryPaused: libraryPaused, captureArmed: captureArmed, anyLost: !lost.isEmpty
+        ) {
         case .none:
             break
+        case .resumeLibrary:
+            KeyboardShortcuts.isEnabled = true
+            Self.log.notice("resumed the shortcut library: it was left paused with no capture armed")
         case .restoreDropped:
             KeyboardShortcuts.enable(dropped)
             // Logged only when it worked: a combination another app holds fails on every
@@ -101,6 +158,54 @@ final class HotkeyKeeper {
             Self.log.notice("registered \(names.count) shortcut(s) afresh after secure input, wake or unlock")
             KeyboardShortcuts.disable(names)
             KeyboardShortcuts.enable(names)
+        case .recoverLost:
+            recover(lost)
         }
     }
+
+    private func lostNames(_ names: [KeyboardShortcuts.Name]) -> [KeyboardShortcuts.Name] {
+        names.filter { name in
+            guard let shortcut = KeyboardShortcuts.getShortcut(for: name) else { return false }
+            return Self.probe(keyCode: UInt32(shortcut.carbonKeyCode), modifiers: UInt32(shortcut.carbonModifiers)) == .free
+        }
+    }
+
+    /// Safe to run during a take, and from the run loop's default mode only, because of two
+    /// invariants:
+    /// - The timer is added in `.default` mode alone, so it never fires while a menu is tracking,
+    ///   the one time the library legitimately unregisters every hot key. A combination found
+    ///   free here is therefore really lost, not paused.
+    /// - A lost combination has no registration, so taking it down and up again cannot lose a
+    ///   key-up; and the probe only registers combinations nobody holds, so it never swallows a
+    ///   press of a working shortcut.
+    private func recover(_ lost: [KeyboardShortcuts.Name]) {
+        // Clears the library's menu-open flag if an end-of-tracking was lost; a fresh
+        // registration would otherwise be paused again at once.
+        NotificationCenter.default.post(name: NSMenu.didEndTrackingNotification, object: nil)
+        KeyboardShortcuts.disable(lost)
+        KeyboardShortcuts.enable(lost)
+        let stillLost = lostNames(lost).map(\.rawValue)
+        let lostList = lost.map(\.rawValue).joined(separator: ", ")
+        if stillLost.isEmpty {
+            reportedLost = []
+            Self.log.notice("re-registered lost shortcut(s) Carbon no longer held: \(lostList, privacy: .public)")
+        } else if stillLost != reportedLost {
+            // Logged on change only: a failing recovery repeats every check.
+            reportedLost = stillLost
+            Self.log.notice("shortcut(s) lost to Carbon and not recovered: \(stillLost.joined(separator: ", "), privacy: .public)")
+        }
+    }
+}
+
+/// Whether a shortcut field is capturing a combination. The library is paused on purpose then,
+/// which tells that pause apart from a stale one.
+@MainActor
+enum ShortcutCapture {
+    private static var armedCount = 0
+
+    static var isArmed: Bool { armedCount > 0 }
+
+    static func armed() { armedCount += 1 }
+
+    static func disarmed() { armedCount = max(0, armedCount - 1) }
 }

@@ -56,6 +56,7 @@ struct TriggerRecorderField: View {
     @State private var heldModifiers: NSEvent.ModifierFlags = []
     @State private var isHovering = false
     @State private var monitors: [Any] = []
+    @State private var focusObservers: [NSObjectProtocol] = []
     @State private var detector = SingleModifierDetector()
     @State private var chordDetector = ChordDetector()
 
@@ -397,8 +398,19 @@ struct TriggerRecorderField: View {
         chordDetector.reset()
         // Pause live hotkeys so re-recording the current trigger doesn't start a dictation.
         KeyboardShortcuts.isEnabled = false
+        ShortcutCapture.armed()
         ModifierKeyMonitor.shared.stop()
         MouseButtonMonitor.shared.stop()
+
+        // Focus leaving the field ends the capture, as in the library's own recorder; without
+        // this a window that closes or loses focus without onDisappear leaves every shortcut off.
+        for name in [NSApplication.didResignActiveNotification, NSWindow.didResignKeyNotification] {
+            focusObservers.append(NotificationCenter.default.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { _ in
+                MainActor.assumeIsolated { disarm() }
+            })
+        }
 
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
             heldModifiers = event.modifierFlags.intersection([.control, .option, .shift, .command])
@@ -559,6 +571,9 @@ struct TriggerRecorderField: View {
     private func disarm() {
         for monitor in monitors { NSEvent.removeMonitor(monitor) }
         monitors = []
+        for observer in focusObservers { NotificationCenter.default.removeObserver(observer) }
+        focusObservers = []
+        if isRecording { ShortcutCapture.disarmed() }
         detector.reset()
         chordDetector.reset()
         KeyboardShortcuts.isEnabled = true
