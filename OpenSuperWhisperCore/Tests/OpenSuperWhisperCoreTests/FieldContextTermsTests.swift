@@ -65,6 +65,13 @@ final class FieldContextTermsTests: CoreTestCase {
                        ["Cherith", "Nyiragongo"])
     }
 
+    /// A chat-shaped line: lowercase chatter around two names, one mid-sentence and one after a
+    /// question mark. Neither the punctuation nor the filler may fuse a run or drop a name.
+    func testChatProseKeepsOnlyTheNames() {
+        XCTAssertEqual(terms("hey Nyiragongo are you around? Sintra said the deploy is at 5"),
+                       ["Nyiragongo", "Sintra"])
+    }
+
     /// A capital at the start of a sentence is grammar, and this word is known in lowercase.
     func testACommonWordThatWasCapitalisedIsNotATerm() {
         XCTAssertEqual(terms("the Parakeet sang"), [])
@@ -100,6 +107,14 @@ final class FieldContextTermsTests: CoreTestCase {
         XCTAssertEqual(terms("the GitHub Cherith wrote"), ["Cherith"])
     }
 
+    /// An email address is a strong shape no dictionary knows, so the shape rule alone would
+    /// boost it. The plan excludes `@` shapes from the field path: the address is not a term,
+    /// and it does not fuse with the name beside it.
+    func testEmailsAreNotFieldTerms() {
+        XCTAssertEqual(terms("write to cherith@example.com about Cherith"), ["Cherith"])
+        XCTAssertEqual(terms("Cherith A@B.com wrote"), ["Cherith"])
+    }
+
     /// Lowercase unknown words are as likely a typo as jargon, so the field path does not boost
     /// them — unlike the dictionary-suggestion path, which follows a correction the user made.
     func testLowercaseUnknownIsNotATerm() {
@@ -125,17 +140,35 @@ final class FieldContextTermsTests: CoreTestCase {
     //
     // Mutations these rows pin, each measured against a model of the reducer: drop the `endsRun`
     // barrier and the comma row fuses to "Cherith Nyiragongo Sintra" and the semicolon row to
-    // "Cherith Nyiragongo"; drop the `startsSentence` check (or the gap from the flag) and the
-    // one-per-line row fuses; revert to the old private tokenizer — no barrier and `. ! ?` as
-    // the only sentence marks — and the ellipsis/CJK row fuses; replace the contiguous survivor
-    // slice with "join every survivor" and the dropped-middle-word row emits "Cherith
+    // "Cherith Nyiragongo"; go back to whitespace-only splitting and the unspaced-separator row
+    // returns "Priya,Nyiragongo"; drop the `startsSentence` check (or the gap from the flag) and
+    // the one-per-line row fuses; let a punctuation-only token become the sentence base again
+    // and the dash row emits "Thier"; revert to the old private tokenizer — no barrier and
+    // `. ! ?` as the only sentence marks — and the ellipsis/CJK row fuses; replace the contiguous
+    // survivor slice with "join every survivor" and the dropped-middle-word row emits "Cherith
     // Nyiragongo"; return `true` for a strong shape before asking the dictionary and the PDF/USA
-    // row emits "PDF Cherith"; drop the memo and the lookup-count row goes from 3 to 36.
+    // row emits "PDF Cherith"; drop the email exclusion and the email row emits the address;
+    // drop the memo and the lookup-count row goes from 3 to 36.
 
     /// A comma separates list items. The old tokenizer trimmed the comma and fused them.
     func testCommasSeparateNames() {
         XCTAssertEqual(terms("Cherith, Nyiragongo, Sintra"),
                        ["Cherith", "Nyiragongo", "Sintra"])
+    }
+
+    /// A comma, semicolon or colon with no space after it separates just as one with a space
+    /// does. Without the split the whole "Priya,Nyiragongo" is one token, and the guard keeps
+    /// it: no dictionary knows the fused string.
+    func testUnspacedSeparatorsStillSeparate() {
+        // The control: the spaced comma reduces the same way, so the comma is what separates,
+        // not the space after it.
+        XCTAssertEqual(terms("Priya, Nyiragongo"), ["Priya", "Nyiragongo"])
+        XCTAssertEqual(terms("Priya,Nyiragongo"), ["Priya", "Nyiragongo"])
+        XCTAssertEqual(terms("Priya;Nyiragongo"), ["Priya", "Nyiragongo"])
+        XCTAssertEqual(terms("Priya:Nyiragongo"), ["Priya", "Nyiragongo"])
+        // A link's `:` is punctuation inside one address, not a separator: the whole shape is
+        // excluded, and splitting it would leak the scheme as a term.
+        XCTAssertEqual(terms("see HTTPS://EXAMPLE.COM now"), [])
     }
 
     /// A semicolon or a colon separates just as a comma does.
@@ -163,6 +196,23 @@ final class FieldContextTermsTests: CoreTestCase {
     func testLeadingPunctuationDoesNotBreakARun() {
         XCTAssertEqual(terms("(Nyiragongo Cherith) wrote"), ["Nyiragongo Cherith"])
         XCTAssertEqual(terms("\"Nyiragongo Cherith\" wrote"), ["Nyiragongo Cherith"])
+    }
+
+    /// A punctuation-only token between a sentence mark and the next word must not become the
+    /// sentence-flag base: "Cherith." still ends the sentence through the last word, so "Thier"
+    /// keeps its sentence-start capital and the dictionary's typo fix rejects it. The control is
+    /// the same sentence with no dash — the flag must not depend on the dash being there.
+    func testAPunctuationOnlyTokenDoesNotBecomeTheSentenceBase() {
+        let fixingThier = DictionaryCandidates.Spelling(
+            knows: { FieldContextTermsTests.known.contains($0.lowercased()) },
+            correctsTypo: { $0.lowercased() == "thier" })
+
+        XCTAssertEqual(FieldContextTerms.terms(from: "Cherith. Thier", spelling: fixingThier,
+                                               capitalMarksNames: true),
+                       ["Cherith"])
+        XCTAssertEqual(FieldContextTerms.terms(from: "Cherith. — Thier", spelling: fixingThier,
+                                               capitalMarksNames: true),
+                       ["Cherith"])
     }
 
     func testCyrillicKeepsItsShape() {
@@ -198,12 +248,18 @@ final class FieldContextTermsTests: CoreTestCase {
         XCTAssertEqual(terms("Nyiragongo then NYIRAGONGO again"), ["Nyiragongo"])
     }
 
-    /// At 240 characters the cap is the ordinary path. Which ten survive is part of the answer:
-    /// first occurrence in the text, left to right.
+    /// At 240 characters the cap is the ordinary path, not the edge. Which ten survive is part
+    /// of the answer: first occurrence in the text, left to right.
+    ///
+    /// The fixture's own length is asserted, so shrinking it back to a short string reddens the
+    /// row instead of quietly moving the case off the path it exists for.
     func testTheCapKeepsTheFirstTenInTextOrder() {
         let many = ["Cherith", "Nyiragongo", "Sintra", "Dunlap", "Bennet",
                     "Kai", "Zed", "Tam", "Nix", "Obo", "Vex"]
-        let reduced = terms(many.joined(separator: " and "))
+        let text = many.joined(separator: " and then the tall ")
+        XCTAssertGreaterThanOrEqual(text.count, 240, "the cap row must sit at the 240-character tail")
+
+        let reduced = terms(text)
 
         XCTAssertEqual(reduced.count, 10)
         XCTAssertEqual(reduced, Array(many.prefix(10)))
@@ -216,8 +272,12 @@ final class FieldContextTermsTests: CoreTestCase {
         XCTAssertEqual(terms("Cherith and Nyiragongo", limit: 0), [])
     }
 
-    /// A document can hand this a single enormous token. It is not a term, and reducing it must
-    /// not be quadratic.
+    /// A document can hand this a single enormous token. It is not a term: `maxTermLength`
+    /// rejects it, and the whole tokeniser sees one token.
+    ///
+    /// This row asserts the output only. It is not a timing bound: at 10k characters even a
+    /// quadratic pass finishes quickly, so a timing assertion here would be theatre — the
+    /// reducer's cost is stated as unmeasured, not pinned by this row.
     func testASingleVeryLongTokenYieldsNothing() {
         XCTAssertEqual(terms(String(repeating: "A", count: 10_000)), [])
     }
@@ -234,24 +294,55 @@ final class FieldContextTermsTests: CoreTestCase {
 
     // MARK: - Languages that capitalise every noun
 
-    /// German's mid-sentence capitals are grammar. The common nouns must not become terms; the
-    /// surname still does.
+    /// German's mid-sentence capitals are grammar, so the *known* common nouns must not become
+    /// terms; the surname still does.
     func testGermanNounsAreNotTerms() {
         XCTAssertEqual(terms("Der Mann ging zu Cherith", capitalMarksNames: false), ["Cherith"])
     }
 
-    /// The flag no longer changes what the reducer emits.
+    /// The German rule is narrower than "a capitalised noun is grammar": it rejects the nouns
+    /// the dictionary knows. An unknown capitalised compound mid-sentence is admitted, the same
+    /// class as "Cherith" — the flag cannot tell it from a name, and rejecting it would reject
+    /// names.
+    func testAnUnknownGermanCompoundIsStillATerm() {
+        XCTAssertEqual(terms("Der Mann ging zu Zahnarztpraxis", capitalMarksNames: false),
+                       ["Zahnarztpraxis"])
+    }
+
+    /// Fusion alone does not depend on the flag: two adjacent survivors become one term under
+    /// either setting. That is all this row claims.
     ///
-    /// Its old row relied on "GitHub" being known as written: the run "Der Mann GitHub" was
-    /// witnessed only by the flag's known-capital branch. Strong shapes are now held to the
-    /// dictionary as well, so that witness is dropped by the guard, and every word that survives
-    /// is vocabulary on its own. Fusion is what remains: two adjacent survivors become one term
-    /// under either flag setting. (The witness path is unreachable with the `correctsTypo: false`
-    /// stub, so no row can pin it; the recall the strong-shape rule costs is stated in
-    /// `testStrongShapesTheDictionaryKnowsAreDropped`.)
+    /// The flag's load-bearing half is run candidacy, pinned separately in
+    /// `testCapitalMarksNamesDecidesWhetherARunIsWitnessed` with a typo-aware dictionary. With
+    /// `correctsTypo: false` every unknown capitalised word is vocabulary on its own, so the
+    /// witness path is unreachable here and this row would stay green if the flag were deleted.
     func testCapitalMarksNamesNoLongerChangesWhatSurvives() {
         XCTAssertEqual(terms("Sintra Dunlap wrote"), ["Sintra Dunlap"])
         XCTAssertEqual(terms("Sintra Dunlap wrote", capitalMarksNames: false), ["Sintra Dunlap"])
+    }
+
+    /// The flag's load-bearing half, on a German clip's setting (`capitalMarksNames: false`).
+    ///
+    /// "Thier" is a dictionary typo at a sentence start, so it is not vocabulary on its own;
+    /// "Parakeet" is a known word capitalised mid-sentence, which `isVocabulary` counts only
+    /// when the language marks names with capitals. With the flag on, that word witnesses the
+    /// run and its survivor — "Thier" — is emitted; with the flag off no run forms and the word
+    /// is refused. This is the answer the flag changes, and deleting the parameter would be
+    /// silent without it.
+    ///
+    /// Mutation: hardcode the flag true and the German row emits "Thier"; hardcode it false (or
+    /// delete the parameter) and the English row emits nothing.
+    func testCapitalMarksNamesDecidesWhetherARunIsWitnessed() {
+        let spelling = DictionaryCandidates.Spelling(
+            knows: { $0.lowercased() == "parakeet" },
+            correctsTypo: { $0.lowercased() == "thier" })
+
+        XCTAssertEqual(FieldContextTerms.terms(from: "Thier Parakeet", spelling: spelling,
+                                               capitalMarksNames: true),
+                       ["Thier"])
+        XCTAssertEqual(FieldContextTerms.terms(from: "Thier Parakeet", spelling: spelling,
+                                               capitalMarksNames: false),
+                       [])
     }
 
     // MARK: - Lookup cost

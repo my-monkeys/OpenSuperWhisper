@@ -10,17 +10,17 @@ import Foundation
 /// does not depend on the machine's installed languages. It reuses `DictionaryCandidates`, the
 /// heuristic the dictionary-suggestion path already ships, with two narrowings that make sense
 /// only for prose — see `survivesFieldGuard`.
-public enum FieldContextTerms {
+enum FieldContextTerms {
 
     /// The terms to boost, in the order they first appear, at most `limit` of them.
     ///
     /// First occurrence is the selection order on purpose: at 240 characters the cap is the
     /// ordinary path, not an edge case, so "which ten survive" has to be a stable answer a test
     /// can assert rather than whatever a set happens to iterate first.
-    public static func terms(from text: String,
-                             spelling: DictionaryCandidates.Spelling,
-                             capitalMarksNames: Bool,
-                             limit: Int = 10) -> [String] {
+    static func terms(from text: String,
+                      spelling: DictionaryCandidates.Spelling,
+                      capitalMarksNames: Bool,
+                      limit: Int = 10) -> [String] {
         guard !text.isEmpty, limit > 0 else { return [] }
 
         let memoisedSpelling = memoised(spelling)
@@ -92,6 +92,9 @@ public enum FieldContextTerms {
     /// prose is much weaker evidence, and a wrong term is not a suggestion — it changes what the
     /// engine hears, including words the user never said.
     ///
+    /// - An email address is never a term. It is a strong shape no spelling dictionary knows, so
+    ///   the shape rule alone would boost it; the plan excludes `@` shapes from the field path.
+    ///   A name beside the address is still reduced on its own.
     /// - A strong shape is evidence only while the spelling dictionary does not already know the
     ///   word as written ("iOS", "eBay", "GPT4"). This is what stops "PDF" and "USA" being
     ///   boosted next to a real name. It costs recall for acronyms and brands the OS dictionary
@@ -103,10 +106,15 @@ public enum FieldContextTerms {
     /// - A capitalised word with no strong shape survives only when its lowercase form is
     ///   unknown. "Cherith" stays; "Parakeet" — and "Maxim" — do not. `isVocabulary` deliberately
     ///   keeps the latter, and that stays right for a dictionary suggestion. This is also what
-    ///   rejects the nouns of a language that capitalises every one of them: a German noun is a
-    ///   known word in lowercase, so its capital buys it nothing here.
+    ///   rejects the *known* nouns of a language that capitalises every one of them: a German
+    ///   noun the dictionary knows in lowercase buys nothing from its capital. An unknown
+    ///   capitalised compound mid-sentence is still admitted — the same class as "Cherith",
+    ///   which no evidence here can tell apart from it.
     private static func survivesFieldGuard(_ word: String,
                                            spelling: DictionaryCandidates.Spelling) -> Bool {
+        // An address is a strong shape no dictionary knows, so the shape rule below would keep
+        // it. It is not a word this feature may boost.
+        if DictionaryCandidates.isEmail(word) { return false }
         // Shape is evidence only while the dictionary does not already know the word: "PDF" and
         // "USA" are spelled right already, so boosting them only makes a near neighbour likelier
         // to be rewritten. Asked as written, the way `isVocabulary` asks about a strong shape.
@@ -133,8 +141,9 @@ public enum FieldContextTerms {
         let text: String
         /// First word of a sentence, where a capital is grammar rather than spelling.
         let startsSentence: Bool
-        /// Punctuation was trimmed from this word's end, so nothing after it belongs to the same
-        /// run. A trim at the front does not count: "(Nyiragongo Cherith" is one name.
+        /// Punctuation ended this word — trimmed from its end, or a `,`, `;` or `:` inside the
+        /// same raw token — so nothing after it belongs to the same run. A trim at the front
+        /// does not count: "(Nyiragongo Cherith" is one name.
         var endsRun: Bool
     }
 
@@ -144,6 +153,9 @@ public enum FieldContextTerms {
     /// so the two cannot disagree about where a word ends. `@`, `#`, `&` and `_` survive it,
     /// which is what tells `DictionaryCandidates` a token is a handle, a flag or a path rather
     /// than a word.
+    ///
+    /// A `,`, `;` or `:` inside a word separates it too: a space is only one of the boundaries
+    /// the field's prose uses, and "Priya,Nyiragongo" is two names.
     ///
     /// The sentence flag is `CorrectionDiff.endsSentence(previousRaw + gap)`, gap included. The
     /// whitespace split loses a line break, and a line break ends a run; passing only the
@@ -160,10 +172,9 @@ public enum FieldContextTerms {
             let core = CorrectionDiff.core(of: raw)
             if core.isEmpty {
                 // A token that is nothing but punctuation ("—", "…", ",,") separates the words
-                // on either side, and a sentence mark among it still ends a sentence for the
-                // word after it.
+                // on either side. It must not become the sentence-flag base: "Cherith. — Thier"
+                // would then read the dash and lose the full stop the last word carries.
                 if !result.isEmpty { result[result.count - 1].endsRun = true }
-                previousRaw = raw
             } else {
                 // The first word starts a sentence; after it the previous raw word plus the gap
                 // decide, so a line break the whitespace split discards still counts.
@@ -173,8 +184,7 @@ public enum FieldContextTerms {
                 } else {
                     startsSentence = CorrectionDiff.endsSentence((previousRaw ?? "") + gap)
                 }
-                result.append(Token(text: core, startsSentence: startsSentence,
-                                    endsRun: !raw.hasSuffix(core)))
+                append(partsOf: core, raw: raw, startsSentence: startsSentence, to: &result)
                 previousRaw = raw
             }
             raw = ""
@@ -195,6 +205,45 @@ public enum FieldContextTerms {
         flush()
         return result
     }
+
+    /// Appends one token per separator-delimited part of a word, carrying the run and sentence
+    /// flags across the separators.
+    ///
+    /// A link or an email is left whole: its `:` and `,` are punctuation inside one address, and
+    /// `DictionaryCandidates` excludes that shape as a whole rather than in pieces.
+    private static func append(partsOf core: String, raw: String, startsSentence: Bool,
+                               to result: inout [Token]) {
+        let wholeShape = DictionaryCandidates.isLink(core) || DictionaryCandidates.isEmail(core)
+        var parts: [(text: String, separator: Character?)] = []
+        var current = ""
+        var separator: Character?
+        for character in core {
+            if !wholeShape, runSeparators.contains(character) {
+                if !current.isEmpty {
+                    parts.append((text: current, separator: separator))
+                    current = ""
+                }
+                separator = character
+            } else {
+                current.append(character)
+            }
+        }
+        if !current.isEmpty { parts.append((text: current, separator: separator)) }
+
+        for (index, part) in parts.enumerated() {
+            let text = CorrectionDiff.core(of: part.text)
+            guard !text.isEmpty else { continue }
+            // Anything but the last part is followed by a separator, which ends the run exactly
+            // as a trailing comma on a whitespace-separated word does.
+            let endsRun = index < parts.count - 1 || !raw.hasSuffix(text)
+            // Only a colon starts a sentence, by `CorrectionDiff.endsSentence`'s own rule; a
+            // comma or a semicolon leaves the next word mid-sentence.
+            let starts = index == 0 ? startsSentence : part.separator == ":"
+            result.append(Token(text: text, startsSentence: starts, endsRun: endsRun))
+        }
+    }
+
+    private static let runSeparators: Set<Character> = [",", ";", ":"]
 
     // MARK: - Spelling lookups
 
