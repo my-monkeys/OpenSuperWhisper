@@ -24,7 +24,16 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     /// global prefs. Readable so a test can check what the fallback factory passed.
     let versionOverride: String?
 
+    /// FluidAudio's debug lines print the transcript and the replacement pair, and Release still
+    /// sends the pair to the unified log. Dictation text is the user's, so the dependency is held
+    /// at warnings for the life of the process; that also drops the count-only "applied N
+    /// replacement(s)" info line, an accepted loss.
+    private static let logLevelConfigured: Void = {
+        AppLogger.minimumLevel = .warning
+    }()
+
     init(versionOverride: String? = nil) {
+        _ = Self.logLevelConfigured
         self.versionOverride = versionOverride
     }
     
@@ -206,19 +215,21 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
         let minSimilarity: Float
     }
 
-    /// The session's terms, tokenised here so it does not parse `tokenizer.json` itself
-    /// (`VocabularyBoostingSession.swift:57-66`). The rescorer still parses one
-    /// (`VocabularyRescorer.swift:152-157`), so after the tokenizer below is warm a rebuild costs
-    /// one parse of the 360,106-byte file plus one BPE encode per term; the first boost of a
-    /// process also pays the tokenizer's own load.
+    /// The session's terms, tokenised here so it does not parse `tokenizer.json` itself:
+    /// `VocabularyBoostingSession.init` only loads `CtcTokenizer` when some term lacks CTC token
+    /// ids, while the `VocabularyRescorer.create` it calls always loads one. After the tokenizer
+    /// below is warm a rebuild therefore costs one parse of the tokenizer file plus one BPE
+    /// encode per term; the first boost of a process also pays the tokenizer's own load.
+    /// (Verified against FluidAudio 0.18.3, the pin in Package.resolved.)
     ///
-    /// A term the tokenizer cannot encode is dropped, exactly as the session's own
-    /// `tokenizingMissingCtcTokens` drops it (`CustomVocabularyContext.swift:154-159`). Every
-    /// surviving term carries an explicit floor, because the session's fallback
-    /// `max(sizeConfig(mergedCount), context)` (`VocabularyBoostingSession.swift:120`) is moved
-    /// by the field's terms for a dictionary that did not change. Base terms keep the floor their
-    /// own list size gives them; the count is taken after the drop, the same grain the session
-    /// uses for its own band (`VocabularyBoostingSession.swift:56-77`).
+    /// A term the tokenizer cannot encode is dropped, exactly as
+    /// `CustomVocabularyContext.tokenizingMissingCtcTokens` drops it. Every surviving term carries
+    /// an explicit floor, because the session's fallback
+    /// `max(thresholds.minSimilarity ?? sizeConfig.minSimilarity, vocabulary.minSimilarity)`
+    /// (`VocabularyBoostingSession.minSimilarity`) is still moved by the field's terms for a
+    /// dictionary that did not change. Base terms keep the floor their own list size gives them;
+    /// the count is taken after the drop, the same grain `VocabularyBoostingSession.init` uses for
+    /// its `ContextBiasingConstants.rescorerConfig(forVocabSize:)` band.
     static func vocabularyTerms(for plan: RecognitionBoost.Plan,
                                 encode: (String) -> [Int]) -> [BoostVocabularyTerm] {
         let encoded = plan.terms.compactMap { text -> (text: String, ctcTokenIds: [Int])? in
@@ -241,13 +252,37 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
         }
     }
 
-    /// The boosting session for the last plan: its terms are tokenised once, then it serves
-    /// every dictation until the dictionary, the snippets or the field's terms change.
+    /// The one-slot cache of boosting sessions: the terms are tokenised once, then one session
+    /// serves every dictation until the dictionary, the snippets or the field's terms change.
     ///
-    /// The key is the whole plan, not just the texts: a dictionary "Priya" and a field "Priya"
+    /// The key is the whole plan, not the merged texts: a dictionary "Priya" and a field "Priya"
     /// merge to the same list but carry different floors, so a texts-only key would serve either
-    /// floor for the other.
-    private var boosting: (plan: RecognitionBoost.Plan, session: VocabularyBoostingSession)?
+    /// floor for the other. Internal and generic so a test can drive it without CTC models;
+    /// `builds` counts every stored miss, which is what makes a silent rebuild (or a silent hit)
+    /// visible.
+    struct BoostSessionCache<Session> {
+        private var plan: RecognitionBoost.Plan?
+        private var session: Session?
+        private(set) var builds = 0
+
+        // Explicit because the stored properties are private: the synthesized memberwise
+        // initializer would be private and the test could not build an empty cache.
+        init() {}
+
+        func cached(for plan: RecognitionBoost.Plan) -> Session? {
+            // A complete key: the floors are a pure function of the plan and the engine's one
+            // cached tokenizer, so no floor can depend on anything outside it.
+            self.plan == plan ? session : nil
+        }
+
+        mutating func store(_ session: Session, for plan: RecognitionBoost.Plan) {
+            self.plan = plan
+            self.session = session
+            builds += 1
+        }
+    }
+
+    private var boostSessions = BoostSessionCache<VocabularyBoostingSession>()
 
     /// The transcript rescored toward the boost terms, or nil to keep it. Never throws: boosting
     /// failing is logged and the plain transcript is used.
@@ -263,14 +298,13 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     }
 
     private func boostingSession(for plan: RecognitionBoost.Plan) async throws -> VocabularyBoostingSession {
-        // A complete key: the floors are a pure function of the plan and the engine's one cached tokenizer.
-        if let boosting, boosting.plan == plan { return boosting.session }
+        if let cached = boostSessions.cached(for: plan) { return cached }
         // Built in code. The path this replaced joined the terms with newlines into a temporary
         // file, where a term containing ":", a leading "#", a newline or "{" would have been
         // read as the loader's own syntax. Terms reduced from a field of prose are the first
         // that can contain any of those.
         let models = try await vocabularyModels()
-        let tokenizer = try await vocabularyTokenizer(for: models.variant)
+        let tokenizer = try await vocabularyTokenizer(for: models)
         let terms = Self.vocabularyTerms(for: plan, encode: tokenizer.encode).map {
             CustomVocabularyTerm(text: $0.text, ctcTokenIds: $0.ctcTokenIds,
                                  minSimilarity: $0.minSimilarity)
@@ -279,7 +313,7 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
         let session = try await VocabularyBoostingSession(vocabulary: vocabulary,
                                                           ctcModels: models,
                                                           config: Self.rescorerConfig)
-        boosting = (plan, session)
+        boostSessions.store(session, for: plan)
         return session
     }
 
@@ -288,10 +322,20 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     /// tokenizer file is the same one for every list.
     private var ctcTokenizer: CtcTokenizer?
 
-    private func vocabularyTokenizer(for variant: CtcModelVariant) async throws -> CtcTokenizer {
+    /// The folder holding the tokenizer.json that matches the CTC models: the folder they were
+    /// loaded from, or the default cache when they carry none. The same rule the session applies
+    /// for its own load (`CtcModels.tokenizerDirectory(loadedFrom:variant:)`, internal at the pin,
+    /// so it is re-expressed here with public API).
+    static func tokenizerDirectory(modelsDirectory: URL?, defaultDirectory: URL) -> URL {
+        modelsDirectory ?? defaultDirectory
+    }
+
+    private func vocabularyTokenizer(for models: CtcModels) async throws -> CtcTokenizer {
         if let ctcTokenizer { return ctcTokenizer }
-        let tokenizer = try await CtcTokenizer.load(
-            from: CtcModels.defaultCacheDirectory(for: variant))
+        let directory = Self.tokenizerDirectory(
+            modelsDirectory: models.directory,
+            defaultDirectory: CtcModels.defaultCacheDirectory(for: models.variant))
+        let tokenizer = try await CtcTokenizer.load(from: directory)
         ctcTokenizer = tokenizer
         return tokenizer
     }

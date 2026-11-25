@@ -60,9 +60,21 @@ final class FieldContextBoostTests: CoreTestCase {
     }
 
     // MARK: - Per-term floors (#307)
+    //
+    // FluidAudio is pinned at 0.18.3 (revision c8b41f98eae668794dd0083bbe028fe7e6585051, the
+    // revision in the project's Package.resolved). The dependency symbols named below are read at
+    // that pin; citations are by symbol, not by line, because a line number belongs to one
+    // revision.
+    //
+    // The three effective bands are 0.52 up to 10 terms, 0.55 from 11 to 100, and 0.60 above 100
+    // (`ContextBiasingConstants.rescorerConfig(forVocabSize:)` raised to the context's default).
 
     /// A dictionary keeps the floor its own list size gives it, whichever band it is in.
-    /// Mutation: carry no per-term floor and the small band reads the merged list's floor.
+    /// Mutation: look the band up from a constant (or from the merged list's size) and the 11-
+    /// and 101-term rows redden. Carrying no per-term floor at all is invisible here — with no
+    /// field terms the merged list *is* the base list, so both floors coincide; that mutation is
+    /// killed by `testFieldTermsCarryTheStricterFloor` and
+    /// `testTheDictionariesFloorDoesNotMoveWhenFieldTermsJoin`.
     func testBaseFloorsAreTheBandsOfTheDictionariesOwnSize() {
         let bands: [(count: Int, floor: Float)] = [(5, 0.52), (11, 0.55), (101, 0.60)]
         for band in bands {
@@ -118,8 +130,8 @@ final class FieldContextBoostTests: CoreTestCase {
     }
 
     /// A term the tokenizer cannot encode is dropped, as the session's own tokenisation drops it
-    /// (`CustomVocabularyContext.swift:154-159`), and the band counts the survivors — the grain
-    /// the session uses for its own band (`VocabularyBoostingSession.swift:56-77`).
+    /// (`CustomVocabularyContext.tokenizingMissingCtcTokens`), and the band counts the survivors —
+    /// the grain `VocabularyBoostingSession.init` uses for its own band.
     /// Mutation: count before the drop and this 11-term dictionary reads 0.55 instead of 0.52.
     func testAnUnencodableTermIsDroppedAndTheBandCountsSurvivors() {
         pinDictionary(11)
@@ -156,5 +168,48 @@ final class FieldContextBoostTests: CoreTestCase {
 
         XCTAssertEqual(plan.terms, ["GitHub", "Nyiragongo"])
         XCTAssertEqual(plan.fieldForms, Set(["nyiragongo"]))
+    }
+
+    // MARK: - Session cache and tokenizer directory
+
+    /// The cache's key is the whole plan. The same plan reuses one session and counts no new
+    /// build; the same texts with different provenance does not reuse it; and the slot holds one
+    /// plan, not two. Mutation: compare `plan.terms` in `cached(for:)` and the field row returns
+    /// the dictionary's session instead of nil; remove the increment from `store` and the
+    /// build-count rows redden; keep a second slot and the eviction row reddens.
+    func testTheBoostSessionCacheKeysOnProvenanceNotTexts() {
+        var cache = FluidAudioEngine.BoostSessionCache<Int>()
+        let fromDictionary = RecognitionBoost.plan(dictionary: ["Priya"], snippets: [], field: [])
+        let fromField = RecognitionBoost.plan(dictionary: [], snippets: [], field: ["Priya"])
+        XCTAssertEqual(fromDictionary.terms, fromField.terms, "the two plans must share their texts")
+
+        XCTAssertNil(cache.cached(for: fromDictionary))
+        cache.store(1, for: fromDictionary)
+        XCTAssertEqual(cache.cached(for: fromDictionary), 1)
+        XCTAssertEqual(cache.builds, 1, "a cache hit must not count as a build")
+
+        XCTAssertNil(cache.cached(for: fromField),
+                     "a texts-only key would serve the dictionary's session here")
+        cache.store(2, for: fromField)
+        XCTAssertEqual(cache.cached(for: fromField), 2)
+        XCTAssertEqual(cache.builds, 2)
+        XCTAssertNil(cache.cached(for: fromDictionary),
+                     "the cache holds one plan; a second slot would still serve the old session")
+    }
+
+    /// The tokenizer must be loaded from the folder the session will use: the models' own folder
+    /// when they carry one, otherwise the default cache. Mutation: drop the models-directory
+    /// branch and the custom row returns the fallback. A custom-directory `CtcModels` cannot be
+    /// constructed in a unit test — its public init needs `MLModel` instances and `loadDirect`
+    /// needs CoreML model files — so the end-to-end case is covered by this precedence, not by
+    /// building a model.
+    func testTheTokenizerDirectoryFollowsTheModelsOwnFolder() {
+        let fallback = URL(fileURLWithPath: "/tmp/fluidaudio-default-tokenizer")
+        let custom = URL(fileURLWithPath: "/tmp/fluidaudio-custom-tokenizer")
+
+        XCTAssertEqual(FluidAudioEngine.tokenizerDirectory(modelsDirectory: nil,
+                                                           defaultDirectory: fallback), fallback)
+        XCTAssertEqual(FluidAudioEngine.tokenizerDirectory(modelsDirectory: custom,
+                                                           defaultDirectory: fallback), custom)
     }
 }
