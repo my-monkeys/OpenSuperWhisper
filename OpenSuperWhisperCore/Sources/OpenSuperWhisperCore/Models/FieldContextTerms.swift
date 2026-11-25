@@ -158,7 +158,8 @@ enum FieldContextTerms {
     /// A `,`, `;` or `:` inside a word separates it too: a space is only one of the boundaries
     /// the field's prose uses, and "Priya,Nyiragongo" is two names.
     ///
-    /// The sentence flag is `CorrectionDiff.endsSentence(previousRaw + gap)`, gap included. The
+    /// The sentence flag is `CorrectionDiff.endsSentence(previousRaw + gap)`, gap included, OR a
+    /// pending sentence start carried across punctuation-only tokens (`pendingSentenceStart`). The
     /// whitespace split loses a line break, and a line break ends a run; passing only the
     /// previous word would make one-name-per-line lists fuse.
     private static func words(in text: String) -> [Token] {
