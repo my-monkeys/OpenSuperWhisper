@@ -67,6 +67,10 @@ final class FieldContextTermsTests: CoreTestCase {
 
     /// A chat-shaped line: lowercase chatter around two names, one mid-sentence and one after a
     /// question mark. Neither the punctuation nor the filler may fuse a run or drop a name.
+    ///
+    /// Mutation: drop the lowercase-unknown rejection and the filler ("hey", "said", "deploy")
+    /// joins the list; drop the excluded-shape rule and the trailing "5" joins — either changes
+    /// this row while the prose row above stays green.
     func testChatProseKeepsOnlyTheNames() {
         XCTAssertEqual(terms("hey Nyiragongo are you around? Sintra said the deploy is at 5"),
                        ["Nyiragongo", "Sintra"])
@@ -253,6 +257,10 @@ final class FieldContextTermsTests: CoreTestCase {
     ///
     /// The fixture's own length is asserted, so shrinking it back to a short string reddens the
     /// row instead of quietly moving the case off the path it exists for.
+    ///
+    /// Mutation: remove the cap and the count/prefix assertions redden (the list returns eleven);
+    /// change the selection order and the prefix assertion reddens; shrink the fixture below 240
+    /// characters and the length assertion reddens.
     func testTheCapKeepsTheFirstTenInTextOrder() {
         let many = ["Cherith", "Nyiragongo", "Sintra", "Dunlap", "Bennet",
                     "Kai", "Zed", "Tam", "Nix", "Obo", "Vex"]
