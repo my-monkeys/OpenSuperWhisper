@@ -46,7 +46,7 @@ struct TextAIRecognitionGroup: View {
         case .prose:
             return "Reads the focused field to recognise names better. Never sent to a server."
         case .terms:
-            return "Reads the focused field and gives Parakeet a term list from it, not a sentence. Never sent to a server."
+            return "Reads the focused field and gives Parakeet a term list from it, not a sentence. A word that sounds close to a listed term can be rewritten. Never sent to a server."
         case .none:
             return "This engine takes no hint about what is coming, so the field is not read."
         case .remoteExcluded:
