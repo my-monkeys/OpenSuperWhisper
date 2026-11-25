@@ -53,7 +53,7 @@ enum FieldContextTerms {
                 // knows as written is vocabulary only when the language marks names with capitals
                 // (`isVocabulary`'s known-capital branch), so a run whose only witness is that
                 // word does not form with the flag off, and a survivor that is not vocabulary on
-                // its own is not emitted through that run. Both answers are pinned in
+                // its own is emitted only when the run forms. Both answers are pinned in
                 // `testCapitalMarksNamesDecidesWhetherARunIsWitnessed`; the strong-shape recall
                 // the guard costs is stated in `survivesFieldGuard`.
                 guard run.allSatisfy({ admitsToRun($0.text) }),
