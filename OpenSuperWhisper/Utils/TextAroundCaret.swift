@@ -92,7 +92,14 @@ struct TextAroundCaret: Equatable {
 
     @MainActor
     private static func read(_ element: AXUIElement, with ax: TimedAccessibility) -> TextAroundCaret? {
-        // One request for both: each round trip to a slow app costs time on the main thread.
+        // The subrole is asked for on its own, first, so the error it failed with is visible: in
+        // a batched answer a missing subrole cannot be told apart from "not secure", which is
+        // the fail-open this guard exists to prevent. One extra round trip on the pre-insertion
+        // path buys an answer the guard can read.
+        let subrole = ax.answer(kAXSubroleAttribute, of: element)
+        guard !SecureTextFields.isSecure(subrole.value as? String, error: subrole.error) else { return nil }
+
+        // One request for the other two: each round trip to a slow app costs time on the main thread.
         guard let answers = ax.copy([kAXSelectedTextRangeAttribute, kAXNumberOfCharactersAttribute], of: element),
               answers.count == 2, let selection = range(from: answers[0]) else { return nil }
 
@@ -135,6 +142,14 @@ private final class TimedAccessibility {
         var value: CFTypeRef?
         let error = request(element) { AXUIElementCopyAttributeValue(element, attribute as CFString, &value) }
         return error == .success ? value : nil
+    }
+
+    /// The value and the error it came with. `copy` above keeps only the value, which cannot
+    /// tell "no such attribute" from "the app did not answer".
+    func answer(_ attribute: String, of element: AXUIElement) -> (value: CFTypeRef?, error: AXError) {
+        var value: CFTypeRef?
+        let error = request(element) { AXUIElementCopyAttributeValue(element, attribute as CFString, &value) }
+        return (value, error)
     }
 
     /// The answers in order. One the app could not give is an `AXValue` holding its error.

@@ -267,7 +267,6 @@ extension Settings {
             useAsianAutocorrect: true,
             customDictionaryEnabled: false,
             customDictionaryEntries: [],
-            useSurroundingTextAsContext: false,
-            focusedText: nil)
+            useSurroundingTextAsContext: false)
     }
 }

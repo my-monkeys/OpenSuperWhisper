@@ -148,7 +148,9 @@ public class TranscriptionService: ObservableObject {
 
     /// The engines `ensureEngineLoaded` can build. Named apart from the classes so the choice can
     /// be made, and tested, without instantiating anything (an engine's init may load a model).
-    enum EngineKind: Equatable {
+    /// `CaseIterable` so `EngineCapabilities.allEngineIds` can be pinned against every kind:
+    /// a new kind whose id never reaches the list is otherwise invisible to the capability test.
+    enum EngineKind: Equatable, CaseIterable {
         case whisper, fluidAudio, senseVoice, remote, appleSpeech
     }
 
@@ -281,9 +283,42 @@ public class TranscriptionService: ObservableObject {
         }
     }
     
-    /// `operation` names this run for `cancelTranscription(operation:)`.
-    public func transcribeAudio(url: URL, settings: TranscriptionSettings, modelOverride: DictationModelOption? = nil,
+    /// - Parameter capturedFieldText: what was already written in the field the dictation started
+    ///   in, captured at record-start by the host and carried per clip. It is resolved into a
+    ///   `FieldContext` only after the engine is known, and reaches an engine only through a
+    ///   context protocol — see `resolveFieldContext`. Chosen over a member on
+    ///   `TranscriptionSettings` because that value is handed to every engine, including the
+    ///   remote one (#89).
+    /// - Parameter operation: names this run for `cancelTranscription(operation:)`.
+    public func transcribeAudio(url: URL, settings: TranscriptionSettings,
+                                capturedFieldText: String? = nil,
+                                modelOverride: DictationModelOption? = nil,
                                 operation: UUID = UUID()) async throws -> String {
+        // Resolve the field's context before taking the gate when the engine that will run is
+        // already loaded. The spelling pass is synchronous main-thread work, and holding the
+        // process-wide permit through it delays whatever dictation is queued behind this one.
+        //
+        // Two conditions, both needed: the per-call override leaves the loaded engine in place —
+        // nil, or the engine+identifier pair `applyOneOffModel` treats as a no-op, which is what
+        // the dictation path normally passes — and an engine of the selected kind is already
+        // loaded. Those are the conditions under which `ensureEngineLoaded` below returns this
+        // same instance. A real model swap reloads inside the gate, so it still resolves after
+        // selection; a value that goes stale anyway is discarded by its `reusable(on:)` check.
+        let overrideKeepsEngine = modelOverride.map { option in
+            let active = ModelCatalog.activeOption()
+            return active?.engine == option.engine && active?.identifier == option.identifier
+        } ?? true
+        let readyContext: FieldContextResolution
+        if overrideKeepsEngine,
+           loadedEngineKind == CoreAccess.preferences.selectedEngine,
+           let engine = currentEngine {
+            readyContext = .resolved(
+                resolveFieldContext(capturedFieldText, for: engine, settings: settings),
+                on: engine)
+        } else {
+            readyContext = .notResolved
+        }
+
         // Serialize every transcription across the app (dictation pipeline, file-drop queue,
         // reruns, CLI): the engines share one non-thread-safe context (e.g. whisper.cpp) and this
         // object's per-run state (isTranscribing/progress/lastUsedModel). Two overlapping calls
@@ -350,14 +385,19 @@ public class TranscriptionService: ObservableObject {
             lastRunTimings = RunTimings(engineWaitMs: engineWaitMs,
                                         engineLoadMs: lastEngineLoadMs)
         }
-        return try await transcribe(url: url, settings: settings, fallbackModel: nil)
+        return try await transcribe(url: url, settings: settings, fallbackModel: nil,
+                                    capturedFieldText: capturedFieldText,
+                                    preResolvedContext: readyContext)
     }
 
     /// Load the appropriate engine and transcribe. On a fallback-worthy remote error
     /// (server unreachable / 5xx after retries), re-runs once with the configured local
     /// fallback model. Recursive by design: the `fallbackModel != nil` attempt is
     /// guarded out of the catch (`fallbackModel == nil`), so it can never loop.
-    private func transcribe(url: URL, settings: TranscriptionSettings, fallbackModel: DictationModelOption?) async throws -> String {
+    private func transcribe(url: URL, settings: TranscriptionSettings,
+                            fallbackModel: DictationModelOption?,
+                            capturedFieldText: String?,
+                            preResolvedContext: FieldContextResolution) async throws -> String {
         let engine: TranscriptionEngine
         if let fallbackModel {
             // The fallback engine is built AND initialized here, so a user on remote-with-
@@ -382,8 +422,19 @@ public class TranscriptionService: ObservableObject {
             lastUsedFallback = false
         }
 
+        // Resolved here, after the engine is known: an engine receives context only if it
+        // declared a context protocol, and the preference gate is evaluated at dispatch time so
+        // a setting switched off between recording and transcription behaves as it did before.
+        //
+        // A resolution taken before the gate is reused only if it answers for this engine. If a
+        // reload or an engine switch replaced it in the meantime, it is resolved again here —
+        // never passed to an engine it does not match. A resolution that came back empty is
+        // reused too: re-running it would repeat the spelling pass for the same nil.
+        let context: FieldContext? = preResolvedContext.reusable(on: engine)
+            ? preResolvedContext.value
+            : resolveFieldContext(capturedFieldText, for: engine, settings: settings)
         do {
-            return try await runOnEngine(engine, url: url, settings: settings)
+            return try await runOnEngine(engine, url: url, settings: settings, context: context)
         } catch let error where fallbackModel == nil && Self.shouldUseFallback(for: error) {
             guard CoreAccess.preferences.remoteFallbackEnabled,
                   CoreAccess.preferences.selectedEngine == "remote",
@@ -391,14 +442,42 @@ public class TranscriptionService: ObservableObject {
                 throw error
             }
             print("Remote transcription failed (\(error)); falling back to local model \(fallback.displayName)")
-            return try await transcribe(url: url, settings: settings, fallbackModel: fallback)
+            // The fallback engine is a different one, so no pre-resolved value is passed; it
+            // re-resolves from the same clip text. The text can genuinely be there — it is
+            // whatever the field held when the clip was recorded, under whichever engine was
+            // selected then — so the refuser is the dispatch-time mode gate in
+            // `resolveFieldContext`, not an absence at record time: the selected id is still
+            // `remote`, and a remote-selected run is handed no field context, fallback or not.
+            return try await transcribe(url: url, settings: settings, fallbackModel: fallback,
+                                        capturedFieldText: capturedFieldText,
+                                        preResolvedContext: .notResolved)
         }
+    }
+
+    /// Dispatch one transcription, passing the field context only to an engine that declared it
+    /// can use it. `nonisolated` because it runs where the transcription runs, off the main actor.
+    ///
+    /// The final branch is the defensive strip in its only honest form: on every path that does
+    /// not match a conforming engine the context argument is simply not passed, so a mistaken
+    /// capability flip drops the context rather than sending it.
+    private nonisolated static func transcribe(_ engine: TranscriptionEngine, url: URL,
+                                               settings: TranscriptionSettings,
+                                               context: FieldContext?) async throws -> String {
+        if case .prose(let text)? = context, let proseEngine = engine as? ProseContextEngine {
+            return try await proseEngine.transcribeAudio(url: url, settings: settings, proseContext: text)
+        }
+        if case .terms(let terms)? = context, let termEngine = engine as? TermContextEngine {
+            return try await termEngine.transcribeAudio(url: url, settings: settings, terms: terms)
+        }
+        return try await engine.transcribeAudio(url: url, settings: settings)
     }
 
     /// Run one transcription on a specific engine: wire its progress callback, run it
     /// off the main actor, and honor cancellation. Any engine error propagates so the
     /// caller (`transcribe`) can decide whether to fall back.
-    private func runOnEngine(_ engine: TranscriptionEngine, url: URL, settings: TranscriptionSettings) async throws -> String {
+    private func runOnEngine(_ engine: TranscriptionEngine, url: URL,
+                             settings: TranscriptionSettings,
+                             context: FieldContext?) async throws -> String {
         // The cancel can land while the engine is still loading, before there is a task to abort.
         if let activeOperation, cancelledOperations.contains(activeOperation) {
             throw CancellationError()
@@ -435,7 +514,7 @@ public class TranscriptionService: ObservableObject {
             }
             guard !cancelled else { throw CancellationError() }
 
-            let result = try await engine.transcribeAudio(url: url, settings: settings)
+            let result = try await Self.transcribe(engine, url: url, settings: settings, context: context)
 
             try Task.checkCancellation()
 

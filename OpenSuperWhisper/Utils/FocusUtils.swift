@@ -218,11 +218,26 @@ class FocusUtils {
     /// How much text is already in the focused field, and where the caret sits in it.
     ///
     /// Sizes and offsets only, never the text itself: this exists to be written to a diagnostic
-    /// log, and the numbers are what the diagnosis needs. Read from the frontmost application's
-    /// own element rather than the system-wide one, which answers `cannotComplete` in cases where
-    /// asking the application directly works. nil when accessibility cannot say, which is a real
-    /// answer here rather than a failure: an app that reports nothing is itself a finding.
-    static func focusedTextMetrics() -> (length: Int, caret: Int?)? {
+    /// log, and the numbers are what the diagnosis needs. The length comes from
+    /// `kAXNumberOfCharactersAttribute`, not from reading the value and counting it — producing
+    /// one integer is not a reason to bring someone's text into this process, which is the same
+    /// rule the secure-field guard enforces. It is the AX count (UTF-16 units), not Swift's
+    /// grapheme count, so logs from before and after this change are not strictly comparable.
+    ///
+    /// A secure field is not measured at all. Even its length is a fact about a password, and
+    /// this line outlives the dictation in a diagnostic log.
+    ///
+    /// Read from the frontmost application's own element rather than the system-wide one, which
+    /// answers `cannotComplete` in cases where asking the application directly works. nil when
+    /// accessibility cannot say at all — no trust, no frontmost app, no focused element, or a
+    /// secure field.
+    ///
+    /// The count and the caret are independent answers, so a missing count is a nil length
+    /// beside a caret rather than a nil result: some apps offer one and not the other, and the
+    /// caret offset comes from the selection range, which needs no count to be placed. What is
+    /// *not* done to recover the count is reading the value and counting it — that is the rule
+    /// above, and the caret is not a reason to break it.
+    static func focusedTextMetrics() -> (length: Int?, caret: Int?)? {
         guard AXIsProcessTrusted(),
               let front = NSWorkspace.shared.frontmostApplication else { return nil }
 
@@ -237,10 +252,19 @@ class FocusUtils {
         let element = focused as! AXUIElement
         AXUIElementSetMessagingTimeout(element, axMessagingTimeout)
 
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element, kAXValueAttribute as CFString, &value
-        ) == .success, let text = value as? String else { return nil }
+        // A subrole read that failed is refused, not read as an ordinary field: its length is a
+        // fact about a password too, and this line outlives the dictation in a diagnostic log.
+        var subroleRef: CFTypeRef?
+        let subroleError = AXUIElementCopyAttributeValue(
+            element, kAXSubroleAttribute as CFString, &subroleRef
+        )
+        guard !SecureTextFields.isSecure(subroleRef as? String, error: subroleError) else { return nil }
+
+        var countRef: CFTypeRef?
+        let count = AXUIElementCopyAttributeValue(
+            element, kAXNumberOfCharactersAttribute as CFString, &countRef
+        )
+        let length = count == .success ? countRef as? Int : nil
 
         var caret: Int?
         var rangeRef: CFTypeRef?
@@ -251,6 +275,7 @@ class FocusUtils {
             if AXValueGetValue(rangeRef as! AXValue, .cfRange, &range) { caret = range.location }
         }
 
-        return (text.count, caret)
+        guard length != nil || caret != nil else { return nil }
+        return (length, caret)
     }
 }

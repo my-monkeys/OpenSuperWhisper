@@ -32,6 +32,31 @@ final class CoreConfigurationInstallTests: CoreTestCase {
 #endif
     }
 
+    /// A provider nobody reads is the same as no provider. Installing a stub and reading it back
+    /// through `CoreAccess` proves the path the field-term reducer will use is live; a test that
+    /// only asserted the value round-trips through the configuration would pass on a dead seam.
+    ///
+    /// The stub answers to the language it is given, so this also pins that the clip's language
+    /// reaches the dictionary rather than one the host read for itself — the defect that made a
+    /// French dictation judge its field against an English preference.
+    @MainActor
+    func testTheSpellingProviderIsReadThroughTheConfiguration() {
+        var configuration = CoreTestEnvironment.configuration
+        configuration.fieldTermSpelling = { language in
+            DictionaryCandidates.Spelling(knows: { $0 == "known" || $0 == language },
+                                          correctsTypo: { $0 == "typo" })
+        }
+        CoreConfiguration.replaceForTesting(configuration)
+        defer { CoreConfiguration.replaceForTesting(CoreTestEnvironment.configuration) }
+
+        let spelling = CoreAccess.fieldTermSpelling("fr")
+        XCTAssertTrue(spelling.knows("known"))
+        XCTAssertFalse(spelling.knows("unknown"))
+        XCTAssertTrue(spelling.knows("fr"), "the provider was not told the language")
+        XCTAssertTrue(spelling.correctsTypo("typo"))
+        XCTAssertFalse(spelling.correctsTypo("known"))
+    }
+
     func testReplaceForTestingSwapsAndReturnsThePrevious() {
         let probeRoot = makeScratchRoot()
 

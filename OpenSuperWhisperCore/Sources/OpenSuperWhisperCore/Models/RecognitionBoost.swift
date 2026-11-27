@@ -13,10 +13,46 @@ import Foundation
 /// otherwise be pushed toward phrases nothing then replaces.
 public enum RecognitionBoost {
 
-    /// Both lists, the dictionary first, without repeating a term that differs only in case.
-    public static func terms(dictionary: [String], snippets: [String]) -> [String] {
+    /// The merged terms and which of them entered from the field.
+    ///
+    /// Parakeet's rescore path holds field terms to a stricter similarity floor than the
+    /// dictionary and the snippets (#307), and that provenance cannot be read back from a text:
+    /// a dictionary "Priya" and a field "Priya" merge to the same list. So the merge returns it.
+    struct Plan: Equatable {
+        /// The lists in priority order — dictionary, snippets, then the field — without
+        /// repeating a term that differs only in case.
+        let terms: [String]
+        /// The lowercased forms that entered from the field list.
+        let fieldForms: Set<String>
+    }
+
+    /// The merged terms with their provenance. `terms` is the same merge without it.
+    ///
+    /// The field's terms come last because they are the weakest evidence: a name the user has
+    /// actually put in their dictionary should win the spelling when the two disagree. They are
+    /// also the only list that changes per dictation, which is why the caller caps them against
+    /// what the first two already cost rather than capping the merged list (#89).
+    static func plan(dictionary: [String], snippets: [String],
+                     field: [String] = []) -> Plan {
         var seen = Set<String>()
-        return (dictionary + snippets).filter { seen.insert($0.lowercased()).inserted }
+        var terms: [String] = []
+        var fieldForms = Set<String>()
+        func append(_ candidates: [String], fromField: Bool) {
+            for candidate in candidates where seen.insert(candidate.lowercased()).inserted {
+                terms.append(candidate)
+                if fromField { fieldForms.insert(candidate.lowercased()) }
+            }
+        }
+        append(dictionary, fromField: false)
+        append(snippets, fromField: false)
+        append(field, fromField: true)
+        return Plan(terms: terms, fieldForms: fieldForms)
+    }
+
+    /// The merged list alone, for the engines and prompts that do not need provenance.
+    public static func terms(dictionary: [String], snippets: [String],
+                             field: [String] = []) -> [String] {
+        plan(dictionary: dictionary, snippets: snippets, field: field).terms
     }
 }
 

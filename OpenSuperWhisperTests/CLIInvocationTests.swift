@@ -146,6 +146,5 @@ final class CLISettingsTests: XCTestCase {
         XCTAssertEqual(settings.customDictionaryEntries, pinned.customDictionaryEntries, file: file, line: line)
         XCTAssertEqual(settings.useSurroundingTextAsContext, pinned.useSurroundingTextAsContext,
                        file: file, line: line)
-        XCTAssertEqual(settings.focusedText, pinned.focusedText, file: file, line: line)
     }
 }

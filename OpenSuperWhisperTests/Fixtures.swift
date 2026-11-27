@@ -72,7 +72,6 @@ extension Fixtures {
         settings.customDictionaryEnabled = false
         settings.customDictionaryEntries = []
         settings.useSurroundingTextAsContext = false
-        settings.focusedText = nil
         return settings
     }
 }

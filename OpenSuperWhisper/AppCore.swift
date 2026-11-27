@@ -12,11 +12,22 @@ enum AppCore {
         textFormatter: { AutocorrectWrapper.format($0) },
         computePolicy: .automatic,
         makeSettings: { Settings() },
+        // The field-term reducer asks the spelling dictionary in the language being dictated;
+        // `SpellingDictionary` already merges it with the user's preferred languages.
+        // The language comes from the clip, not from a preference read here: a dictation can run
+        // in a different language from the one selected when it was queued.
+        fieldTermSpelling: { SpellingDictionary.spelling(for: $0) },
         confirmEnableHistory: { confirmEnableHistory() })
 
     /// Idempotent, because a SwiftUI preview never runs main and calls this from its body.
     static func install() {
         guard !CoreConfiguration.isInstalled else { return }
+        // FluidAudio logs the transcript and the applied replacement pair at debug, and Release
+        // still sends the pair through os_log. The live preview (`StreamingTranscriptionController`)
+        // builds its FluidAudio manager at record start, before any engine exists, so the level is
+        // set here: `AppMain.main` runs this before the GUI, the CLI or the agent hook, and nothing
+        // in the process can have built a preview or an engine before it.
+        FluidAudioLogging.keepDictationTextOutOfTheLog()
         CoreConfiguration.install(configuration)
     }
 

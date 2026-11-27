@@ -17,6 +17,14 @@ struct WatchedField: @unchecked Sendable {
     let element: AXUIElement
     let pid: pid_t
 
+    /// Only `focused(in:)` may build one: it is the path that asks the secure-field predicate,
+    /// and a memberwise init would let any caller hold a password box the guard never saw. The
+    /// initializer is private so that bypass does not compile.
+    private init(element: AXUIElement, pid: pid_t) {
+        self.element = element
+        self.pid = pid
+    }
+
     /// Shorter than `FocusUtils.axMessagingTimeout`: nothing waits on these, and a field that
     /// cannot answer in a quarter of a second is one to give up on rather than wait for.
     static let timeout: Float = 0.25
@@ -39,7 +47,12 @@ struct WatchedField: @unchecked Sendable {
         AXUIElementSetMessagingTimeout(element, timeout)
         let field = WatchedField(element: element, pid: pid)
         // A secure field reports bullets or nothing, but it is not ours to ask in the first place.
-        guard field.string(kAXSubroleAttribute) != (kAXSecureTextFieldSubrole as String) else { return nil }
+        // The error comes with the answer: a subrole read that failed is not an absent subrole.
+        var subroleRef: CFTypeRef?
+        let subroleError = AXUIElementCopyAttributeValue(
+            element, kAXSubroleAttribute as CFString, &subroleRef
+        )
+        guard !SecureTextFields.isSecure(subroleRef as? String, error: subroleError) else { return nil }
         return field
     }
 
