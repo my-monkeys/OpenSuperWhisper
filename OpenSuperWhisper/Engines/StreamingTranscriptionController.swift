@@ -187,20 +187,40 @@ final class StreamingTranscriptionController: ObservableObject {
         isRunning = false
     }
 
+    /// The weight FluidAudio's one-term-per-line loader gives every term, which the temporary
+    /// vocabulary file this replaced went through.
+    private static let boostWeight: Float = 10
+
+    /// Loaded once, like the batch engine's: the tokenizer file is the same for every term list.
+    private var ctcTokenizer: CtcTokenizer?
+
+    /// Boosting is skipped, as with no terms, when the CTC models are unavailable on this OS
+    /// build (`CtcModelLoader`). The models are the batch rescorer's, so the encoder compiles once.
     private func configureVocabulary(on manager: SlidingWindowAsrManager, boostTerms: [String]) async {
         let terms = boostTerms.filter { !$0.isEmpty }
         guard !terms.isEmpty else { return }
-        let vocabularyURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("OpenSuperWhisper-StreamVocab-\(UUID().uuidString)")
-            .appendingPathExtension("txt")
         do {
-            try terms.joined(separator: "\n").write(to: vocabularyURL, atomically: true, encoding: .utf8)
-            defer { try? FileManager.default.removeItem(at: vocabularyURL) }
-            let vocab = try await CustomVocabularyContext.loadWithCtcTokens(from: vocabularyURL.path)
-            guard !vocab.vocab.terms.isEmpty else { return }
-            try await manager.configureVocabularyBoosting(vocabulary: vocab.vocab, ctcModels: vocab.models)
+            guard let models = try await CtcModelLoader.shared.models() else { return }
+            let tokenizer = try await vocabularyTokenizer(for: models)
+            // Built in code rather than through a temporary file, where a term containing ":"
+            // or a leading "#" was read as the loader's own syntax.
+            let vocabularyTerms = terms.compactMap { text -> CustomVocabularyTerm? in
+                let ids = tokenizer.encode(text)
+                return ids.isEmpty ? nil : CustomVocabularyTerm(text: text, weight: Self.boostWeight, ctcTokenIds: ids)
+            }
+            guard !vocabularyTerms.isEmpty else { return }
+            try await manager.configureVocabularyBoosting(
+                vocabulary: CustomVocabularyContext(terms: vocabularyTerms), ctcModels: models)
         } catch {
             print("Streaming custom vocabulary unavailable: \(error)")
         }
+    }
+
+    private func vocabularyTokenizer(for models: CtcModels) async throws -> CtcTokenizer {
+        if let ctcTokenizer { return ctcTokenizer }
+        let tokenizer = try await CtcTokenizer.load(
+            from: models.directory ?? CtcModels.defaultCacheDirectory(for: models.variant))
+        ctcTokenizer = tokenizer
+        return tokenizer
     }
 }

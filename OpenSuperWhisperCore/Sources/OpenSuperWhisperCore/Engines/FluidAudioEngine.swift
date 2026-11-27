@@ -7,14 +7,6 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
 
     private var asrManager: AsrManager?
     private var asrModels: AsrModels?
-    /// The CTC models the vocabulary path spots with, loaded the first time a boost is actually
-    /// used: ~64 MB a user with no dictionary boost, no snippet boost and no field context never
-    /// pays for.
-    ///
-    /// No cache key: the CTC model is chosen by `CtcModelVariant`, not by the ASR model version.
-    /// The file path this replaced always asked for `.ctc110m` whatever `AsrModelVersion` ran,
-    /// so one load serves every dictation this engine transcribes.
-    private var ctcModels: CtcModels?
     private var isCancelled = false
     private var transcriptionTask: Task<String, Error>?
     private var progressTask: Task<Void, Never>?
@@ -289,11 +281,12 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     private var boostSessions = BoostSessionCache<VocabularyBoostingSession>()
 
     /// The transcript rescored toward the boost terms, or nil to keep it. Never throws: boosting
-    /// failing is logged and the plain transcript is used.
+    /// failing is logged and the plain transcript is used, as it is when the CTC models are
+    /// unavailable on this OS build (`CtcModelLoader`).
     private func rescore(_ text: String, timings: [TokenTiming], samples: [Float],
                          plan: RecognitionBoost.Plan) async -> String? {
         do {
-            let session = try await boostingSession(for: plan)
+            guard let session = try await boostingSession(for: plan) else { return nil }
             return await session.rescore(text: text, tokenTimings: timings, audioSamples: samples)?.text
         } catch {
             print("Parakeet vocabulary boosting unavailable, keeping the plain transcript: \(error)")
@@ -301,23 +294,24 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
         }
     }
 
-    private func boostingSession(for plan: RecognitionBoost.Plan) async throws -> VocabularyBoostingSession {
+    private func boostingSession(for plan: RecognitionBoost.Plan) async throws -> VocabularyBoostingSession? {
         if let cached = boostSessions.cached(for: plan) { return cached }
+        guard let models = try await CtcModelLoader.shared.models() else { return nil }
         // Built in code. The path this replaced joined the terms with newlines into a temporary
         // file, where a term containing ":", a leading "#", a newline or "{" would have been
         // read as the loader's own syntax. Terms reduced from a field of prose are the first
         // that can contain any of those.
-        let vocabulary = CustomVocabularyContext(terms: try await vocabulary(for: plan))
+        let vocabulary = CustomVocabularyContext(terms: try await vocabulary(for: plan, models: models))
         let session = try await VocabularyBoostingSession(vocabulary: vocabulary,
-                                                          ctcModels: try await vocabularyModels(),
+                                                          ctcModels: models,
                                                           config: Self.rescorerConfig)
         boostSessions.store(session, for: plan)
         return session
     }
 
     /// The terms the session receives for `plan`: the tokenized list with its floors.
-    private func vocabulary(for plan: RecognitionBoost.Plan) async throws -> [CustomVocabularyTerm] {
-        let models = try await vocabularyModels()
+    private func vocabulary(for plan: RecognitionBoost.Plan,
+                            models: CtcModels) async throws -> [CustomVocabularyTerm] {
         let tokenizer = try await vocabularyTokenizer(for: models)
         return Self.vocabularyTerms(for: plan, encode: tokenizer.encode).map {
             CustomVocabularyTerm(text: $0.text, ctcTokenIds: $0.ctcTokenIds,
@@ -329,8 +323,8 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
     /// term the CTC tokenizer cannot encode is dropped, so an arm's input list cannot prove its
     /// boost was real — the inert arm exists to make that visible.
     func boostedTermCount(for plan: RecognitionBoost.Plan) async throws -> Int {
-        guard !plan.terms.isEmpty else { return 0 }
-        return try await vocabulary(for: plan).count
+        guard !plan.terms.isEmpty, let models = try await CtcModelLoader.shared.models() else { return 0 }
+        return try await vocabulary(for: plan, models: models).count
     }
 
     /// The CTC tokenizer, loaded once and reused: pre-tokenising every term is what lets the
@@ -354,15 +348,6 @@ class FluidAudioEngine: TranscriptionEngine, TermContextEngine {
         let tokenizer = try await CtcTokenizer.load(from: directory)
         ctcTokenizer = tokenizer
         return tokenizer
-    }
-
-    /// The CTC models, loaded once and reused. The session is rebuilt whenever the term list
-    /// changes; the models it runs on are the same for every list.
-    private func vocabularyModels() async throws -> CtcModels {
-        if let ctcModels { return ctcModels }
-        let models = try await CtcModels.downloadAndLoad(variant: .ctc110m)
-        ctcModels = models
-        return models
     }
 
     /// Samples to hand FluidAudio in place of the file, or nil to let it read the file itself.
