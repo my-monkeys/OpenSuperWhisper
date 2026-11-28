@@ -167,11 +167,10 @@ class AudioRecorder: NSObject, ObservableObject {
     }
     #endif
 
-    /// Claims a start's take — its file URL and its App Nap assertion — in one critical section.
-    /// Claimed separately, the pair could be observed half-claimed: a failed older start releasing
-    /// between a newer start's `beginRecordingActivity` and its URL write would end the newer
-    /// take's assertion, the #98 freeze class. Ends any previous assertion after the lock. The
-    /// last refusal is cleared here too: a take is live now, so it no longer describes the state.
+    /// Claims a start's take — its file URL and its App Nap assertion — in one critical section, so
+    /// a failed older start's release can never observe the pair half-claimed and end this take's
+    /// assertion (the #98 freeze class). Ends the previous assertion after the lock, and clears the
+    /// last refusal: a take is live now, so it no longer describes the state.
     private func claimTake(fileURL: URL) {
         let activity = ProcessInfo.processInfo.beginActivity(
             options: .userInitiatedAllowingIdleSystemSleep,
