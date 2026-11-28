@@ -33,18 +33,23 @@ final class PunctuationCalibrationModel: ObservableObject {
 
     /// `startFailurePublisher` is the recorder's refusal feed, injectable so a test can drive one
     /// without a microphone. The default skips the value `@Published` replays on subscribe, which
-    /// belongs to a previous take; an injected publisher is subscribed as-is.
+    /// belongs to a previous take; an injected publisher is subscribed as-is. `takeIsLive` says
+    /// whether a take currently owns the recorder: a refusal already scheduled through
+    /// `receive(on:)` can land after a newer take claimed the recorder, and acting on it would put
+    /// the older attempt's reason on the newer take.
     init(startFailurePublisher: AnyPublisher<String?, Never> =
-            AudioRecorder.shared.$startFailureMessage.dropFirst().eraseToAnyPublisher()) {
+            AudioRecorder.shared.$startFailureMessage.dropFirst().eraseToAnyPublisher(),
+         takeIsLive: @escaping () -> Bool = { AudioRecorder.shared.currentRecordingURL != nil }) {
         // A start this sheet asked for can be refused before the recorder opens (no microphone,
         // a switch that fails). `begin` shows the button as recording by the time the refusal
         // lands, so put it back and keep the reason under the sentence: the same sentence stays
         // up to try again, and a later stop cannot advance as if a take happened. `isRecording`
-        // keeps another caller's failure off this sheet. (#360 review)
+        // keeps another caller's failure off this sheet; `takeIsLive` keeps an already-scheduled
+        // refusal from a previous attempt off a take that has since claimed the recorder. (#360 review)
         startFailurePublisher
             .receive(on: RunLoop.main)
             .sink { [weak self] message in
-                guard let self = self, let message, self.isRecording else { return }
+                guard let self = self, let message, self.isRecording, !takeIsLive() else { return }
                 self.isRecording = false
                 self.refusalMessage = message
             }
