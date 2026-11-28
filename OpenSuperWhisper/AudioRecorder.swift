@@ -257,33 +257,50 @@ class AudioRecorder: NSObject, ObservableObject {
         #if os(macOS)
         if let activeMic = MicrophoneService.shared.getActiveMicrophone() {
             // A failed switch would record from whatever macOS still uses instead of the
-            // microphone the user chose, so the take must not start at all. (#360)
+            // microphone the user chose, so the take must not start — unless that input already
+            // is the chosen device. (#360)
             let switched = Diag.measure("setAsSystemDefaultInput") {
                 MicrophoneService.shared.setAsSystemDefaultInput(activeMic)
             }
             if let blocker = Self.microphoneSwitchBlocker(switched: switched) {
-                print("Cannot start recording: \(blocker)")
-                // A stop or a new take can land while the switch blocks, and only this start's
-                // URL and App Nap assertion are ours to release: a newer take owns its own, and
-                // clearing them here would silently discard its recording. (#360 review)
-                let (released, activity) = take.withLockUnchecked {
-                    state -> (released: Bool, activity: NSObjectProtocol?) in
-                    guard Self.canReleaseAbortedStart(startedURL: fileURL, currentURL: state.url) else {
-                        return (false, nil)
+                // A Set can report an error while the system input is already the chosen device
+                // (a transient HAL error), and that take still records from it: refusing there
+                // would lose a working take. Re-read the input before treating it as a mismatch.
+                // The same lookup says which call failed, for the log. (#360 review)
+                let service = MicrophoneService.shared
+                let targetID = service.getCoreAudioDeviceID(for: activeMic)
+                let alreadyDefault = targetID != nil
+                    && targetID == service.getCurrentSystemDefaultInputDevice()
+                if alreadyDefault {
+                    Diag.mark("recorder.micSwitch: \(activeMic.displayName) is already the system default input; continuing")
+                } else {
+                    Diag.mark("recorder.micSwitch failed for \(activeMic.displayName) "
+                        + (targetID == nil ? "(device-ID translation failed)" : "(AudioObjectSetPropertyData failed)"))
+                    print("Cannot start recording: \(blocker)")
+                    // A stop or a new take can land while the switch blocks, and only this start's
+                    // URL and App Nap assertion are ours to release: a newer take owns its own, and
+                    // clearing them here would silently discard its recording. (#360 review)
+                    let (released, activity) = take.withLockUnchecked {
+                        state -> (released: Bool, activity: NSObjectProtocol?) in
+                        guard Self.canReleaseAbortedStart(startedURL: fileURL, currentURL: state.url) else {
+                            return (false, nil)
+                        }
+                        state.url = nil
+                        defer { state.activity = nil }
+                        return (true, state.activity)
                     }
-                    state.url = nil
-                    defer { state.activity = nil }
-                    return (true, state.activity)
-                }
-                guard released else {
-                    Diag.mark("recorder.start abandoned: mic switch failed after a newer take claimed the take")
+                    guard released else {
+                        Diag.mark("recorder.start abandoned: mic switch failed after a newer take claimed the take")
+                        return
+                    }
+                    activity.map(ProcessInfo.processInfo.endActivity)
+                    reportStartFailure(blocker)
                     return
                 }
-                activity.map(ProcessInfo.processInfo.endActivity)
-                reportStartFailure(blocker)
-                return
             }
-            print("Set system default input to: \(activeMic.displayName)")
+            if switched {
+                print("Set system default input to: \(activeMic.displayName)")
+            }
         }
         #endif
 
