@@ -266,5 +266,25 @@ final class PunctuationCalibrationModelTests: XCTestCase {
         XCTAssertFalse(model.isRecordingForTesting)
         XCTAssertNil(model.refusalMessage, "a refusal from another caller must not surface here")
     }
+
+    /// A refusal already scheduled through `receive(on:)` can land after a newer take claimed the
+    /// recorder. The sheet must not take the older attempt's reason as this take's, so a live take
+    /// vetoes the message even while the sheet's own flag is set. (#360 review)
+    func testARefusalForANewerTakeIsIgnoredWhileATakeIsLive() async throws {
+        let failures = CurrentValueSubject<String?, Never>(nil)
+        let model = PunctuationCalibrationModel(
+            startFailurePublisher: failures.eraseToAnyPublisher(),
+            takeIsLive: { true })
+        model.isRecordingForTesting = true
+        XCTAssertTrue(model.isRecordingForTesting,
+                      "the fixture must hold a take, or the guard under test is not reached")
+
+        failures.send(reason)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertTrue(model.isRecordingForTesting,
+                      "a refusal that belongs to an older attempt must not end this take")
+        XCTAssertNil(model.refusalMessage)
+    }
 }
 #endif
