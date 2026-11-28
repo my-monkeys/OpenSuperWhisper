@@ -60,6 +60,28 @@ final class RecordingStartAndStopEventsTests: XCTestCase {
         XCTAssertEqual(vm.state, .idle)
     }
 
+    /// A stop can land on a take that never started: a refused start leaves the bubble showing
+    /// the specific reason while the trigger's take is still set, so the user's stop arrives in
+    /// `startDecoding`. There is nothing to stop, and the generic "Nothing was recorded" would
+    /// replace the reason they need. (#360)
+    func testAStopOnARefusedStartLeavesTheReasonAlone() {
+        let vm = IndicatorViewModel()
+        defer { vm.cleanup() }
+        var stops = 0
+        vm.stopRecordingOverride = {
+            stops += 1
+            return .noAudio
+        }
+        let reason = "Couldn't use the selected microphone. Check that it's connected and try again."
+        vm.state = .error(reason)
+
+        vm.startDecoding()
+
+        XCTAssertEqual(stops, 0, "a refused start has no take to stop")
+        XCTAssertEqual(vm.state, .error(reason),
+                       "the specific reason must survive the stop, not become the generic no-audio message")
+    }
+
     func testAStartWithNoMicrophoneIsBlocked() {
         XCTAssertNotNil(AudioRecorder.startBlocker(canRecord: false, microphoneAccess: .authorized))
     }
