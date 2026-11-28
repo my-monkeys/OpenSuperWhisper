@@ -30,15 +30,6 @@ final class RecordingFailureTests: XCTestCase {
         XCTAssertLessThanOrEqual(AudioRecorder.connectionGracePeriod, 10)
     }
 
-    /// A switch that fails would leave the take recording from whatever macOS still uses — silent
-    /// on a closed laptop lid — and a silent clip is deleted as "no speech", so the user saw
-    /// nothing to explain it (#360). The take has to fail instead, and say why.
-    func testAFailedMicrophoneSwitchBlocksTheTake() {
-        XCTAssertNil(AudioRecorder.microphoneSwitchBlocker(switched: true))
-        XCTAssertEqual(AudioRecorder.microphoneSwitchBlocker(switched: false),
-                       String(localized: "Couldn't use the selected microphone. Check that it's connected and try again."))
-    }
-
     /// A start can fail while a stop, or a whole new take, lands during the blocking switch. Its
     /// cleanup may then release only state it still owns: releasing a newer take's URL and App Nap
     /// assertion would silently discard that take's recording. (#360 review)

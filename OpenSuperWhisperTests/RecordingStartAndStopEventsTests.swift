@@ -74,4 +74,17 @@ final class RecordingStartAndStopEventsTests: XCTestCase {
         XCTAssertNil(AudioRecorder.startBlocker(canRecord: true, microphoneAccess: .authorized))
         XCTAssertNil(AudioRecorder.startBlocker(canRecord: true, microphoneAccess: .notDetermined))
     }
+
+    /// A switch that fails would leave the take recording from whatever macOS still uses — silent
+    /// on a closed laptop lid — and a silent clip is deleted as "no speech", so the user saw
+    /// nothing to explain it (#360). This pins the reason the take is refused; the abort that acts
+    /// on it lives in `startRecording`.
+    func testAFailedMicrophoneSwitchHasAReason() {
+        XCTAssertNil(AudioRecorder.microphoneSwitchBlocker(switched: true))
+        // The English copy, not a second catalog lookup: this pins the message, and
+        // `Scripts/check-localizations.sh` owns catalog completeness.
+        // shortcut: English-locale runner assumed; pin the locale if the suite runs elsewhere.
+        XCTAssertEqual(AudioRecorder.microphoneSwitchBlocker(switched: false),
+                       "Couldn't use the selected microphone. Check that it's connected and try again.")
+    }
 }
