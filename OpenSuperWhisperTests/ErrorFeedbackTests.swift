@@ -5,6 +5,7 @@
 //  Tests for error feedback implementation (GitHub issue #117).
 //
 
+import AVFoundation
 import Combine
 import XCTest
 @testable import OpenSuperWhisper
@@ -245,6 +246,31 @@ final class ContentViewModelErrorTests: XCTestCase {
 
         XCTAssertEqual(viewModel.state, .idle)
         XCTAssertNil(viewModel.errorMessage, "a refusal from another caller must not surface here")
+    }
+
+    /// The real refusal path, not an injected feed: the recorder's own `isRecording = false`
+    /// publication and the failure message race through the same main run loop, and the window
+    /// must still show why. The state sink resets `.recording` to `.idle` on that publication,
+    /// so the message has to be published first or the failure sink's guard rejects it (#360).
+    /// `canRecord = false` is refused before the recorder opens, so the microphone stays shut.
+    func testARefusedStartOnTheRealRecorderPathShowsTheReasonInTheMainWindow() async throws {
+        let recorder = AudioRecorder.shared
+        let previousCanRecord = recorder.canRecord
+        recorder.canRecord = false
+        defer { recorder.canRecord = previousCanRecord }
+
+        let viewModel = ContentViewModel()
+        // Let the recorder's replayed state settle before the optimistic one.
+        try await Task.sleep(nanoseconds: 100_000_000)
+        viewModel.state = .recording
+
+        recorder.startRecording()
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(viewModel.errorMessage,
+                       AudioRecorder.startBlocker(canRecord: false, microphoneAccess: .authorized),
+                       "the main window must show why the start was refused")
+        XCTAssertEqual(viewModel.state, .idle, "and it must not stay stuck on recording")
     }
 }
 

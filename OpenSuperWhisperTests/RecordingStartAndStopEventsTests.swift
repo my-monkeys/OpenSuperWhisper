@@ -119,6 +119,61 @@ final class RecordingStartAndStopEventsTests: XCTestCase {
         vm.cancelLivePreview()
         XCTAssertFalse(vm.livePreviewActiveForTesting, "a second call with nothing staged is a no-op")
     }
+
+    /// The failure seam is what ends a take that died without a stop, so the manager's call is
+    /// what actually cancels the dead take's preview; `cleanup()` does not. The controller call
+    /// behind it stays the structural boundary. (#360 review)
+    func testReportingADeadTakeCancelsItsLivePreview() {
+        let vm = IndicatorViewModel()
+        vm.livePreviewActiveForTesting = true
+        let windows = IndicatorWindowManager.shared
+        let original = windows.viewModel
+        windows.viewModel = vm
+        defer {
+            windows.viewModel = original
+            vm.cleanup()
+        }
+
+        windows.reportRecordingFailure("boom")
+
+        XCTAssertFalse(vm.livePreviewActiveForTesting,
+                       "the manager's failure seam must cancel the dead take's preview")
+    }
+
+    /// A take that dies can have an agent reply armed with no stop to follow, and an agent-panel
+    /// take keeps its bubble off screen, so there may be no view model at all. The failure seam
+    /// is then the only place that can hand the reply back. (#360 review)
+    func testReportingADeadTakeDisarmsTheAgentReplyWithoutABubble() {
+        AgentInbox.shared.stageDictation(for: "dead-take")
+        defer { AgentInbox.shared.stageDictation(for: nil) }
+        XCTAssertEqual(AgentInbox.shared.armedReplyID, "dead-take",
+                       "the fixture must arm the reply before the failure, or the assertion proves nothing")
+        let windows = IndicatorWindowManager.shared
+        let original = windows.viewModel
+        windows.viewModel = nil
+        defer { windows.viewModel = original }
+
+        windows.reportRecordingFailure("boom")
+
+        XCTAssertNil(AgentInbox.shared.armedReplyID,
+                     "no stop follows a take that died, so the failure seam is the only place to hand the reply back")
+    }
+
+    /// The trigger can fire when the recorder has no input, and the panel may already have armed
+    /// the reply; the no-input guard is the only exit that runs, so it has to hand it back.
+    func testARefusedStartWithNoInputDisarmsTheAgentReply() {
+        let vm = IndicatorViewModel()
+        defer { vm.cleanup() }
+        AgentInbox.shared.stageDictation(for: "no-input")
+        defer { AgentInbox.shared.stageDictation(for: nil) }
+        XCTAssertEqual(AgentInbox.shared.armedReplyID, "no-input")
+
+        vm.startRecording(recorderStarted: false)
+
+        XCTAssertNil(AgentInbox.shared.armedReplyID,
+                     "a start that never reaches the recorder has no stop to hand the reply back")
+        XCTAssertEqual(vm.state, .error("No microphone available"))
+    }
     #endif
 
     func testAStartWithNoMicrophoneIsBlocked() {
