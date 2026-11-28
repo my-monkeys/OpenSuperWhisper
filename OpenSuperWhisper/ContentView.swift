@@ -46,7 +46,14 @@ class ContentViewModel: ObservableObject {
     /// Local keyDown monitor for Esc-to-cancel while a main-window recording is live.
     private var escapeMonitor: Any?
     
-    init() {
+    /// `startFailures` is the recorder's refusal feed, injectable so a test can drive one without
+    /// a microphone. The default skips the value `@Published` replays on subscribe, which belongs
+    /// to a previous take; an injected publisher is subscribed as-is. `takeIsLive` is read when a
+    /// message lands: a refusal already past the recorder's live-take guard can still be delivered
+    /// after the next take has claimed the recorder, and that take's UI is not ours to reset.
+    init(startFailures: AnyPublisher<String?, Never> =
+            AudioRecorder.shared.$startFailureMessage.dropFirst().eraseToAnyPublisher(),
+         takeIsLive: @escaping () -> Bool = { AudioRecorder.shared.currentRecordingURL != nil }) {
         recorder.$isConnecting
             .receive(on: RunLoop.main)
             .sink { [weak self] isConnecting in
@@ -74,6 +81,26 @@ class ContentViewModel: ObservableObject {
                     self.stopDurationTimer()
                     self.recordingDuration = 0
                 }
+            }
+            .store(in: &cancellables)
+
+        // A refused start never reaches `$isRecording`, so the optimistic `.recording` or
+        // `.connecting` set by `startRecording` has to be undone here, and the reason shown: the
+        // main window has no indicator bubble to carry it. The default feed skips the replayed
+        // last failure, which belongs to a previous take. `takeIsLive` is re-checked at receipt:
+        // a message already on its way can land after the next take claimed the recorder.
+        // (#360 review)
+        startFailures
+            .receive(on: RunLoop.main)
+            .sink { [weak self] message in
+                guard let self = self, let message, !takeIsLive(),
+                      self.state == .recording || self.state == .connecting else { return }
+                self.removeEscapeMonitor()
+                self.stopBlinking()
+                self.stopDurationTimer()
+                self.recordingDuration = 0
+                self.state = .idle
+                self.showError(message)
             }
             .store(in: &cancellables)
     }

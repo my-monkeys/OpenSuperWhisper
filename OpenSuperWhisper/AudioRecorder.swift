@@ -12,7 +12,13 @@ class AudioRecorder: NSObject, ObservableObject {
     @Published var currentlyPlayingURL: URL?
     @Published var canRecord = false
     @Published var isConnecting = false
-    
+    /// Why the last start was refused, for callers that never get an indicator bubble: the main
+    /// window's Record button and punctuation calibration. The bubble is told directly by
+    /// `reportStartFailure`; this is the same message for everyone else. It is cleared when a later
+    /// take claims the recorder, but `@Published` replays the last value to a new subscriber, so a
+    /// consumer can still start with a previous take's reason — which is why both skip the replay.
+    @Published private(set) var startFailureMessage: String?
+
     private var audioPlayer: AVAudioPlayer?
     private var notificationSound: NSSound?
     /// The volume duck waiting for the start chime to finish. Cancelled by a stop that lands
@@ -143,10 +149,12 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
+    #if DEBUG
     /// Tells the system this app is doing work the user asked for, so App Nap leaves it alone.
     /// See `take.activity`. Ending any assertion already held keeps them from stacking: a
     /// start that never saw a matching stop would otherwise leak one and hold App Nap off for good.
-    /// Internal rather than private so a test can check the pair stays balanced.
+    /// Test seam: AppNapActivityTests drives begin/end directly; production claims through
+    /// `claimTake`, which writes the URL in the same critical section.
     func beginRecordingActivity() {
         let activity = ProcessInfo.processInfo.beginActivity(
             options: .userInitiatedAllowingIdleSystemSleep,
@@ -157,9 +165,30 @@ class AudioRecorder: NSObject, ObservableObject {
         }
         previous.map(ProcessInfo.processInfo.endActivity)
     }
+    #endif
+
+    /// Claims a start's take — its file URL and its App Nap assertion — in one critical section, so
+    /// a failed older start's release can never observe the pair half-claimed and end this take's
+    /// assertion (the #98 freeze class). Ends the previous assertion after the lock, and clears the
+    /// last refusal: a take is live now, so it no longer describes the state.
+    private func claimTake(fileURL: URL) {
+        let activity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep,
+            reason: "Recording audio for dictation")
+        let previous = take.withLockUnchecked { state -> NSObjectProtocol? in
+            defer {
+                state.url = fileURL
+                state.activity = activity
+            }
+            return state.activity
+        }
+        previous.map(ProcessInfo.processInfo.endActivity)
+        DispatchQueue.main.async { self.startFailureMessage = nil }
+    }
 
     /// Releases the assertion. Safe to call when none is held, which is what makes it usable both
-    /// on every exit path and as the guard against stacking in `beginRecordingActivity`.
+    /// on every exit path and as the guard against stacking in `claimTake` (and the DEBUG
+    /// `beginRecordingActivity` seam).
     func endRecordingActivity() {
         let activity = take.withLockUnchecked { state -> NSObjectProtocol? in
             defer { state.activity = nil }
@@ -184,11 +213,45 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
 
+    /// Why a take cannot go ahead when the system input is not the chosen microphone, nil when it
+    /// is. `switched` is the verified result — a `true` from the Set alone is not proof the input
+    /// changed (see `startRecording`). Left ignored, the take recorded from whatever macOS still
+    /// used — silent on a closed laptop lid — and a silent clip is deleted as "no speech", so
+    /// the user had nothing to go on (#360). `locale` is injectable so a test can pin the copy.
+    static func microphoneSwitchBlocker(switched: Bool, locale: Locale = .current) -> String? {
+        guard !switched else { return nil }
+        return String(localized: "Couldn't use the selected microphone. Check that it's connected and try again.",
+                      locale: locale)
+    }
+
+    /// Whether a take may record from the chosen microphone after the switch attempt. The current
+    /// default decides, not the Set's return value: a failed Set still records from the chosen
+    /// device when that device already is the default (a transient HAL error), and a successful
+    /// one can land after the recorder has opened the old device (#360 "lands late"). A missing or
+    /// zero device ID is a translation failure, never a match — an unknown UID translates without
+    /// error into kAudioObjectUnknown.
+    static func systemInputIsChosen(targetID: AudioDeviceID?, currentDefault: AudioDeviceID?) -> Bool {
+        guard let targetID, targetID != kAudioObjectUnknown else { return false }
+        return targetID == currentDefault
+    }
+
     /// Clears the recording state and puts the reason where the user is looking. Not routed
-    /// through `flash`: the bubble is waiting on this very recording.
+    /// through `flash`: the bubble is waiting on this very recording. Re-checked when it lands on
+    /// the main thread: a stop or a newer take may have taken the recorder over while this start
+    /// was failing, and that take's bubble, state and field text are not ours to reset. (#360 review)
     private func reportStartFailure(_ message: String) {
-        updateRecordingState(isRecording: false, isConnecting: false)
-        Task { @MainActor in IndicatorWindowManager.shared.reportRecordingFailure(message) }
+        Task { @MainActor in
+            guard currentRecordingURL == nil else { return }
+            // Assigned here rather than through `updateRecordingState`, which hops through the
+            // main queue again: the ownership check above covers all three writes. The message
+            // goes first: each property reaches the main window through `receive(on: RunLoop.main)`
+            // in emission order, and a state write delivered first would reset the optimistic
+            // `.recording` to `.idle` before the failure sink's guard runs, dropping the reason.
+            startFailureMessage = message
+            isRecording = false
+            isConnecting = false
+            IndicatorWindowManager.shared.reportRecordingFailure(message)
+        }
     }
 
     /// Starts the recording in a detached task and returns at once; false when there is no input
@@ -219,10 +282,6 @@ class AudioRecorder: NSObject, ObservableObject {
             _ = stopRecording()
         }
 
-        // Before any of the audio setup, so the connection wait and the state updates that follow
-        // are already protected from being throttled. (#98)
-        beginRecordingActivity()
-
         // A UUID suffix keeps each recording's temp file unique. Without it, two recordings
         // started in the same wall-clock second share a path — and starting the next recording
         // would truncate the previous clip's file while the background pipeline is still reading
@@ -230,16 +289,50 @@ class AudioRecorder: NSObject, ObservableObject {
         let timestamp = Int(Date().timeIntervalSince1970)
         let filename = "rec-\(timestamp)-\(UUID().uuidString.prefix(8)).wav"
         let fileURL = UnfinishedDictations.directory.appendingPathComponent(filename)
-        take.withLockUnchecked { $0.url = fileURL }
+        // Before any of the audio setup, so the connection wait and the state updates that follow
+        // are already protected from being throttled (#98), and with the URL in the same claim so
+        // a failed start can tell its own take from a newer one at a single point.
+        claimTake(fileURL: fileURL)
 
         print("start record file to \(fileURL)")
 
         #if os(macOS)
         if let activeMic = MicrophoneService.shared.getActiveMicrophone() {
-            Diag.measure("setAsSystemDefaultInput") {
-                _ = MicrophoneService.shared.setAsSystemDefaultInput(activeMic)
+            // A failed — or silently late — switch would record from whatever macOS still uses
+            // instead of the microphone the user chose, so the take must not start. `true` from
+            // the Set is not proof the input changed: it can report success while the default is
+            // still the old device, which is the "lands late" case in #360. Decide from what the
+            // system actually uses, re-read after the Set. (#360)
+            let service = MicrophoneService.shared
+            let switched = Diag.measure("setAsSystemDefaultInput") {
+                service.setAsSystemDefaultInput(activeMic)
             }
-            print("Set system default input to: \(activeMic.displayName)")
+            let targetID = service.getCoreAudioDeviceID(for: activeMic)
+            let currentDefault = service.getCurrentSystemDefaultInputDevice()
+            // A zero ID is a translation failure rather than a device; both reads returning zero
+            // is not a match either.
+            let translationFailed = targetID == nil || targetID == kAudioObjectUnknown
+            let inputIsChosen = Self.systemInputIsChosen(targetID: targetID, currentDefault: currentDefault)
+
+            if let blocker = Self.microphoneSwitchBlocker(switched: inputIsChosen) {
+                Diag.mark("recorder.micSwitch failed for \(activeMic.displayName) "
+                    + (translationFailed ? "(device-ID translation failed)" : "(system input is not the chosen device)"))
+                print("Cannot start recording: \(blocker)")
+                // A stop or a new take can land while the switch blocks, and only this start's
+                // claim is ours to release: a newer take owns its own, and clearing it here would
+                // silently discard its recording. (#360 review)
+                guard releaseTakeIfStillOwned(by: fileURL) else {
+                    Diag.mark("recorder.start abandoned: mic switch failed after a newer take claimed the take")
+                    return
+                }
+                reportStartFailure(blocker)
+                return
+            }
+            if switched {
+                print("Set system default input to: \(activeMic.displayName)")
+            } else {
+                Diag.mark("recorder.micSwitch: \(activeMic.displayName) is already the system default input; continuing")
+            }
         }
         #endif
 
@@ -352,10 +445,9 @@ class AudioRecorder: NSObject, ObservableObject {
             print("Recording started successfully")
         } catch {
             print("Failed to start recording: \(error)")
-            take.withLockUnchecked { $0.url = nil }
-            // No recording to protect, and nothing will call `stopRecording` for a start that
-            // never happened — so release the assertion here or it is held for ever.
-            endRecordingActivity()
+            // As above: a stop or a newer take may have taken the claim while the recorder was
+            // being built, and then only its own release is ours to do.
+            guard releaseTakeIfStillOwned(by: fileURL) else { return }
             reportStartFailure(String(localized: "Recording could not start"))
         }
     }
@@ -364,6 +456,33 @@ class AudioRecorder: NSObject, ObservableObject {
     /// URL while the recorder was being made, or the next take has replaced it.
     static func startWasAbandoned(startedURL: URL, currentURL: URL?) -> Bool {
         currentURL != startedURL
+    }
+
+    /// Whether a start that failed before its recorder existed may release the shared take state.
+    /// It may while the lock still holds this start's URL or nothing at all; once a newer take has
+    /// replaced the URL, that URL and the App Nap assertion belong to the newer take, and clearing
+    /// them here would silently discard its recording. `claimTake` sets both fields together, so
+    /// "nothing at all" cannot be a newer take's assertion with its URL not yet written. (#360 review)
+    static func canReleaseAbortedStart(startedURL: URL, currentURL: URL?) -> Bool {
+        currentURL == nil || currentURL == startedURL
+    }
+
+    /// Releases the URL and App Nap assertion a failed start still owns. Returns false when a newer
+    /// take has replaced them: releasing then would discard its recording. Both pre-recorder abort
+    /// paths use this one ritual so they cannot drift apart. (#360 review)
+    private func releaseTakeIfStillOwned(by startedURL: URL) -> Bool {
+        let (released, activity) = take.withLockUnchecked {
+            state -> (released: Bool, activity: NSObjectProtocol?) in
+            guard Self.canReleaseAbortedStart(startedURL: startedURL, currentURL: state.url) else {
+                return (false, nil)
+            }
+            state.url = nil
+            defer { state.activity = nil }
+            return (true, state.activity)
+        }
+        guard released else { return false }
+        activity.map(ProcessInfo.processInfo.endActivity)
+        return true
     }
 
     /// Cleans up after a start that a stop beat to it. The recorder it just began is an orphan

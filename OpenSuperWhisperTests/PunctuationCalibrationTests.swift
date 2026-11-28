@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 
 @testable import OpenSuperWhisper
@@ -224,3 +225,66 @@ final class PunctuationCalibrationTests: XCTestCase {
         XCTAssertEqual(PunctuationCalibration.sentences(for: "fr-FR").first?.language, "fr")
     }
 }
+
+#if DEBUG
+/// The sheet's side of a refused start: put the button back and keep the reason. The recorder is
+/// a structural boundary here (it needs a microphone), so the refusal feed is injected and the
+/// recording flag staged; the production sink is otherwise untouched.
+@MainActor
+final class PunctuationCalibrationModelTests: XCTestCase {
+
+    private let reason = "Couldn't use the selected microphone. Check that it's connected and try again."
+
+    private func makeModel() -> (PunctuationCalibrationModel, CurrentValueSubject<String?, Never>) {
+        let failures = CurrentValueSubject<String?, Never>(nil)
+        let model = PunctuationCalibrationModel(startFailurePublisher: failures.eraseToAnyPublisher())
+        return (model, failures)
+    }
+
+    /// A refusal this sheet asked for must not leave the button stuck on Stop, and the reason has
+    /// to stay under the sentence: the sheet is the only place it can be shown. (#360 review)
+    func testARefusalWhileTheSheetHoldsATakeResetsItAndShowsTheReason() async throws {
+        let (model, failures) = makeModel()
+        model.isRecordingForTesting = true
+
+        failures.send(reason)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertFalse(model.isRecordingForTesting, "the button must go back to Record")
+        XCTAssertEqual(model.refusalMessage, reason)
+    }
+
+    /// The feed is process-wide: a refusal that belongs to the bubble or the main window must not
+    /// end a take this sheet is not holding, or put its reason on the sheet.
+    func testARefusalWhileTheSheetIsIdleIsIgnored() async throws {
+        let (model, failures) = makeModel()
+        model.isRecordingForTesting = false
+
+        failures.send(reason)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertFalse(model.isRecordingForTesting)
+        XCTAssertNil(model.refusalMessage, "a refusal from another caller must not surface here")
+    }
+
+    /// A refusal already scheduled through `receive(on:)` can land after a newer take claimed the
+    /// recorder. The sheet must not take the older attempt's reason as this take's, so a live take
+    /// vetoes the message even while the sheet's own flag is set. (#360 review)
+    func testARefusalForANewerTakeIsIgnoredWhileATakeIsLive() async throws {
+        let failures = CurrentValueSubject<String?, Never>(nil)
+        let model = PunctuationCalibrationModel(
+            startFailurePublisher: failures.eraseToAnyPublisher(),
+            takeIsLive: { true })
+        model.isRecordingForTesting = true
+        XCTAssertTrue(model.isRecordingForTesting,
+                      "the fixture must hold a take, or the guard under test is not reached")
+
+        failures.send(reason)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertTrue(model.isRecordingForTesting,
+                      "a refusal that belongs to an older attempt must not end this take")
+        XCTAssertNil(model.refusalMessage)
+    }
+}
+#endif

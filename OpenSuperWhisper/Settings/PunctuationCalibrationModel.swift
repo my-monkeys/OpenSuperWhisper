@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import OpenSuperWhisperCore
@@ -20,10 +21,50 @@ final class PunctuationCalibrationModel: ObservableObject {
     @Published private(set) var stage: Stage = .reading
     @Published private(set) var index = 0
     @Published private(set) var isRecording = false
+    /// Why a start this sheet asked for was refused, under the sentence until the next attempt.
+    /// Only a refusal that lands while this sheet is the one recording gets here, so a dictation
+    /// started elsewhere cannot put its reason on this sheet.
+    @Published private(set) var refusalMessage: String?
     @Published private(set) var sentences: [PunctuationCalibration.Sentence] = []
     @Published var proposals: [Proposal] = []
 
     private var learned: [PunctuationCalibration.DerivedRule] = []
+    private var cancellables = Set<AnyCancellable>()
+
+    /// `startFailurePublisher` is the recorder's refusal feed, injectable so a test can drive one
+    /// without a microphone. The default skips the value `@Published` replays on subscribe, which
+    /// belongs to a previous take; an injected publisher is subscribed as-is. `takeIsLive` says
+    /// whether a take currently owns the recorder: a refusal already scheduled through
+    /// `receive(on:)` can land after a newer take claimed the recorder, and acting on it would put
+    /// the older attempt's reason on the newer take.
+    init(startFailurePublisher: AnyPublisher<String?, Never> =
+            AudioRecorder.shared.$startFailureMessage.dropFirst().eraseToAnyPublisher(),
+         takeIsLive: @escaping () -> Bool = { AudioRecorder.shared.currentRecordingURL != nil }) {
+        // A start this sheet asked for can be refused before the recorder opens (no microphone,
+        // a switch that fails). `begin` shows the button as recording by the time the refusal
+        // lands, so put it back and keep the reason under the sentence: the same sentence stays
+        // up to try again, and a later stop cannot advance as if a take happened. `isRecording`
+        // keeps another caller's failure off this sheet; `takeIsLive` keeps an already-scheduled
+        // refusal from a previous attempt off a take that has since claimed the recorder. (#360 review)
+        startFailurePublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] message in
+                guard let self = self, let message, self.isRecording, !takeIsLive() else { return }
+                self.isRecording = false
+                self.refusalMessage = message
+            }
+            .store(in: &cancellables)
+    }
+
+    #if DEBUG
+    /// Stages the sheet's recording flag for the refusal sink. Only `begin` sets it in production,
+    /// and `begin` opens the real recorder; staging it lets both guard branches be tested without
+    /// a microphone.
+    var isRecordingForTesting: Bool {
+        get { isRecording }
+        set { isRecording = newValue }
+    }
+    #endif
 
     var currentSentence: PunctuationCalibration.Sentence? {
         sentences.indices.contains(index) ? sentences[index] : nil
@@ -48,6 +89,12 @@ final class PunctuationCalibrationModel: ObservableObject {
     }
 
     private func begin() {
+        // The reason belonged to the attempt just finished; this one starts clean.
+        refusalMessage = nil
+        // `startRecording` reports a refusal on a later main-actor turn (`reportStartFailure`
+        // hops through a Task), so `isRecording` is already true when the sink above resets it.
+        // The flag must be set before this method returns; the order of these two lines is not
+        // what carries that.
         AudioRecorder.shared.startRecording()
         isRecording = true
     }

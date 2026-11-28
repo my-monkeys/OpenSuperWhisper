@@ -24,6 +24,20 @@ final class RecorderTakeStateTests: XCTestCase {
         XCTAssertTrue(AudioRecorder.startWasAbandoned(startedURL: url, currentURL: nil))
     }
 
+    /// The other side of the same question: not "may this start continue?" but "may it clean up?".
+    /// A start can fail while a stop, or a whole new take, lands during the blocking mic switch.
+    /// Its cleanup may then release only state it still owns: releasing a newer take's URL and App
+    /// Nap assertion would silently discard that take's recording. (#360 review)
+    func testAnAbortedStartReleasesOnlyATakeItStillOwns() {
+        let mine = URL(fileURLWithPath: "/tmp/mine.wav")
+        let newer = URL(fileURLWithPath: "/tmp/newer.wav")
+        // Still this start's, or already released by a stop: nothing of another take to clobber.
+        XCTAssertTrue(AudioRecorder.canReleaseAbortedStart(startedURL: mine, currentURL: mine))
+        XCTAssertTrue(AudioRecorder.canReleaseAbortedStart(startedURL: mine, currentURL: nil))
+        // A newer take owns the URL and the assertion: this start must leave both alone.
+        XCTAssertFalse(AudioRecorder.canReleaseAbortedStart(startedURL: mine, currentURL: newer))
+    }
+
     /// Never a real recorder: the hosted runner must not open the microphone. An `NSObject`
     /// stands in, since what is under test is the lock, not the audio.
     func testConcurrentWritesAndReadsKeepReferencesAlive() {

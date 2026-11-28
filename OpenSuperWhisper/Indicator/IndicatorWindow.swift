@@ -58,6 +58,16 @@ class IndicatorViewModel: ObservableObject {
     var uptime: () -> UInt64 = UptimeClock.now
     var stopRecordingOverride: (() -> AudioRecorder.StopOutcome)?
 
+    #if DEBUG
+    /// Stages the live-preview flag so `cancelLivePreview` can be pinned: the take it belongs to
+    /// dies before a stop or cancel, which the unit suite cannot drive without a real model and
+    /// microphone. The controller cancel itself stays a structural boundary.
+    var livePreviewActiveForTesting: Bool {
+        get { liveStreamingActive }
+        set { liveStreamingActive = newValue }
+    }
+    #endif
+
     var delegate: IndicatorViewDelegate?
     private var blinkTimer: Timer?
     private var soundCheck: Timer?
@@ -160,6 +170,9 @@ class IndicatorViewModel: ObservableObject {
         // No input device — surface it instead of optimistically showing "recording" and silently
         // capturing nothing (#157).
         guard recorderStarted ?? recorder.startRecordingInBackground() else {
+            // The reply this take was armed for can never be recorded, so clear it now rather
+            // than leaving the panel listening for a take that never happens. (#360 review)
+            _ = AgentInbox.shared.takeArmedReply()
             showError("No microphone available")
             return
         }
@@ -295,6 +308,14 @@ class IndicatorViewModel: ObservableObject {
         // A second stop on a take that is already transcribing has nothing left to stop; it
         // would find the recorder empty and report the dictation as lost.
         guard state != .decoding else { return }
+        // A stop can also land on a take that never started: a refused start leaves the bubble
+        // showing the reason while the trigger's take is still set, so the user's stop arrives
+        // here. The stop still has to run: `.error` is also where a take that DID start ends when
+        // the recorder fails (the microphone-dropped-out death), and its stop is the only place
+        // media resumes and the ducked volume is restored. Only the generic "nothing was
+        // recorded" message is suppressed below, so the specific reason survives. (#360 review)
+        let wasError: Bool
+        if case .error = state { wasError = true } else { wasError = false }
         takeEnded = true
         // This take owns the field's text, captured at its start. Take it out of the shared
         // context before any exit below — the dropped-take returns included — so nothing keeps
@@ -345,8 +366,14 @@ class IndicatorViewModel: ObservableObject {
             case .noAudio where !heard.isEmpty:
                 Diag.mark("vm.startDecoding - recorder captured nothing, rescuing the live preview")
             case .noAudio:
-                Diag.mark("vm.startDecoding - recording captured nothing, telling the user")
-                showError("Nothing was recorded, so this dictation was lost")
+                if wasError {
+                    // The bubble already carries the specific reason this take refused or died
+                    // with; the generic one would replace it. (#360 review)
+                    Diag.mark("vm.startDecoding - nothing captured, keeping the on-screen reason")
+                } else {
+                    Diag.mark("vm.startDecoding - recording captured nothing, telling the user")
+                    showError("Nothing was recorded, so this dictation was lost")
+                }
                 return
             default:
                 Diag.mark("vm.startDecoding - clip too short, dropped without a notice")
@@ -468,6 +495,17 @@ class IndicatorViewModel: ObservableObject {
             liveStreamingActive = false
             Task { await StreamingTranscriptionController.shared.cancel() }
         }
+    }
+
+    /// The take died on its own, so neither `startDecoding` nor `cancelRecording` will run to end
+    /// the live preview. Left running it holds the microphone tap and the engine, and the next
+    /// take's `start()` returns early on `isRunning` with the dead take's caption still in the
+    /// controller — which that take's stop would then hand to the pipeline as its fallback text.
+    /// Called by `IndicatorWindowManager.reportRecordingFailure`. (#360 review)
+    func cancelLivePreview() {
+        guard liveStreamingActive else { return }
+        liveStreamingActive = false
+        Task { await StreamingTranscriptionController.shared.cancel() }
     }
 
     @MainActor

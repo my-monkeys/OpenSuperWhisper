@@ -5,6 +5,8 @@
 //  Tests for error feedback implementation (GitHub issue #117).
 //
 
+import AVFoundation
+import Combine
 import XCTest
 @testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
@@ -208,6 +210,85 @@ final class ContentViewModelErrorTests: XCTestCase {
         wait(for: [dismissExpectation], timeout: 4.0)
         XCTAssertNil(viewModel.errorMessage,
                      "errorMessage should be nil after the reset timer expires")
+    }
+
+    /// A refused start reaches the main window only through the recorder's failure feed: the
+    /// optimistic `.recording`/`.connecting` was set before the take opened, and nothing else puts
+    /// it back. The window has no bubble to carry the reason, so it must show the message too.
+    /// (#360 review)
+    func testARefusedStartResetsTheMainWindowAndShowsTheReason() async throws {
+        let reason = "Couldn't use the selected microphone. Check that it's connected and try again."
+        for optimistic in [RecordingState.recording, .connecting] {
+            let failures = CurrentValueSubject<String?, Never>(nil)
+            let viewModel = ContentViewModel(startFailures: failures.eraseToAnyPublisher())
+            // Let the recorder's replayed state settle before setting the optimistic one.
+            try await Task.sleep(nanoseconds: 100_000_000)
+            viewModel.state = optimistic
+
+            failures.send(reason)
+            try await Task.sleep(nanoseconds: 100_000_000)
+
+            XCTAssertEqual(viewModel.state, .idle, "\(optimistic) must be undone by the refusal")
+            XCTAssertEqual(viewModel.errorMessage, reason)
+        }
+    }
+
+    /// The other side of the same condition: a refusal already on its way can land after a newer
+    /// take claimed the recorder, and that take's UI is not this window's to reset. Paired with
+    /// the reset above, both sides of `takeIsLive` are pinned. (#360 review)
+    func testARefusalForANewerTakeIsIgnoredWhileATakeIsLive() async throws {
+        let failures = CurrentValueSubject<String?, Never>(nil)
+        let viewModel = ContentViewModel(startFailures: failures.eraseToAnyPublisher(),
+                                         takeIsLive: { true })
+        try await Task.sleep(nanoseconds: 100_000_000)
+        viewModel.state = .recording
+
+        failures.send("Couldn't use the selected microphone. Check that it's connected and try again.")
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(viewModel.state, .recording,
+                       "a refusal that belongs to an older attempt must not reset this take")
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    /// The feed is process-wide: a refusal that belongs to the bubble or the calibration sheet
+    /// must not tear down a main window that is not recording.
+    func testARefusalIsIgnoredWhenTheMainWindowIsNotRecording() async throws {
+        let failures = CurrentValueSubject<String?, Never>(nil)
+        let viewModel = ContentViewModel(startFailures: failures.eraseToAnyPublisher())
+        try await Task.sleep(nanoseconds: 100_000_000)
+        viewModel.state = .idle
+
+        failures.send("Couldn't use the selected microphone. Check that it's connected and try again.")
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(viewModel.state, .idle)
+        XCTAssertNil(viewModel.errorMessage, "a refusal from another caller must not surface here")
+    }
+
+    /// The real refusal path, not an injected feed: the recorder's own `isRecording = false`
+    /// publication and the failure message race through the same main run loop, and the window
+    /// must still show why. The state sink resets `.recording` to `.idle` on that publication,
+    /// so the message has to be published first or the failure sink's guard rejects it (#360).
+    /// `canRecord = false` is refused before the recorder opens, so the microphone stays shut.
+    func testARefusedStartOnTheRealRecorderPathShowsTheReasonInTheMainWindow() async throws {
+        let recorder = AudioRecorder.shared
+        let previousCanRecord = recorder.canRecord
+        recorder.canRecord = false
+        defer { recorder.canRecord = previousCanRecord }
+
+        let viewModel = ContentViewModel()
+        // Let the recorder's replayed state settle before the optimistic one.
+        try await Task.sleep(nanoseconds: 100_000_000)
+        viewModel.state = .recording
+
+        recorder.startRecording()
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(viewModel.errorMessage,
+                       AudioRecorder.startBlocker(canRecord: false, microphoneAccess: .authorized),
+                       "the main window must show why the start was refused")
+        XCTAssertEqual(viewModel.state, .idle, "and it must not stay stuck on recording")
     }
 }
 

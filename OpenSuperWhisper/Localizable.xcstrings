@@ -20241,6 +20241,52 @@
         }
       }
     },
+    "Couldn't use the selected microphone. Check that it's connected and try again.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ausgewählte Mikrofon konnte nicht verwendet werden. Prüfe, ob es verbunden ist, und versuche es erneut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo usar el micrófono seleccionado. Comprueba que esté conectado e inténtalo de nuevo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d'utiliser le micro sélectionné. Vérifiez qu'il est connecté, puis réessayez."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile usare il microfono selezionato. Verifica che sia collegato e riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível usar o microfone selecionado. Verifique se ele está conectado e tente novamente."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể dùng micrô đã chọn. Kiểm tra xem micrô đã kết nối chưa rồi thử lại."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法使用所选麦克风。请检查它是否已连接，然后重试。"
+          }
+        }
+      }
+    },
     "Current model": {
       "localizations": {
         "de": {
