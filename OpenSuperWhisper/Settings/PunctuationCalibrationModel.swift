@@ -31,19 +31,17 @@ final class PunctuationCalibrationModel: ObservableObject {
     private var learned: [PunctuationCalibration.DerivedRule] = []
     private var cancellables = Set<AnyCancellable>()
 
-    /// `startFailures` is the recorder's refusal feed, injectable so a test can drive one without
-    /// a microphone. It is expected to replay its current value on subscribe, like `@Published`:
-    /// that first emission is a previous take's and is skipped.
-    init(startFailures: AnyPublisher<String?, Never> =
-            AudioRecorder.shared.$startFailureMessage.eraseToAnyPublisher()) {
+    /// `startFailurePublisher` is the recorder's refusal feed, injectable so a test can drive one
+    /// without a microphone. The default skips the value `@Published` replays on subscribe, which
+    /// belongs to a previous take; an injected publisher is subscribed as-is.
+    init(startFailurePublisher: AnyPublisher<String?, Never> =
+            AudioRecorder.shared.$startFailureMessage.dropFirst().eraseToAnyPublisher()) {
         // A start this sheet asked for can be refused before the recorder opens (no microphone,
         // a switch that fails). `begin` shows the button as recording by the time the refusal
         // lands, so put it back and keep the reason under the sentence: the same sentence stays
-        // up to try again, and a later stop cannot advance as if a take happened. `dropFirst`
-        // skips a failure from an earlier take, and `isRecording` keeps another caller's failure
-        // off this sheet. (#360 review)
-        startFailures
-            .dropFirst()
+        // up to try again, and a later stop cannot advance as if a take happened. `isRecording`
+        // keeps another caller's failure off this sheet. (#360 review)
+        startFailurePublisher
             .receive(on: RunLoop.main)
             .sink { [weak self] message in
                 guard let self = self, let message, self.isRecording else { return }
