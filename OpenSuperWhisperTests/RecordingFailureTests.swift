@@ -30,6 +30,15 @@ final class RecordingFailureTests: XCTestCase {
         XCTAssertLessThanOrEqual(AudioRecorder.connectionGracePeriod, 10)
     }
 
+    /// A switch that fails would leave the take recording from whatever macOS still uses — silent
+    /// on a closed laptop lid — and a silent clip is deleted as "no speech", so the user saw
+    /// nothing to explain it (#360). The take has to fail instead, and say why.
+    func testAFailedMicrophoneSwitchBlocksTheTake() {
+        XCTAssertNil(AudioRecorder.microphoneSwitchBlocker(switched: true))
+        XCTAssertEqual(AudioRecorder.microphoneSwitchBlocker(switched: false),
+                       String(localized: "Couldn't use the selected microphone. Check that it's connected and try again."))
+    }
+
     /// An error must be able to take the bubble even while it is showing a live recording. Every
     /// other message steps aside for one, which is right for a message about an earlier clip and
     /// wrong here: the live recording is the thing that failed.

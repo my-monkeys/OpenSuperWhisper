@@ -184,6 +184,15 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
 
+    /// Why a take cannot go ahead when the system input would not switch to the chosen
+    /// microphone, nil when it did. Left ignored, the take recorded from whatever macOS still
+    /// used — silent on a closed laptop lid — and a silent clip is deleted as "no speech", so
+    /// the user had nothing to go on (#360).
+    static func microphoneSwitchBlocker(switched: Bool) -> String? {
+        guard !switched else { return nil }
+        return String(localized: "Couldn't use the selected microphone. Check that it's connected and try again.")
+    }
+
     /// Clears the recording state and puts the reason where the user is looking. Not routed
     /// through `flash`: the bubble is waiting on this very recording.
     private func reportStartFailure(_ message: String) {
@@ -236,8 +245,19 @@ class AudioRecorder: NSObject, ObservableObject {
 
         #if os(macOS)
         if let activeMic = MicrophoneService.shared.getActiveMicrophone() {
-            Diag.measure("setAsSystemDefaultInput") {
-                _ = MicrophoneService.shared.setAsSystemDefaultInput(activeMic)
+            // A failed switch would record from whatever macOS still uses instead of the
+            // microphone the user chose, so the take must not start at all. (#360)
+            let switched = Diag.measure("setAsSystemDefaultInput") {
+                MicrophoneService.shared.setAsSystemDefaultInput(activeMic)
+            }
+            if let blocker = Self.microphoneSwitchBlocker(switched: switched) {
+                print("Cannot start recording: \(blocker)")
+                // No stop follows a start that never happened, so the take and the App Nap
+                // assertion are released here or they are held for ever.
+                take.withLockUnchecked { $0.url = nil }
+                endRecordingActivity()
+                reportStartFailure(blocker)
+                return
             }
             print("Set system default input to: \(activeMic.displayName)")
         }
