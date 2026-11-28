@@ -51,6 +51,16 @@ final class PunctuationCalibrationModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    #if DEBUG
+    /// Stages the sheet's recording flag for the refusal sink. Only `begin` sets it in production,
+    /// and `begin` opens the real recorder; staging it lets both guard branches be tested without
+    /// a microphone.
+    var isRecordingForTesting: Bool {
+        get { isRecording }
+        set { isRecording = newValue }
+    }
+    #endif
+
     var currentSentence: PunctuationCalibration.Sentence? {
         sentences.indices.contains(index) ? sentences[index] : nil
     }

@@ -104,6 +104,21 @@ final class RecordingStartAndStopEventsTests: XCTestCase {
         XCTAssertNil(AgentInbox.shared.armedReplyID,
                      "the next dictation must not be taken as the reply to a take that never started")
     }
+
+    /// `cancelLivePreview` runs only when a take dies before a stop or cancel can end its stream.
+    /// The controller call is a structural boundary (a real model and microphone), but the guard
+    /// is not: a staged preview is cleared, and a call with nothing staged leaves it clear.
+    func testCancelLivePreviewClearsAStagedPreview() {
+        let vm = IndicatorViewModel()
+        defer { vm.cleanup() }
+        vm.livePreviewActiveForTesting = true
+
+        vm.cancelLivePreview()
+
+        XCTAssertFalse(vm.livePreviewActiveForTesting, "the dead take's preview flag must be cleared")
+        vm.cancelLivePreview()
+        XCTAssertFalse(vm.livePreviewActiveForTesting, "a second call with nothing staged is a no-op")
+    }
     #endif
 
     func testAStartWithNoMicrophoneIsBlocked() {

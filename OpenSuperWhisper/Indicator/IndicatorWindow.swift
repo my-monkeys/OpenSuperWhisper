@@ -58,6 +58,16 @@ class IndicatorViewModel: ObservableObject {
     var uptime: () -> UInt64 = UptimeClock.now
     var stopRecordingOverride: (() -> AudioRecorder.StopOutcome)?
 
+    #if DEBUG
+    /// Stages the live-preview flag so `cancelLivePreview` can be pinned: the take it belongs to
+    /// dies before a stop or cancel, which the unit suite cannot drive without a real model and
+    /// microphone. The controller cancel itself stays a structural boundary.
+    var livePreviewActiveForTesting: Bool {
+        get { liveStreamingActive }
+        set { liveStreamingActive = newValue }
+    }
+    #endif
+
     var delegate: IndicatorViewDelegate?
     private var blinkTimer: Timer?
     private var soundCheck: Timer?
