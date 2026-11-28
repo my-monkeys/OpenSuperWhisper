@@ -233,6 +233,24 @@ final class ContentViewModelErrorTests: XCTestCase {
         }
     }
 
+    /// The other side of the same condition: a refusal already on its way can land after a newer
+    /// take claimed the recorder, and that take's UI is not this window's to reset. Paired with
+    /// the reset above, both sides of `takeIsLive` are pinned. (#360 review)
+    func testARefusalForANewerTakeIsIgnoredWhileATakeIsLive() async throws {
+        let failures = CurrentValueSubject<String?, Never>(nil)
+        let viewModel = ContentViewModel(startFailures: failures.eraseToAnyPublisher(),
+                                         takeIsLive: { true })
+        try await Task.sleep(nanoseconds: 100_000_000)
+        viewModel.state = .recording
+
+        failures.send("Couldn't use the selected microphone. Check that it's connected and try again.")
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(viewModel.state, .recording,
+                       "a refusal that belongs to an older attempt must not reset this take")
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
     /// The feed is process-wide: a refusal that belongs to the bubble or the calibration sheet
     /// must not tear down a main window that is not recording.
     func testARefusalIsIgnoredWhenTheMainWindowIsNotRecording() async throws {

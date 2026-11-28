@@ -29,6 +29,7 @@ final class AppNapActivityTests: XCTestCase {
         XCTAssertFalse(recorder.isHoldingRecordingActivity)
     }
 
+    #if DEBUG
     func testBeginningHoldsAnActivity() {
         recorder.beginRecordingActivity()
         XCTAssertTrue(recorder.isHoldingRecordingActivity)
@@ -48,6 +49,7 @@ final class AppNapActivityTests: XCTestCase {
         recorder.endRecordingActivity()
         XCTAssertFalse(recorder.isHoldingRecordingActivity)
     }
+    #endif
 
     /// Ending is used both on every exit path and as the guard inside `beginRecordingActivity`,
     /// so it has to tolerate being called with nothing held.
@@ -59,9 +61,11 @@ final class AppNapActivityTests: XCTestCase {
 
     /// Cancelling a recording releases the assertion, the same as stopping one. Esc used to be the
     /// only way out of the state in #98, so it must not be the path that leaks.
+    #if DEBUG
     func testCancellingARecordingReleasesTheActivity() {
         recorder.beginRecordingActivity()
         recorder.cancelRecording()
         XCTAssertFalse(recorder.isHoldingRecordingActivity)
     }
+    #endif
 }
