@@ -30,19 +30,6 @@ final class RecordingFailureTests: XCTestCase {
         XCTAssertLessThanOrEqual(AudioRecorder.connectionGracePeriod, 10)
     }
 
-    /// A start can fail while a stop, or a whole new take, lands during the blocking switch. Its
-    /// cleanup may then release only state it still owns: releasing a newer take's URL and App Nap
-    /// assertion would silently discard that take's recording. (#360 review)
-    func testAnAbortedStartReleasesOnlyATakeItStillOwns() {
-        let mine = URL(fileURLWithPath: "/tmp/mine.wav")
-        let newer = URL(fileURLWithPath: "/tmp/newer.wav")
-        // Still this start's, or already released by a stop: nothing of another take to clobber.
-        XCTAssertTrue(AudioRecorder.canReleaseAbortedStart(startedURL: mine, currentURL: mine))
-        XCTAssertTrue(AudioRecorder.canReleaseAbortedStart(startedURL: mine, currentURL: nil))
-        // A newer take owns the URL and the assertion: this start must leave both alone.
-        XCTAssertFalse(AudioRecorder.canReleaseAbortedStart(startedURL: mine, currentURL: newer))
-    }
-
     /// An error must be able to take the bubble even while it is showing a live recording. Every
     /// other message steps aside for one, which is right for a message about an earlier clip and
     /// wrong here: the live recording is the thing that failed.

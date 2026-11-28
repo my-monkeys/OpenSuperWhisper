@@ -5,6 +5,7 @@
 //  Tests for error feedback implementation (GitHub issue #117).
 //
 
+import Combine
 import XCTest
 @testable import OpenSuperWhisper
 @testable import OpenSuperWhisperCore
@@ -208,6 +209,42 @@ final class ContentViewModelErrorTests: XCTestCase {
         wait(for: [dismissExpectation], timeout: 4.0)
         XCTAssertNil(viewModel.errorMessage,
                      "errorMessage should be nil after the reset timer expires")
+    }
+
+    /// A refused start reaches the main window only through the recorder's failure feed: the
+    /// optimistic `.recording`/`.connecting` was set before the take opened, and nothing else puts
+    /// it back. The window has no bubble to carry the reason, so it must show the message too.
+    /// (#360 review)
+    func testARefusedStartResetsTheMainWindowAndShowsTheReason() async throws {
+        let reason = "Couldn't use the selected microphone. Check that it's connected and try again."
+        for optimistic in [RecordingState.recording, .connecting] {
+            let failures = CurrentValueSubject<String?, Never>(nil)
+            let viewModel = ContentViewModel(startFailures: failures.eraseToAnyPublisher())
+            // Let the recorder's replayed state settle before setting the optimistic one.
+            try await Task.sleep(nanoseconds: 100_000_000)
+            viewModel.state = optimistic
+
+            failures.send(reason)
+            try await Task.sleep(nanoseconds: 100_000_000)
+
+            XCTAssertEqual(viewModel.state, .idle, "\(optimistic) must be undone by the refusal")
+            XCTAssertEqual(viewModel.errorMessage, reason)
+        }
+    }
+
+    /// The feed is process-wide: a refusal that belongs to the bubble or the calibration sheet
+    /// must not tear down a main window that is not recording.
+    func testARefusalIsIgnoredWhenTheMainWindowIsNotRecording() async throws {
+        let failures = CurrentValueSubject<String?, Never>(nil)
+        let viewModel = ContentViewModel(startFailures: failures.eraseToAnyPublisher())
+        try await Task.sleep(nanoseconds: 100_000_000)
+        viewModel.state = .idle
+
+        failures.send("Couldn't use the selected microphone. Check that it's connected and try again.")
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(viewModel.state, .idle)
+        XCTAssertNil(viewModel.errorMessage, "a refusal from another caller must not surface here")
     }
 }
 
