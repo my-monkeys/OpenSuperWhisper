@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import OpenSuperWhisperCore
@@ -24,6 +25,22 @@ final class PunctuationCalibrationModel: ObservableObject {
     @Published var proposals: [Proposal] = []
 
     private var learned: [PunctuationCalibration.DerivedRule] = []
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // A start this sheet asked for can be refused before the recorder opens (no microphone,
+        // a switch that fails). `begin` has already shown the button as recording, so put it back:
+        // the same sentence stays up to try again, and a later stop cannot advance as if a take
+        // happened. `dropFirst` skips a failure from an earlier take. (#360 review)
+        AudioRecorder.shared.$startFailureMessage
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] message in
+                guard let self = self, message != nil, self.isRecording else { return }
+                self.isRecording = false
+            }
+            .store(in: &cancellables)
+    }
 
     var currentSentence: PunctuationCalibration.Sentence? {
         sentences.indices.contains(index) ? sentences[index] : nil

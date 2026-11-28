@@ -76,6 +76,25 @@ class ContentViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        // A refused start never reaches `$isRecording`, so the optimistic `.recording` or
+        // `.connecting` set by `startRecording` has to be undone here, and the reason shown: the
+        // main window has no indicator bubble to carry it. `dropFirst` skips the replayed last
+        // failure, which belongs to a previous take. (#360 review)
+        recorder.$startFailureMessage
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] message in
+                guard let self = self, let message,
+                      self.state == .recording || self.state == .connecting else { return }
+                self.removeEscapeMonitor()
+                self.stopBlinking()
+                self.stopDurationTimer()
+                self.recordingDuration = 0
+                self.state = .idle
+                self.showError(message)
+            }
+            .store(in: &cancellables)
     }
     
     func loadInitialData() {

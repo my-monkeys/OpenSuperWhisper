@@ -12,7 +12,12 @@ class AudioRecorder: NSObject, ObservableObject {
     @Published var currentlyPlayingURL: URL?
     @Published var canRecord = false
     @Published var isConnecting = false
-    
+    /// Why the last start was refused, for callers that never get an indicator bubble: the main
+    /// window's Record button and punctuation calibration. The bubble is told directly by
+    /// `reportStartFailure`; this is the same message for everyone else, and only while no take
+    /// is live.
+    @Published private(set) var startFailureMessage: String?
+
     private var audioPlayer: AVAudioPlayer?
     private var notificationSound: NSSound?
     /// The volume duck waiting for the start chime to finish. Cancelled by a stop that lands
@@ -194,10 +199,16 @@ class AudioRecorder: NSObject, ObservableObject {
     }
 
     /// Clears the recording state and puts the reason where the user is looking. Not routed
-    /// through `flash`: the bubble is waiting on this very recording.
+    /// through `flash`: the bubble is waiting on this very recording. Re-checked when it lands on
+    /// the main thread: a stop or a newer take may have taken the recorder over while this start
+    /// was failing, and that take's bubble, state and field text are not ours to reset. (#360 review)
     private func reportStartFailure(_ message: String) {
-        updateRecordingState(isRecording: false, isConnecting: false)
-        Task { @MainActor in IndicatorWindowManager.shared.reportRecordingFailure(message) }
+        Task { @MainActor in
+            guard currentRecordingURL == nil else { return }
+            updateRecordingState(isRecording: false, isConnecting: false)
+            startFailureMessage = message
+            IndicatorWindowManager.shared.reportRecordingFailure(message)
+        }
     }
 
     /// Starts the recording in a detached task and returns at once; false when there is no input
@@ -252,10 +263,23 @@ class AudioRecorder: NSObject, ObservableObject {
             }
             if let blocker = Self.microphoneSwitchBlocker(switched: switched) {
                 print("Cannot start recording: \(blocker)")
-                // No stop follows a start that never happened, so the take and the App Nap
-                // assertion are released here or they are held for ever.
-                take.withLockUnchecked { $0.url = nil }
-                endRecordingActivity()
+                // A stop or a new take can land while the switch blocks, and only this start's
+                // URL and App Nap assertion are ours to release: a newer take owns its own, and
+                // clearing them here would silently discard its recording. (#360 review)
+                let (released, activity) = take.withLockUnchecked {
+                    state -> (released: Bool, activity: NSObjectProtocol?) in
+                    guard Self.canReleaseAbortedStart(startedURL: fileURL, currentURL: state.url) else {
+                        return (false, nil)
+                    }
+                    state.url = nil
+                    defer { state.activity = nil }
+                    return (true, state.activity)
+                }
+                guard released else {
+                    Diag.mark("recorder.start abandoned: mic switch failed after a newer take claimed the take")
+                    return
+                }
+                activity.map(ProcessInfo.processInfo.endActivity)
                 reportStartFailure(blocker)
                 return
             }
@@ -372,10 +396,19 @@ class AudioRecorder: NSObject, ObservableObject {
             print("Recording started successfully")
         } catch {
             print("Failed to start recording: \(error)")
-            take.withLockUnchecked { $0.url = nil }
-            // No recording to protect, and nothing will call `stopRecording` for a start that
-            // never happened — so release the assertion here or it is held for ever.
-            endRecordingActivity()
+            // As above: a stop or a newer take may have taken the URL while the recorder was
+            // being built, and then only its own release is ours to do.
+            let (released, activity) = take.withLockUnchecked {
+                state -> (released: Bool, activity: NSObjectProtocol?) in
+                guard Self.canReleaseAbortedStart(startedURL: fileURL, currentURL: state.url) else {
+                    return (false, nil)
+                }
+                state.url = nil
+                defer { state.activity = nil }
+                return (true, state.activity)
+            }
+            guard released else { return }
+            activity.map(ProcessInfo.processInfo.endActivity)
             reportStartFailure(String(localized: "Recording could not start"))
         }
     }
@@ -384,6 +417,14 @@ class AudioRecorder: NSObject, ObservableObject {
     /// URL while the recorder was being made, or the next take has replaced it.
     static func startWasAbandoned(startedURL: URL, currentURL: URL?) -> Bool {
         currentURL != startedURL
+    }
+
+    /// Whether a start that failed before its recorder existed may release the shared take state.
+    /// It may while the lock still holds this start's URL or nothing at all; once a newer take has
+    /// replaced the URL, that URL and the App Nap assertion belong to the newer take, and clearing
+    /// them here would silently discard its recording. (#360 review)
+    static func canReleaseAbortedStart(startedURL: URL, currentURL: URL?) -> Bool {
+        currentURL == nil || currentURL == startedURL
     }
 
     /// Cleans up after a start that a stop beat to it. The recorder it just began is an orphan
