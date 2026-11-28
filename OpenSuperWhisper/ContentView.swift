@@ -46,7 +46,11 @@ class ContentViewModel: ObservableObject {
     /// Local keyDown monitor for Esc-to-cancel while a main-window recording is live.
     private var escapeMonitor: Any?
     
-    init() {
+    /// `startFailures` is the recorder's refusal feed, injectable so a test can drive one without
+    /// a microphone. The default skips the value `@Published` replays on subscribe, which belongs
+    /// to a previous take; an injected publisher is subscribed as-is.
+    init(startFailures: AnyPublisher<String?, Never> =
+            AudioRecorder.shared.$startFailureMessage.dropFirst().eraseToAnyPublisher()) {
         recorder.$isConnecting
             .receive(on: RunLoop.main)
             .sink { [weak self] isConnecting in
@@ -79,10 +83,9 @@ class ContentViewModel: ObservableObject {
 
         // A refused start never reaches `$isRecording`, so the optimistic `.recording` or
         // `.connecting` set by `startRecording` has to be undone here, and the reason shown: the
-        // main window has no indicator bubble to carry it. `dropFirst` skips the replayed last
-        // failure, which belongs to a previous take. (#360 review)
-        recorder.$startFailureMessage
-            .dropFirst()
+        // main window has no indicator bubble to carry it. The default feed skips the replayed
+        // last failure, which belongs to a previous take. (#360 review)
+        startFailures
             .receive(on: RunLoop.main)
             .sink { [weak self] message in
                 guard let self = self, let message,

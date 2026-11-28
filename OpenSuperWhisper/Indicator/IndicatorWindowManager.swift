@@ -417,6 +417,11 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         // which can belong to a previous take while a new one is already capturing its own.
         // Before the guard: with the bubble already gone there is still a held text to release.
         RecordingContext.shared.clearFocusedText()
+        // Likewise no stop may follow to hand back the agent reply this take was armed for; left
+        // armed, the next dictation, wherever aimed, would be sent to the panel instead. Before
+        // the guard, so the no-bubble case (an agent-panel take keeps its bubble off screen) is
+        // covered too. (#360 review)
+        _ = AgentInbox.shared.takeArmedReply()
         guard let viewModel else { return }
         // The preview belongs to the dead take: `cleanup()` does not end it, and no stop will
         // follow to do it later. (#360 review)

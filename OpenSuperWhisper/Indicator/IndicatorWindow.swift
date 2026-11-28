@@ -160,6 +160,9 @@ class IndicatorViewModel: ObservableObject {
         // No input device — surface it instead of optimistically showing "recording" and silently
         // capturing nothing (#157).
         guard recorderStarted ?? recorder.startRecordingInBackground() else {
+            // The reply this take was armed for can never be recorded, so clear it now rather
+            // than leaving the panel listening for a take that never happens. (#360 review)
+            _ = AgentInbox.shared.takeArmedReply()
             showError("No microphone available")
             return
         }
@@ -297,9 +300,12 @@ class IndicatorViewModel: ObservableObject {
         guard state != .decoding else { return }
         // A stop can also land on a take that never started: a refused start leaves the bubble
         // showing the reason while the trigger's take is still set, so the user's stop arrives
-        // here. There is nothing to stop, and reporting "nothing was recorded" would replace the
-        // specific reason with a generic one. (#360 review)
-        if case .error = state { return }
+        // here. The stop still has to run: `.error` is also where a take that DID start ends when
+        // the recorder fails (the microphone-dropped-out death), and its stop is the only place
+        // media resumes and the ducked volume is restored. Only the generic "nothing was
+        // recorded" message is suppressed below, so the specific reason survives. (#360 review)
+        let wasError: Bool
+        if case .error = state { wasError = true } else { wasError = false }
         takeEnded = true
         // This take owns the field's text, captured at its start. Take it out of the shared
         // context before any exit below — the dropped-take returns included — so nothing keeps
@@ -350,8 +356,14 @@ class IndicatorViewModel: ObservableObject {
             case .noAudio where !heard.isEmpty:
                 Diag.mark("vm.startDecoding - recorder captured nothing, rescuing the live preview")
             case .noAudio:
-                Diag.mark("vm.startDecoding - recording captured nothing, telling the user")
-                showError("Nothing was recorded, so this dictation was lost")
+                if wasError {
+                    // The bubble already carries the specific reason this take refused or died
+                    // with; the generic one would replace it. (#360 review)
+                    Diag.mark("vm.startDecoding - nothing captured, keeping the on-screen reason")
+                } else {
+                    Diag.mark("vm.startDecoding - recording captured nothing, telling the user")
+                    showError("Nothing was recorded, so this dictation was lost")
+                }
                 return
             default:
                 Diag.mark("vm.startDecoding - clip too short, dropped without a notice")
