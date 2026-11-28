@@ -295,6 +295,11 @@ class IndicatorViewModel: ObservableObject {
         // A second stop on a take that is already transcribing has nothing left to stop; it
         // would find the recorder empty and report the dictation as lost.
         guard state != .decoding else { return }
+        // A stop can also land on a take that never started: a refused start leaves the bubble
+        // showing the reason while the trigger's take is still set, so the user's stop arrives
+        // here. There is nothing to stop, and reporting "nothing was recorded" would replace the
+        // specific reason with a generic one. (#360 review)
+        if case .error = state { return }
         takeEnded = true
         // This take owns the field's text, captured at its start. Take it out of the shared
         // context before any exit below — the dropped-take returns included — so nothing keeps
@@ -468,6 +473,17 @@ class IndicatorViewModel: ObservableObject {
             liveStreamingActive = false
             Task { await StreamingTranscriptionController.shared.cancel() }
         }
+    }
+
+    /// The take died on its own, so neither `startDecoding` nor `cancelRecording` will run to end
+    /// the live preview. Left running it holds the microphone tap and the engine, and the next
+    /// take's `start()` returns early on `isRunning` with the dead take's caption still in the
+    /// controller — which that take's stop would then hand to the pipeline as its fallback text.
+    /// Called by `IndicatorWindowManager.reportRecordingFailure`. (#360 review)
+    func cancelLivePreview() {
+        guard liveStreamingActive else { return }
+        liveStreamingActive = false
+        Task { await StreamingTranscriptionController.shared.cancel() }
     }
 
     @MainActor

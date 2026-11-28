@@ -418,6 +418,9 @@ class IndicatorWindowManager: IndicatorViewDelegate {
         // Before the guard: with the bubble already gone there is still a held text to release.
         RecordingContext.shared.clearFocusedText()
         guard let viewModel else { return }
+        // The preview belongs to the dead take: `cleanup()` does not end it, and no stop will
+        // follow to do it later. (#360 review)
+        viewModel.cancelLivePreview()
         viewModel.cleanup()
         viewModel.showError(message)
     }
