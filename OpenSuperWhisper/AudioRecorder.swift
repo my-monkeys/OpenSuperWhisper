@@ -149,10 +149,12 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
+    #if DEBUG
     /// Tells the system this app is doing work the user asked for, so App Nap leaves it alone.
     /// See `take.activity`. Ending any assertion already held keeps them from stacking: a
     /// start that never saw a matching stop would otherwise leak one and hold App Nap off for good.
-    /// Internal rather than private so a test can check the pair stays balanced.
+    /// Test seam: AppNapActivityTests drives begin/end directly; production claims through
+    /// `claimTake`, which writes the URL in the same critical section.
     func beginRecordingActivity() {
         let activity = ProcessInfo.processInfo.beginActivity(
             options: .userInitiatedAllowingIdleSystemSleep,
@@ -163,6 +165,7 @@ class AudioRecorder: NSObject, ObservableObject {
         }
         previous.map(ProcessInfo.processInfo.endActivity)
     }
+    #endif
 
     /// Claims a start's take — its file URL and its App Nap assertion — in one critical section.
     /// Claimed separately, the pair could be observed half-claimed: a failed older start releasing
@@ -185,7 +188,8 @@ class AudioRecorder: NSObject, ObservableObject {
     }
 
     /// Releases the assertion. Safe to call when none is held, which is what makes it usable both
-    /// on every exit path and as the guard against stacking in `beginRecordingActivity`/`claimTake`.
+    /// on every exit path and as the guard against stacking in `claimTake` (and the DEBUG
+    /// `beginRecordingActivity` seam).
     func endRecordingActivity() {
         let activity = take.withLockUnchecked { state -> NSObjectProtocol? in
             defer { state.activity = nil }
@@ -240,10 +244,13 @@ class AudioRecorder: NSObject, ObservableObject {
         Task { @MainActor in
             guard currentRecordingURL == nil else { return }
             // Assigned here rather than through `updateRecordingState`, which hops through the
-            // main queue again: the ownership check above must cover the write it protects.
+            // main queue again: the ownership check above covers all three writes. The message
+            // goes first: each property reaches the main window through `receive(on: RunLoop.main)`
+            // in emission order, and a state write delivered first would reset the optimistic
+            // `.recording` to `.idle` before the failure sink's guard runs, dropping the reason.
+            startFailureMessage = message
             isRecording = false
             isConnecting = false
-            startFailureMessage = message
             IndicatorWindowManager.shared.reportRecordingFailure(message)
         }
     }
