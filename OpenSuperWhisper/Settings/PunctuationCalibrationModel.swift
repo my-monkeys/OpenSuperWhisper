@@ -21,23 +21,34 @@ final class PunctuationCalibrationModel: ObservableObject {
     @Published private(set) var stage: Stage = .reading
     @Published private(set) var index = 0
     @Published private(set) var isRecording = false
+    /// Why a start this sheet asked for was refused, under the sentence until the next attempt.
+    /// Only a refusal that lands while this sheet is the one recording gets here, so a dictation
+    /// started elsewhere cannot put its reason on this sheet.
+    @Published private(set) var refusalMessage: String?
     @Published private(set) var sentences: [PunctuationCalibration.Sentence] = []
     @Published var proposals: [Proposal] = []
 
     private var learned: [PunctuationCalibration.DerivedRule] = []
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    /// `startFailures` is the recorder's refusal feed, injectable so a test can drive one without
+    /// a microphone. It is expected to replay its current value on subscribe, like `@Published`:
+    /// that first emission is a previous take's and is skipped.
+    init(startFailures: AnyPublisher<String?, Never> =
+            AudioRecorder.shared.$startFailureMessage.eraseToAnyPublisher()) {
         // A start this sheet asked for can be refused before the recorder opens (no microphone,
-        // a switch that fails). `begin` has already shown the button as recording, so put it back:
-        // the same sentence stays up to try again, and a later stop cannot advance as if a take
-        // happened. `dropFirst` skips a failure from an earlier take. (#360 review)
-        AudioRecorder.shared.$startFailureMessage
+        // a switch that fails). `begin` shows the button as recording by the time the refusal
+        // lands, so put it back and keep the reason under the sentence: the same sentence stays
+        // up to try again, and a later stop cannot advance as if a take happened. `dropFirst`
+        // skips a failure from an earlier take, and `isRecording` keeps another caller's failure
+        // off this sheet. (#360 review)
+        startFailures
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] message in
-                guard let self = self, message != nil, self.isRecording else { return }
+                guard let self = self, let message, self.isRecording else { return }
                 self.isRecording = false
+                self.refusalMessage = message
             }
             .store(in: &cancellables)
     }
@@ -65,6 +76,12 @@ final class PunctuationCalibrationModel: ObservableObject {
     }
 
     private func begin() {
+        // The reason belonged to the attempt just finished; this one starts clean.
+        refusalMessage = nil
+        // `startRecording` reports a refusal on a later main-actor turn (`reportStartFailure`
+        // hops through a Task), so `isRecording` is already true when the sink above resets it.
+        // The flag must be set before this method returns; the order of these two lines is not
+        // what carries that.
         AudioRecorder.shared.startRecording()
         isRecording = true
     }

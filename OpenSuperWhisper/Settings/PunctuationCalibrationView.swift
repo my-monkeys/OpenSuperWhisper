@@ -92,6 +92,17 @@ struct PunctuationCalibrationView: View {
                 .scaledFont(size: 12)
                 .foregroundColor(STheme.hint)
 
+            // A refused start used to reset the button with no reason; the message is already
+            // localized where it is made, so it renders verbatim here.
+            if let refusal = model.refusalMessage {
+                Text(verbatim: refusal)
+                    .scaledFont(size: 12)
+                    .foregroundColor(STheme.warn)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 44)
+            }
+
             Button(action: model.toggleRecording) {
                 HStack(spacing: 8) {
                     Circle()
